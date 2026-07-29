@@ -1,0 +1,514 @@
+import asyncio
+import gc
+import hashlib
+import json
+from pathlib import Path
+from typing import Any, TypedDict, cast
+
+import numpy as np
+from fastapi import HTTPException, status
+
+from app.metrics import observe
+from app.model_config import config_section, config_value, model_config
+from app.model_package import model_hash, validate_model_hash
+from app.observability import logger, now, wall_time
+from app.portrait_response import exception_log_summary
+from app.runtime_sessions import create_session, input_dtype, io_meta, primary_execution_provider
+from app.runtime_state import MODEL_LOAD_LOCKS, MODEL_LOAD_RETRY_AFTER, MODEL_REGISTRY, REGISTRY_LOCK, gpu_device_ids
+from app.schemas import ModelBundle
+from app.settings import (
+    DYNAMIC_BATCH_ASYNC_MAX_WAIT_MS,
+    DYNAMIC_BATCH_MAX_QUEUE_SIZE,
+    DYNAMIC_BATCH_MAX_SIZE,
+    DYNAMIC_BATCH_MAX_WAIT_MS,
+    DYNAMIC_BATCHING_ENABLED,
+    MAX_LOADED_MODELS,
+    MODEL_CONCURRENCY_LIMIT,
+    MODEL_DRAIN_TIMEOUT_SECONDS,
+    MODEL_LOAD_RETRY_COOLDOWN_SECONDS,
+    MODEL_QUEUE_TIMEOUT_SECONDS,
+)
+
+_DRAIN_TASKS: set[asyncio.Task[None]] = set()
+
+
+class DynamicBatchConfig(TypedDict):
+    dynamic_batching_enabled: bool
+    dynamic_batch_max_size: int
+    dynamic_batch_max_wait_ms: float
+    dynamic_batch_async_max_wait_ms: float
+    dynamic_batch_max_queue_size: int
+    contract_version: str
+
+
+def bundle_providers(bundle: ModelBundle) -> list[str]:
+    get_providers = getattr(bundle["session"], "get_providers", None)
+    if callable(get_providers):
+        providers = get_providers()
+        if isinstance(providers, list):
+            return [str(p) for p in providers]
+    provider = bundle.get("execution_provider")
+    return [provider] if isinstance(provider, str) and provider else []
+
+
+def bundle_info(cache_key_value: str, bundle: ModelBundle) -> dict[str, Any]:
+    session = bundle["session"]
+    providers = bundle_providers(bundle)
+    return {
+        "model": cache_key_value,
+        "artifact_resolved": bool(bundle.get("path")),
+        "model_hash": bundle["model_hash"],
+        "model_fingerprint": bundle.get("model_fingerprint", bundle["model_hash"]),
+        "file_size": bundle["file_size"],
+        "loaded_at": bundle["loaded_at"],
+        "last_used_at": bundle["last_used_at"],
+        "load_count": bundle["load_count"],
+        "inference_count": bundle["inference_count"],
+        "max_concurrency": bundle.get("max_concurrency", 1),
+        "queue_timeout_seconds": bundle.get("queue_timeout_seconds", 0),
+        "contract_version": bundle.get("contract_version", "1"),
+        "dynamic_batching": {
+            "enabled": bool(bundle.get("dynamic_batching_enabled", False)),
+            "max_batch_size": bundle.get("dynamic_batch_max_size", 1),
+            "max_wait_ms": bundle.get("dynamic_batch_max_wait_ms", 0),
+            "async_max_wait_ms": bundle.get("dynamic_batch_async_max_wait_ms", 0),
+            "max_queue_size": bundle.get("dynamic_batch_max_queue_size", 0),
+        },
+        "gpu_device_id": bundle.get("gpu_device_id"),
+        "execution_provider": bundle.get("execution_provider") or primary_execution_provider(providers),
+        "providers": providers,
+        "prewarm": bundle.get("prewarm"),
+        **io_meta(session),
+    }
+
+
+def model_path_fingerprint(path: Path) -> str:
+    return hashlib.sha256(str(path).encode("utf-8")).hexdigest()[:16]
+
+
+def model_runtime_fingerprint(cache_key_value: str, digest: str) -> str:
+    config = model_config(cache_key_value)
+    material = {
+        "artifact_sha256": digest,
+        "runtime": config.get("runtime"),
+        "precision": config.get("precision"),
+        "version": config.get("version"),
+        "input": config.get("input"),
+        "output": config.get("output"),
+        "batching": config.get("batching"),
+    }
+    canonical = json.dumps(material, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def model_runtime_limits(cache_key_value: str) -> tuple[int, float]:
+    config = model_config(cache_key_value)
+    raw_concurrency = config_value(config, "runtime", "max_concurrency", config.get("max_concurrency", MODEL_CONCURRENCY_LIMIT))
+    raw_timeout = config_value(config, "runtime", "queue_timeout_seconds", config.get("queue_timeout_seconds", MODEL_QUEUE_TIMEOUT_SECONDS))
+    try:
+        max_concurrency = max(1, int(raw_concurrency))
+    except (TypeError, ValueError):
+        max_concurrency = max(1, MODEL_CONCURRENCY_LIMIT)
+    try:
+        queue_timeout = max(0.0, float(raw_timeout))
+    except (TypeError, ValueError):
+        queue_timeout = max(0.0, MODEL_QUEUE_TIMEOUT_SECONDS)
+    return max_concurrency, queue_timeout
+
+
+def model_dynamic_batch_config(cache_key_value: str) -> DynamicBatchConfig:
+    config = model_config(cache_key_value)
+    batching = config_section(config, "batching")
+    raw_enabled = batching.get("enabled", DYNAMIC_BATCHING_ENABLED)
+    if isinstance(raw_enabled, str):
+        enabled = raw_enabled.strip().lower() in {"1", "true", "yes", "on"}
+    else:
+        enabled = bool(raw_enabled)
+
+    def positive_int(key: str, default: int) -> int:
+        try:
+            return max(1, int(batching.get(key, default)))
+        except (TypeError, ValueError):
+            return max(1, default)
+
+    def nonnegative_float(key: str, default: float) -> float:
+        try:
+            return max(0.0, float(batching.get(key, default)))
+        except (TypeError, ValueError):
+            return max(0.0, default)
+
+    max_wait_ms = nonnegative_float("max_wait_ms", DYNAMIC_BATCH_MAX_WAIT_MS)
+    return {
+        "dynamic_batching_enabled": enabled,
+        "dynamic_batch_max_size": positive_int("max_batch_size", DYNAMIC_BATCH_MAX_SIZE),
+        "dynamic_batch_max_wait_ms": max_wait_ms,
+        "dynamic_batch_async_max_wait_ms": max(
+            max_wait_ms,
+            nonnegative_float("async_max_wait_ms", DYNAMIC_BATCH_ASYNC_MAX_WAIT_MS),
+        ),
+        "dynamic_batch_max_queue_size": positive_int(
+            "max_queue_size", DYNAMIC_BATCH_MAX_QUEUE_SIZE
+        ),
+        "contract_version": str(
+            batching.get("contract_version")
+            or config.get("contract_version")
+            or config.get("version")
+            or "1"
+        ),
+    }
+
+
+def model_gpu_device_id(cache_key_value: str) -> int:
+    config = model_config(cache_key_value)
+    raw_device = config_value(config, "runtime", "device_id", config.get("device_id"))
+    devices = gpu_device_ids()
+    try:
+        device_id = int(raw_device)
+    except (TypeError, ValueError):
+        digest = hashlib.sha256(cache_key_value.encode("utf-8")).digest()
+        return devices[int.from_bytes(digest[:4], "big") % len(devices)]
+    return device_id if device_id in devices else devices[0]
+
+
+def release_model_bundle(bundle: ModelBundle | None) -> None:
+    if not bundle:
+        return
+    # 在强制 GC 前先移除 bundle 字典自身对 ONNX session 的强引用。仅删除局部变量名
+    # 会让 session 仍可通过字典被引用，导致其 GPU 显存要等到 bundle 自身被回收时才释放。
+    session = cast(dict[str, Any], bundle).pop("session", None)
+    try:
+        del session
+    finally:
+        gc.collect(0)
+
+
+async def get_model_load_lock(cache_key_value: str) -> asyncio.Lock:
+    async with REGISTRY_LOCK:
+        lock = MODEL_LOAD_LOCKS.get(cache_key_value)
+        if lock is None:
+            lock = asyncio.Lock()
+            MODEL_LOAD_LOCKS[cache_key_value] = lock
+        return lock
+async def evict_lru_if_needed(except_key: str | None = None) -> None:
+    if MAX_LOADED_MODELS <= 0:
+        return
+
+    async with REGISTRY_LOCK:
+        while len(MODEL_REGISTRY) > MAX_LOADED_MODELS:
+            # 淘汰真正最久未使用的模型，但绝对不能淘汰任何有正在进行的推理（in_use > 0）的模型
+            # ——在运行中途释放会话是未定义行为。如果每个可淘汰的模型都在忙碌，
+            # 则停止淘汰并允许注册表短暂超出容量限制，而不是去损坏一个活跃的会话。
+            evictable = [
+                key
+                for key, bundle in MODEL_REGISTRY.items()
+                if key != except_key and not bundle.get("in_use", 0)
+            ]
+            if not evictable:
+                return
+            evict_key = min(evictable, key=lambda key: MODEL_REGISTRY[key].get("last_used_at", 0.0))
+            removed = MODEL_REGISTRY.pop(evict_key, None)
+            MODEL_LOAD_LOCKS.pop(evict_key, None)
+            release_model_bundle(removed)
+            observe("model_unloads_total")
+            logger.info("evicted model from cache: %s", evict_key)
+
+
+async def unload_model_by_key(cache_key_value: str) -> bool:
+    async with REGISTRY_LOCK:
+        removed = MODEL_REGISTRY.pop(cache_key_value, None)
+        MODEL_LOAD_LOCKS.pop(cache_key_value, None)
+    if removed is not None:
+        async def release_when_drained() -> None:
+            while int(removed.get("in_use", 0) or 0) > 0:
+                await asyncio.sleep(0.01)
+            release_model_bundle(removed)
+
+        try:
+            await asyncio.wait_for(
+                release_when_drained(),
+                timeout=MODEL_DRAIN_TIMEOUT_SECONDS if MODEL_DRAIN_TIMEOUT_SECONDS > 0 else None,
+            )
+        except TimeoutError:
+            task = asyncio.create_task(release_when_drained(), name="portrait-model-drain")
+            _DRAIN_TASKS.add(task)
+            task.add_done_callback(_DRAIN_TASKS.discard)
+        observe("model_unloads_total")
+        logger.info("unloaded model: %s", cache_key_value)
+        return True
+    return False
+
+
+async def touch_model(cache_key_value: str, bundle: ModelBundle) -> None:
+    bundle["last_used_at"] = wall_time()
+    async with REGISTRY_LOCK:
+        if cache_key_value in MODEL_REGISTRY:
+            MODEL_REGISTRY.move_to_end(cache_key_value)
+
+
+def model_warmup_array(cache_key_value: str, bundle: ModelBundle) -> np.ndarray[Any, Any]:
+    input_meta = bundle["session"].get_inputs()[0]
+    raw_shape = list(input_meta.shape)
+    shape = [value if isinstance(value, int) and value > 0 else 1 for value in raw_shape]
+    config = model_config(cache_key_value)
+    input_config = config_section(config, "input")
+    raw_size = input_config.get("size") or config.get("input_size")
+    if isinstance(raw_size, list) and len(raw_size) == 2 and len(shape) >= 4:
+        height, width = raw_size
+        if isinstance(height, int) and height > 0 and isinstance(width, int) and width > 0:
+            shape[-2:] = [height, width]
+    shape[0] = 1
+    return np.zeros(shape, dtype=input_dtype(str(input_meta.type)))
+
+
+async def prewarm_model_bundle(cache_key_value: str, bundle: ModelBundle) -> dict[str, Any]:
+    from app.runtime_execution import _run_model_bundle_direct
+
+    input_array = model_warmup_array(cache_key_value, bundle)
+    outputs, queue_seconds, inference_seconds = await _run_model_bundle_direct(bundle, input_array)
+    if not outputs:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="model prewarm returned no outputs",
+        )
+    result = {
+        "status": "passed",
+        "completed_at": wall_time(),
+        "input_shape": list(input_array.shape),
+        "output_shapes": [list(output.shape) for output in outputs],
+        "queue_seconds": queue_seconds,
+        "inference_seconds": inference_seconds,
+    }
+    bundle["prewarm"] = result
+    observe("model_prewarms_total")
+    return result
+
+
+def model_load_cooldown_active(cache_key_value: str) -> bool:
+    return MODEL_LOAD_RETRY_AFTER.get(cache_key_value, 0.0) > wall_time()
+
+
+def mark_model_load_failed(cache_key_value: str) -> None:
+    # 记录“重试时间戳”，冷却窗口内的后续请求直接快速失败；窗口过后自动重试实现自愈。
+    # 冷却时间 <=0 表示关闭冷却（不写标记，保持每次请求都重试的旧行为）。
+    if MODEL_LOAD_RETRY_COOLDOWN_SECONDS > 0:
+        MODEL_LOAD_RETRY_AFTER[cache_key_value] = wall_time() + MODEL_LOAD_RETRY_COOLDOWN_SECONDS
+
+
+def raise_model_load_cooldown(cache_key_value: str) -> None:
+    observe("model_load_cooldown_rejections_total")
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="model load is cooling down after a recent failure",
+    )
+
+
+async def create_candidate_model_bundle(
+    cache_key_value: str,
+    model_path: Path,
+) -> tuple[ModelBundle, float]:
+    start = now()
+    logger.info("loading candidate model: %s path_hash=%s", cache_key_value, model_path_fingerprint(model_path))
+    try:
+        digest = await asyncio.to_thread(model_hash, model_path)
+        validate_model_hash(cache_key_value, digest)
+        gpu_device_id = model_gpu_device_id(cache_key_value)
+        session = await asyncio.to_thread(create_session, model_path, cache_key_value, gpu_device_id)
+        execution_provider = primary_execution_provider(session.get_providers())
+    except HTTPException:
+        observe("model_load_errors_total")
+        mark_model_load_failed(cache_key_value)
+        raise
+    except Exception as exc:
+        observe("model_load_errors_total")
+        mark_model_load_failed(cache_key_value)
+        logger.warning("candidate model load failed: %s error=%s", cache_key_value, exception_log_summary(exc))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="candidate model runtime load failed",
+        ) from exc
+
+    load_seconds = now() - start
+    stat = model_path.stat()
+    max_concurrency, queue_timeout = model_runtime_limits(cache_key_value)
+    dynamic_batch_config = model_dynamic_batch_config(cache_key_value)
+    bundle: ModelBundle = {
+        "key": cache_key_value,
+        "session": session,
+        "lock": asyncio.Lock(),
+        "semaphore": asyncio.Semaphore(max_concurrency),
+        "gpu_device_id": gpu_device_id,
+        "path": str(model_path),
+        "model_hash": digest,
+        "model_fingerprint": model_runtime_fingerprint(cache_key_value, digest),
+        "file_size": stat.st_size,
+        "loaded_at": wall_time(),
+        "last_used_at": wall_time(),
+        "load_count": 1,
+        "inference_count": 0,
+        "in_use": 0,
+        "max_concurrency": max_concurrency,
+        "queue_timeout_seconds": queue_timeout,
+        "execution_provider": execution_provider,
+        "dynamic_batching_enabled": dynamic_batch_config["dynamic_batching_enabled"],
+        "dynamic_batch_max_size": dynamic_batch_config["dynamic_batch_max_size"],
+        "dynamic_batch_max_wait_ms": dynamic_batch_config["dynamic_batch_max_wait_ms"],
+        "dynamic_batch_async_max_wait_ms": dynamic_batch_config["dynamic_batch_async_max_wait_ms"],
+        "dynamic_batch_max_queue_size": dynamic_batch_config["dynamic_batch_max_queue_size"],
+        "contract_version": dynamic_batch_config["contract_version"],
+    }
+    return bundle, load_seconds
+
+
+async def replace_model_bundle(
+    cache_key_value: str,
+    model_path: Path,
+) -> tuple[ModelBundle, ModelBundle | None, float, dict[str, Any]]:
+    load_lock = await get_model_load_lock(cache_key_value)
+    async with load_lock:
+        candidate, load_seconds = await create_candidate_model_bundle(cache_key_value, model_path)
+        try:
+            prewarm = await prewarm_model_bundle(cache_key_value, candidate)
+        except Exception:
+            release_model_bundle(candidate)
+            raise
+        async with REGISTRY_LOCK:
+            previous = MODEL_REGISTRY.get(cache_key_value)
+            MODEL_REGISTRY[cache_key_value] = candidate
+            MODEL_REGISTRY.move_to_end(cache_key_value)
+        MODEL_LOAD_RETRY_AFTER.pop(cache_key_value, None)
+        observe("model_loads_total")
+        observe("model_load_seconds_sum", load_seconds)
+
+    await evict_lru_if_needed(except_key=cache_key_value)
+    return candidate, previous, load_seconds, prewarm
+
+
+def retire_model_bundle(bundle: ModelBundle | None) -> None:
+    if bundle is None:
+        return
+
+    async def release_when_drained() -> None:
+        while int(bundle.get("in_use", 0) or 0) > 0:
+            await asyncio.sleep(0.01)
+        release_model_bundle(bundle)
+
+    task = asyncio.create_task(release_when_drained(), name="portrait-model-hot-swap-drain")
+    _DRAIN_TASKS.add(task)
+    task.add_done_callback(_DRAIN_TASKS.discard)
+
+
+async def get_or_load_model(
+    cache_key_value: str,
+    model_path: Path,
+) -> tuple[ModelBundle, bool, float]:
+    cached_bundle = MODEL_REGISTRY.get(cache_key_value)
+    if cached_bundle is not None:
+        observe("cache_hits_total")
+        await touch_model(cache_key_value, cached_bundle)
+        return cached_bundle, False, 0
+
+    observe("cache_misses_total")
+    # 快速路径：上次加载失败且仍在冷却窗口内，直接 503，不去排队抢加载锁、也不重做昂贵的加载。
+    if model_load_cooldown_active(cache_key_value):
+        raise_model_load_cooldown(cache_key_value)
+    load_lock = await get_model_load_lock(cache_key_value)
+    async with load_lock:
+        cached_bundle = MODEL_REGISTRY.get(cache_key_value)
+        if cached_bundle is not None:
+            observe("cache_hits_total")
+            await touch_model(cache_key_value, cached_bundle)
+            return cached_bundle, False, 0
+        # 持锁后再次确认：等锁期间可能已有并发请求把该模型置于冷却。
+        if model_load_cooldown_active(cache_key_value):
+            raise_model_load_cooldown(cache_key_value)
+
+        start = now()
+        logger.info("loading model: %s path_hash=%s", cache_key_value, model_path_fingerprint(model_path))
+        try:
+            digest = await asyncio.to_thread(model_hash, model_path)
+            validate_model_hash(cache_key_value, digest)
+            gpu_device_id = model_gpu_device_id(cache_key_value)
+            session = await asyncio.to_thread(create_session, model_path, cache_key_value, gpu_device_id)
+            execution_provider = primary_execution_provider(session.get_providers())
+        except HTTPException:
+            observe("model_load_errors_total")
+            mark_model_load_failed(cache_key_value)
+            raise
+        except Exception as exc:
+            observe("model_load_errors_total")
+            mark_model_load_failed(cache_key_value)
+            logger.warning("加载模型失败: %s error=%s", cache_key_value, exception_log_summary(exc))
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="加载模型运行时失败",
+            ) from exc
+
+        # 加载成功，清除任何残留的冷却标记，使该模型恢复正常服务。
+        MODEL_LOAD_RETRY_AFTER.pop(cache_key_value, None)
+        load_seconds = now() - start
+        stat = model_path.stat()
+        max_concurrency, queue_timeout = model_runtime_limits(cache_key_value)
+        dynamic_batch_config = model_dynamic_batch_config(cache_key_value)
+        bundle: ModelBundle = {
+            "key": cache_key_value,
+            "session": session,
+            "lock": asyncio.Lock(),
+            "semaphore": asyncio.Semaphore(max_concurrency),
+            "gpu_device_id": gpu_device_id,
+            "path": str(model_path),
+            "model_hash": digest,
+            "model_fingerprint": model_runtime_fingerprint(cache_key_value, digest),
+            "file_size": stat.st_size,
+            "loaded_at": wall_time(),
+            "last_used_at": wall_time(),
+            "load_count": 1,
+            "inference_count": 0,
+            "in_use": 0,
+            "max_concurrency": max_concurrency,
+            "queue_timeout_seconds": queue_timeout,
+            "execution_provider": execution_provider,
+            "dynamic_batching_enabled": dynamic_batch_config["dynamic_batching_enabled"],
+            "dynamic_batch_max_size": dynamic_batch_config["dynamic_batch_max_size"],
+            "dynamic_batch_max_wait_ms": dynamic_batch_config["dynamic_batch_max_wait_ms"],
+            "dynamic_batch_async_max_wait_ms": dynamic_batch_config["dynamic_batch_async_max_wait_ms"],
+            "dynamic_batch_max_queue_size": dynamic_batch_config["dynamic_batch_max_queue_size"],
+            "contract_version": dynamic_batch_config["contract_version"],
+        }
+        MODEL_REGISTRY[cache_key_value] = bundle
+        await touch_model(cache_key_value, bundle)
+        observe("model_loads_total")
+        observe("model_load_seconds_sum", load_seconds)
+        await evict_lru_if_needed(except_key=cache_key_value)
+        logger.info(
+            "model loaded: %s execution_provider=%s device_id=%s load_seconds=%.6f hash=%s",
+            cache_key_value,
+            execution_provider,
+            gpu_device_id,
+            load_seconds,
+            digest,
+        )
+        return bundle, True, load_seconds
+
+
+__all__ = [
+    "bundle_info",
+    "bundle_providers",
+    "create_candidate_model_bundle",
+    "evict_lru_if_needed",
+    "get_model_load_lock",
+    "get_or_load_model",
+    "mark_model_load_failed",
+    "model_dynamic_batch_config",
+    "model_gpu_device_id",
+    "model_load_cooldown_active",
+    "model_path_fingerprint",
+    "model_runtime_fingerprint",
+    "model_runtime_limits",
+    "model_warmup_array",
+    "prewarm_model_bundle",
+    "release_model_bundle",
+    "replace_model_bundle",
+    "retire_model_bundle",
+    "touch_model",
+    "unload_model_by_key",
+]

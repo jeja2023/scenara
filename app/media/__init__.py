@@ -1,0 +1,81 @@
+"""媒体解码、采样、质量和视频流辅助函数（重新导出外观门面）。"""
+
+from app.media.frame_sampler import (
+    bounded_max_frames,
+    hybrid_sample_indexes,
+    normalize_frame_interval,
+    sample_indexes,
+    take_every,
+    uniform_sample_indexes,
+)
+from app.media.image_decode import (
+    IMAGE_EXTENSION_FORMATS,
+    SUPPORTED_IMAGE_EXTENSIONS,
+    SUPPORTED_IMAGE_FORMATS,
+    decode_image_bytes,
+    decode_upload_image,
+    decode_upload_images,
+    duplicate_distance,
+    expected_format_from_filename,
+    mark_near_duplicates,
+    read_limited_upload,
+    sniff_image_format,
+    validate_image_content,
+    validate_image_filename,
+)
+from app.media.media_schema import (
+    DecodedImage,
+    MediaFrame,
+)
+from app.media.quality import (
+    assess_image_quality,
+    clamp01,
+    round_quality,
+)
+from app.media.stream_decode import (
+    SUPPORTED_STREAM_SCHEMES,
+    host_matches_allowlist,
+    is_blocked_stream_address,
+    mask_stream_url,
+    reject_blocked_stream_address,
+    reject_private_ip_literal,
+    reject_private_resolved_addresses,
+    resolve_stream_host_addresses,
+    validate_media_stream_url,
+)
+
+__all__ = [
+    "IMAGE_EXTENSION_FORMATS",
+    "SUPPORTED_IMAGE_EXTENSIONS",
+    "SUPPORTED_IMAGE_FORMATS",
+    "SUPPORTED_STREAM_SCHEMES",
+    "DecodedImage",
+    "MediaFrame",
+    "assess_image_quality",
+    "bounded_max_frames",
+    "clamp01",
+    "decode_image_bytes",
+    "decode_upload_image",
+    "decode_upload_images",
+    "duplicate_distance",
+    "expected_format_from_filename",
+    "host_matches_allowlist",
+    "hybrid_sample_indexes",
+    "is_blocked_stream_address",
+    "mark_near_duplicates",
+    "mask_stream_url",
+    "normalize_frame_interval",
+    "read_limited_upload",
+    "reject_blocked_stream_address",
+    "reject_private_ip_literal",
+    "reject_private_resolved_addresses",
+    "resolve_stream_host_addresses",
+    "round_quality",
+    "sample_indexes",
+    "sniff_image_format",
+    "take_every",
+    "uniform_sample_indexes",
+    "validate_image_content",
+    "validate_image_filename",
+    "validate_media_stream_url",
+]

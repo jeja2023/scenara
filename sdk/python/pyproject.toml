@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scenara-sdk"
+version = "0.1.0.dev0"
+description = "Official Python SDK for the Scenara v1 API"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Scenara" }]
+dependencies = ["httpx>=0.28.1,<1.0.0"]
+classifiers = ["Programming Language :: Python :: 3", "Typing :: Typed"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["scenara_sdk*"]
+
+[tool.setuptools.package-data]
+scenara_sdk = ["py.typed"]

@@ -1,0 +1,558 @@
+from copy import deepcopy
+from typing import Any
+
+from fastapi import Depends, HTTPException, Query, status
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.api_contracts import ContractAPIRouter as APIRouter
+from app.observability import logger
+from app.portrait_async import run_blocking_io
+from app.portrait_audit import (
+    MAX_PUBLIC_AUDIT_EVENT_LIMIT,
+    MAX_PUBLIC_BACKUP_SNAPSHOT_LIMIT,
+    audit_event,
+    public_audit_chain_verification,
+    read_public_audit_events,
+    read_public_backup_snapshots,
+)
+from app.portrait_auth import permission_dependency, require_step_up_authentication
+from app.portrait_commercial import require_compliance_control
+from app.portrait_gallery import (
+    GALLERY,
+    PersonRecord,
+    feature_object_infos,
+    gallery_key,
+    list_gallery_people,
+    persist_feature,
+    persist_person,
+)
+from app.portrait_gallery import (
+    delete_person as delete_gallery_person,
+)
+from app.portrait_jobs import VIDEO_JOBS, VideoJob, job_key, persist_video_job, remove_video_job
+from app.portrait_model_capabilities import MODEL_CAPABILITIES
+from app.portrait_object_storage import OBJECT_STORE, public_object_info
+from app.portrait_pagination import normalize_list_pagination, normalize_stream_event_pagination, page_items_keyset
+from app.portrait_request_context import PortraitRequestContext, portrait_request_context
+from app.portrait_response import OBJECT_CLEANUP_FAILED, exception_log_summary, portrait_success, raise_rollback_failure
+from app.portrait_runtime_store import (
+    gallery_people_snapshots,
+    video_jobs_snapshots,
+)
+from app.portrait_security import redact_sensitive_fields
+from app.portrait_storage import GALLERY_STORE
+from app.portrait_stream_worker import stream_worker_status
+from app.portrait_streams import (
+    StreamRecord,
+    persist_stream,
+    restore_stream,
+    restore_stream_snapshot_in_store,
+    stream_records_snapshot,
+)
+from app.portrait_task_queue import TASK_QUEUE
+from app.portrait_thresholds import threshold_snapshot
+from app.portrait_vector_store import VECTOR_STORE
+from app.security import require_api_token
+from app.settings import (
+    API_TOKEN,
+    AUDIT_WRITE_FAIL_CLOSED,
+    ENCRYPTION_KEY,
+    ENCRYPTION_KEY_ID,
+    ENCRYPTION_KEYRING,
+    JWT_AUDIENCE,
+    JWT_REQUIRE_AUD,
+    JWT_REQUIRE_EXP,
+    JWT_REQUIRE_ISS,
+    JWT_REQUIRE_TENANT,
+    JWT_SECRET,
+    JWT_SECRET_ID,
+    JWT_SECRET_KEYRING,
+    PORTRAIT_OBJECT_STORAGE_BACKEND,
+    PORTRAIT_STORAGE_BACKEND,
+    PORTRAIT_VECTOR_BACKEND,
+    RBAC_ENABLED,
+    REQUIRE_ENCRYPTION,
+    TASK_QUEUE_BACKEND,
+    TENANT_HEADER_REQUIRED,
+)
+
+router = APIRouter(dependencies=[Depends(require_api_token)])
+
+
+class RetentionCleanupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    retention_days: int = Field(..., ge=0, le=3650)
+    confirm: str | None = Field(default=None)
+
+
+class AdminBackupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    updated_since: float | None = Field(default=None, ge=0)
+    confirm: str | None = Field(default=None)
+
+
+def rollback_retention_cleanup(
+    removed_jobs: list[VideoJob],
+    trimmed_streams: list[tuple[StreamRecord, StreamRecord]],
+    removed_gallery_people: list[PersonRecord],
+) -> list[str]:
+    errors: list[str] = []
+    for person in reversed(removed_gallery_people):
+        try:
+            restored_person = deepcopy(person)
+            GALLERY[gallery_key(restored_person.tenant_id, restored_person.person_id)] = restored_person
+            persist_person(restored_person)
+            for feature in restored_person.features:
+                persist_feature(restored_person, feature)
+        except Exception as exc:
+            logger.warning("保留回滚期间持久化恢复人员失败: %s", exception_log_summary(exc))
+            errors.append("restore retained gallery person failed")
+
+    for stream, previous_stream in reversed(trimmed_streams):
+        restore_stream(stream, previous_stream)
+        restore_stream_snapshot_in_store(stream)
+        try:
+            persist_stream(stream)
+        except Exception as exc:
+            logger.warning("保留回滚期间持久化恢复视频流失败: %s", exception_log_summary(exc))
+            errors.append("restore retained stream failed")
+
+    for job in reversed(removed_jobs):
+        try:
+            restored_job = deepcopy(job)
+            VIDEO_JOBS[job_key(restored_job.tenant_id, restored_job.job_id)] = restored_job
+            persist_video_job(restored_job)
+        except Exception as exc:
+            logger.warning("保留回滚期间持久化恢复视频任务失败: %s", exception_log_summary(exc))
+            errors.append("restore retained 视频任务失败")
+    return errors
+
+
+def raise_retention_cleanup_rollback_failure(original_error: Exception, rollback_errors: list[str]) -> None:
+    raise_rollback_failure("保留清理失败，且回滚持久化失败", original_error, rollback_errors)
+
+
+def cleanup_retained_gallery_feature_objects(person: PersonRecord) -> tuple[int, list[str]]:
+    deleted_count = 0
+    errors: list[str] = []
+    for object_info in feature_object_infos(person):
+        try:
+            result = OBJECT_STORE.delete_object(object_info)
+            if result.get("deleted"):
+                deleted_count += 1
+                continue
+            logger.warning(
+                "object cleanup during retention did not delete gallery object: backend=%s reason=%s",
+                result.get("backend"),
+                result.get("reason"),
+            )
+            errors.append(OBJECT_CLEANUP_FAILED)
+        except Exception as exc:
+            logger.warning("保留清理期间清理人员库对象失败: %s", exception_log_summary(exc))
+            errors.append(OBJECT_CLEANUP_FAILED)
+    return deleted_count, errors
+
+
+def admin_health_snapshot() -> dict[str, Any]:
+    return {
+        "storage": GALLERY_STORE.health(),
+        "vector_store": VECTOR_STORE.health(),
+        "object_storage": OBJECT_STORE.health(),
+        "task_queue": TASK_QUEUE.health(),
+        "stream_worker": stream_worker_status(),
+    }
+
+
+def retention_cleanup_transaction(
+    *,
+    request_id: str,
+    tenant_id: str,
+    retention_days: int,
+) -> dict[str, Any]:
+    import time
+
+    cutoff = time.time() - retention_days * 86400
+    gallery_candidates = [
+        deepcopy(person)
+        for person in gallery_people_snapshots(tenant_id)
+        if person.tenant_id == tenant_id and person.updated_at < cutoff
+    ]
+    removed_jobs = 0
+    trimmed_events = 0
+    removed_gallery_people = 0
+    deleted_gallery_objects = 0
+    removed_job_snapshots: list[VideoJob] = []
+    trimmed_stream_snapshots: list[tuple[StreamRecord, StreamRecord]] = []
+    removed_gallery_snapshots: list[PersonRecord] = []
+
+    try:
+        audit_event(
+            "retention_cleanup",
+            request_id=request_id,
+            tenant_id=tenant_id,
+            outcome="started",
+            retention_days=retention_days,
+            candidate_gallery_people=len(gallery_candidates),
+            candidate_gallery_feature_count=sum(len(person.features) for person in gallery_candidates),
+            candidate_gallery_object_reference_count=sum(
+                len(feature_object_infos(person)) for person in gallery_candidates
+            ),
+        )
+
+        for job in video_jobs_snapshots(tenant_id):
+            if job.tenant_id == tenant_id and job.updated_at < cutoff:
+                previous_job = deepcopy(job)
+                if remove_video_job(job.job_id, tenant_id):
+                    removed_job_snapshots.append(previous_job)
+                    removed_jobs += 1
+
+        for stream in stream_records_snapshot():
+            if stream.tenant_id != tenant_id:
+                continue
+            before = len(stream.events)
+            retained_events = [event for event in stream.events if event.created_at >= cutoff]
+            if before == len(retained_events):
+                continue
+            previous_stream = deepcopy(stream)
+            stream.events = retained_events
+            trimmed_stream_snapshots.append((stream, previous_stream))
+            persist_stream(stream)
+            trimmed_events += before - len(retained_events)
+
+        for previous_person in gallery_candidates:
+            if delete_gallery_person(previous_person.person_id, tenant_id=tenant_id):
+                removed_gallery_snapshots.append(previous_person)
+                deleted_object_count, object_cleanup_errors = cleanup_retained_gallery_feature_objects(previous_person)
+                if object_cleanup_errors:
+                    raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=OBJECT_CLEANUP_FAILED)
+                deleted_gallery_objects += deleted_object_count
+                removed_gallery_people += 1
+    except Exception as exc:
+        rollback_errors = rollback_retention_cleanup(
+            removed_job_snapshots, trimmed_stream_snapshots, removed_gallery_snapshots
+        )
+        if rollback_errors:
+            raise_retention_cleanup_rollback_failure(exc, rollback_errors)
+        raise
+
+    return {
+        "tenant_id": tenant_id,
+        "retention_days": retention_days,
+        "removed_jobs": removed_jobs,
+        "trimmed_stream_events": trimmed_events,
+        "removed_gallery_people": removed_gallery_people,
+        "deleted_gallery_objects": deleted_gallery_objects,
+    }
+
+
+@router.get("/v1/admin/status", dependencies=[Depends(permission_dependency("admin:status"))])
+async def v1_admin_status(ctx: PortraitRequestContext = Depends(portrait_request_context)) -> dict[str, Any]:
+    request_id = ctx.request_id
+    tenant_id = ctx.scope_id
+    health = await run_blocking_io(admin_health_snapshot)
+    return portrait_success(
+        request_id,
+        {
+            "tenant_id": tenant_id,
+            **health,
+            "security": {
+                "api_token_enabled": bool(API_TOKEN),
+                "jwt_configured": bool(JWT_SECRET),
+                "jwt_secret_id_configured": bool(JWT_SECRET_ID),
+                "jwt_secret_keyring_configured": bool(JWT_SECRET_KEYRING),
+                "rbac_enabled": RBAC_ENABLED,
+                "jwt_audience": JWT_AUDIENCE,
+                "jwt_require_exp": JWT_REQUIRE_EXP,
+                "jwt_require_iss": JWT_REQUIRE_ISS,
+                "jwt_require_aud": JWT_REQUIRE_AUD,
+                "jwt_require_tenant": JWT_REQUIRE_TENANT,
+                "tenant_header_required": TENANT_HEADER_REQUIRED,
+                "encryption_enabled": bool(ENCRYPTION_KEY),
+                "encryption_key_id_configured": bool(ENCRYPTION_KEY_ID),
+                "encryption_keyring_configured": bool(ENCRYPTION_KEYRING),
+                "require_encryption": REQUIRE_ENCRYPTION,
+                "audit_write_fail_closed": AUDIT_WRITE_FAIL_CLOSED,
+            },
+            "configured_backends": {
+                "gallery": PORTRAIT_STORAGE_BACKEND,
+                "vector": PORTRAIT_VECTOR_BACKEND,
+                "object_storage": PORTRAIT_OBJECT_STORAGE_BACKEND,
+                "task_queue": TASK_QUEUE_BACKEND,
+            },
+            "model_capabilities": MODEL_CAPABILITIES,
+        },
+    )
+
+
+@router.get("/v1/admin/audit/verify", dependencies=[Depends(permission_dependency("admin:status"))])
+async def v1_admin_audit_verify(ctx: PortraitRequestContext = Depends(portrait_request_context)) -> dict[str, Any]:
+    request_id = ctx.request_id
+    tenant_id = ctx.scope_id
+    try:
+        audit_chain = await run_blocking_io(public_audit_chain_verification)
+    except Exception as exc:
+        logger.warning("校验审计链失败: %s", exception_log_summary(exc))
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="审计链校验不可用") from exc
+    return portrait_success(request_id, {"tenant_id": tenant_id, "audit_chain": audit_chain})
+
+
+@router.get("/v1/admin/audit/events", dependencies=[Depends(permission_dependency("admin:status"))])
+async def v1_admin_audit_events(
+    limit: int = Query(50, ge=1, le=MAX_PUBLIC_AUDIT_EVENT_LIMIT),
+    event: str | None = Query(None, max_length=128),
+    outcome: str | None = Query(None, max_length=64),
+    request_id: str | None = Query(None, max_length=128),
+    category: str | None = Query(None, max_length=64),
+    created_since: float | None = Query(None, ge=0),
+    created_until: float | None = Query(None, ge=0),
+    ctx: PortraitRequestContext = Depends(portrait_request_context),
+) -> dict[str, Any]:
+    request_id_header = ctx.request_id
+    tenant_id = ctx.scope_id
+    if category is not None and category not in {"delete_requests", "exports", "model_versions", "retention", "other"}:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不支持的审计事件类别")
+    if created_since is not None and created_until is not None and created_until < created_since:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="created_until 必须大于等于 created_since")
+    try:
+        audit_events = await run_blocking_io(
+            read_public_audit_events,
+            limit,
+            tenant_id,
+            event=event.strip() if event else None,
+            outcome=outcome.strip() if outcome else None,
+            request_id=request_id.strip() if request_id else None,
+            category=category,
+            created_since=created_since,
+            created_until=created_until,
+        )
+    except Exception as exc:
+        logger.warning("读取审计事件失败: %s", exception_log_summary(exc))
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="审计事件不可用") from exc
+    return portrait_success(request_id_header, {"tenant_id": tenant_id, **audit_events})
+
+
+@router.get(
+    "/v1/admin/export",
+    dependencies=[Depends(permission_dependency("admin:export")), Depends(require_step_up_authentication)],
+)
+async def v1_admin_export(
+    people_limit: int | None = Query(None),
+    people_offset: int | None = Query(None),
+    people_cursor: str | None = Query(None),
+    jobs_limit: int | None = Query(None),
+    jobs_offset: int | None = Query(None),
+    jobs_cursor: str | None = Query(None),
+    streams_limit: int | None = Query(None),
+    streams_offset: int | None = Query(None),
+    streams_cursor: str | None = Query(None),
+    stream_events_limit: int | None = Query(None),
+    stream_events_offset: int | None = Query(None),
+    stream_events_cursor: str | None = Query(None),
+    updated_since: float | None = Query(None, ge=0),
+    ctx: PortraitRequestContext = Depends(portrait_request_context),
+) -> dict[str, Any]:
+    await run_blocking_io(require_compliance_control, ctx.tenant_id, ctx.project_id, "COM-006")
+    request_id = ctx.request_id
+    tenant_id = ctx.scope_id
+    people_request = normalize_list_pagination(people_limit, people_offset, people_cursor)
+    jobs_request = normalize_list_pagination(jobs_limit, jobs_offset, jobs_cursor)
+    streams_request = normalize_list_pagination(streams_limit, streams_offset, streams_cursor)
+    events_request = normalize_stream_event_pagination(stream_events_limit, stream_events_offset, stream_events_cursor)
+
+    all_people = [
+        item
+        for item in list_gallery_people(tenant_id=tenant_id)
+        if updated_since is None or float(item.get("updated_at") or item.get("created_at") or 0.0) >= updated_since
+    ]
+    all_jobs = [
+        job
+        for job in video_jobs_snapshots(tenant_id)
+        if job.tenant_id == tenant_id
+        and (updated_since is None or float(job.updated_at or job.created_at) >= updated_since)
+    ]
+    all_streams = [
+        stream
+        for stream in stream_records_snapshot()
+        if stream.tenant_id == tenant_id
+        and (updated_since is None or float(stream.updated_at or stream.created_at) >= updated_since)
+    ]
+    people, people_page = page_items_keyset(
+        sorted(all_people, key=lambda item: item["person_id"]),
+        limit=people_request.limit,
+        offset=people_request.offset,
+        cursor=people_request.cursor,
+        key_fields=["person_id"],
+    )
+    jobs, jobs_page = page_items_keyset(
+        sorted(all_jobs, key=lambda item: item.job_id),
+        limit=jobs_request.limit,
+        offset=jobs_request.offset,
+        cursor=jobs_request.cursor,
+        key_fields=["job_id"],
+    )
+    streams, streams_page = page_items_keyset(
+        sorted(all_streams, key=lambda item: item.stream_id),
+        limit=streams_request.limit,
+        offset=streams_request.offset,
+        cursor=streams_request.cursor,
+        key_fields=["stream_id"],
+    )
+    stream_payloads = []
+    event_pages = {}
+    for stream in streams:
+        event_page, pagination = page_items_keyset(
+            stream.events,
+            limit=events_request.limit,
+            offset=events_request.offset,
+            cursor=events_request.cursor,
+            key_fields=["created_at", "event_id"],
+        )
+        payload = stream.public_dict(include_events=False)
+        payload["events"] = [event.public_dict() for event in event_page]
+        payload["events_pagination"] = pagination
+        stream_payloads.append(payload)
+        event_pages[stream.stream_id] = pagination
+
+    export_payload = {
+        "tenant_id": tenant_id,
+        "export_mode": "incremental" if updated_since is not None else "full",
+        "updated_since": updated_since,
+        "people": people,
+        "thresholds": threshold_snapshot(),
+        "model_capabilities": MODEL_CAPABILITIES,
+        "jobs": [job.public_dict(include_result=False) for job in jobs],
+        "streams": stream_payloads,
+        "pagination": {
+            "people": people_page,
+            "jobs": jobs_page,
+            "streams": streams_page,
+            "stream_events": event_pages,
+        },
+    }
+    await run_blocking_io(
+        audit_event,
+        "admin_export",
+        request_id=request_id,
+        tenant_id=tenant_id,
+        people_count=len(people),
+        people_total=people_page["total"],
+        jobs_count=len(jobs),
+        jobs_total=jobs_page["total"],
+        streams_count=len(stream_payloads),
+        streams_total=streams_page["total"],
+        stream_events_count=sum(page["count"] for page in event_pages.values()),
+        stream_count=len(event_pages),
+        people_limit=people_page["limit"],
+        people_offset=people_page["offset"],
+        jobs_limit=jobs_page["limit"],
+        jobs_offset=jobs_page["offset"],
+        streams_limit=streams_page["limit"],
+        streams_offset=streams_page["offset"],
+        stream_events_limit=events_request.limit,
+        stream_events_offset=events_request.offset,
+        stream_events_cursor=events_request.cursor,
+        updated_since=updated_since,
+    )
+    return portrait_success(
+        request_id,
+        redact_sensitive_fields(export_payload),
+    )
+
+
+@router.get("/v1/admin/backups", dependencies=[Depends(permission_dependency("admin:export"))])
+async def v1_admin_backups(
+    limit: int = Query(20, ge=1, le=MAX_PUBLIC_BACKUP_SNAPSHOT_LIMIT),
+    ctx: PortraitRequestContext = Depends(portrait_request_context),
+) -> dict[str, Any]:
+    request_id = ctx.request_id
+    tenant_id = ctx.scope_id
+    try:
+        backups = await run_blocking_io(read_public_backup_snapshots, limit, tenant_id)
+    except Exception as exc:
+        logger.warning("读取备份快照失败: %s", exception_log_summary(exc))
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="备份快照不可用") from exc
+    return portrait_success(request_id, {"tenant_id": tenant_id, **backups})
+
+
+@router.post(
+    "/v1/admin/backup",
+    dependencies=[Depends(permission_dependency("admin:export")), Depends(require_step_up_authentication)],
+)
+async def v1_admin_backup(
+    payload: AdminBackupRequest,
+    ctx: PortraitRequestContext = Depends(portrait_request_context),
+) -> dict[str, Any]:
+    request_id = ctx.request_id
+    tenant_id = ctx.scope_id
+    if payload.confirm is not None and payload.confirm != "backup":
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='请在 confirm 中输入 "backup" 后执行备份')
+    export_response = await v1_admin_export(
+        people_limit=None,
+        people_offset=None,
+        people_cursor=None,
+        jobs_limit=None,
+        jobs_offset=None,
+        jobs_cursor=None,
+        streams_limit=None,
+        streams_offset=None,
+        streams_cursor=None,
+        stream_events_limit=None,
+        stream_events_offset=None,
+        stream_events_cursor=None,
+        updated_since=payload.updated_since,
+        ctx=ctx,
+    )
+    data = export_response["data"]
+    body = __import__("json").dumps(data, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    object_info = await run_blocking_io(
+        OBJECT_STORE.put_bytes,
+        tenant_id,
+        "admin-backup",
+        f"portrait-backup-{request_id}.json",
+        body,
+    )
+    await run_blocking_io(
+        audit_event,
+        "admin_backup",
+        request_id=request_id,
+        tenant_id=tenant_id,
+        updated_since=payload.updated_since,
+        object_backend=object_info.get("backend"),
+        bytes=len(body),
+    )
+    return portrait_success(
+        request_id,
+        {
+            "backup": public_object_info(object_info),
+            "bytes": len(body),
+            "export_mode": data.get("export_mode"),
+            "updated_since": payload.updated_since,
+        },
+    )
+
+
+@router.post(
+    "/v1/admin/retention/cleanup",
+    dependencies=[Depends(permission_dependency("admin:retention")), Depends(require_step_up_authentication)],
+)
+async def v1_admin_retention_cleanup(
+    payload: RetentionCleanupRequest,
+    ctx: PortraitRequestContext = Depends(portrait_request_context),
+) -> dict[str, Any]:
+    request_id = ctx.request_id
+    tenant_id = ctx.scope_id
+    if payload.confirm is not None and payload.confirm != "cleanup":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='请在 confirm 中输入 "cleanup" 后执行保留清理',
+        )
+
+    result = await run_blocking_io(
+        retention_cleanup_transaction,
+        request_id=request_id,
+        tenant_id=tenant_id,
+        retention_days=payload.retention_days,
+    )
+    return portrait_success(request_id, result)

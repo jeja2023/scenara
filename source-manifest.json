@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "source_repository": "https://github.com/jeja2023/portrait-hub",
+  "source_commit": "ae9798f3119099a5b3aec554a830e25d97293e66",
+  "history_imported": false,
+  "selection": [
+    "app",
+    "frontend/console",
+    "models/*.model-card.yml",
+    "models/*.governance.yml",
+    "models/*.labels.txt",
+    "requirements",
+    "sdk/python"
+  ],
+  "excluded": [
+    ".env",
+    "runtime-state",
+    "model weights",
+    "release history",
+    "legacy OpenAPI baseline",
+    "generated clients",
+    "legacy console-next workspace",
+    "Go/Java SDKs"
+  ]
+}

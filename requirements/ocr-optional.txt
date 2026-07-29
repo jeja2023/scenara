@@ -1,0 +1,3 @@
+# Install with the matching PaddlePaddle GPU runtime for the deployment CUDA version.
+# Model weights must be supplied through the approved offline model-asset process.
+paddleocr>=3.0.0,<4.0.0

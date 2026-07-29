@@ -1,0 +1,13 @@
+{
+  "name": "scenara-sdk",
+  "version": "0.1.0-dev.0",
+  "description": "Official TypeScript SDK for the Scenara v1 API",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {".": {"types": "./dist/index.d.ts", "import": "./dist/index.js"}},
+  "files": ["dist", "README.md"],
+  "scripts": {"build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json --noEmit", "check": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.json"},
+  "engines": {"node": ">=22.22.2 <23"},
+  "devDependencies": {"typescript": "5.9.3"}
+}
