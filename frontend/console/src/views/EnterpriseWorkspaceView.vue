@@ -2,7 +2,7 @@
 import { Plus, RefreshCw } from "@lucide/vue";
 import { onMounted, reactive, ref } from "vue";
 
-import { ApiError, api } from "../api";
+import { ApiError, api, userFacingError } from "../api";
 import { labelCaseStatus, labelEntitlement, labelPriority, labelSeverity, labelSupportTier } from "../labels";
 
 interface EnterpriseStatus {
@@ -54,9 +54,8 @@ async function refresh(): Promise<void> {
     cases.value = nextCases;
     evidence.value = nextEvidence;
   } catch (caught) {
-    const message = caught instanceof Error ? caught.message : String(caught);
     unavailable.value = caught instanceof ApiError && caught.status === 404;
-    error.value = unavailable.value ? "" : message;
+    error.value = unavailable.value ? "" : userFacingError(caught, "企业数据加载失败，请稍后重试");
   } finally {
     loading.value = false;
   }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RefreshCw } from "@lucide/vue";
 import { onMounted, ref } from "vue";
-import { api } from "../api";
+import { api, userFacingError } from "../api";
 import { labelCapability, labelDomain } from "../labels";
 import type { DomainManifest, ModelPackage } from "../types";
 
@@ -19,7 +19,7 @@ async function refresh(): Promise<void> {
       api<ModelPackage[]>("/api/v1/models"),
     ]);
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught);
+    error.value = userFacingError(caught, "模型数据加载失败，请稍后重试");
   } finally {
     loading.value = false;
   }

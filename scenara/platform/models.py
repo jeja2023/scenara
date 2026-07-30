@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class StrictModel(BaseModel):
@@ -54,6 +54,8 @@ class PrincipalContext(StrictModel):
     tenant_id: str
     project_id: str
     principal_id: str = "anonymous"
+    scopes: frozenset[str] = Field(default_factory=frozenset)
+    product_ids: frozenset[str] = Field(default_factory=frozenset)
 
 
 class MediaAsset(StrictModel):
@@ -373,6 +375,314 @@ class SystemStatus(StrictModel):
     production_models_required: bool
     auth_required: bool
     enterprise_policy_provider: str = "not_configured"
+
+
+type ProductId = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.-]{1,63}$")]
+
+
+class ProductLayer(StrEnum):
+    PRODUCT_MODULE = "product_module"
+    CONTROL_PLANE = "control_plane"
+    DEVELOPER_SURFACE = "developer_surface"
+    FOUNDATION = "foundation"
+
+
+class ProductMaturity(StrEnum):
+    AVAILABLE = "available"
+    SEED = "seed"
+    PLANNED = "planned"
+    GATED = "gated"
+
+
+class ProductCatalogItem(StrictModel):
+    product_id: ProductId
+    name: str
+    layer: ProductLayer
+    maturity: ProductMaturity
+    summary: str
+    current_scope: list[str] = Field(default_factory=list)
+    not_in_scope_yet: list[str] = Field(default_factory=list)
+    console_route: str | None = None
+    api_paths: list[str] = Field(default_factory=list)
+    depends_on: list[ProductId] = Field(default_factory=list)
+    next_gate: str
+
+
+type RepositoryId = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.-]{1,63}$")]
+type RepositoryResponsibilityId = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.-]{1,95}$")]
+
+
+class RepositoryKind(StrEnum):
+    PLATFORM_INTEGRATION = "platform_integration"
+    SPECIALIZED_PRODUCT = "specialized_product"
+
+
+class RepositoryLifecycle(StrEnum):
+    CURRENT = "current"
+    EXTERNAL_EXISTING = "external_existing"
+    PLANNED = "planned"
+
+
+class RepositoryBoundaryRule(StrEnum):
+    VERSIONED_CONTRACTS_ONLY = "versioned_contracts_only"
+    NO_SHARED_DATABASE = "no_shared_database"
+    NO_CROSS_REPOSITORY_SOURCE_IMPORTS = "no_cross_repository_source_imports"
+    IMMUTABLE_ARTIFACT_REFERENCES = "immutable_artifact_references"
+
+
+class RepositoryContractTransport(StrEnum):
+    VERSIONED_API = "versioned_api"
+    EVENT = "event"
+    IMMUTABLE_MANIFEST = "immutable_manifest"
+
+
+class RepositoryTopologyItem(StrictModel):
+    repository_id: RepositoryId
+    name: str
+    kind: RepositoryKind
+    lifecycle: RepositoryLifecycle
+    current_repository: bool = False
+    primary_product_ids: list[ProductId] = Field(default_factory=list)
+    integration_product_ids: list[ProductId] = Field(default_factory=list)
+    responsibilities: list[RepositoryResponsibilityId] = Field(default_factory=list)
+    excluded_responsibilities: list[RepositoryResponsibilityId] = Field(default_factory=list)
+    next_gate: str
+
+
+class RepositoryIntegrationContract(StrictModel):
+    contract_id: Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.-]{1,63}$")]
+    producer_repository_id: RepositoryId
+    consumer_repository_id: RepositoryId
+    transport: RepositoryContractTransport
+    payload_type: Annotated[str, Field(pattern=r"^[A-Z][A-Za-z0-9]{1,63}$")]
+    invariants: list[RepositoryResponsibilityId] = Field(default_factory=list)
+
+
+class RepositoryTopology(StrictModel):
+    schema_version: Literal["1.0"] = "1.0"
+    current_repository_id: RepositoryId
+    repositories: list[RepositoryTopologyItem]
+    integration_contracts: list[RepositoryIntegrationContract]
+    boundary_rules: list[RepositoryBoundaryRule]
+
+    @model_validator(mode="after")
+    def validate_repository_references(self) -> RepositoryTopology:
+        repository_ids = [repository.repository_id for repository in self.repositories]
+        if len(repository_ids) != len(set(repository_ids)):
+            raise ValueError("repository identifiers must be unique")
+        if self.current_repository_id not in repository_ids:
+            raise ValueError("current repository must exist in repositories")
+        current = [repository.repository_id for repository in self.repositories if repository.current_repository]
+        if current != [self.current_repository_id]:
+            raise ValueError("exactly the declared current repository must be marked current")
+        for contract in self.integration_contracts:
+            if contract.producer_repository_id not in repository_ids:
+                raise ValueError(f"unknown producer repository: {contract.producer_repository_id}")
+            if contract.consumer_repository_id not in repository_ids:
+                raise ValueError(f"unknown consumer repository: {contract.consumer_repository_id}")
+        return self
+
+
+class AccessCapabilityStatus(StrEnum):
+    AVAILABLE = "available"
+    SEED = "seed"
+    PLANNED = "planned"
+    GATED = "gated"
+
+
+class AccessCapabilityItem(StrictModel):
+    capability_id: str = Field(pattern=r"^[a-z][a-z0-9_.-]{1,63}$")
+    name: str
+    status: AccessCapabilityStatus
+    summary: str
+    current_scope: list[str] = Field(default_factory=list)
+    not_in_scope_yet: list[str] = Field(default_factory=list)
+    next_gate: str
+
+
+class AccessFoundationStatus(StrictModel):
+    schema_version: Literal["1.0"] = "1.0"
+    auth_mode: Literal["development_open", "single_bearer_token"]
+    principal_source: Literal["anonymous", "api_token", "service_account_api_key", "header"]
+    tenant_id: str
+    project_id: str
+    principal_id: str
+    policy_provider: str
+    capabilities: list[AccessCapabilityItem]
+
+
+type AccessId = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.-]{1,63}$")]
+
+
+class PrincipalType(StrEnum):
+    USER = "user"
+    SERVICE_ACCOUNT = "service_account"
+
+
+class EntitlementStatus(StrEnum):
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
+
+
+class Organization(StrictModel):
+    tenant_id: AccessId
+    display_name: str = Field(min_length=1, max_length=256)
+    created_at: float
+    updated_at: float
+
+
+class Project(StrictModel):
+    tenant_id: AccessId
+    project_id: AccessId
+    display_name: str = Field(min_length=1, max_length=256)
+    created_at: float
+    updated_at: float
+
+
+class UserAccount(StrictModel):
+    tenant_id: AccessId
+    user_id: AccessId
+    display_name: str = Field(min_length=1, max_length=256)
+    email: str | None = Field(default=None, max_length=320)
+    disabled: bool = False
+    created_at: float
+    updated_at: float
+
+
+class Role(StrictModel):
+    tenant_id: AccessId
+    role_id: AccessId
+    display_name: str = Field(min_length=1, max_length=256)
+    scopes: frozenset[str] = Field(min_length=1, max_length=128)
+    product_ids: frozenset[ProductId] = Field(default_factory=frozenset)
+    created_at: float
+    updated_at: float
+
+
+class Membership(StrictModel):
+    tenant_id: AccessId
+    project_id: AccessId
+    principal_id: AccessId
+    principal_type: PrincipalType
+    role_ids: frozenset[AccessId] = Field(min_length=1, max_length=64)
+    created_at: float
+    updated_at: float
+
+
+class ServiceAccount(StrictModel):
+    tenant_id: AccessId
+    project_id: AccessId
+    service_account_id: AccessId
+    display_name: str = Field(min_length=1, max_length=256)
+    scopes: frozenset[str] = Field(min_length=1, max_length=128)
+    product_ids: frozenset[ProductId] = Field(default_factory=frozenset)
+    disabled: bool = False
+    created_at: float
+    updated_at: float
+
+
+class ApiKeyRecord(StrictModel):
+    tenant_id: AccessId
+    project_id: AccessId
+    key_id: AccessId
+    service_account_id: AccessId
+    name: str = Field(min_length=1, max_length=256)
+    token_prefix: str = Field(min_length=8, max_length=32)
+    scopes: frozenset[str] = Field(min_length=1, max_length=128)
+    product_ids: frozenset[ProductId] = Field(default_factory=frozenset)
+    expires_at: float | None = None
+    revoked_at: float | None = None
+    last_used_at: float | None = None
+    created_at: float
+
+
+class ProductEntitlement(StrictModel):
+    tenant_id: AccessId
+    project_id: AccessId
+    product_id: ProductId
+    status: EntitlementStatus = EntitlementStatus.ACTIVE
+    source: Literal["manual", "enterprise_license", "system"] = "manual"
+    created_at: float
+    updated_at: float
+
+
+class CreateOrganizationRequest(StrictModel):
+    display_name: str = Field(min_length=1, max_length=256)
+
+
+class CreateProjectRequest(StrictModel):
+    project_id: AccessId | None = None
+    display_name: str = Field(min_length=1, max_length=256)
+
+
+class CreateUserRequest(StrictModel):
+    user_id: AccessId | None = None
+    display_name: str = Field(min_length=1, max_length=256)
+    email: str | None = Field(default=None, max_length=320)
+
+
+class CreateRoleRequest(StrictModel):
+    role_id: AccessId | None = None
+    display_name: str = Field(min_length=1, max_length=256)
+    scopes: frozenset[str] = Field(min_length=1, max_length=128)
+    product_ids: frozenset[ProductId] = Field(default_factory=frozenset)
+
+
+class CreateMembershipRequest(StrictModel):
+    project_id: AccessId | None = None
+    principal_id: AccessId
+    principal_type: PrincipalType
+    role_ids: frozenset[AccessId] = Field(min_length=1, max_length=64)
+
+
+class CreateServiceAccountRequest(StrictModel):
+    service_account_id: AccessId | None = None
+    display_name: str = Field(min_length=1, max_length=256)
+    scopes: frozenset[str] = Field(min_length=1, max_length=128)
+    product_ids: frozenset[ProductId] = Field(default_factory=frozenset)
+
+
+class CreateApiKeyRequest(StrictModel):
+    name: str = Field(min_length=1, max_length=256)
+    scopes: frozenset[str] | None = Field(default=None, min_length=1, max_length=128)
+    product_ids: frozenset[ProductId] | None = None
+    expires_at: float | None = None
+
+
+class CreateApiKeyResponse(StrictModel):
+    record: ApiKeyRecord
+    api_key: str
+
+
+class CreateProductEntitlementRequest(StrictModel):
+    project_id: AccessId | None = None
+    product_id: ProductId
+    status: EntitlementStatus = EntitlementStatus.ACTIVE
+    source: Literal["manual", "enterprise_license", "system"] = "manual"
+
+
+class UpdateProductEntitlementRequest(StrictModel):
+    status: EntitlementStatus
+    source: Literal["manual", "enterprise_license", "system"] = "manual"
+
+
+class IamInventory(StrictModel):
+    organizations: int
+    projects: int
+    users: int
+    roles: int
+    memberships: int
+    service_accounts: int
+    api_keys: int
+    product_entitlements: int
+
+
+class IamSummary(StrictModel):
+    schema_version: Literal["1.0"] = "1.0"
+    tenant_id: str
+    project_id: str
+    inventory: IamInventory
+    default_admin_scopes: frozenset[str]
 
 
 class ApiErrorDetail(StrictModel):

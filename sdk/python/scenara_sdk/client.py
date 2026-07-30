@@ -9,15 +9,28 @@ from typing import Any, cast
 import httpx
 
 from .models import (
+    AccessFoundationStatus,
+    ApiKeyRecord,
+    CreateApiKeyResponse,
     Domain,
     FeedbackRecord,
     HardSampleManifest,
+    IamSummary,
     MediaAsset,
+    Membership,
     ModelDeploymentEvent,
     ModelPackage,
     ModelRelease,
+    Organization,
+    ProductCatalogItem,
+    ProductEntitlement,
+    Project,
+    RepositoryTopology,
     ResultEnvelope,
+    Role,
     Run,
+    ServiceAccount,
+    UserAccount,
     WebhookDelivery,
     WebhookSubscription,
 )
@@ -47,7 +60,7 @@ class ScenaraClient:
         headers = {
             "X-Tenant-Id": tenant_id,
             "X-Project-Id": project_id,
-            "User-Agent": "scenara-sdk-python/0.2.0.dev0",
+            "User-Agent": "scenara-sdk-python/0.3.0.dev0",
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -203,6 +216,210 @@ class ScenaraClient:
     def list_domains(self) -> list[dict[str, Any]]:
         return cast(list[dict[str, Any]], self._request("GET", "/api/v1/domains"))
 
+    def list_products(self) -> list[ProductCatalogItem]:
+        return cast(list[ProductCatalogItem], self._request("GET", "/api/v1/platform/products"))
+
+    def get_repository_topology(self) -> RepositoryTopology:
+        return cast(RepositoryTopology, self._request("GET", "/api/v1/platform/repositories"))
+
+    def get_access_foundation(self) -> AccessFoundationStatus:
+        return cast(AccessFoundationStatus, self._request("GET", "/api/v1/platform/access-foundation"))
+
+    def get_iam_summary(self) -> IamSummary:
+        return cast(IamSummary, self._request("GET", "/api/v1/platform/iam/summary"))
+
+    def create_organization(self, display_name: str) -> Organization:
+        return cast(
+            Organization,
+            self._request("POST", "/api/v1/platform/organizations", json={"display_name": display_name}),
+        )
+
+    def list_organizations(self) -> list[Organization]:
+        return cast(list[Organization], self._request("GET", "/api/v1/platform/organizations"))
+
+    def create_project(self, display_name: str, *, project_id: str | None = None) -> Project:
+        return cast(
+            Project,
+            self._request(
+                "POST",
+                "/api/v1/platform/projects",
+                json={"display_name": display_name, "project_id": project_id},
+            ),
+        )
+
+    def list_projects(self) -> list[Project]:
+        return cast(list[Project], self._request("GET", "/api/v1/platform/projects"))
+
+    def create_user(
+        self,
+        display_name: str,
+        *,
+        user_id: str | None = None,
+        email: str | None = None,
+    ) -> UserAccount:
+        return cast(
+            UserAccount,
+            self._request(
+                "POST",
+                "/api/v1/platform/users",
+                json={"display_name": display_name, "user_id": user_id, "email": email},
+            ),
+        )
+
+    def list_users(self) -> list[UserAccount]:
+        return cast(list[UserAccount], self._request("GET", "/api/v1/platform/users"))
+
+    def create_role(
+        self,
+        display_name: str,
+        *,
+        scopes: list[str],
+        product_ids: list[str] | None = None,
+        role_id: str | None = None,
+    ) -> Role:
+        return cast(
+            Role,
+            self._request(
+                "POST",
+                "/api/v1/platform/roles",
+                json={
+                    "display_name": display_name,
+                    "role_id": role_id,
+                    "scopes": scopes,
+                    "product_ids": product_ids or [],
+                },
+            ),
+        )
+
+    def list_roles(self) -> list[Role]:
+        return cast(list[Role], self._request("GET", "/api/v1/platform/roles"))
+
+    def create_membership(
+        self,
+        principal_id: str,
+        *,
+        principal_type: str,
+        role_ids: list[str],
+        project_id: str | None = None,
+    ) -> Membership:
+        return cast(
+            Membership,
+            self._request(
+                "POST",
+                "/api/v1/platform/memberships",
+                json={
+                    "principal_id": principal_id,
+                    "principal_type": principal_type,
+                    "role_ids": role_ids,
+                    "project_id": project_id,
+                },
+            ),
+        )
+
+    def list_memberships(self) -> list[Membership]:
+        return cast(list[Membership], self._request("GET", "/api/v1/platform/memberships"))
+
+    def create_service_account(
+        self,
+        display_name: str,
+        *,
+        scopes: list[str],
+        product_ids: list[str] | None = None,
+        service_account_id: str | None = None,
+    ) -> ServiceAccount:
+        return cast(
+            ServiceAccount,
+            self._request(
+                "POST",
+                "/api/v1/platform/service-accounts",
+                json={
+                    "display_name": display_name,
+                    "service_account_id": service_account_id,
+                    "scopes": scopes,
+                    "product_ids": product_ids or [],
+                },
+            ),
+        )
+
+    def list_service_accounts(self) -> list[ServiceAccount]:
+        return cast(list[ServiceAccount], self._request("GET", "/api/v1/platform/service-accounts"))
+
+    def create_api_key(
+        self,
+        service_account_id: str,
+        *,
+        name: str,
+        scopes: list[str] | None = None,
+        product_ids: list[str] | None = None,
+        expires_at: float | None = None,
+    ) -> CreateApiKeyResponse:
+        return cast(
+            CreateApiKeyResponse,
+            self._request(
+                "POST",
+                f"/api/v1/platform/service-accounts/{service_account_id}/api-keys",
+                json={
+                    "name": name,
+                    "scopes": scopes,
+                    "product_ids": product_ids,
+                    "expires_at": expires_at,
+                },
+            ),
+        )
+
+    def list_api_keys(self) -> list[ApiKeyRecord]:
+        return cast(list[ApiKeyRecord], self._request("GET", "/api/v1/platform/api-keys"))
+
+    def revoke_api_key(self, key_id: str) -> ApiKeyRecord:
+        return cast(
+            ApiKeyRecord,
+            self._request("POST", f"/api/v1/platform/api-keys/{key_id}/revoke"),
+        )
+
+    def create_product_entitlement(
+        self,
+        product_id: str,
+        *,
+        status: str = "active",
+        source: str = "manual",
+        project_id: str | None = None,
+    ) -> ProductEntitlement:
+        return cast(
+            ProductEntitlement,
+            self._request(
+                "POST",
+                "/api/v1/platform/product-entitlements",
+                json={
+                    "product_id": product_id,
+                    "status": status,
+                    "source": source,
+                    "project_id": project_id,
+                },
+            ),
+        )
+
+    def list_product_entitlements(self) -> list[ProductEntitlement]:
+        return cast(
+            list[ProductEntitlement],
+            self._request("GET", "/api/v1/platform/product-entitlements"),
+        )
+
+    def update_product_entitlement(
+        self,
+        product_id: str,
+        *,
+        status: str,
+        source: str = "manual",
+    ) -> ProductEntitlement:
+        return cast(
+            ProductEntitlement,
+            self._request(
+                "PUT",
+                f"/api/v1/platform/product-entitlements/{product_id}",
+                json={"status": status, "source": source},
+            ),
+        )
+
     def list_models(self) -> list[ModelPackage]:
         return cast(list[ModelPackage], self._request("GET", "/api/v1/models"))
 
@@ -331,9 +548,7 @@ class ScenaraClient:
     def list_model_releases(self) -> list[ModelRelease]:
         return cast(list[ModelRelease], self._request("GET", "/api/v1/model-releases"))
 
-    def transition_model_release(
-        self, model_id: str, version: str, *, status: str, reason: str
-    ) -> ModelRelease:
+    def transition_model_release(self, model_id: str, version: str, *, status: str, reason: str) -> ModelRelease:
         return cast(
             ModelRelease,
             self._request(

@@ -432,13 +432,17 @@ class RunService:
     async def wait(self, context: PrincipalContext, run_id: str, wait_ms: int) -> RunRecord:
         deadline = asyncio.get_running_loop().time() + wait_ms / 1000
         while asyncio.get_running_loop().time() < deadline:
-            run = await self.get_run(context, run_id)
+            run = await self._get_run(context, run_id)
             if run.status in TERMINAL_RUN_STATUSES:
                 return run
             await asyncio.sleep(0.02)
-        return await self.get_run(context, run_id)
+        return await self._get_run(context, run_id)
 
     async def get_run(self, context: PrincipalContext, run_id: str) -> RunRecord:
+        await require_allowed(self.policy, context, "read", "run", {"run_id": run_id})
+        return await self._get_run(context, run_id)
+
+    async def _get_run(self, context: PrincipalContext, run_id: str) -> RunRecord:
         run = await self.state.get_run(context.tenant_id, context.project_id, run_id)
         if run is None:
             raise ResourceNotFound("run not found")
@@ -453,6 +457,7 @@ class RunService:
         offset: int = 0,
         limit: int = 50,
     ) -> tuple[list[RunRecord], int]:
+        await require_allowed(self.policy, context, "list", "run")
         rows = await self.state.list_runs(context.tenant_id, context.project_id)
         if status is not None:
             rows = [item for item in rows if item.status == status]
@@ -461,7 +466,8 @@ class RunService:
         return rows[offset : offset + limit], len(rows)
 
     async def result(self, context: PrincipalContext, run_id: str) -> ResultEnvelope:
-        await self.get_run(context, run_id)
+        await require_allowed(self.policy, context, "read", "run", {"run_id": run_id})
+        await self._get_run(context, run_id)
         reference = await self.state.get_result_reference(context.tenant_id, context.project_id, run_id)
         if reference is None:
             raise ResourceNotFound("run result is not available")
@@ -493,7 +499,7 @@ class RunService:
     async def transition(self, context: PrincipalContext, run_id: str, action: str) -> RunRecord:
         await require_allowed(self.policy, context, action, "run", {"run_id": run_id})
         for _ in range(4):
-            run = await self.get_run(context, run_id)
+            run = await self._get_run(context, run_id)
             pipeline = await self.pipeline_definition(
                 run.pipeline.pipeline_id,
                 run.pipeline.version,

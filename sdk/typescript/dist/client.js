@@ -64,6 +64,113 @@ export class ScenaraClient {
     listDomains() {
         return this.transport("GET", "/api/v1/domains");
     }
+    listProducts() {
+        return this.transport("GET", "/api/v1/platform/products");
+    }
+    getRepositoryTopology() {
+        return this.transport("GET", "/api/v1/platform/repositories");
+    }
+    getAccessFoundation() {
+        return this.transport("GET", "/api/v1/platform/access-foundation");
+    }
+    getIamSummary() {
+        return this.transport("GET", "/api/v1/platform/iam/summary");
+    }
+    createOrganization(displayName) {
+        return this.transport("POST", "/api/v1/platform/organizations", {
+            body: { display_name: displayName },
+        });
+    }
+    listOrganizations() {
+        return this.transport("GET", "/api/v1/platform/organizations");
+    }
+    createProject(input) {
+        return this.transport("POST", "/api/v1/platform/projects", {
+            body: { display_name: input.displayName, project_id: input.projectId },
+        });
+    }
+    listProjects() {
+        return this.transport("GET", "/api/v1/platform/projects");
+    }
+    createUser(input) {
+        return this.transport("POST", "/api/v1/platform/users", {
+            body: { display_name: input.displayName, user_id: input.userId, email: input.email },
+        });
+    }
+    listUsers() {
+        return this.transport("GET", "/api/v1/platform/users");
+    }
+    createRole(input) {
+        return this.transport("POST", "/api/v1/platform/roles", {
+            body: {
+                display_name: input.displayName,
+                role_id: input.roleId,
+                scopes: input.scopes,
+                product_ids: input.productIds ?? [],
+            },
+        });
+    }
+    listRoles() {
+        return this.transport("GET", "/api/v1/platform/roles");
+    }
+    createMembership(input) {
+        return this.transport("POST", "/api/v1/platform/memberships", {
+            body: {
+                principal_id: input.principalId,
+                principal_type: input.principalType,
+                role_ids: input.roleIds,
+                project_id: input.projectId,
+            },
+        });
+    }
+    listMemberships() {
+        return this.transport("GET", "/api/v1/platform/memberships");
+    }
+    createServiceAccount(input) {
+        return this.transport("POST", "/api/v1/platform/service-accounts", {
+            body: {
+                display_name: input.displayName,
+                service_account_id: input.serviceAccountId,
+                scopes: input.scopes,
+                product_ids: input.productIds ?? [],
+            },
+        });
+    }
+    listServiceAccounts() {
+        return this.transport("GET", "/api/v1/platform/service-accounts");
+    }
+    createApiKey(input) {
+        return this.transport("POST", "/api/v1/platform/service-accounts/" + encodeURIComponent(input.serviceAccountId) + "/api-keys", {
+            body: {
+                name: input.name,
+                scopes: input.scopes,
+                product_ids: input.productIds,
+                expires_at: input.expiresAt,
+            },
+        });
+    }
+    listApiKeys() {
+        return this.transport("GET", "/api/v1/platform/api-keys");
+    }
+    revokeApiKey(keyId) {
+        return this.transport("POST", "/api/v1/platform/api-keys/" + encodeURIComponent(keyId) + "/revoke");
+    }
+    createProductEntitlement(input) {
+        return this.transport("POST", "/api/v1/platform/product-entitlements", {
+            body: {
+                product_id: input.productId,
+                status: input.status ?? "active",
+                source: input.source ?? "manual",
+                project_id: input.projectId,
+            },
+        });
+    }
+    listProductEntitlements() {
+        return this.transport("GET", "/api/v1/platform/product-entitlements");
+    }
+    updateProductEntitlement(input) {
+        return this.transport("PUT", "/api/v1/platform/product-entitlements/" + encodeURIComponent(input.productId), { body: { status: input.status, source: input.source ?? "manual" } });
+    }
     listModels() {
         return this.transport("GET", "/api/v1/models");
     }

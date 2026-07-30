@@ -1,21 +1,34 @@
 import type {
+  AccessFoundationStatus,
+  ApiKeyRecord,
+  CreateApiKeyResponse,
   Domain,
   FeedbackRecord,
   HardSampleManifest,
+  IamSummary,
+  Membership,
   ModelDeploymentEvent,
   ModelPackage,
   ModelRelease,
+  Organization,
+  ProductCatalogItem,
+  ProductEntitlement,
+  Project,
+  RepositoryTopology,
   ResultEnvelope,
   ResultPage,
   Run,
   RunPage,
   RunStatus,
+  Role,
+  ServiceAccount,
+  UserAccount,
   WebhookDelivery,
   WebhookSubscription,
 } from "./types.js";
 
 export type ScenaraTransport = <T>(
-  method: "GET" | "POST" | "DELETE",
+  method: "GET" | "POST" | "PUT" | "DELETE",
   path: string,
   options?: { body?: unknown; idempotencyKey?: string },
 ) => Promise<T>;
@@ -108,6 +121,176 @@ export class ScenaraClient {
 
   listDomains(): Promise<Record<string, unknown>[]> {
     return this.transport<Record<string, unknown>[]>("GET", "/api/v1/domains");
+  }
+
+  listProducts(): Promise<ProductCatalogItem[]> {
+    return this.transport<ProductCatalogItem[]>("GET", "/api/v1/platform/products");
+  }
+
+  getRepositoryTopology(): Promise<RepositoryTopology> {
+    return this.transport<RepositoryTopology>("GET", "/api/v1/platform/repositories");
+  }
+
+  getAccessFoundation(): Promise<AccessFoundationStatus> {
+    return this.transport<AccessFoundationStatus>("GET", "/api/v1/platform/access-foundation");
+  }
+
+  getIamSummary(): Promise<IamSummary> {
+    return this.transport<IamSummary>("GET", "/api/v1/platform/iam/summary");
+  }
+
+  createOrganization(displayName: string): Promise<Organization> {
+    return this.transport<Organization>("POST", "/api/v1/platform/organizations", {
+      body: { display_name: displayName },
+    });
+  }
+
+  listOrganizations(): Promise<Organization[]> {
+    return this.transport<Organization[]>("GET", "/api/v1/platform/organizations");
+  }
+
+  createProject(input: { displayName: string; projectId?: string }): Promise<Project> {
+    return this.transport<Project>("POST", "/api/v1/platform/projects", {
+      body: { display_name: input.displayName, project_id: input.projectId },
+    });
+  }
+
+  listProjects(): Promise<Project[]> {
+    return this.transport<Project[]>("GET", "/api/v1/platform/projects");
+  }
+
+  createUser(input: { displayName: string; userId?: string; email?: string }): Promise<UserAccount> {
+    return this.transport<UserAccount>("POST", "/api/v1/platform/users", {
+      body: { display_name: input.displayName, user_id: input.userId, email: input.email },
+    });
+  }
+
+  listUsers(): Promise<UserAccount[]> {
+    return this.transport<UserAccount[]>("GET", "/api/v1/platform/users");
+  }
+
+  createRole(input: {
+    displayName: string;
+    scopes: string[];
+    productIds?: string[];
+    roleId?: string;
+  }): Promise<Role> {
+    return this.transport<Role>("POST", "/api/v1/platform/roles", {
+      body: {
+        display_name: input.displayName,
+        role_id: input.roleId,
+        scopes: input.scopes,
+        product_ids: input.productIds ?? [],
+      },
+    });
+  }
+
+  listRoles(): Promise<Role[]> {
+    return this.transport<Role[]>("GET", "/api/v1/platform/roles");
+  }
+
+  createMembership(input: {
+    principalId: string;
+    principalType: "user" | "service_account";
+    roleIds: string[];
+    projectId?: string;
+  }): Promise<Membership> {
+    return this.transport<Membership>("POST", "/api/v1/platform/memberships", {
+      body: {
+        principal_id: input.principalId,
+        principal_type: input.principalType,
+        role_ids: input.roleIds,
+        project_id: input.projectId,
+      },
+    });
+  }
+
+  listMemberships(): Promise<Membership[]> {
+    return this.transport<Membership[]>("GET", "/api/v1/platform/memberships");
+  }
+
+  createServiceAccount(input: {
+    displayName: string;
+    scopes: string[];
+    productIds?: string[];
+    serviceAccountId?: string;
+  }): Promise<ServiceAccount> {
+    return this.transport<ServiceAccount>("POST", "/api/v1/platform/service-accounts", {
+      body: {
+        display_name: input.displayName,
+        service_account_id: input.serviceAccountId,
+        scopes: input.scopes,
+        product_ids: input.productIds ?? [],
+      },
+    });
+  }
+
+  listServiceAccounts(): Promise<ServiceAccount[]> {
+    return this.transport<ServiceAccount[]>("GET", "/api/v1/platform/service-accounts");
+  }
+
+  createApiKey(input: {
+    serviceAccountId: string;
+    name: string;
+    scopes?: string[];
+    productIds?: string[];
+    expiresAt?: number;
+  }): Promise<CreateApiKeyResponse> {
+    return this.transport<CreateApiKeyResponse>(
+      "POST",
+      "/api/v1/platform/service-accounts/" + encodeURIComponent(input.serviceAccountId) + "/api-keys",
+      {
+        body: {
+          name: input.name,
+          scopes: input.scopes,
+          product_ids: input.productIds,
+          expires_at: input.expiresAt,
+        },
+      },
+    );
+  }
+
+  listApiKeys(): Promise<ApiKeyRecord[]> {
+    return this.transport<ApiKeyRecord[]>("GET", "/api/v1/platform/api-keys");
+  }
+
+  revokeApiKey(keyId: string): Promise<ApiKeyRecord> {
+    return this.transport<ApiKeyRecord>(
+      "POST",
+      "/api/v1/platform/api-keys/" + encodeURIComponent(keyId) + "/revoke",
+    );
+  }
+
+  createProductEntitlement(input: {
+    productId: string;
+    status?: "active" | "suspended";
+    source?: "manual" | "enterprise_license" | "system";
+    projectId?: string;
+  }): Promise<ProductEntitlement> {
+    return this.transport<ProductEntitlement>("POST", "/api/v1/platform/product-entitlements", {
+      body: {
+        product_id: input.productId,
+        status: input.status ?? "active",
+        source: input.source ?? "manual",
+        project_id: input.projectId,
+      },
+    });
+  }
+
+  listProductEntitlements(): Promise<ProductEntitlement[]> {
+    return this.transport<ProductEntitlement[]>("GET", "/api/v1/platform/product-entitlements");
+  }
+
+  updateProductEntitlement(input: {
+    productId: string;
+    status: "active" | "suspended";
+    source?: "manual" | "enterprise_license" | "system";
+  }): Promise<ProductEntitlement> {
+    return this.transport<ProductEntitlement>(
+      "PUT",
+      "/api/v1/platform/product-entitlements/" + encodeURIComponent(input.productId),
+      { body: { status: input.status, source: input.source ?? "manual" } },
+    );
   }
 
   listModels(): Promise<ModelPackage[]> {

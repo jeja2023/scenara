@@ -22,6 +22,39 @@ def test_python_sdk_context_lifecycle_and_domain_methods() -> None:
             return httpx.Response(200, content=b"jpeg-preview", headers={"Content-Type": "image/jpeg"})
         if request.url.path.endswith("/models"):
             return httpx.Response(200, content=envelope([]))
+        if request.url.path.endswith("/platform/products"):
+            return httpx.Response(
+                200,
+                content=envelope([{"product_id": "parse", "name": "Scenara Parse", "maturity": "available"}]),
+            )
+        if request.url.path.endswith("/platform/repositories"):
+            return httpx.Response(
+                200,
+                content=envelope(
+                    {
+                        "schema_version": "1.0",
+                        "current_repository_id": "scenara",
+                        "repositories": [{"repository_id": "scenara", "current_repository": True}],
+                        "integration_contracts": [],
+                        "boundary_rules": ["versioned_contracts_only"],
+                    }
+                ),
+            )
+        if request.url.path.endswith("/platform/access-foundation"):
+            return httpx.Response(
+                200,
+                content=envelope(
+                    {
+                        "auth_mode": "single_bearer_token",
+                        "principal_source": "api_token",
+                        "tenant_id": "tenant-a",
+                        "project_id": "project-a",
+                        "principal_id": "api-token",
+                        "policy_provider": "development-open",
+                        "capabilities": [],
+                    }
+                ),
+            )
         if request.url.path.endswith("/webhooks/subscriptions") and request.method == "POST":
             return httpx.Response(201, content=envelope({"endpoint_id": "whk-1", "name": "sink"}))
         if request.url.path.endswith("/webhooks/subscriptions"):
@@ -48,13 +81,19 @@ def test_python_sdk_context_lifecycle_and_domain_methods() -> None:
         assert client.search_portrait({"feature_space_id": "face-v1", "embedding": [1.0, 0.0]})["matches"] == []
         assert client.enterprise_status()["license_id"] == "lic-1"
         assert client.get_asset_preview("asset-1") == b"jpeg-preview"
+        assert client.list_products()[0]["product_id"] == "parse"
+        assert client.get_repository_topology()["current_repository_id"] == "scenara"
+        assert client.get_access_foundation()["auth_mode"] == "single_bearer_token"
         assert client.list_models() == []
-        assert client.create_webhook_subscription(
-            name="sink",
-            url="https://events.example/scenara",
-            secret="webhook-secret-1234",
-            event_types=["result.available"],
-        )["endpoint_id"] == "whk-1"
+        assert (
+            client.create_webhook_subscription(
+                name="sink",
+                url="https://events.example/scenara",
+                secret="webhook-secret-1234",
+                event_types=["result.available"],
+            )["endpoint_id"]
+            == "whk-1"
+        )
         assert client.list_webhook_subscriptions() == []
         assert client.list_webhook_deliveries() == []
         client.delete_asset("asset-1")
@@ -92,6 +131,90 @@ def test_python_sdk_preserves_api_errors() -> None:
     assert caught.value.request_id == "req-denied"
 
 
+def test_python_sdk_iam_administration_methods() -> None:
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        path = request.url.path
+        if path.endswith("/iam/summary"):
+            return httpx.Response(200, content=envelope({"inventory": {"service_accounts": 1}}))
+        if path.endswith("/organizations"):
+            data: object = [] if request.method == "GET" else {"tenant_id": "tenant-a"}
+        elif path.endswith("/projects"):
+            data = [] if request.method == "GET" else {"project_id": "project-a"}
+        elif path.endswith("/users"):
+            data = [] if request.method == "GET" else {"user_id": "user-a"}
+        elif path.endswith("/roles"):
+            data = [] if request.method == "GET" else {"role_id": "role-a"}
+        elif path.endswith("/memberships"):
+            data = [] if request.method == "GET" else {"principal_id": "user-a"}
+        elif path.endswith("/service-accounts"):
+            data = [] if request.method == "GET" else {"service_account_id": "svc-a"}
+        elif path.endswith("/api-keys") and "/service-accounts/" in path:
+            data = {"record": {"key_id": "key-a"}, "api_key": "sk_scenara_secret"}
+        elif path.endswith("/api-keys"):
+            data = []
+        elif path.endswith("/revoke"):
+            data = {"key_id": "key-a", "revoked_at": 1.0}
+        elif "/product-entitlements/" in path:
+            data = {"product_id": "console", "status": "suspended"}
+        elif path.endswith("/product-entitlements"):
+            data = [] if request.method == "GET" else {"product_id": "console", "status": "active"}
+        else:
+            raise AssertionError(f"unexpected SDK request: {request.method} {path}")
+        return httpx.Response(200, content=envelope(data))
+
+    with ScenaraClient("https://scenara.example", transport=httpx.MockTransport(handler)) as client:
+        assert client.get_iam_summary()["inventory"]["service_accounts"] == 1
+        assert client.create_organization("Scenara Labs")["tenant_id"] == "tenant-a"
+        assert client.list_organizations() == []
+        assert client.create_project("Vision", project_id="project-a")["project_id"] == "project-a"
+        assert client.list_projects() == []
+        assert client.create_user("Owner", user_id="user-a")["user_id"] == "user-a"
+        assert client.list_users() == []
+        assert (
+            client.create_role("Admin", role_id="role-a", scopes=["iam:*"], product_ids=["console"])["role_id"]
+            == "role-a"
+        )
+        assert client.list_roles() == []
+        assert (
+            client.create_membership("user-a", principal_type="user", role_ids=["role-a"])["principal_id"] == "user-a"
+        )
+        assert client.list_memberships() == []
+        assert (
+            client.create_service_account(
+                "Automation",
+                service_account_id="svc-a",
+                scopes=["iam:read"],
+                product_ids=["console"],
+            )["service_account_id"]
+            == "svc-a"
+        )
+        assert client.list_service_accounts() == []
+        assert (
+            client.create_api_key("svc-a", name="CI", scopes=["iam:read"], product_ids=["console"])["record"]["key_id"]
+            == "key-a"
+        )
+        assert client.list_api_keys() == []
+        assert client.revoke_api_key("key-a")["revoked_at"] == 1.0
+        assert client.create_product_entitlement("console")["status"] == "active"
+        assert client.list_product_entitlements() == []
+        assert client.update_product_entitlement("console", status="suspended")["status"] == "suspended"
+
+    key_request = next(request for request in requests if request.url.path.endswith("/service-accounts/svc-a/api-keys"))
+    assert json.loads(key_request.content) == {
+        "name": "CI",
+        "scopes": ["iam:read"],
+        "product_ids": ["console"],
+        "expires_at": None,
+    }
+    assert any(request.url.path.endswith("/api-keys/key-a/revoke") for request in requests)
+    assert any(
+        request.method == "PUT" and request.url.path.endswith("/product-entitlements/console") for request in requests
+    )
+
+
 def test_python_sdk_feedback_and_model_release_methods() -> None:
     requests: list[httpx.Request] = []
 
@@ -105,9 +228,13 @@ def test_python_sdk_feedback_and_model_release_methods() -> None:
         if path.endswith("/model-releases") and request.method == "GET":
             return httpx.Response(200, content=envelope([]))
         if "/model-releases/" in path:
-            return httpx.Response(200, content=envelope({"model_id": "portrait", "version": "1.0.0", "status": "active"}))
+            return httpx.Response(
+                200, content=envelope({"model_id": "portrait", "version": "1.0.0", "status": "active"})
+            )
         if path.endswith("/model-releases"):
-            return httpx.Response(201, content=envelope({"model_id": "portrait", "version": "1.0.0", "status": "candidate"}))
+            return httpx.Response(
+                201, content=envelope({"model_id": "portrait", "version": "1.0.0", "status": "candidate"})
+            )
         if path.endswith("/review"):
             return httpx.Response(200, content=envelope({"feedback_id": "fbk-1", "status": "approved"}))
         if path.endswith("/feedback") and request.method == "GET":
@@ -118,21 +245,28 @@ def test_python_sdk_feedback_and_model_release_methods() -> None:
         assert client.create_feedback({"kind": "false_negative"})["feedback_id"] == "fbk-1"
         assert client.list_feedback() == []
         assert client.review_feedback("fbk-1", status="approved")["status"] == "approved"
-        assert client.create_hard_sample_manifest(
-            dataset_id="portrait.hard-samples",
-            version="1.0.0",
-            feedback_ids=["fbk-1"],
-        )["manifest_id"] == "hsm-1"
-        assert client.create_model_release(
-            {"model_id": "portrait", "version": "1.0.0", "package_sha256": "a" * 64}
-        )["status"] == "candidate"
+        assert (
+            client.create_hard_sample_manifest(
+                dataset_id="portrait.hard-samples",
+                version="1.0.0",
+                feedback_ids=["fbk-1"],
+            )["manifest_id"]
+            == "hsm-1"
+        )
+        assert (
+            client.create_model_release({"model_id": "portrait", "version": "1.0.0", "package_sha256": "a" * 64})[
+                "status"
+            ]
+            == "candidate"
+        )
         assert client.list_model_releases() == []
-        assert client.transition_model_release(
-            "portrait", "1.0.0", status="active", reason="approved"
-        )["status"] == "active"
-        assert client.rollback_model_release(
-            "portrait", target_version="1.0.0", reason="regression"
-        )["status"] == "active"
+        assert (
+            client.transition_model_release("portrait", "1.0.0", status="active", reason="approved")["status"]
+            == "active"
+        )
+        assert (
+            client.rollback_model_release("portrait", target_version="1.0.0", reason="regression")["status"] == "active"
+        )
         assert client.list_model_deployment_events() == []
 
     assert any(request.url.path.endswith("/review") for request in requests)

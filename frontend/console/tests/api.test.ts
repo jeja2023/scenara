@@ -3,8 +3,19 @@ import { join } from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, api, saveConnection } from "../src/api";
-import { labelCapability, labelDomain, labelPipeline, labelRunStatus } from "../src/labels";
+import { ApiError, api, saveConnection, userFacingError } from "../src/api";
+import {
+  labelAccessCapability,
+  labelCapability,
+  labelDomain,
+  labelEntitlementSource,
+  labelPipeline,
+  labelProductGate,
+  labelProductSummary,
+  labelRunStatus,
+  labelVersion,
+  labelWarning,
+} from "../src/labels";
 import { routes } from "../src/router";
 
 describe("console API contract", () => {
@@ -73,6 +84,13 @@ describe("console information architecture", () => {
     expect(labelPipeline("ocr.document")).toBe("OCR 文档识别");
     expect(labelRunStatus("future-status")).toBe("未知状态");
     expect(labelCapability("future-capability")).toBe("未命名能力");
+    expect(labelProductSummary("parse")).toContain("视觉解析");
+    expect(labelProductGate("edge")).toContain("服务端部署");
+    expect(labelAccessCapability("api_authentication").name).toBe("接口认证");
+    expect(labelEntitlementSource("manual")).toBe("手动配置");
+    expect(labelWarning("gait_requires_at_least_8_frames")).toBe("步态分析至少需要 8 帧画面");
+    expect(labelVersion("0.3.0.dev0")).toBe("0.3.0 开发版");
+    expect(userFacingError(new TypeError("Failed to fetch"))).toBe("操作失败，请稍后重试");
   });
 
   it("includes every 0.7 workspace", () => {
@@ -116,6 +134,19 @@ describe("console information architecture", () => {
       "<th>ID</th>",
       "<span>URL</span>",
       ">API v1<",
+      "项目 ID",
+      "用户 ID",
+      "角色 ID",
+      "主体 ID",
+      "账号 ID",
+      ">Scope<",
+      ">API Keys<",
+      "<th>Key</th>",
+      "Key 名称",
+      "签发 Key",
+      "API Key 已签发",
+      "暂无 API Key",
+      "接口 v1",
     ];
     expect(untranslatedLabels.filter((label) => source.includes(label))).toEqual([]);
   });

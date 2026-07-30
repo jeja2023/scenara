@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -233,6 +234,335 @@ async def test_pipeline_and_model_catalog_endpoints_use_state_store(client) -> N
     models = await api.get("/api/v1/models")
     assert models.status_code == 200
     assert models.json()["data"] == []
+
+
+@pytest.mark.asyncio
+async def test_platform_product_catalog_exposes_matrix_boundaries(client) -> None:
+    api, _ = client
+    response = await api.get("/api/v1/platform/products")
+    assert response.status_code == 200, response.text
+    items = response.json()["data"]
+    by_id = {item["product_id"]: item for item in items}
+    assert set(by_id) == {
+        "agent",
+        "api",
+        "console",
+        "data",
+        "edge",
+        "flow",
+        "index",
+        "model",
+        "parse",
+        "sdk",
+        "search",
+    }
+    assert by_id["parse"]["maturity"] == "available"
+    assert by_id["parse"]["console_route"] == "/parse"
+    assert "OCR document parsing" in by_id["parse"]["current_scope"]
+    assert by_id["model"]["maturity"] == "seed"
+    assert "training jobs" in by_id["model"]["not_in_scope_yet"]
+    assert by_id["console"]["layer"] == "control_plane"
+    assert by_id["api"]["layer"] == "developer_surface"
+    assert by_id["agent"]["maturity"] == "gated"
+    assert by_id["agent"]["depends_on"] == ["flow", "search", "api", "console"]
+
+
+@pytest.mark.asyncio
+async def test_platform_repository_topology_exposes_ownership_and_integration_boundaries(client) -> None:
+    api, _ = client
+    response = await api.get("/api/v1/platform/repositories")
+    assert response.status_code == 200, response.text
+    topology = response.json()["data"]
+    assert topology["schema_version"] == "1.0"
+    assert topology["current_repository_id"] == "scenara"
+
+    by_id = {item["repository_id"]: item for item in topology["repositories"]}
+    assert set(by_id) == {"scenara", "scenara-data", "scenara-model"}
+    assert by_id["scenara"]["current_repository"] is True
+    assert set(by_id["scenara"]["primary_product_ids"]) == {
+        "agent",
+        "api",
+        "console",
+        "edge",
+        "flow",
+        "index",
+        "parse",
+        "sdk",
+        "search",
+    }
+    assert by_id["scenara"]["integration_product_ids"] == ["model", "data"]
+    assert "model_admission_release_and_deployment" in by_id["scenara"]["responsibilities"]
+    assert "model_training_jobs" in by_id["scenara"]["excluded_responsibilities"]
+
+    assert by_id["scenara-model"]["lifecycle"] == "external_existing"
+    assert "model_training_jobs" in by_id["scenara-model"]["responsibilities"]
+    assert "model_admission_release_and_deployment" in by_id["scenara-model"]["excluded_responsibilities"]
+    assert by_id["scenara-data"]["lifecycle"] == "planned"
+    assert "dataset_catalog_and_versioning" in by_id["scenara-data"]["responsibilities"]
+
+    contracts = {item["contract_id"]: item for item in topology["integration_contracts"]}
+    assert contracts["model-package-admission"]["producer_repository_id"] == "scenara-model"
+    assert contracts["model-package-admission"]["consumer_repository_id"] == "scenara"
+    assert contracts["model-package-admission"]["payload_type"] == "ModelPackageManifest"
+    assert contracts["hard-sample-handoff"]["payload_type"] == "HardSampleManifest"
+    assert set(topology["boundary_rules"]) == {
+        "immutable_artifact_references",
+        "no_cross_repository_source_imports",
+        "no_shared_database",
+        "versioned_contracts_only",
+    }
+
+
+@pytest.mark.asyncio
+async def test_platform_access_foundation_exposes_current_identity_boundary(client) -> None:
+    api, _ = client
+    response = await api.get(
+        "/api/v1/platform/access-foundation",
+        headers={"X-Tenant-Id": "tenant-a", "X-Project-Id": "project-a", "X-Principal-Id": "operator-a"},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()["data"]
+    assert payload["auth_mode"] == "development_open"
+    assert payload["principal_source"] == "header"
+    assert payload["tenant_id"] == "tenant-a"
+    assert payload["project_id"] == "project-a"
+    assert payload["principal_id"] == "operator-a"
+    assert payload["policy_provider"] == "development-open"
+    by_id = {item["capability_id"]: item for item in payload["capabilities"]}
+    assert by_id["tenant_project_context"]["status"] == "available"
+    assert by_id["api_authentication"]["status"] == "available"
+    assert by_id["policy_provider"]["status"] == "available"
+    assert "service account API keys" in by_id["api_authentication"]["current_scope"]
+    assert by_id["sso"]["status"] == "planned"
+
+
+@pytest.mark.asyncio
+async def test_iam_lifecycle_issues_scoped_service_credentials(development_settings) -> None:
+    settings = replace(development_settings, auth_required=True, api_token="root-secret")
+    runtime = build_runtime(settings)
+    app = create_app(runtime=runtime)
+    root_headers = {
+        "Authorization": "Bearer root-secret",
+        "X-Tenant-Id": "tenant-a",
+        "X-Project-Id": "project-a",
+    }
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as api:
+        organization = await api.post(
+            "/api/v1/platform/organizations", json={"display_name": "Scenara Labs"}, headers=root_headers
+        )
+        assert organization.status_code == 201, organization.text
+        assert organization.json()["data"]["tenant_id"] == "tenant-a"
+
+        project = await api.post(
+            "/api/v1/platform/projects",
+            json={"project_id": "project-a", "display_name": "Vision Platform"},
+            headers=root_headers,
+        )
+        assert project.status_code == 201, project.text
+        user = await api.post(
+            "/api/v1/platform/users",
+            json={"user_id": "user-a", "display_name": "Platform Owner", "email": "owner@example.test"},
+            headers=root_headers,
+        )
+        assert user.status_code == 201, user.text
+        role = await api.post(
+            "/api/v1/platform/roles",
+            json={"role_id": "role-admin", "display_name": "Project Admin", "scopes": ["iam:*"], "product_ids": ["console"]},
+            headers=root_headers,
+        )
+        assert role.status_code == 201, role.text
+        membership = await api.post(
+            "/api/v1/platform/memberships",
+            json={"principal_id": "user-a", "principal_type": "user", "role_ids": ["role-admin"]},
+            headers=root_headers,
+        )
+        assert membership.status_code == 201, membership.text
+        entitlement = await api.post(
+            "/api/v1/platform/product-entitlements",
+            json={"product_id": "console"},
+            headers=root_headers,
+        )
+        assert entitlement.status_code == 201, entitlement.text
+
+        service_account = await api.post(
+            "/api/v1/platform/service-accounts",
+            json={
+                "service_account_id": "automation-reader",
+                "display_name": "Console Reader",
+                "scopes": ["iam:*"],
+                "product_ids": ["console"],
+            },
+            headers=root_headers,
+        )
+        assert service_account.status_code == 201, service_account.text
+
+        escalation = await api.post(
+            "/api/v1/platform/service-accounts/automation-reader/api-keys",
+            json={"name": "invalid", "scopes": ["*"], "product_ids": ["console"]},
+            headers=root_headers,
+        )
+        assert escalation.status_code == 403
+        assert escalation.json()["error"]["code"] == "POLICY_DENIED"
+
+        issued = await api.post(
+            "/api/v1/platform/service-accounts/automation-reader/api-keys",
+            json={"name": "console automation", "scopes": ["iam:read"], "product_ids": ["console"]},
+            headers=root_headers,
+        )
+        assert issued.status_code == 201, issued.text
+        credential = issued.json()["data"]
+        api_key = credential["api_key"]
+        key_id = credential["record"]["key_id"]
+        assert api_key.startswith("sk_scenara_")
+        assert "sha256" not in issued.text.lower()
+
+        key_headers = {"Authorization": f"Bearer {api_key}"}
+        summary = await api.get("/api/v1/platform/iam/summary", headers=key_headers)
+        assert summary.status_code == 200, summary.text
+        assert summary.json()["data"]["inventory"] == {
+            "organizations": 1,
+            "projects": 1,
+            "users": 1,
+            "roles": 1,
+            "memberships": 1,
+            "service_accounts": 1,
+            "api_keys": 1,
+            "product_entitlements": 1,
+        }
+        foundation = await api.get("/api/v1/platform/access-foundation", headers=key_headers)
+        assert foundation.status_code == 200
+        assert foundation.json()["data"]["principal_source"] == "service_account_api_key"
+        assert foundation.json()["data"]["principal_id"] == "automation-reader"
+
+        denied_write = await api.post(
+            "/api/v1/platform/users",
+            json={"display_name": "Denied User"},
+            headers=key_headers,
+        )
+        assert denied_write.status_code == 403
+        project_mismatch = await api.get(
+            "/api/v1/platform/iam/summary",
+            headers={**key_headers, "X-Project-Id": "project-b"},
+        )
+        assert project_mismatch.status_code == 403
+
+        suspended = await api.put(
+            "/api/v1/platform/product-entitlements/console",
+            json={"status": "suspended"},
+            headers=root_headers,
+        )
+        assert suspended.status_code == 200, suspended.text
+        product_suspended = await api.get("/api/v1/platform/iam/summary", headers=key_headers)
+        assert product_suspended.status_code == 403
+        assert product_suspended.json()["error"]["message"] == "product denied: console"
+        restored = await api.put(
+            "/api/v1/platform/product-entitlements/console",
+            json={"status": "active"},
+            headers=root_headers,
+        )
+        assert restored.status_code == 200, restored.text
+        assert (await api.get("/api/v1/platform/iam/summary", headers=key_headers)).status_code == 200
+
+        parser_account = await api.post(
+            "/api/v1/platform/service-accounts",
+            json={
+                "service_account_id": "automation-parser",
+                "display_name": "Parser without entitlement",
+                "scopes": ["*"],
+                "product_ids": ["parse"],
+            },
+            headers=root_headers,
+        )
+        assert parser_account.status_code == 201, parser_account.text
+        parser_key_response = await api.post(
+            "/api/v1/platform/service-accounts/automation-parser/api-keys",
+            json={"name": "parser", "scopes": ["*"], "product_ids": ["parse"]},
+            headers=root_headers,
+        )
+        assert parser_key_response.status_code == 201, parser_key_response.text
+        parser_key = parser_key_response.json()["data"]["api_key"]
+        product_denied = await api.get(
+            "/api/v1/media/assets",
+            headers={"Authorization": f"Bearer {parser_key}"},
+        )
+        assert product_denied.status_code == 403
+        assert product_denied.json()["error"]["message"] == "product denied: parse"
+
+        revoked = await api.post(
+            f"/api/v1/platform/api-keys/{key_id}/revoke", headers=root_headers
+        )
+        assert revoked.status_code == 200, revoked.text
+        assert revoked.json()["data"]["revoked_at"] is not None
+        assert (await api.get("/api/v1/platform/iam/summary", headers=key_headers)).status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_iam_rejects_cross_project_assignments(client) -> None:
+    api, _ = client
+    headers = {"X-Tenant-Id": "tenant-a", "X-Project-Id": "project-a"}
+    membership = await api.post(
+        "/api/v1/platform/memberships",
+        json={
+            "project_id": "project-b",
+            "principal_id": "user-a",
+            "principal_type": "user",
+            "role_ids": ["role-a"],
+        },
+        headers=headers,
+    )
+    assert membership.status_code == 403
+    entitlement = await api.post(
+        "/api/v1/platform/product-entitlements",
+        json={"project_id": "project-b", "product_id": "parse"},
+        headers=headers,
+    )
+    assert entitlement.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_iam_rejects_dangling_projects_principals_and_roles(client) -> None:
+    api, _ = client
+    headers = {"X-Tenant-Id": "tenant-a", "X-Project-Id": "project-a"}
+    missing_project = await api.post(
+        "/api/v1/platform/service-accounts",
+        json={"display_name": "Orphan", "scopes": ["iam:read"]},
+        headers=headers,
+    )
+    assert missing_project.status_code == 404
+
+    assert (
+        await api.post(
+            "/api/v1/platform/organizations",
+            json={"display_name": "Scenara Labs"},
+            headers=headers,
+        )
+    ).status_code == 201
+    assert (
+        await api.post(
+            "/api/v1/platform/projects",
+            json={"project_id": "project-a", "display_name": "Vision"},
+            headers=headers,
+        )
+    ).status_code == 201
+    missing_principal = await api.post(
+        "/api/v1/platform/memberships",
+        json={"principal_id": "user-a", "principal_type": "user", "role_ids": ["role-a"]},
+        headers=headers,
+    )
+    assert missing_principal.status_code == 404
+    assert (
+        await api.post(
+            "/api/v1/platform/users",
+            json={"user_id": "user-a", "display_name": "Owner"},
+            headers=headers,
+        )
+    ).status_code == 201
+    missing_role = await api.post(
+        "/api/v1/platform/memberships",
+        json={"principal_id": "user-a", "principal_type": "user", "role_ids": ["role-a"]},
+        headers=headers,
+    )
+    assert missing_role.status_code == 404
 
 
 @pytest.mark.asyncio

@@ -2,8 +2,8 @@
 import { ChevronLeft, ChevronRight, RefreshCw, Search } from "@lucide/vue";
 import { computed, onMounted, ref } from "vue";
 
-import { api } from "../api";
-import { labelCapability, labelDomain, labelObjectType, labelPipeline, labelUnitType } from "../labels";
+import { api, userFacingError } from "../api";
+import { labelCapability, labelDomain, labelObjectType, labelPipeline, labelUnitType, labelWarning } from "../labels";
 import type { ResultEnvelope, ResultPage, Run, RunPage } from "../types";
 
 const runs = ref<Run[]>([]);
@@ -43,7 +43,7 @@ async function loadResult(offset = unitOffset.value): Promise<void> {
     unitTotal.value = page.unit_total;
   } catch (caught) {
     result.value = null;
-    error.value = caught instanceof Error ? caught.message : String(caught);
+    error.value = userFacingError(caught, "结果加载失败，请稍后重试");
   } finally {
     loading.value = false;
   }
@@ -54,7 +54,7 @@ async function initialize(): Promise<void> {
     await refreshRuns();
     await loadResult(0);
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught);
+    error.value = userFacingError(caught, "已完成运行加载失败，请稍后重试");
   }
 }
 
@@ -81,7 +81,7 @@ onMounted(initialize);
             {{ labelDomain(run.domain) }} · {{ run.run_id }}
           </option>
         </select>
-        <input v-model.trim="runId" aria-label="运行标识" placeholder="run_..." @keyup.enter="loadResult(0)" />
+        <input v-model.trim="runId" aria-label="运行标识" placeholder="输入运行标识" @keyup.enter="loadResult(0)" />
         <button class="button primary" :disabled="!runId || loading" @click="loadResult(0)">
           <Search :size="16" />加载
         </button>
@@ -117,7 +117,7 @@ onMounted(initialize);
               <tbody>
                 <tr v-for="unit in result.units" :key="unit.unit_id">
                   <td><strong>{{ unit.unit_id }}</strong><div class="muted">{{ labelUnitType(unit.unit_type) }}</div></td>
-                  <td>{{ unit.page_number ? "第 " + unit.page_number + " 页" : (unit.pts_ms ?? 0) + " ms" }}</td>
+                  <td>{{ unit.page_number ? "第 " + unit.page_number + " 页" : (unit.pts_ms ?? 0) + " 毫秒" }}</td>
                   <td>{{ unit.width }} × {{ unit.height }}</td>
                   <td>
                     <div class="object-list">
@@ -150,7 +150,7 @@ onMounted(initialize);
           <section class="panel">
             <div class="panel-header"><h2>告警</h2></div>
             <div class="panel-body warning-list">
-              <code v-for="warning in result.warnings" :key="warning">{{ warning }}</code>
+              <code v-for="warning in result.warnings" :key="warning">{{ labelWarning(warning) }}</code>
               <span v-if="!result.warnings.length" class="muted">没有告警。</span>
             </div>
           </section>

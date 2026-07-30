@@ -1,6 +1,6 @@
 # Scenara（景枢）企业级视觉 AI 平台优化升级方案
 
-**版本：V2.3（0.2.0-dev.0 工程收口版）**
+**版本：V2.4（0.3.0-dev.0 产品矩阵与访问底座版）**
 
 **基线日期：2026-07-30**
 
@@ -11,8 +11,8 @@
 ## 1. 执行结论
 
 1. **品牌决策已确定**：英文品牌保持 **Scenara**，中文品牌由“景析”正式变更为 **景枢**，完整名称统一为 **Scenara 景枢**，产品类别为“企业视觉 AI 中枢平台”。“景枢”表达统一接入、解析、调度、输出和治理的视觉能力中枢；不再保留两套中文品牌，也不恢复 Portrait Hub 或 Vision Hub。
-2. **近期只有一个平台产品**：Parsing、Model、Data、Console 是能力域，不是四套需要独立建设、部署和销售的产品。当前交付形态保持为 Scenara 平台、Scenara Console、Python/TypeScript SDK 和可选企业模块。
-3. **先完成 1.0 资格验证，再扩功能**：仓库中 0.3-1.0 的主体代码已经存在，主要缺口不是继续堆功能，而是真实 PostgreSQL/Redis/MinIO、合法模型、目标 GPU、离线安装和备份恢复证据。
+2. **建立统一产品矩阵，但不复制平台**：Parse、Model、Data、Edge、Flow、Search 与 Agent 是可独立演进的产品模块；Console、API、SDK 是共享入口，Index 是共享底座。当前继续使用同一平台内核、IAM、授权、审计和部署栈，不因命名拆分重复系统。
+3. **先完成 1.0 资格验证，再扩功能**：仓库中 0.4-1.0 的主体代码已经存在，主要缺口不是继续堆功能，而是真实 PostgreSQL/Redis/MinIO、合法模型、目标 GPU、离线安装和备份恢复证据。
 4. **Portrait 是首个正式领域，OCR/Document 是验证领域**：二者用于证明平台内核可复用。Vehicle、Industrial、Behavior 等新领域只有在现有领域通过质量和商业验证后才立项。
 5. **训练平台与 Scenara 解耦协作**：训练平台负责数据集、标注、实验和训练；Scenara 负责模型包准入、部署、推理、评估证据、运行反馈和版本追溯。双方通过版本化制品与事件契约连接，不共享内部数据库。
 6. **产品宣传必须分级**：只有“实现完成 + 资格验证完成 + 证据签署”后，能力才能标记为生产可用。当前开发替代实现、未授权权重和未签署评估结果不得进入对外能力清单。
@@ -24,7 +24,8 @@
 | 维度 | 当前事实 | 结论 |
 |---|---|---|
 | 品牌现状 | `README.md`、品牌规范、控制台、OpenAPI、SDK 文档和品牌资产已统一为“景枢” | 品牌迁移已完成；仓库门禁阻止旧品牌重新进入当前产品表面 |
-| 产品阶段 | 当前版本为 `0.2.0-dev`，仓库明确声明尚未发布 1.0（`README.md:5-12`） | 所有生产级宣传均受发布门禁约束 |
+| 产品阶段 | 当前版本为 `0.3.0-dev.0`，仓库明确声明尚未发布 1.0（`README.md`） | 所有生产级宣传均受发布门禁约束 |
+| 产品与访问底座 | 11 项产品目录、Organization、Project、User、Role、Membership、Service Account、API Key 与 Product Entitlement 已成为公共契约 | 产品继续共享 IAM、授权、审计和部署栈；身份联邦与商业生命周期仍受门禁约束 |
 | 架构边界 | `platform` 定义契约，`domains` 实现领域，`infrastructure` 实现端口，`enterprise` 通过 Policy Hook 接入（`docs/adr/0001-platform-domain-boundaries.md:14-29`） | 继续采用模块化单体，不拆微服务平台 |
 | 正式领域 | Portrait 为正式领域；OCR/Document 为验证领域（`README.md:7-8`） | 2026 年不同时扩张多个新领域 |
 | 媒体范围 | Media/Run/Pipeline/Result 契约已覆盖图片、视频、PDF 和实时流（`README.md:3`） | 以统一媒体与运行契约对外，不为每种媒体另建 API 体系 |
@@ -46,14 +47,15 @@
 | 0.5 OCR/Document 能力 | 已实现，待模型资格验证 | 中文、旋转、PDF、版面固定评估报告 |
 | 0.6 企业策略与治理 | 完成 | 正式 License、配额失败关闭和合规证据演练 |
 | 0.7 Console 与 SDK | 完成 | 持续通过前端单测、类型检查、构建、SDK 漂移检查和桌面/移动浏览器验收 |
+| 0.8 产品矩阵与共享访问底座 | 工程完成，联邦身份和商业生命周期待建设 | 持续通过租户隔离、密钥生命周期、scope 收窄、产品授权、PostgreSQL、Console 与 SDK 契约测试 |
 | 1.0 私有化交付 | 已实现，待目标环境资格验证 | GPU 容量、离线安装、备份恢复和安全评估报告 |
 
 ### 2.3 2026-07-30 质量快照
 
-- `python -m pytest -q --cov=scenara --cov=sdk/python/scenara_sdk --cov-fail-under=75`：**81 passed，5 skipped，77.12% coverage**。跳过项为需要真实外部服务的集成测试，不能计作 1.0 已通过。
+- `python -m pytest -q --cov=scenara --cov=sdk/python/scenara_sdk --cov-fail-under=75`：**87 passed，6 skipped，78.29% coverage**。跳过项为需要真实外部服务的集成测试，不能计作 1.0 已通过；启用 Docker 服务后 6 项集成测试全部通过。
 - `python scripts/release_gate.py --implementation-only`：通过，说明所需实现文件与生成契约当前齐全。
 - `python scripts/repository_gate.py`：通过，说明仓库来源、敏感信息、模型资产和公共命名门禁当前通过。
-- `npm run check`：通过；`pnpm run console:e2e` 在桌面 Chrome 与 Pixel 7 两个视口完成 26 项浏览器验收，无页面异常或横向溢出。
+- `npm run check`：通过；`pnpm run console:e2e` 在桌面 Chrome 与 Pixel 7 两个视口完成 28 项浏览器验收，无页面异常或横向溢出。
 
 以上结果是当前工作区快照，不替代 CI、目标环境报告或正式签署证据。
 
@@ -77,7 +79,10 @@
 
 | 交付项 | 责任 | 2026 年定位 |
 |---|---|---|
-| Scenara Platform | API、媒体、运行、Pipeline、Domain、结果、模型运行时与治理 | 核心产品 |
+| Scenara Platform | 共享内核、IAM、授权、审计、产品目录与部署栈 | 平台底座 |
+| Scenara Parse / Model / Data | 解析、模型治理与数据闭环产品模块 | 当前可用或种子能力，共享平台底座 |
+| Scenara Edge / Flow / Search / Agent | 边缘、流程、检索和智能动作产品模块 | 规划或门禁中，不宣称生产可用 |
+| Scenara Index | 特征、向量和未来通用索引资源 | 共享种子底座 |
 | Scenara Console | 解析、结果查看、配置、接入和运维工作台 | 核心产品界面 |
 | Scenara SDK | Python 与 TypeScript 客户端 | 核心集成入口 |
 | Scenara Enterprise | License、权益、配额、SLA、事件、支持和合规证据 | 可选商业模块 |

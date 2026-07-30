@@ -75,7 +75,7 @@ onMounted(checkConnection);
           </RouterLink>
         </section>
       </nav>
-      <div class="sidebar-footer"><span>0.1 开发版</span><i></i><span>接口 v1</span></div>
+      <div class="sidebar-footer"><span>0.3 开发版</span><i></i><span>接口版本 1</span></div>
     </aside>
     <button v-if="mobileOpen" class="nav-scrim" aria-label="关闭导航" @click="mobileOpen = false"></button>
 

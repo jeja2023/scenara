@@ -5,6 +5,28 @@ from typing import Any, Protocol
 
 from scenara.platform.models import PrincipalContext
 
+RESOURCE_PRODUCTS = {
+    "enterprise_compliance": "console",
+    "enterprise_incident": "console",
+    "enterprise_sla": "console",
+    "enterprise_support": "console",
+    "feedback": "data",
+    "hard-sample-manifest": "data",
+    "iam": "console",
+    "media_asset": "parse",
+    "media_source": "parse",
+    "model_package": "model",
+    "model-deployment-event": "model",
+    "model-release": "model",
+    "operations": "console",
+    "pipeline": "parse",
+    "portrait_feature": "parse",
+    "portrait_identity": "parse",
+    "run": "parse",
+    "webhook_delivery": "api",
+    "webhook_subscription": "api",
+}
+
 
 class PolicyDenied(RuntimeError):
     pass
@@ -96,6 +118,17 @@ async def require_allowed(
     resource: str,
     attributes: dict[str, Any] | None = None,
 ) -> PolicyDecision:
+    if context.scopes:
+        required = {
+            "*",
+            f"{resource}:*",
+            f"{resource}:{action}",
+        }
+        if not (required & context.scopes):
+            raise PolicyDenied(f"scope denied: {resource}:{action}")
+        product_id = RESOURCE_PRODUCTS.get(resource)
+        if product_id is not None and product_id not in context.product_ids:
+            raise PolicyDenied(f"product denied: {product_id}")
     decision = await provider.authorize(context, action, resource, attributes)
     if not decision.allowed:
         raise PolicyDenied(decision.reason)
@@ -103,6 +136,7 @@ async def require_allowed(
 
 
 __all__ = [
+    "RESOURCE_PRODUCTS",
     "DenyUnavailablePolicyProvider",
     "DevelopmentPolicyProvider",
     "PolicyDecision",

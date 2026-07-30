@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { api } from "../api";
+import { api, userFacingError } from "../api";
 import { labelDomain, labelOperator, labelPipeline, labelPipelineStatus } from "../labels";
 import type { Pipeline } from "../types";
 
@@ -8,7 +8,7 @@ const rows = ref<Pipeline[]>([]);
 const error = ref("");
 async function refresh(): Promise<void> {
   try { rows.value = await api<Pipeline[]>("/api/v1/pipelines"); }
-  catch (caught) { error.value = caught instanceof Error ? caught.message : String(caught); }
+  catch (caught) { error.value = userFacingError(caught, "流水线加载失败，请稍后重试"); }
 }
 onMounted(refresh);
 </script>

@@ -43,6 +43,8 @@ from scenara.enterprise.service import (
     SlaSnapshot,
     SupportCase,
 )
+from scenara.platform.access import AccessNotFound
+from scenara.platform.access_foundation import build_access_foundation
 from scenara.platform.audit import AuditUnavailable
 from scenara.platform.features import FeatureStoreError
 from scenara.platform.feedback import (
@@ -61,32 +63,56 @@ from scenara.platform.feedback import (
 )
 from scenara.platform.models import (
     TERMINAL_RUN_STATUSES,
+    AccessFoundationStatus,
     ApiEnvelope,
     ApiErrorDetail,
     ApiErrorEnvelope,
+    ApiKeyRecord,
+    CreateApiKeyRequest,
+    CreateApiKeyResponse,
     CreateMediaSourceRequest,
+    CreateMembershipRequest,
+    CreateOrganizationRequest,
+    CreateProductEntitlementRequest,
+    CreateProjectRequest,
+    CreateRoleRequest,
     CreateRunRequest,
+    CreateServiceAccountRequest,
+    CreateUserRequest,
     CreateWebhookSubscriptionRequest,
+    IamSummary,
     MediaAsset,
     MediaAssetPage,
     MediaKind,
     MediaSource,
     MediaSourcePage,
+    Membership,
+    Organization,
     ParseImageResponse,
     PipelineRef,
     PipelineTransitionRequest,
     PrincipalContext,
+    ProductCatalogItem,
+    ProductEntitlement,
+    Project,
+    RepositoryTopology,
     ResultPage,
+    Role,
     RunPage,
     RunRecord,
     RunStatus,
+    ServiceAccount,
     SystemStatus,
+    UpdateProductEntitlementRequest,
+    UserAccount,
     WebhookDeliveryRecord,
     WebhookSubscriptionView,
 )
 from scenara.platform.observability import RequestMetrics
 from scenara.platform.pipeline import PipelineError
-from scenara.platform.policy import PolicyDenied, PolicyUnavailable
+from scenara.platform.policy import PolicyDenied, PolicyUnavailable, require_allowed
+from scenara.platform.product_catalog import build_product_catalog
+from scenara.platform.repository_topology import build_repository_topology
 from scenara.platform.services import InvalidTransition, ResourceNotFound, sse_payload
 from scenara.platform.store import StateConflict
 from scenara.platform.webhook_service import WebhookNotFound
@@ -123,12 +149,34 @@ async def principal_context(
     settings = runtime.settings
     if settings.auth_required:
         expected = f"Bearer {settings.api_token}"
-        if not authorization or not hmac.compare_digest(authorization, expected):
+        if not authorization:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid bearer token")
+        if hmac.compare_digest(authorization, expected):
+            if x_principal_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="principal identity is credential-derived"
+                )
+            tenant_id = x_tenant_id or settings.default_tenant_id
+            project_id = x_project_id or settings.default_project_id
+            principal_id = "api-token"
+            if not all(CONTEXT_ID.fullmatch(value) for value in (tenant_id, project_id, principal_id)):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid context identifier")
+            return PrincipalContext(tenant_id=tenant_id, project_id=project_id, principal_id=principal_id)
+        scheme, _, token = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not token:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid bearer token")
+        credential = await runtime.access.authenticate_api_key(token)
+        if credential is None:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid bearer token")
         if x_principal_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="principal identity is credential-derived"
             )
+        if x_tenant_id and x_tenant_id != credential.tenant_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="credential tenant mismatch")
+        if x_project_id and x_project_id != credential.project_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="credential project mismatch")
+        return credential
     tenant_id = x_tenant_id or settings.default_tenant_id
     project_id = x_project_id or settings.default_project_id
     principal_id = x_principal_id or ("api-token" if settings.auth_required else "anonymous")
@@ -240,6 +288,10 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     async def portrait_conflict(request: Request, exc: PortraitConflict) -> JSONResponse:
         return error_response(request, 409, "PORTRAIT_CONFLICT", str(exc))
 
+    @app.exception_handler(AccessNotFound)
+    async def access_not_found(request: Request, exc: AccessNotFound) -> JSONResponse:
+        return error_response(request, 404, "ACCESS_NOT_FOUND", str(exc))
+
     @app.exception_handler(FeatureStoreError)
     async def feature_store_error(request: Request, exc: FeatureStoreError) -> JSONResponse:
         return error_response(request, 409, "FEATURE_SPACE_CONFLICT", str(exc))
@@ -281,7 +333,8 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         return _envelope(request, {"status": "ready", "components": components})  # type: ignore[return-value]
 
     @app.get("/metrics", include_in_schema=False)
-    async def metrics(_: PrincipalContext = Depends(principal_context)) -> Response:
+    async def metrics(context: PrincipalContext = Depends(principal_context)) -> Response:
+        await require_allowed(runtime.policy, context, "read", "operations")
         return Response(
             content=app.state.request_metrics.render(),
             media_type="text/plain; version=0.0.4; charset=utf-8",
@@ -314,6 +367,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[MediaAssetPage]:
+        await require_allowed(runtime.policy, context, "list", "media_asset")
         rows = await runtime.state.list_assets(context.tenant_id, context.project_id)
         rows = [item for item in rows if item.deleted_at is None]
         return _envelope(
@@ -327,6 +381,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[MediaAsset]:
+        await require_allowed(runtime.policy, context, "read", "media_asset", {"asset_id": asset_id})
         asset = await runtime.state.get_asset(context.tenant_id, context.project_id, asset_id)
         if asset is None or asset.deleted_at is not None:
             raise ResourceNotFound("media asset not found")
@@ -364,6 +419,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[MediaSourcePage]:
+        await require_allowed(runtime.policy, context, "list", "media_source")
         rows = await runtime.state.list_sources(context.tenant_id, context.project_id)
         return _envelope(
             request,
@@ -669,7 +725,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     async def list_pipelines(
         request: Request, context: PrincipalContext = Depends(principal_context)
     ) -> ApiEnvelope[list[dict[str, object]]]:
-        del context
+        await require_allowed(runtime.policy, context, "list", "pipeline")
         rows = [pipeline.model_dump(mode="json") for pipeline in await runtime.runs.sync_pipeline_catalog()]
         return _envelope(request, rows)  # type: ignore[return-value]
 
@@ -816,7 +872,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     async def list_models(
         request: Request, context: PrincipalContext = Depends(principal_context)
     ) -> ApiEnvelope[list[dict[str, object]]]:
-        del context
+        await require_allowed(runtime.policy, context, "list", "model_package")
         rows = [package.model_dump(mode="json") for package in await runtime.state.list_model_packages()]
         return _envelope(request, rows)  # type: ignore[return-value]
 
@@ -837,12 +893,181 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         ]
         return _envelope(request, rows)  # type: ignore[return-value]
 
+    @app.get("/api/v1/platform/products", tags=["Platform"])
+    async def list_platform_products(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[ProductCatalogItem]]:
+        del context
+        installed_domains = [manifest.domain_id for manifest in runtime.plugins.manifests()]
+        return _envelope(request, build_product_catalog(installed_domains))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/repositories", tags=["Platform"])
+    async def platform_repository_topology(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[RepositoryTopology]:
+        del context
+        return _envelope(request, build_repository_topology())  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/access-foundation", tags=["Platform"])
+    async def platform_access_foundation(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[AccessFoundationStatus]:
+        return _envelope(
+            request,
+            build_access_foundation(runtime.settings, context, policy_provider=runtime.policy.provider_id),
+        )  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/iam/summary", tags=["IAM"])
+    async def iam_summary(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[IamSummary]:
+        return _envelope(request, await runtime.access.summary(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/organizations", status_code=201, tags=["IAM"])
+    async def create_organization(
+        body: CreateOrganizationRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[Organization]:
+        return _envelope(request, await runtime.access.create_organization(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/organizations", tags=["IAM"])
+    async def list_organizations(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[Organization]]:
+        return _envelope(request, await runtime.access.list_organizations(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/projects", status_code=201, tags=["IAM"])
+    async def create_project(
+        body: CreateProjectRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[Project]:
+        return _envelope(request, await runtime.access.create_project(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/projects", tags=["IAM"])
+    async def list_projects(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[Project]]:
+        return _envelope(request, await runtime.access.list_projects(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/users", status_code=201, tags=["IAM"])
+    async def create_user(
+        body: CreateUserRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[UserAccount]:
+        return _envelope(request, await runtime.access.create_user(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/users", tags=["IAM"])
+    async def list_users(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[UserAccount]]:
+        return _envelope(request, await runtime.access.list_users(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/roles", status_code=201, tags=["IAM"])
+    async def create_role(
+        body: CreateRoleRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[Role]:
+        return _envelope(request, await runtime.access.create_role(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/roles", tags=["IAM"])
+    async def list_roles(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[Role]]:
+        return _envelope(request, await runtime.access.list_roles(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/memberships", status_code=201, tags=["IAM"])
+    async def create_membership(
+        body: CreateMembershipRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[Membership]:
+        return _envelope(request, await runtime.access.create_membership(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/memberships", tags=["IAM"])
+    async def list_memberships(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[Membership]]:
+        return _envelope(request, await runtime.access.list_memberships(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/service-accounts", status_code=201, tags=["IAM"])
+    async def create_service_account(
+        body: CreateServiceAccountRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[ServiceAccount]:
+        return _envelope(request, await runtime.access.create_service_account(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/service-accounts", tags=["IAM"])
+    async def list_service_accounts(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[ServiceAccount]]:
+        return _envelope(request, await runtime.access.list_service_accounts(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/service-accounts/{service_account_id}/api-keys", status_code=201, tags=["IAM"])
+    async def create_api_key(
+        service_account_id: str,
+        body: CreateApiKeyRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[CreateApiKeyResponse]:
+        return _envelope(
+            request,
+            await runtime.access.create_api_key(context, service_account_id, body),
+        )  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/api-keys", tags=["IAM"])
+    async def list_api_keys(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[ApiKeyRecord]]:
+        return _envelope(request, await runtime.access.list_api_keys(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/api-keys/{key_id}/revoke", tags=["IAM"])
+    async def revoke_api_key(
+        key_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[ApiKeyRecord]:
+        return _envelope(request, await runtime.access.revoke_api_key(context, key_id))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/product-entitlements", status_code=201, tags=["IAM"])
+    async def create_product_entitlement(
+        body: CreateProductEntitlementRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[ProductEntitlement]:
+        return _envelope(
+            request,
+            await runtime.access.create_product_entitlement(context, body),
+        )  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/product-entitlements", tags=["IAM"])
+    async def list_product_entitlements(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[ProductEntitlement]]:
+        return _envelope(request, await runtime.access.list_product_entitlements(context))  # type: ignore[return-value]
+
+    @app.put("/api/v1/platform/product-entitlements/{product_id}", tags=["IAM"])
+    async def update_product_entitlement(
+        product_id: str,
+        body: UpdateProductEntitlementRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[ProductEntitlement]:
+        return _envelope(
+            request,
+            await runtime.access.update_product_entitlement(context, product_id, body),
+        )  # type: ignore[return-value]
+
     @app.get("/api/v1/system/status", tags=["Operations"])
     async def system_status(
         request: Request,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[SystemStatus]:
-        del context
+        await require_allowed(runtime.policy, context, "read", "operations")
         settings = runtime.settings
         return _envelope(
             request,

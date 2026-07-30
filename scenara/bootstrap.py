@@ -16,12 +16,14 @@ from scenara.enterprise.service import (
 )
 from scenara.infrastructure.memory_state import MemoryStateStore
 from scenara.infrastructure.object_store import LocalObjectStore, S3ObjectStore
+from scenara.infrastructure.postgres_access import PostgresAccessRepository
 from scenara.infrastructure.postgres_enterprise import PostgresEnterpriseRepository
 from scenara.infrastructure.postgres_features import PostgresFeatureStore
 from scenara.infrastructure.postgres_feedback import PostgresFeedbackRepository
 from scenara.infrastructure.postgres_portrait import PostgresPortraitRepository
 from scenara.infrastructure.postgres_state import PostgresStateStore
 from scenara.infrastructure.queue import InlineRunQueue, RedisRunQueue
+from scenara.platform.access import AccessRepository, AccessService, MemoryAccessRepository
 from scenara.platform.audit import AuditLogger
 from scenara.platform.features import FeatureStore, MemoryFeatureStore
 from scenara.platform.feedback import FeedbackRepository, FeedbackService, MemoryFeedbackRepository
@@ -43,6 +45,7 @@ from scenara.settings import Settings, load_settings
 @dataclass(slots=True)
 class Runtime:
     settings: Settings
+    access: AccessService
     features: FeatureStore
     secrets: SecretStore
     audit: AuditLogger
@@ -90,12 +93,14 @@ def build_runtime(
     if settings.state_backend == "postgres":
         postgres_state = PostgresStateStore(settings.postgres_dsn)
         state: StateStore = postgres_state
+        access_repository: AccessRepository = PostgresAccessRepository(postgres_state.pool)
         features: FeatureStore = PostgresFeatureStore(postgres_state.pool)
         portrait_repository: PortraitRepository = PostgresPortraitRepository(postgres_state.pool)
         enterprise_repository: EnterpriseRepository = PostgresEnterpriseRepository(postgres_state.pool)
         feedback_repository: FeedbackRepository = PostgresFeedbackRepository(postgres_state.pool)
     elif settings.state_backend == "memory":
         state = MemoryStateStore()
+        access_repository = MemoryAccessRepository()
         features = MemoryFeatureStore()
         portrait_repository = MemoryPortraitRepository()
         enterprise_repository = MemoryEnterpriseRepository()
@@ -176,8 +181,10 @@ def build_runtime(
         allow_private_media_sources=settings.allow_private_media_sources,
     )
     feedback = FeedbackService(feedback_repository, state, state, objects, policy, audit)
+    access = AccessService(access_repository, audit, policy)
     return Runtime(
         settings=settings,
+        access=access,
         state=state,
         objects=objects,
         queue=queue,

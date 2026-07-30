@@ -1,7 +1,43 @@
-export declare const OPENAPI_SHA256 = "bc4c102285961c150dd3f900ed9563519321f43505a3a3556979f5959bce9008";
+export declare const OPENAPI_SHA256 = "35dd908147ea0390f99a2dbbd786d1733f432309f8f8f1bd2e8b13930dafb1eb";
 export declare namespace OpenApi {
+    type AccessCapabilityItem = {
+        capability_id: string;
+        current_scope?: Array<string>;
+        name: string;
+        next_gate: string;
+        not_in_scope_yet?: Array<string>;
+        status: AccessCapabilityStatus;
+        summary: string;
+    };
+    type AccessCapabilityStatus = "available" | "seed" | "planned" | "gated";
+    type AccessFoundationStatus = {
+        auth_mode: "development_open" | "single_bearer_token";
+        capabilities: Array<AccessCapabilityItem>;
+        policy_provider: string;
+        principal_id: string;
+        principal_source: "anonymous" | "api_token" | "service_account_api_key" | "header";
+        project_id: string;
+        schema_version?: "1.0";
+        tenant_id: string;
+    };
+    type AccessId = string;
+    type ApiEnvelope_AccessFoundationStatus_ = {
+        data: AccessFoundationStatus;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_ApiKeyRecord_ = {
+        data: ApiKeyRecord;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_ComplianceEvidence_ = {
         data: ComplianceEvidence;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_CreateApiKeyResponse_ = {
+        data: CreateApiKeyResponse;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -17,6 +53,11 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_HardSampleManifest_ = {
         data: HardSampleManifest;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_IamSummary_ = {
+        data: IamSummary;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -45,8 +86,18 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_Membership_ = {
+        data: Membership;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_ModelRelease_ = {
         data: ModelRelease;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_Organization_ = {
+        data: Organization;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -80,8 +131,28 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_ProductEntitlement_ = {
+        data: ProductEntitlement;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_Project_ = {
+        data: Project;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_RepositoryTopology_ = {
+        data: RepositoryTopology;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_ResultPage_ = {
         data: ResultPage;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_Role_ = {
+        data: Role;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -92,6 +163,11 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_RunRecord_ = {
         data: RunRecord;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_ServiceAccount_ = {
+        data: ServiceAccount;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -107,6 +183,11 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_SystemStatus_ = {
         data: SystemStatus;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_UserAccount_ = {
+        data: UserAccount;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -126,6 +207,11 @@ export declare namespace OpenApi {
         data: {
             [key: string]: string;
         };
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_ApiKeyRecord__ = {
+        data: Array<ApiKeyRecord>;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -149,6 +235,11 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_list_Membership__ = {
+        data: Array<Membership>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_list_ModelDeploymentEvent__ = {
         data: Array<ModelDeploymentEvent>;
         request_id: string;
@@ -159,8 +250,43 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_list_Organization__ = {
+        data: Array<Organization>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_ProductCatalogItem__ = {
+        data: Array<ProductCatalogItem>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_ProductEntitlement__ = {
+        data: Array<ProductEntitlement>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_Project__ = {
+        data: Array<Project>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_Role__ = {
+        data: Array<Role>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_ServiceAccount__ = {
+        data: Array<ServiceAccount>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_list_SupportCase__ = {
         data: Array<SupportCase>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_UserAccount__ = {
+        data: Array<UserAccount>;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -180,6 +306,20 @@ export declare namespace OpenApi {
         }>;
         request_id: string;
         schema_version?: "1.0";
+    };
+    type ApiKeyRecord = {
+        created_at: number;
+        expires_at?: (number) | (null);
+        key_id: AccessId;
+        last_used_at?: (number) | (null);
+        name: string;
+        product_ids?: Array<ProductId>;
+        project_id: AccessId;
+        revoked_at?: (number) | (null);
+        scopes: Array<string>;
+        service_account_id: AccessId;
+        tenant_id: AccessId;
+        token_prefix: string;
     };
     type Body_create_media_asset_api_v1_media_assets_post = {
         file: string;
@@ -209,6 +349,16 @@ export declare namespace OpenApi {
         sha256: string;
         signed_by: string;
         tenant_id: string;
+    };
+    type CreateApiKeyRequest = {
+        expires_at?: (number) | (null);
+        name: string;
+        product_ids?: (Array<ProductId>) | (null);
+        scopes?: (Array<string>) | (null);
+    };
+    type CreateApiKeyResponse = {
+        api_key: string;
+        record: ApiKeyRecord;
     };
     type CreateComplianceEvidenceRequest = {
         evidence_type: string;
@@ -256,11 +406,36 @@ export declare namespace OpenApi {
         name: string;
         url: string;
     };
+    type CreateMembershipRequest = {
+        principal_id: AccessId;
+        principal_type: PrincipalType;
+        project_id?: (AccessId) | (null);
+        role_ids: Array<AccessId>;
+    };
     type CreateModelReleaseRequest = {
         evidence_refs?: Array<string>;
         model_id: string;
         package_sha256: string;
         version: string;
+    };
+    type CreateOrganizationRequest = {
+        display_name: string;
+    };
+    type CreateProductEntitlementRequest = {
+        product_id: ProductId;
+        project_id?: (AccessId) | (null);
+        source?: "manual" | "enterprise_license" | "system";
+        status?: EntitlementStatus;
+    };
+    type CreateProjectRequest = {
+        display_name: string;
+        project_id?: (AccessId) | (null);
+    };
+    type CreateRoleRequest = {
+        display_name: string;
+        product_ids?: Array<ProductId>;
+        role_id?: (AccessId) | (null);
+        scopes: Array<string>;
     };
     type CreateRunRequest = {
         asset_id?: (string) | (null);
@@ -273,10 +448,21 @@ export declare namespace OpenApi {
         source_id?: (string) | (null);
         wait_ms?: number;
     };
+    type CreateServiceAccountRequest = {
+        display_name: string;
+        product_ids?: Array<ProductId>;
+        scopes: Array<string>;
+        service_account_id?: (AccessId) | (null);
+    };
     type CreateSupportCaseRequest = {
         description: string;
         priority?: "low" | "normal" | "high" | "urgent";
         subject: string;
+    };
+    type CreateUserRequest = {
+        display_name: string;
+        email?: (string) | (null);
+        user_id?: (AccessId) | (null);
     };
     type CreateWebhookSubscriptionRequest = {
         event_types: Array<string>;
@@ -316,6 +502,7 @@ export declare namespace OpenApi {
             [key: string]: number;
         };
     };
+    type EntitlementStatus = "active" | "suspended";
     type FeedbackKind = "false_positive" | "false_negative" | "wrong_attribute" | "wrong_identity" | "ocr_correction";
     type FeedbackRecord = {
         authorized_for_training: boolean;
@@ -374,6 +561,23 @@ export declare namespace OpenApi {
         split?: "train" | "validation" | "test";
         tenant_id: string;
         version: string;
+    };
+    type IamInventory = {
+        api_keys: number;
+        memberships: number;
+        organizations: number;
+        product_entitlements: number;
+        projects: number;
+        roles: number;
+        service_accounts: number;
+        users: number;
+    };
+    type IamSummary = {
+        default_admin_scopes: Array<string>;
+        inventory: IamInventory;
+        project_id: string;
+        schema_version?: "1.0";
+        tenant_id: string;
     };
     type Incident = {
         created_at: number;
@@ -443,6 +647,15 @@ export declare namespace OpenApi {
         unit_type: "frame" | "page";
         width: number;
     };
+    type Membership = {
+        created_at: number;
+        principal_id: AccessId;
+        principal_type: PrincipalType;
+        project_id: AccessId;
+        role_ids: Array<AccessId>;
+        tenant_id: AccessId;
+        updated_at: number;
+    };
     type ModelDeploymentEvent = {
         action: string;
         audit_id: string;
@@ -497,6 +710,12 @@ export declare namespace OpenApi {
         score?: (number) | (null);
         text: string;
         [key: string]: unknown;
+    };
+    type Organization = {
+        created_at: number;
+        display_name: string;
+        tenant_id: AccessId;
+        updated_at: number;
     };
     type ParseImageResponse = {
         asset: MediaAsset;
@@ -583,10 +802,76 @@ export declare namespace OpenApi {
         feature_space_id: string;
         matches: Array<PortraitSearchMatch>;
     };
+    type PrincipalType = "user" | "service_account";
+    type ProductCatalogItem = {
+        api_paths?: Array<string>;
+        console_route?: (string) | (null);
+        current_scope?: Array<string>;
+        depends_on?: Array<ProductId>;
+        layer: ProductLayer;
+        maturity: ProductMaturity;
+        name: string;
+        next_gate: string;
+        not_in_scope_yet?: Array<string>;
+        product_id: ProductId;
+        summary: string;
+    };
+    type ProductEntitlement = {
+        created_at: number;
+        product_id: ProductId;
+        project_id: AccessId;
+        source?: "manual" | "enterprise_license" | "system";
+        status?: EntitlementStatus;
+        tenant_id: AccessId;
+        updated_at: number;
+    };
+    type ProductId = string;
+    type ProductLayer = "product_module" | "control_plane" | "developer_surface" | "foundation";
+    type ProductMaturity = "available" | "seed" | "planned" | "gated";
+    type Project = {
+        created_at: number;
+        display_name: string;
+        project_id: AccessId;
+        tenant_id: AccessId;
+        updated_at: number;
+    };
     type ProvenanceEvidence = {
         development_substitutes?: Array<string>;
         generated_by?: string;
         source_sha256?: (string) | (null);
+    };
+    type RepositoryBoundaryRule = "versioned_contracts_only" | "no_shared_database" | "no_cross_repository_source_imports" | "immutable_artifact_references";
+    type RepositoryContractTransport = "versioned_api" | "event" | "immutable_manifest";
+    type RepositoryId = string;
+    type RepositoryIntegrationContract = {
+        consumer_repository_id: RepositoryId;
+        contract_id: string;
+        invariants?: Array<RepositoryResponsibilityId>;
+        payload_type: string;
+        producer_repository_id: RepositoryId;
+        transport: RepositoryContractTransport;
+    };
+    type RepositoryKind = "platform_integration" | "specialized_product";
+    type RepositoryLifecycle = "current" | "external_existing" | "planned";
+    type RepositoryResponsibilityId = string;
+    type RepositoryTopology = {
+        boundary_rules: Array<RepositoryBoundaryRule>;
+        current_repository_id: RepositoryId;
+        integration_contracts: Array<RepositoryIntegrationContract>;
+        repositories: Array<RepositoryTopologyItem>;
+        schema_version?: "1.0";
+    };
+    type RepositoryTopologyItem = {
+        current_repository?: boolean;
+        excluded_responsibilities?: Array<RepositoryResponsibilityId>;
+        integration_product_ids?: Array<ProductId>;
+        kind: RepositoryKind;
+        lifecycle: RepositoryLifecycle;
+        name: string;
+        next_gate: string;
+        primary_product_ids?: Array<ProductId>;
+        repository_id: RepositoryId;
+        responsibilities?: Array<RepositoryResponsibilityId>;
     };
     type ResolveIncidentRequest = {
         summary?: string;
@@ -633,6 +918,15 @@ export declare namespace OpenApi {
         notes?: string;
         status: FeedbackStatus;
     };
+    type Role = {
+        created_at: number;
+        display_name: string;
+        product_ids?: Array<ProductId>;
+        role_id: AccessId;
+        scopes: Array<string>;
+        tenant_id: AccessId;
+        updated_at: number;
+    };
     type RollbackModelReleaseRequest = {
         reason: string;
         target_version: string;
@@ -667,6 +961,17 @@ export declare namespace OpenApi {
         updated_at: number;
     };
     type RunStatus = "queued" | "running" | "pausing" | "paused" | "completed" | "failed" | "cancelling" | "cancelled";
+    type ServiceAccount = {
+        created_at: number;
+        disabled?: boolean;
+        display_name: string;
+        product_ids?: Array<ProductId>;
+        project_id: AccessId;
+        scopes: Array<string>;
+        service_account_id: AccessId;
+        tenant_id: AccessId;
+        updated_at: number;
+    };
     type SlaSnapshot = {
         breaches: Array<string>;
         measured_at: number;
@@ -703,6 +1008,19 @@ export declare namespace OpenApi {
     type TransitionModelReleaseRequest = {
         reason: string;
         status: ModelReleaseStatus;
+    };
+    type UpdateProductEntitlementRequest = {
+        source?: "manual" | "enterprise_license" | "system";
+        status: EntitlementStatus;
+    };
+    type UserAccount = {
+        created_at: number;
+        disabled?: boolean;
+        display_name: string;
+        email?: (string) | (null);
+        tenant_id: AccessId;
+        updated_at: number;
+        user_id: AccessId;
     };
     type ValidationError = {
         ctx?: {};

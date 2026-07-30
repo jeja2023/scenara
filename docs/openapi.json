@@ -1,6 +1,179 @@
 {
   "components": {
     "schemas": {
+      "AccessCapabilityItem": {
+        "additionalProperties": false,
+        "properties": {
+          "capability_id": {
+            "pattern": "^[a-z][a-z0-9_.-]{1,63}$",
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "current_scope": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Current Scope",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_gate": {
+            "title": "Next Gate",
+            "type": "string"
+          },
+          "not_in_scope_yet": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Not In Scope Yet",
+            "type": "array"
+          },
+          "status": {
+            "$ref": "#/components/schemas/AccessCapabilityStatus"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "capability_id",
+          "name",
+          "status",
+          "summary",
+          "next_gate"
+        ],
+        "title": "AccessCapabilityItem",
+        "type": "object"
+      },
+      "AccessCapabilityStatus": {
+        "enum": [
+          "available",
+          "seed",
+          "planned",
+          "gated"
+        ],
+        "title": "AccessCapabilityStatus",
+        "type": "string"
+      },
+      "AccessFoundationStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "auth_mode": {
+            "enum": [
+              "development_open",
+              "single_bearer_token"
+            ],
+            "title": "Auth Mode",
+            "type": "string"
+          },
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/AccessCapabilityItem"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "policy_provider": {
+            "title": "Policy Provider",
+            "type": "string"
+          },
+          "principal_id": {
+            "title": "Principal Id",
+            "type": "string"
+          },
+          "principal_source": {
+            "enum": [
+              "anonymous",
+              "api_token",
+              "service_account_api_key",
+              "header"
+            ],
+            "title": "Principal Source",
+            "type": "string"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "tenant_id": {
+            "title": "Tenant Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "auth_mode",
+          "principal_source",
+          "tenant_id",
+          "project_id",
+          "principal_id",
+          "policy_provider",
+          "capabilities"
+        ],
+        "title": "AccessFoundationStatus",
+        "type": "object"
+      },
+      "AccessId": {
+        "pattern": "^[a-z][a-z0-9_.-]{1,63}$",
+        "type": "string"
+      },
+      "ApiEnvelope_AccessFoundationStatus_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AccessFoundationStatus"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[AccessFoundationStatus]",
+        "type": "object"
+      },
+      "ApiEnvelope_ApiKeyRecord_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ApiKeyRecord"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[ApiKeyRecord]",
+        "type": "object"
+      },
       "ApiEnvelope_ComplianceEvidence_": {
         "additionalProperties": false,
         "properties": {
@@ -23,6 +196,30 @@
           "data"
         ],
         "title": "ApiEnvelope[ComplianceEvidence]",
+        "type": "object"
+      },
+      "ApiEnvelope_CreateApiKeyResponse_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CreateApiKeyResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[CreateApiKeyResponse]",
         "type": "object"
       },
       "ApiEnvelope_EnterpriseStatus_": {
@@ -95,6 +292,30 @@
           "data"
         ],
         "title": "ApiEnvelope[HardSampleManifest]",
+        "type": "object"
+      },
+      "ApiEnvelope_IamSummary_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/IamSummary"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[IamSummary]",
         "type": "object"
       },
       "ApiEnvelope_Incident_": {
@@ -217,6 +438,30 @@
         "title": "ApiEnvelope[MediaSource]",
         "type": "object"
       },
+      "ApiEnvelope_Membership_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Membership"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[Membership]",
+        "type": "object"
+      },
       "ApiEnvelope_ModelRelease_": {
         "additionalProperties": false,
         "properties": {
@@ -239,6 +484,30 @@
           "data"
         ],
         "title": "ApiEnvelope[ModelRelease]",
+        "type": "object"
+      },
+      "ApiEnvelope_Organization_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Organization"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[Organization]",
         "type": "object"
       },
       "ApiEnvelope_ParseImageResponse_": {
@@ -385,6 +654,78 @@
         "title": "ApiEnvelope[PortraitSearchResponse]",
         "type": "object"
       },
+      "ApiEnvelope_ProductEntitlement_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ProductEntitlement"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[ProductEntitlement]",
+        "type": "object"
+      },
+      "ApiEnvelope_Project_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Project"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[Project]",
+        "type": "object"
+      },
+      "ApiEnvelope_RepositoryTopology_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RepositoryTopology"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[RepositoryTopology]",
+        "type": "object"
+      },
       "ApiEnvelope_ResultPage_": {
         "additionalProperties": false,
         "properties": {
@@ -407,6 +748,30 @@
           "data"
         ],
         "title": "ApiEnvelope[ResultPage]",
+        "type": "object"
+      },
+      "ApiEnvelope_Role_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Role"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[Role]",
         "type": "object"
       },
       "ApiEnvelope_RunPage_": {
@@ -455,6 +820,30 @@
           "data"
         ],
         "title": "ApiEnvelope[RunRecord]",
+        "type": "object"
+      },
+      "ApiEnvelope_ServiceAccount_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ServiceAccount"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[ServiceAccount]",
         "type": "object"
       },
       "ApiEnvelope_SlaSnapshot_": {
@@ -527,6 +916,30 @@
           "data"
         ],
         "title": "ApiEnvelope[SystemStatus]",
+        "type": "object"
+      },
+      "ApiEnvelope_UserAccount_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UserAccount"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[UserAccount]",
         "type": "object"
       },
       "ApiEnvelope_WebhookSubscriptionView_": {
@@ -605,6 +1018,34 @@
           "data"
         ],
         "title": "ApiEnvelope[dict[str, str]]",
+        "type": "object"
+      },
+      "ApiEnvelope_list_ApiKeyRecord__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ApiKeyRecord"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[list[ApiKeyRecord]]",
         "type": "object"
       },
       "ApiEnvelope_list_ComplianceEvidence__": {
@@ -719,6 +1160,34 @@
         "title": "ApiEnvelope[list[Incident]]",
         "type": "object"
       },
+      "ApiEnvelope_list_Membership__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Membership"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[list[Membership]]",
+        "type": "object"
+      },
       "ApiEnvelope_list_ModelDeploymentEvent__": {
         "additionalProperties": false,
         "properties": {
@@ -775,6 +1244,174 @@
         "title": "ApiEnvelope[list[ModelRelease]]",
         "type": "object"
       },
+      "ApiEnvelope_list_Organization__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Organization"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[list[Organization]]",
+        "type": "object"
+      },
+      "ApiEnvelope_list_ProductCatalogItem__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ProductCatalogItem"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[list[ProductCatalogItem]]",
+        "type": "object"
+      },
+      "ApiEnvelope_list_ProductEntitlement__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ProductEntitlement"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[list[ProductEntitlement]]",
+        "type": "object"
+      },
+      "ApiEnvelope_list_Project__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Project"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[list[Project]]",
+        "type": "object"
+      },
+      "ApiEnvelope_list_Role__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/Role"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[list[Role]]",
+        "type": "object"
+      },
+      "ApiEnvelope_list_ServiceAccount__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceAccount"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[list[ServiceAccount]]",
+        "type": "object"
+      },
       "ApiEnvelope_list_SupportCase__": {
         "additionalProperties": false,
         "properties": {
@@ -801,6 +1438,34 @@
           "data"
         ],
         "title": "ApiEnvelope[list[SupportCase]]",
+        "type": "object"
+      },
+      "ApiEnvelope_list_UserAccount__": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/UserAccount"
+            },
+            "title": "Data",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[list[UserAccount]]",
         "type": "object"
       },
       "ApiEnvelope_list_WebhookDeliveryRecord__": {
@@ -886,6 +1551,102 @@
           "data"
         ],
         "title": "ApiEnvelope[list[dict[str, object]]]",
+        "type": "object"
+      },
+      "ApiKeyRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "key_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "product_ids": {
+            "items": {
+              "$ref": "#/components/schemas/ProductId"
+            },
+            "title": "Product Ids",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 128,
+            "minItems": 1,
+            "title": "Scopes",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "service_account_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "tenant_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "token_prefix": {
+            "maxLength": 32,
+            "minLength": 8,
+            "title": "Token Prefix",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "project_id",
+          "key_id",
+          "service_account_id",
+          "name",
+          "token_prefix",
+          "scopes",
+          "created_at"
+        ],
+        "title": "ApiKeyRecord",
         "type": "object"
       },
       "Body_create_media_asset_api_v1_media_assets_post": {
@@ -1035,6 +1796,83 @@
           "created_at"
         ],
         "title": "ComplianceEvidence",
+        "type": "object"
+      },
+      "CreateApiKeyRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "product_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ProductId"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Product Ids"
+          },
+          "scopes": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 128,
+                "minItems": 1,
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scopes"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "CreateApiKeyRequest",
+        "type": "object"
+      },
+      "CreateApiKeyResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "api_key": {
+            "title": "Api Key",
+            "type": "string"
+          },
+          "record": {
+            "$ref": "#/components/schemas/ApiKeyRecord"
+          }
+        },
+        "required": [
+          "record",
+          "api_key"
+        ],
+        "title": "CreateApiKeyResponse",
         "type": "object"
       },
       "CreateComplianceEvidenceRequest": {
@@ -1268,6 +2106,44 @@
         "title": "CreateMediaSourceRequest",
         "type": "object"
       },
+      "CreateMembershipRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "principal_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "principal_type": {
+            "$ref": "#/components/schemas/PrincipalType"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "role_ids": {
+            "items": {
+              "$ref": "#/components/schemas/AccessId"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Role Ids",
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "principal_id",
+          "principal_type",
+          "role_ids"
+        ],
+        "title": "CreateMembershipRequest",
+        "type": "object"
+      },
       "CreateModelReleaseRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1303,6 +2179,130 @@
           "package_sha256"
         ],
         "title": "CreateModelReleaseRequest",
+        "type": "object"
+      },
+      "CreateOrganizationRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "display_name"
+        ],
+        "title": "CreateOrganizationRequest",
+        "type": "object"
+      },
+      "CreateProductEntitlementRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "product_id": {
+            "$ref": "#/components/schemas/ProductId"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "source": {
+            "default": "manual",
+            "enum": [
+              "manual",
+              "enterprise_license",
+              "system"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EntitlementStatus",
+            "default": "active"
+          }
+        },
+        "required": [
+          "product_id"
+        ],
+        "title": "CreateProductEntitlementRequest",
+        "type": "object"
+      },
+      "CreateProjectRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "display_name"
+        ],
+        "title": "CreateProjectRequest",
+        "type": "object"
+      },
+      "CreateRoleRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "product_ids": {
+            "items": {
+              "$ref": "#/components/schemas/ProductId"
+            },
+            "title": "Product Ids",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "role_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 128,
+            "minItems": 1,
+            "title": "Scopes",
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "display_name",
+          "scopes"
+        ],
+        "title": "CreateRoleRequest",
         "type": "object"
       },
       "CreateRunRequest": {
@@ -1363,6 +2363,51 @@
         "title": "CreateRunRequest",
         "type": "object"
       },
+      "CreateServiceAccountRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "product_ids": {
+            "items": {
+              "$ref": "#/components/schemas/ProductId"
+            },
+            "title": "Product Ids",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 128,
+            "minItems": 1,
+            "title": "Scopes",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "service_account_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "display_name",
+          "scopes"
+        ],
+        "title": "CreateServiceAccountRequest",
+        "type": "object"
+      },
       "CreateSupportCaseRequest": {
         "additionalProperties": false,
         "properties": {
@@ -1395,6 +2440,44 @@
           "description"
         ],
         "title": "CreateSupportCaseRequest",
+        "type": "object"
+      },
+      "CreateUserRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "display_name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 320,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AccessId"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "display_name"
+        ],
+        "title": "CreateUserRequest",
         "type": "object"
       },
       "CreateWebhookSubscriptionRequest": {
@@ -1616,6 +2699,14 @@
         ],
         "title": "EnterpriseStatus",
         "type": "object"
+      },
+      "EntitlementStatus": {
+        "enum": [
+          "active",
+          "suspended"
+        ],
+        "title": "EntitlementStatus",
+        "type": "string"
       },
       "FeedbackKind": {
         "enum": [
@@ -1911,6 +3002,93 @@
           "created_at"
         ],
         "title": "HardSampleManifest",
+        "type": "object"
+      },
+      "IamInventory": {
+        "additionalProperties": false,
+        "properties": {
+          "api_keys": {
+            "title": "Api Keys",
+            "type": "integer"
+          },
+          "memberships": {
+            "title": "Memberships",
+            "type": "integer"
+          },
+          "organizations": {
+            "title": "Organizations",
+            "type": "integer"
+          },
+          "product_entitlements": {
+            "title": "Product Entitlements",
+            "type": "integer"
+          },
+          "projects": {
+            "title": "Projects",
+            "type": "integer"
+          },
+          "roles": {
+            "title": "Roles",
+            "type": "integer"
+          },
+          "service_accounts": {
+            "title": "Service Accounts",
+            "type": "integer"
+          },
+          "users": {
+            "title": "Users",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "organizations",
+          "projects",
+          "users",
+          "roles",
+          "memberships",
+          "service_accounts",
+          "api_keys",
+          "product_entitlements"
+        ],
+        "title": "IamInventory",
+        "type": "object"
+      },
+      "IamSummary": {
+        "additionalProperties": false,
+        "properties": {
+          "default_admin_scopes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Default Admin Scopes",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "inventory": {
+            "$ref": "#/components/schemas/IamInventory"
+          },
+          "project_id": {
+            "title": "Project Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "tenant_id": {
+            "title": "Tenant Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "project_id",
+          "inventory",
+          "default_admin_scopes"
+        ],
+        "title": "IamSummary",
         "type": "object"
       },
       "Incident": {
@@ -2336,6 +3514,52 @@
         "title": "MediaUnitResult",
         "type": "object"
       },
+      "Membership": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "principal_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "principal_type": {
+            "$ref": "#/components/schemas/PrincipalType"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "role_ids": {
+            "items": {
+              "$ref": "#/components/schemas/AccessId"
+            },
+            "maxItems": 64,
+            "minItems": 1,
+            "title": "Role Ids",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "tenant_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "number"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "project_id",
+          "principal_id",
+          "principal_type",
+          "role_ids",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Membership",
+        "type": "object"
+      },
       "ModelDeploymentEvent": {
         "additionalProperties": false,
         "properties": {
@@ -2659,6 +3883,36 @@
           "text"
         ],
         "title": "OcrTextBlock",
+        "type": "object"
+      },
+      "Organization": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "display_name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "tenant_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "number"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "display_name",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Organization",
         "type": "object"
       },
       "ParseImageResponse": {
@@ -3133,6 +4387,192 @@
         "title": "PortraitSearchResponse",
         "type": "object"
       },
+      "PrincipalType": {
+        "enum": [
+          "user",
+          "service_account"
+        ],
+        "title": "PrincipalType",
+        "type": "string"
+      },
+      "ProductCatalogItem": {
+        "additionalProperties": false,
+        "properties": {
+          "api_paths": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Api Paths",
+            "type": "array"
+          },
+          "console_route": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Console Route"
+          },
+          "current_scope": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Current Scope",
+            "type": "array"
+          },
+          "depends_on": {
+            "items": {
+              "$ref": "#/components/schemas/ProductId"
+            },
+            "title": "Depends On",
+            "type": "array"
+          },
+          "layer": {
+            "$ref": "#/components/schemas/ProductLayer"
+          },
+          "maturity": {
+            "$ref": "#/components/schemas/ProductMaturity"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_gate": {
+            "title": "Next Gate",
+            "type": "string"
+          },
+          "not_in_scope_yet": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Not In Scope Yet",
+            "type": "array"
+          },
+          "product_id": {
+            "$ref": "#/components/schemas/ProductId"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "product_id",
+          "name",
+          "layer",
+          "maturity",
+          "summary",
+          "next_gate"
+        ],
+        "title": "ProductCatalogItem",
+        "type": "object"
+      },
+      "ProductEntitlement": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "product_id": {
+            "$ref": "#/components/schemas/ProductId"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "source": {
+            "default": "manual",
+            "enum": [
+              "manual",
+              "enterprise_license",
+              "system"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EntitlementStatus",
+            "default": "active"
+          },
+          "tenant_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "number"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "project_id",
+          "product_id",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ProductEntitlement",
+        "type": "object"
+      },
+      "ProductId": {
+        "pattern": "^[a-z][a-z0-9_.-]{1,63}$",
+        "type": "string"
+      },
+      "ProductLayer": {
+        "enum": [
+          "product_module",
+          "control_plane",
+          "developer_surface",
+          "foundation"
+        ],
+        "title": "ProductLayer",
+        "type": "string"
+      },
+      "ProductMaturity": {
+        "enum": [
+          "available",
+          "seed",
+          "planned",
+          "gated"
+        ],
+        "title": "ProductMaturity",
+        "type": "string"
+      },
+      "Project": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "display_name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "tenant_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "number"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "project_id",
+          "display_name",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Project",
+        "type": "object"
+      },
       "ProvenanceEvidence": {
         "additionalProperties": false,
         "properties": {
@@ -3161,6 +4601,197 @@
           }
         },
         "title": "ProvenanceEvidence",
+        "type": "object"
+      },
+      "RepositoryBoundaryRule": {
+        "enum": [
+          "versioned_contracts_only",
+          "no_shared_database",
+          "no_cross_repository_source_imports",
+          "immutable_artifact_references"
+        ],
+        "title": "RepositoryBoundaryRule",
+        "type": "string"
+      },
+      "RepositoryContractTransport": {
+        "enum": [
+          "versioned_api",
+          "event",
+          "immutable_manifest"
+        ],
+        "title": "RepositoryContractTransport",
+        "type": "string"
+      },
+      "RepositoryId": {
+        "pattern": "^[a-z][a-z0-9_.-]{1,63}$",
+        "type": "string"
+      },
+      "RepositoryIntegrationContract": {
+        "additionalProperties": false,
+        "properties": {
+          "consumer_repository_id": {
+            "$ref": "#/components/schemas/RepositoryId"
+          },
+          "contract_id": {
+            "pattern": "^[a-z][a-z0-9_.-]{1,63}$",
+            "title": "Contract Id",
+            "type": "string"
+          },
+          "invariants": {
+            "items": {
+              "$ref": "#/components/schemas/RepositoryResponsibilityId"
+            },
+            "title": "Invariants",
+            "type": "array"
+          },
+          "payload_type": {
+            "pattern": "^[A-Z][A-Za-z0-9]{1,63}$",
+            "title": "Payload Type",
+            "type": "string"
+          },
+          "producer_repository_id": {
+            "$ref": "#/components/schemas/RepositoryId"
+          },
+          "transport": {
+            "$ref": "#/components/schemas/RepositoryContractTransport"
+          }
+        },
+        "required": [
+          "contract_id",
+          "producer_repository_id",
+          "consumer_repository_id",
+          "transport",
+          "payload_type"
+        ],
+        "title": "RepositoryIntegrationContract",
+        "type": "object"
+      },
+      "RepositoryKind": {
+        "enum": [
+          "platform_integration",
+          "specialized_product"
+        ],
+        "title": "RepositoryKind",
+        "type": "string"
+      },
+      "RepositoryLifecycle": {
+        "enum": [
+          "current",
+          "external_existing",
+          "planned"
+        ],
+        "title": "RepositoryLifecycle",
+        "type": "string"
+      },
+      "RepositoryResponsibilityId": {
+        "pattern": "^[a-z][a-z0-9_.-]{1,95}$",
+        "type": "string"
+      },
+      "RepositoryTopology": {
+        "additionalProperties": false,
+        "properties": {
+          "boundary_rules": {
+            "items": {
+              "$ref": "#/components/schemas/RepositoryBoundaryRule"
+            },
+            "title": "Boundary Rules",
+            "type": "array"
+          },
+          "current_repository_id": {
+            "$ref": "#/components/schemas/RepositoryId"
+          },
+          "integration_contracts": {
+            "items": {
+              "$ref": "#/components/schemas/RepositoryIntegrationContract"
+            },
+            "title": "Integration Contracts",
+            "type": "array"
+          },
+          "repositories": {
+            "items": {
+              "$ref": "#/components/schemas/RepositoryTopologyItem"
+            },
+            "title": "Repositories",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "current_repository_id",
+          "repositories",
+          "integration_contracts",
+          "boundary_rules"
+        ],
+        "title": "RepositoryTopology",
+        "type": "object"
+      },
+      "RepositoryTopologyItem": {
+        "additionalProperties": false,
+        "properties": {
+          "current_repository": {
+            "default": false,
+            "title": "Current Repository",
+            "type": "boolean"
+          },
+          "excluded_responsibilities": {
+            "items": {
+              "$ref": "#/components/schemas/RepositoryResponsibilityId"
+            },
+            "title": "Excluded Responsibilities",
+            "type": "array"
+          },
+          "integration_product_ids": {
+            "items": {
+              "$ref": "#/components/schemas/ProductId"
+            },
+            "title": "Integration Product Ids",
+            "type": "array"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RepositoryKind"
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/RepositoryLifecycle"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_gate": {
+            "title": "Next Gate",
+            "type": "string"
+          },
+          "primary_product_ids": {
+            "items": {
+              "$ref": "#/components/schemas/ProductId"
+            },
+            "title": "Primary Product Ids",
+            "type": "array"
+          },
+          "repository_id": {
+            "$ref": "#/components/schemas/RepositoryId"
+          },
+          "responsibilities": {
+            "items": {
+              "$ref": "#/components/schemas/RepositoryResponsibilityId"
+            },
+            "title": "Responsibilities",
+            "type": "array"
+          }
+        },
+        "required": [
+          "repository_id",
+          "name",
+          "kind",
+          "lifecycle",
+          "next_gate"
+        ],
+        "title": "RepositoryTopologyItem",
         "type": "object"
       },
       "ResolveIncidentRequest": {
@@ -3415,6 +5046,59 @@
         "title": "ReviewFeedbackRequest",
         "type": "object"
       },
+      "Role": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "display_name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "product_ids": {
+            "items": {
+              "$ref": "#/components/schemas/ProductId"
+            },
+            "title": "Product Ids",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "role_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 128,
+            "minItems": 1,
+            "title": "Scopes",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "tenant_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "number"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "role_id",
+          "display_name",
+          "scopes",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "Role",
+        "type": "object"
+      },
       "RollbackModelReleaseRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3623,6 +5307,68 @@
         "title": "RunStatus",
         "type": "string"
       },
+      "ServiceAccount": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "disabled": {
+            "default": false,
+            "title": "Disabled",
+            "type": "boolean"
+          },
+          "display_name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "product_ids": {
+            "items": {
+              "$ref": "#/components/schemas/ProductId"
+            },
+            "title": "Product Ids",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "project_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "scopes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 128,
+            "minItems": 1,
+            "title": "Scopes",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "service_account_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "tenant_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "number"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "project_id",
+          "service_account_id",
+          "display_name",
+          "scopes",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "ServiceAccount",
+        "type": "object"
+      },
       "SlaSnapshot": {
         "additionalProperties": false,
         "properties": {
@@ -3809,6 +5555,80 @@
           "reason"
         ],
         "title": "TransitionModelReleaseRequest",
+        "type": "object"
+      },
+      "UpdateProductEntitlementRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "default": "manual",
+            "enum": [
+              "manual",
+              "enterprise_license",
+              "system"
+            ],
+            "title": "Source",
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/EntitlementStatus"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "UpdateProductEntitlementRequest",
+        "type": "object"
+      },
+      "UserAccount": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "disabled": {
+            "default": false,
+            "title": "Disabled",
+            "type": "boolean"
+          },
+          "display_name": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Display Name",
+            "type": "string"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "maxLength": 320,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "tenant_id": {
+            "$ref": "#/components/schemas/AccessId"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "number"
+          },
+          "user_id": {
+            "$ref": "#/components/schemas/AccessId"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "user_id",
+          "display_name",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "UserAccount",
         "type": "object"
       },
       "ValidationError": {
@@ -4089,7 +5909,7 @@
   "info": {
     "description": "Scenara 景枢企业视觉 AI 中枢平台",
     "title": "Scenara API",
-    "version": "0.2.0.dev0"
+    "version": "0.3.0.dev0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -7388,6 +9208,2243 @@
         "summary": "Transition Pipeline",
         "tags": [
           "Pipelines"
+        ]
+      }
+    },
+    "/api/v1/platform/access-foundation": {
+      "get": {
+        "operationId": "platform_access_foundation_api_v1_platform_access_foundation_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_AccessFoundationStatus_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Platform Access Foundation",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/api-keys": {
+      "get": {
+        "operationId": "list_api_keys_api_v1_platform_api_keys_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_list_ApiKeyRecord__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Api Keys",
+        "tags": [
+          "IAM"
+        ]
+      }
+    },
+    "/api/v1/platform/api-keys/{key_id}/revoke": {
+      "post": {
+        "operationId": "revoke_api_key_api_v1_platform_api_keys__key_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key_id",
+            "required": true,
+            "schema": {
+              "title": "Key Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_ApiKeyRecord_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Api Key",
+        "tags": [
+          "IAM"
+        ]
+      }
+    },
+    "/api/v1/platform/iam/summary": {
+      "get": {
+        "operationId": "iam_summary_api_v1_platform_iam_summary_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_IamSummary_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Iam Summary",
+        "tags": [
+          "IAM"
+        ]
+      }
+    },
+    "/api/v1/platform/memberships": {
+      "get": {
+        "operationId": "list_memberships_api_v1_platform_memberships_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_list_Membership__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Memberships",
+        "tags": [
+          "IAM"
+        ]
+      },
+      "post": {
+        "operationId": "create_membership_api_v1_platform_memberships_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMembershipRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_Membership_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Membership",
+        "tags": [
+          "IAM"
+        ]
+      }
+    },
+    "/api/v1/platform/organizations": {
+      "get": {
+        "operationId": "list_organizations_api_v1_platform_organizations_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_list_Organization__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Organizations",
+        "tags": [
+          "IAM"
+        ]
+      },
+      "post": {
+        "operationId": "create_organization_api_v1_platform_organizations_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrganizationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_Organization_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Organization",
+        "tags": [
+          "IAM"
+        ]
+      }
+    },
+    "/api/v1/platform/product-entitlements": {
+      "get": {
+        "operationId": "list_product_entitlements_api_v1_platform_product_entitlements_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_list_ProductEntitlement__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Product Entitlements",
+        "tags": [
+          "IAM"
+        ]
+      },
+      "post": {
+        "operationId": "create_product_entitlement_api_v1_platform_product_entitlements_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProductEntitlementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_ProductEntitlement_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Product Entitlement",
+        "tags": [
+          "IAM"
+        ]
+      }
+    },
+    "/api/v1/platform/product-entitlements/{product_id}": {
+      "put": {
+        "operationId": "update_product_entitlement_api_v1_platform_product_entitlements__product_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "product_id",
+            "required": true,
+            "schema": {
+              "title": "Product Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProductEntitlementRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_ProductEntitlement_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Product Entitlement",
+        "tags": [
+          "IAM"
+        ]
+      }
+    },
+    "/api/v1/platform/products": {
+      "get": {
+        "operationId": "list_platform_products_api_v1_platform_products_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_list_ProductCatalogItem__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Platform Products",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/projects": {
+      "get": {
+        "operationId": "list_projects_api_v1_platform_projects_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_list_Project__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Projects",
+        "tags": [
+          "IAM"
+        ]
+      },
+      "post": {
+        "operationId": "create_project_api_v1_platform_projects_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProjectRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_Project_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Project",
+        "tags": [
+          "IAM"
+        ]
+      }
+    },
+    "/api/v1/platform/repositories": {
+      "get": {
+        "operationId": "platform_repository_topology_api_v1_platform_repositories_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_RepositoryTopology_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Platform Repository Topology",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/roles": {
+      "get": {
+        "operationId": "list_roles_api_v1_platform_roles_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_list_Role__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Roles",
+        "tags": [
+          "IAM"
+        ]
+      },
+      "post": {
+        "operationId": "create_role_api_v1_platform_roles_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateRoleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_Role_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Role",
+        "tags": [
+          "IAM"
+        ]
+      }
+    },
+    "/api/v1/platform/service-accounts": {
+      "get": {
+        "operationId": "list_service_accounts_api_v1_platform_service_accounts_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_list_ServiceAccount__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Service Accounts",
+        "tags": [
+          "IAM"
+        ]
+      },
+      "post": {
+        "operationId": "create_service_account_api_v1_platform_service_accounts_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateServiceAccountRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_ServiceAccount_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Service Account",
+        "tags": [
+          "IAM"
+        ]
+      }
+    },
+    "/api/v1/platform/service-accounts/{service_account_id}/api-keys": {
+      "post": {
+        "operationId": "create_api_key_api_v1_platform_service_accounts__service_account_id__api_keys_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "service_account_id",
+            "required": true,
+            "schema": {
+              "title": "Service Account Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApiKeyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_CreateApiKeyResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Api Key",
+        "tags": [
+          "IAM"
+        ]
+      }
+    },
+    "/api/v1/platform/users": {
+      "get": {
+        "operationId": "list_users_api_v1_platform_users_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_list_UserAccount__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Users",
+        "tags": [
+          "IAM"
+        ]
+      },
+      "post": {
+        "operationId": "create_user_api_v1_platform_users_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_UserAccount_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create User",
+        "tags": [
+          "IAM"
         ]
       }
     },

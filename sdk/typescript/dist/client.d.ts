@@ -1,5 +1,5 @@
-import type { Domain, FeedbackRecord, HardSampleManifest, ModelDeploymentEvent, ModelPackage, ModelRelease, ResultEnvelope, Run, RunPage, RunStatus, WebhookDelivery, WebhookSubscription } from "./types.js";
-export type ScenaraTransport = <T>(method: "GET" | "POST" | "DELETE", path: string, options?: {
+import type { AccessFoundationStatus, ApiKeyRecord, CreateApiKeyResponse, Domain, FeedbackRecord, HardSampleManifest, IamSummary, Membership, ModelDeploymentEvent, ModelPackage, ModelRelease, Organization, ProductCatalogItem, ProductEntitlement, Project, RepositoryTopology, ResultEnvelope, Run, RunPage, RunStatus, Role, ServiceAccount, UserAccount, WebhookDelivery, WebhookSubscription } from "./types.js";
+export type ScenaraTransport = <T>(method: "GET" | "POST" | "PUT" | "DELETE", path: string, options?: {
     body?: unknown;
     idempotencyKey?: string;
 }) => Promise<T>;
@@ -40,6 +40,65 @@ export declare class ScenaraClient {
     getAssetPreview(assetId: string): Promise<Uint8Array>;
     listPipelines(): Promise<Record<string, unknown>[]>;
     listDomains(): Promise<Record<string, unknown>[]>;
+    listProducts(): Promise<ProductCatalogItem[]>;
+    getRepositoryTopology(): Promise<RepositoryTopology>;
+    getAccessFoundation(): Promise<AccessFoundationStatus>;
+    getIamSummary(): Promise<IamSummary>;
+    createOrganization(displayName: string): Promise<Organization>;
+    listOrganizations(): Promise<Organization[]>;
+    createProject(input: {
+        displayName: string;
+        projectId?: string;
+    }): Promise<Project>;
+    listProjects(): Promise<Project[]>;
+    createUser(input: {
+        displayName: string;
+        userId?: string;
+        email?: string;
+    }): Promise<UserAccount>;
+    listUsers(): Promise<UserAccount[]>;
+    createRole(input: {
+        displayName: string;
+        scopes: string[];
+        productIds?: string[];
+        roleId?: string;
+    }): Promise<Role>;
+    listRoles(): Promise<Role[]>;
+    createMembership(input: {
+        principalId: string;
+        principalType: "user" | "service_account";
+        roleIds: string[];
+        projectId?: string;
+    }): Promise<Membership>;
+    listMemberships(): Promise<Membership[]>;
+    createServiceAccount(input: {
+        displayName: string;
+        scopes: string[];
+        productIds?: string[];
+        serviceAccountId?: string;
+    }): Promise<ServiceAccount>;
+    listServiceAccounts(): Promise<ServiceAccount[]>;
+    createApiKey(input: {
+        serviceAccountId: string;
+        name: string;
+        scopes?: string[];
+        productIds?: string[];
+        expiresAt?: number;
+    }): Promise<CreateApiKeyResponse>;
+    listApiKeys(): Promise<ApiKeyRecord[]>;
+    revokeApiKey(keyId: string): Promise<ApiKeyRecord>;
+    createProductEntitlement(input: {
+        productId: string;
+        status?: "active" | "suspended";
+        source?: "manual" | "enterprise_license" | "system";
+        projectId?: string;
+    }): Promise<ProductEntitlement>;
+    listProductEntitlements(): Promise<ProductEntitlement[]>;
+    updateProductEntitlement(input: {
+        productId: string;
+        status: "active" | "suspended";
+        source?: "manual" | "enterprise_license" | "system";
+    }): Promise<ProductEntitlement>;
     listModels(): Promise<ModelPackage[]>;
     createWebhookSubscription(input: {
         name: string;

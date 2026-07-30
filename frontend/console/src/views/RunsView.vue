@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { api } from "../api";
-import { labelDomain, labelRunStatus } from "../labels";
+import { api, userFacingError } from "../api";
+import { labelDomain, labelPipeline, labelRunError, labelRunStatus } from "../labels";
 import type { Run, RunPage, RunStatus } from "../types";
 
 const runs = ref<Run[]>([]);
@@ -24,7 +24,7 @@ async function refresh(): Promise<void> {
     runs.value = page.items;
     total.value = page.total;
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught);
+    error.value = userFacingError(caught, "运行记录加载失败，请稍后重试");
   } finally {
     loading.value = false;
   }
@@ -35,7 +35,7 @@ async function transition(run: Run, action: "cancel" | "pause" | "resume"): Prom
     await api<Run>("/api/v1/runs/" + encodeURIComponent(run.run_id) + "/" + action, { method: "POST" });
     await refresh();
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught);
+    error.value = userFacingError(caught, "运行状态更新失败，请稍后重试");
   }
 }
 
@@ -46,7 +46,7 @@ async function openResult(run: Run): Promise<void> {
     const page = await api<unknown>("/api/v1/runs/" + encodeURIComponent(run.run_id) + "/result");
     rawResult.value = JSON.stringify(page, null, 2);
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught);
+    error.value = userFacingError(caught, "运行结果加载失败，请稍后重试");
   }
 }
 
@@ -78,8 +78,8 @@ onMounted(refresh);
             <tr v-for="run in runs" :key="run.run_id">
               <td class="mono">{{ run.run_id }}</td>
               <td>{{ labelDomain(run.domain) }}</td>
-              <td><span class="badge" :class="run.status">{{ labelRunStatus(run.status) }}</span><div v-if="run.error_code" class="muted">{{ run.error_code }}</div></td>
-              <td class="truncate">{{ run.pipeline.pipeline_id }}@{{ run.pipeline.version }}</td>
+              <td><span class="badge" :class="run.status">{{ labelRunStatus(run.status) }}</span><div v-if="run.error_code" class="muted">{{ labelRunError(run.error_code) }}</div></td>
+              <td class="truncate">{{ labelPipeline(run.pipeline.pipeline_id) }} · {{ run.pipeline.version }}</td>
               <td class="mono truncate">{{ run.asset_id || run.source_id }}</td>
               <td>{{ new Date(run.created_at * 1000).toLocaleString() }}</td>
               <td>

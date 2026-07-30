@@ -2,12 +2,13 @@
 import { Check, History, Plus, RefreshCw, RotateCcw, X } from "@lucide/vue";
 import { computed, onMounted, reactive, ref } from "vue";
 
-import { ApiError, api } from "../api";
+import { api, userFacingError } from "../api";
 import {
   labelDeploymentAction,
   labelFeedbackKind,
   labelFeedbackStatus,
   labelModelReleaseStatus,
+  labelSystemReason,
 } from "../labels";
 import type {
   FeedbackRecord,
@@ -82,7 +83,7 @@ async function refresh(): Promise<void> {
 }
 
 function showError(caught: unknown): void {
-  error.value = caught instanceof ApiError ? caught.message : "操作失败，请检查输入后重试";
+  error.value = userFacingError(caught, "操作失败，请检查输入后重试");
 }
 
 async function selectRun(): Promise<void> {
@@ -224,7 +225,7 @@ onMounted(refresh);
     <template v-else>
       <section class="panel"><div class="panel-header"><h2>登记候选版本</h2></div><div class="panel-body"><div class="form-grid"><label><span>已登记模型包</span><select v-model="releaseForm.package_key"><option value="">请选择</option><option v-for="item in models" :key="item.model_id + item.version" :value="`${item.model_id}@${item.version}`">{{ item.model_id }} · {{ item.version }}</option></select></label><label><span>证据引用（每行一个）</span><textarea v-model="releaseForm.evidence_refs"></textarea></label></div><button class="button primary" :disabled="!selectedPackage" @click="createRelease"><Plus :size="16" />登记候选版本</button></div></section>
       <section class="panel spaced"><div class="panel-header"><h2>发布版本</h2><span class="badge">{{ releases.length }}</span></div><div class="table-scroll"><table class="data-table"><thead><tr><th>模型</th><th>版本</th><th>状态</th><th>证据</th><th>操作</th></tr></thead><tbody><tr v-for="item in releases" :key="item.model_id + item.version"><td><strong>{{ item.model_id }}</strong></td><td class="mono">{{ item.version }}</td><td><span class="badge" :class="item.status">{{ labelModelReleaseStatus(item.status) }}</span></td><td><details v-if="item.evidence_refs.length"><summary>{{ item.evidence_refs.length }} 项</summary><div v-for="reference in item.evidence_refs" :key="reference" class="mono evidence-ref">{{ reference }}</div></details><span v-else class="muted">未登记</span></td><td><div class="row-actions"><button v-if="nextStatus(item)" class="button compact" :disabled="item.status === 'candidate' && !item.evidence_refs.length" :title="item.status === 'candidate' && !item.evidence_refs.length ? '登记证据后才能验证' : ''" @click="transition(item)">{{ labelModelReleaseStatus(nextStatus(item) || '') }}</button><button v-if="item.status === 'retired'" class="icon-button" title="回滚到此版本" @click="rollback(item)"><RotateCcw :size="15" /></button></div></td></tr></tbody></table><div v-if="!releases.length" class="empty">暂无发布版本</div></div></section>
-      <section class="panel spaced"><div class="panel-header"><h2>部署事件</h2><History :size="16" /></div><div class="table-scroll"><table class="data-table"><thead><tr><th>操作</th><th>模型版本</th><th>状态变化</th><th>原因</th><th>时间</th></tr></thead><tbody><tr v-for="item in events" :key="item.event_id"><td>{{ labelDeploymentAction(item.action) }}</td><td>{{ item.model_id }}<div class="mono muted">{{ item.version }}</div></td><td>{{ item.from_status ? labelModelReleaseStatus(item.from_status) : '无' }} → {{ labelModelReleaseStatus(item.to_status) }}</td><td>{{ item.reason }}</td><td>{{ new Date(item.created_at * 1000).toLocaleString() }}</td></tr></tbody></table><div v-if="!events.length" class="empty">暂无部署事件</div></div></section>
+      <section class="panel spaced"><div class="panel-header"><h2>部署事件</h2><History :size="16" /></div><div class="table-scroll"><table class="data-table"><thead><tr><th>操作</th><th>模型版本</th><th>状态变化</th><th>原因</th><th>时间</th></tr></thead><tbody><tr v-for="item in events" :key="item.event_id"><td>{{ labelDeploymentAction(item.action) }}</td><td>{{ item.model_id }}<div class="mono muted">{{ item.version }}</div></td><td>{{ item.from_status ? labelModelReleaseStatus(item.from_status) : '无' }} → {{ labelModelReleaseStatus(item.to_status) }}</td><td>{{ labelSystemReason(item.reason) }}</td><td>{{ new Date(item.created_at * 1000).toLocaleString() }}</td></tr></tbody></table><div v-if="!events.length" class="empty">暂无部署事件</div></div></section>
     </template>
   </section>
 </template>

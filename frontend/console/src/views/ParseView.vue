@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { FileImage, Play, RefreshCw } from "@lucide/vue";
 import { computed, ref, watch } from "vue";
-import { api, idempotencyKey } from "../api";
-import { labelDomain, labelPipeline, labelRunStatus } from "../labels";
+import { api, idempotencyKey, userFacingError } from "../api";
+import { labelDomain, labelPipeline, labelRunError, labelRunStatus, labelTerminationReason } from "../labels";
 import type { Domain, ResultEnvelope, Run } from "../types";
 
 const props = defineProps<{ domain: Domain }>();
@@ -46,9 +46,15 @@ async function execute(): Promise<void> {
     });
     run.value = parsed.run;
     result.value = parsed.result;
-    if (parsed.run.status !== "completed") error.value = parsed.run.termination_reason || parsed.run.error_code || labelRunStatus(parsed.run.status);
+    if (parsed.run.status !== "completed") {
+      error.value = parsed.run.termination_reason
+        ? labelTerminationReason(parsed.run.termination_reason)
+        : parsed.run.error_code
+          ? labelRunError(parsed.run.error_code)
+          : labelRunStatus(parsed.run.status);
+    }
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught);
+    error.value = userFacingError(caught, "解析失败，请检查输入后重试");
   } finally {
     loading.value = false;
   }
@@ -73,7 +79,7 @@ async function execute(): Promise<void> {
       <section class="panel"><div class="panel-header"><h2>结果</h2><RefreshCw v-if="loading" :size="16" class="spin" /></div><div class="panel-body result-body">
         <template v-if="result"><div class="stats mini"><div class="stat teal"><span>对象</span><strong>{{ persons.length || ocrBlocks.length }}</strong></div><div class="stat green"><span>模型</span><strong>{{ result.models.length }}</strong></div></div>
           <div v-if="domain === 'portrait'" class="table-scroll"><table class="data-table"><thead><tr><th>标识</th><th>分数</th><th>边框</th></tr></thead><tbody><tr v-for="person in persons" :key="person.object_id"><td class="mono">{{ person.object_id }}</td><td>{{ person.score?.toFixed(3) }}</td><td class="mono">{{ person.bbox }}</td></tr></tbody></table></div>
-          <textarea v-else readonly :value="ocrText"></textarea><details><summary>原始 JSON</summary><pre>{{ JSON.stringify(result, null, 2) }}</pre></details>
+          <textarea v-else readonly :value="ocrText"></textarea><details><summary>原始结果（JSON）</summary><pre>{{ JSON.stringify(result, null, 2) }}</pre></details>
         </template><div v-else class="empty">暂无结果</div>
       </div></section>
     </div>

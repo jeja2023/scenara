@@ -2,6 +2,9 @@ export type Domain = "portrait" | "ocr";
 export type RunStatus = "queued" | "running" | "pausing" | "paused" | "completed" | "failed" | "cancelling" | "cancelled";
 export type FeedbackStatus = "pending" | "approved" | "rejected";
 export type ModelReleaseStatus = "candidate" | "validated" | "approved" | "active" | "retired";
+export type ProductLayer = "product_module" | "control_plane" | "developer_surface" | "foundation";
+export type ProductMaturity = "available" | "seed" | "planned" | "gated";
+export type AccessCapabilityStatus = "available" | "seed" | "planned" | "gated";
 export interface PipelineRef {
     pipeline_id: string;
     version: string;
@@ -32,6 +35,164 @@ export interface ModelPackage {
     vram_mb: number;
     regression_samples: string[];
     production_ready: boolean;
+}
+export interface ProductCatalogItem {
+    product_id: string;
+    name: string;
+    layer: ProductLayer;
+    maturity: ProductMaturity;
+    summary: string;
+    current_scope: string[];
+    not_in_scope_yet: string[];
+    console_route: string | null;
+    api_paths: string[];
+    depends_on: string[];
+    next_gate: string;
+}
+export type RepositoryKind = "platform_integration" | "specialized_product";
+export type RepositoryLifecycle = "current" | "external_existing" | "planned";
+export type RepositoryBoundaryRule = "versioned_contracts_only" | "no_shared_database" | "no_cross_repository_source_imports" | "immutable_artifact_references";
+export type RepositoryContractTransport = "versioned_api" | "event" | "immutable_manifest";
+export interface RepositoryTopologyItem {
+    repository_id: string;
+    name: string;
+    kind: RepositoryKind;
+    lifecycle: RepositoryLifecycle;
+    current_repository: boolean;
+    primary_product_ids: string[];
+    integration_product_ids: string[];
+    responsibilities: string[];
+    excluded_responsibilities: string[];
+    next_gate: string;
+}
+export interface RepositoryIntegrationContract {
+    contract_id: string;
+    producer_repository_id: string;
+    consumer_repository_id: string;
+    transport: RepositoryContractTransport;
+    payload_type: string;
+    invariants: string[];
+}
+export interface RepositoryTopology {
+    schema_version: "1.0";
+    current_repository_id: string;
+    repositories: RepositoryTopologyItem[];
+    integration_contracts: RepositoryIntegrationContract[];
+    boundary_rules: RepositoryBoundaryRule[];
+}
+export interface AccessCapabilityItem {
+    capability_id: string;
+    name: string;
+    status: AccessCapabilityStatus;
+    summary: string;
+    current_scope: string[];
+    not_in_scope_yet: string[];
+    next_gate: string;
+}
+export interface AccessFoundationStatus {
+    schema_version: "1.0";
+    auth_mode: "development_open" | "single_bearer_token";
+    principal_source: "anonymous" | "api_token" | "service_account_api_key" | "header";
+    tenant_id: string;
+    project_id: string;
+    principal_id: string;
+    policy_provider: string;
+    capabilities: AccessCapabilityItem[];
+}
+export interface Organization {
+    tenant_id: string;
+    display_name: string;
+    created_at: number;
+    updated_at: number;
+}
+export interface Project {
+    tenant_id: string;
+    project_id: string;
+    display_name: string;
+    created_at: number;
+    updated_at: number;
+}
+export interface UserAccount {
+    tenant_id: string;
+    user_id: string;
+    display_name: string;
+    email: string | null;
+    disabled: boolean;
+    created_at: number;
+    updated_at: number;
+}
+export interface Role {
+    tenant_id: string;
+    role_id: string;
+    display_name: string;
+    scopes: string[];
+    product_ids: string[];
+    created_at: number;
+    updated_at: number;
+}
+export interface Membership {
+    tenant_id: string;
+    project_id: string;
+    principal_id: string;
+    principal_type: "user" | "service_account";
+    role_ids: string[];
+    created_at: number;
+    updated_at: number;
+}
+export interface ServiceAccount {
+    tenant_id: string;
+    project_id: string;
+    service_account_id: string;
+    display_name: string;
+    scopes: string[];
+    product_ids: string[];
+    disabled: boolean;
+    created_at: number;
+    updated_at: number;
+}
+export interface ApiKeyRecord {
+    tenant_id: string;
+    project_id: string;
+    key_id: string;
+    service_account_id: string;
+    name: string;
+    token_prefix: string;
+    scopes: string[];
+    product_ids: string[];
+    expires_at: number | null;
+    revoked_at: number | null;
+    last_used_at: number | null;
+    created_at: number;
+}
+export interface CreateApiKeyResponse {
+    record: ApiKeyRecord;
+    api_key: string;
+}
+export interface ProductEntitlement {
+    tenant_id: string;
+    project_id: string;
+    product_id: string;
+    status: "active" | "suspended";
+    source: "manual" | "enterprise_license" | "system";
+    created_at: number;
+    updated_at: number;
+}
+export interface IamInventory {
+    organizations: number;
+    projects: number;
+    users: number;
+    roles: number;
+    memberships: number;
+    service_accounts: number;
+    api_keys: number;
+    product_entitlements: number;
+}
+export interface IamSummary {
+    schema_version: "1.0";
+    tenant_id: string;
+    project_id: string;
+    inventory: IamInventory;
+    default_admin_scopes: string[];
 }
 export interface WebhookSubscription {
     endpoint_id: string;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RefreshCw, Upload } from "@lucide/vue";
 import { onMounted, reactive, ref } from "vue";
-import { api } from "../api";
+import { api, userFacingError } from "../api";
 import { labelMediaKind } from "../labels";
 import type { MediaAsset, MediaSource } from "../types";
 
@@ -22,7 +22,7 @@ async function refresh(): Promise<void> {
     assets.value = assetPage.items;
     sources.value = sourcePage.items;
   } catch (caught) {
-    error.value = caught instanceof Error ? caught.message : String(caught);
+    error.value = userFacingError(caught, "媒体数据加载失败，请稍后重试");
   } finally {
     loading.value = false;
   }

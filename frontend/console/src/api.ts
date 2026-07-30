@@ -43,7 +43,11 @@ function localizedHttpError(status: number, code: string): string {
   if (status === 403) return "当前身份无权执行此操作";
   if (status === 404) return "未找到请求的资源";
   if (status >= 500) return "服务暂时不可用，请稍后重试";
-  return `请求失败（错误代码：${code}）`;
+  return "请求失败，请检查输入后重试";
+}
+
+export function userFacingError(caught: unknown, fallback = "操作失败，请稍后重试"): string {
+  return caught instanceof ApiError ? caught.message : fallback;
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
