@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import re
 import subprocess
@@ -33,11 +34,18 @@ LEGACY_PUBLIC_ALLOWLIST = {
     "scripts/repository_gate.py",
     "Scenara 景枢全面优化升级方案.md",
 }
-SECRET_PATTERNS = (
-    re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
-    re.compile(r"(?i)(?:api[_-]?key|secret[_-]?key|password)\s*[:=]\s*['\"]?[A-Za-z0-9+/=_-]{24,}"),
+PRIVATE_KEY = re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----")
+SECRET_ASSIGNMENT = re.compile(
+    r"(?im)(?:api[_-]?key|secret[_-]?key|password|token|encryption[_-]?key)"
+    r"[ \t]*[:=][ \t]*['\"]?([A-Za-z0-9+/=_-]{24,})"
 )
-TEXT_SUFFIXES = {".py", ".ts", ".vue", ".js", ".json", ".yml", ".yaml", ".md", ".txt", ".toml", ".sql", ".env"}
+SECRET_PLACEHOLDER = re.compile(r"(?i)^(?:replace[-_]|example[-_])")
+KNOWN_INSECURE_SECRET = re.compile(base64.urlsafe_b64encode(b"0" * 32).decode("ascii"))
+TEXT_SUFFIXES = {
+    ".py", ".ts", ".vue", ".js", ".json", ".yml", ".yaml", ".md", ".txt", ".toml", ".sql", ".env",
+    ".sh", ".ps1",
+}
+TEXT_NAMES = {"Dockerfile"}
 ALLOWED_MODEL_SUFFIXES = (".governance.yml", ".labels.txt", ".model-card.yml")
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -48,6 +56,20 @@ def repository_files() -> list[str]:
         cwd=ROOT,
     )
     return [item.decode("utf-8") for item in output.split(b"\0") if item]
+
+
+def has_possible_secret(value: str) -> bool:
+    if PRIVATE_KEY.search(value) or KNOWN_INSECURE_SECRET.search(value):
+        return True
+    return any(not SECRET_PLACEHOLDER.match(match.group(1)) for match in SECRET_ASSIGNMENT.finditer(value))
+
+
+def is_scannable_text(path: Path) -> bool:
+    return (
+        path.suffix.lower() in TEXT_SUFFIXES
+        or path.name in TEXT_NAMES
+        or (path.name.startswith(".env") and path.name.endswith(".example"))
+    )
 
 
 def main() -> None:
@@ -67,10 +89,10 @@ def main() -> None:
             errors.append(f"model artifact must not be tracked: {name}")
             continue
         path = ROOT / name
-        if path.suffix.lower() not in TEXT_SUFFIXES or not path.is_file() or path.stat().st_size > 2_000_000:
+        if not is_scannable_text(path) or not path.is_file() or path.stat().st_size > 2_000_000:
             continue
         value = path.read_text(encoding="utf-8", errors="ignore")
-        if any(pattern.search(value) for pattern in SECRET_PATTERNS):
+        if has_possible_secret(value):
             errors.append(f"possible secret in tracked file: {name}")
         if (
             LEGACY_PUBLIC_PATTERN.search(value)

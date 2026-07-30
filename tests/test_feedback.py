@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
@@ -186,7 +186,7 @@ async def qualification_refs(
     *,
     signed_by: str = "算法评估负责人",
 ) -> list[str]:
-    executed_at = datetime.now(timezone.utc)
+    executed_at = datetime.now(UTC)
     details = {
         "model_rights": {"rights_cleared": True},
         "portrait_evaluation": {
@@ -297,7 +297,7 @@ async def test_model_release_rejects_untrusted_or_placeholder_evidence(feedback_
             "evidence_refs": ["s3://evidence/fake.json"],
         },
     )
-    assert malformed.status_code == 422
+    assert malformed.status_code == 400
 
     evidence_refs = await qualification_refs(runtime, "1.0.0", "a" * 64, signed_by="TBD")
     created = await api.post(

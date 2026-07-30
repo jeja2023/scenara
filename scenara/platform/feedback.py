@@ -135,6 +135,13 @@ class HardSampleManifest(FeedbackModel):
     created_at: float
 
 
+MODEL_EVIDENCE_REF = re.compile(
+    r"^tenants/[A-Za-z0-9][A-Za-z0-9_.-]{0,63}/projects/"
+    r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}/model-evidence/"
+    r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\.json#sha256=[0-9a-f]{64}$"
+)
+
+
 class CreateModelReleaseRequest(FeedbackModel):
     model_id: str = Field(min_length=1, max_length=128)
     version: str = Field(pattern=r"^\d+\.\d+\.\d+(?:-[a-z0-9.-]+)?$")
@@ -153,12 +160,6 @@ class CreateModelReleaseRequest(FeedbackModel):
             raise ValueError("evidence references must be scoped object keys with a SHA-256 digest")
         return normalized
 
-
-MODEL_EVIDENCE_REF = re.compile(
-    r"^tenants/[A-Za-z0-9][A-Za-z0-9_.-]{0,63}/projects/"
-    r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}/model-evidence/"
-    r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\.json#sha256=[0-9a-f]{64}$"
-)
 EVIDENCE_SIGNER_PLACEHOLDER = re.compile(r"(?i)(?:<[^>]+>|\b(?:example|replace|todo|tbd)\b|待填写|占位)")
 
 

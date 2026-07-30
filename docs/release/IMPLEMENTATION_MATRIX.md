@@ -45,7 +45,7 @@ The following checks were executed on 2026-07-30 and are supporting implementati
 
 | Check | Result |
 |---|---|
-| `python -m pytest -q` | 62 passed, 5 integration tests skipped by default; each skip requires `SCENARA_RUN_INTEGRATION=1` |
+| `python -m pytest -q` | 64 passed, 5 integration tests skipped by default; each skip requires `SCENARA_RUN_INTEGRATION=1` |
 | `SCENARA_RUN_INTEGRATION=1 python -m pytest -q -m integration tests/integration` | 5 passed against Docker PostgreSQL/pgvector, Redis and MinIO |
 | `scripts/local_backup_restore_drill.ps1` | passed; PostgreSQL and MinIO markers restored and verified |
 | `npm run check` | passed; console lint, 6 console tests, typecheck, build and TypeScript SDK check |
