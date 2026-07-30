@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from importlib import import_module
 from typing import Any
 
 from scenara.platform.models import RunRecord
@@ -59,10 +60,10 @@ class RedisRunQueue:
 
     async def open(self) -> None:
         try:
-            import redis.asyncio as redis
+            redis: Any = import_module("redis.asyncio")
         except ImportError as exc:  # pragma: no cover - optional production dependency
             raise RuntimeError("redis is required for the Redis run queue") from exc
-        self._client = redis.from_url(self._url, decode_responses=True)  # type: ignore[no-untyped-call]
+        self._client = redis.from_url(self._url, decode_responses=True)
         for lane in ("batch", "stream"):
             try:
                 await self._client.xgroup_create(

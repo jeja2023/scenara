@@ -2,6 +2,7 @@ import base64
 import binascii
 import hashlib
 import hmac
+import importlib
 import json
 import math
 import time
@@ -30,10 +31,11 @@ from app.settings import (
     STEP_UP_AUTH_MAX_AGE_SECONDS,
 )
 
+pyjwt: Any = None
 try:  # pragma: no cover - 可选的生产环境依赖
-    import jwt as pyjwt
+    pyjwt = importlib.import_module("jwt")
 except Exception:  # pragma: no cover - 当依赖不存在时执行
-    pyjwt = None  # type: ignore[assignment]
+    pass
 
 
 ROLE_PERMISSIONS = {
