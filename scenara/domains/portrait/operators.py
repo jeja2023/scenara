@@ -4,7 +4,7 @@ import time
 from typing import Any
 from uuid import uuid4
 
-from scenara.platform.media import DecodedImage
+from scenara.platform.media_batch import DecodedMedia
 from scenara.platform.models import (
     BoundingBox,
     MediaUnitResult,
@@ -22,10 +22,12 @@ class PortraitPersonDetectionOperator:
         operator_id="portrait.person-detection",
         version="1.0.0",
         domain="portrait",
-        input_types={"image": "media/image"},
+        input_types={"batch": "media/batch"},
         output_types={"result": "result/portrait"},
         timeout_seconds=120,
         resource_class="gpu",
+        resource_budget={"vram_mb": 4096, "cpu_cores": 2},
+        max_batch_size=256,
         batchable=True,
     )
 
@@ -35,9 +37,9 @@ class PortraitPersonDetectionOperator:
         inputs: dict[str, Any],
         parameters: dict[str, Any],
     ) -> dict[str, Any]:
-        decoded = inputs["image"]
-        if not isinstance(decoded, DecodedImage):
-            raise TypeError("portrait detector requires a decoded image")
+        decoded = inputs["batch"]
+        if not isinstance(decoded, DecodedMedia):
+            raise TypeError("portrait detector requires a decoded media batch")
 
         from app.inference_detection import infer_person_frames
         from app.portrait_model_runtime_capability import get_capability_runtime, runtime_output_value
@@ -51,27 +53,48 @@ class PortraitPersonDetectionOperator:
         frames, runtime_meta = await infer_person_frames(
             runtime.bundle,
             runtime.cache_key,
-            [decoded.image],
-            [context.filename],
+            [unit.image for unit in decoded.units],
+            [context.filename for _ in decoded.units],
             confidence=max(0.0, min(1.0, confidence)),
             iou=max(0.0, min(1.0, iou)),
             max_detections=max(1, min(256, max_detections)),
         )
-        frame = frames[0] if frames else {}
         persons: list[VisionObject] = []
-        for item in frame.get("persons", []):
-            box = item.get("box", [])
-            bbox = None
-            if isinstance(box, list) and len(box) >= 4:
-                x1, y1, x2, y2 = (float(value) for value in box[:4])
-                bbox = BoundingBox(x=x1, y=y1, width=max(0.0, x2 - x1), height=max(0.0, y2 - y1))
-            persons.append(
-                VisionObject(
+        units: list[MediaUnitResult] = []
+        for unit_index, unit in enumerate(decoded.units):
+            frame = frames[unit_index] if unit_index < len(frames) else {}
+            unit_persons: list[VisionObject] = []
+            for item in frame.get("persons", []):
+                box = item.get("box", [])
+                bbox = None
+                if isinstance(box, list) and len(box) >= 4:
+                    x1, y1, x2, y2 = (float(value) for value in box[:4])
+                    bbox = BoundingBox(
+                        x=x1,
+                        y=y1,
+                        width=max(0.0, x2 - x1),
+                        height=max(0.0, y2 - y1),
+                    )
+                person = VisionObject(
                     object_id=f"person_{uuid4().hex}",
                     object_type="person",
                     score=float(item["score"]) if item.get("score") is not None else None,
                     bbox=bbox,
+                    track_id=str(item["track_id"]) if item.get("track_id") else None,
                     attributes={key: value for key, value in item.items() if key not in {"box", "score", "embedding"}},
+                )
+                unit_persons.append(person)
+                persons.append(person)
+            units.append(
+                MediaUnitResult(
+                    unit_id=unit.unit_id,
+                    unit_type=unit.unit_type,
+                    index=unit.index,
+                    pts_ms=unit.pts_ms,
+                    page_number=unit.page_number,
+                    width=unit.width,
+                    height=unit.height,
+                    objects=unit_persons,
                 )
             )
         timings = {key: float(value) for key, value in runtime_meta.get("timing", {}).items()}
@@ -79,19 +102,10 @@ class PortraitPersonDetectionOperator:
             run_id=context.run_id,
             domain="portrait",
             pipeline=PipelineRef(pipeline_id=context.pipeline_id, version=context.pipeline_version),
+            warnings=([f"media_termination:{decoded.termination_reason}"] if decoded.termination_reason else []),
             asset_id=context.asset_id,
             source_id=context.source_id,
-            units=[
-                MediaUnitResult(
-                    unit_id="frame_0",
-                    unit_type="frame",
-                    index=0,
-                    pts_ms=0,
-                    width=decoded.width,
-                    height=decoded.height,
-                    objects=persons,
-                )
-            ],
+            units=units,
             domain_payload=PortraitDomainPayload(persons=persons, capabilities=["person_detection"]),
             models=[
                 ModelProvenance(

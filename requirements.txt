@@ -1,9 +1,10 @@
 fastapi==0.139.0
 uvicorn[standard]==0.51.0
-onnxruntime-gpu==1.20.1
+onnxruntime-gpu==1.20.2
 numpy==1.26.4
 opencv-python-headless==4.10.0.84
 pillow==12.3.0
+pypdfium2==5.4.0
 pydantic==2.13.4
 python-multipart==0.0.32
 PyYAML==6.0.3

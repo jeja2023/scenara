@@ -1,0 +1,229 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -r requirements/dev.txt
+      - run: python -m ruff check scenara tests sdk/python scripts
+      - run: python -m mypy scenara sdk/python/scenara_sdk
+      - run: python -m pytest -q
+      - run: python scripts/generate_typescript_sdk.py --check
+      - run: python scripts/export_openapi.py --check
+      - run: python scripts/repository_gate.py
+      - run: python scripts/release_gate.py --implementation-only
+      - name: Validate deployment shell scripts
+        run: bash -n deploy/scripts/*.sh
+
+  web:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check
+      - name: Build console container stage
+        run: docker build --target console-builder -t scenara-console-builder:ci .
+
+  integration-services:
+    runs-on: ubuntu-24.04
+    env:
+      SCENARA_RUN_INTEGRATION: "1"
+      SCENARA_POSTGRES_PASSWORD: scenara-integration
+      SCENARA_API_TOKEN: integration-api-token
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -r requirements/dev.txt -r requirements/prod-optional.txt
+      - name: Generate ephemeral encryption key
+        run: |
+          python -c "from cryptography.fernet import Fernet; print('SCENARA_SECRET_ENCRYPTION_KEY=' + Fernet.generate_key().decode())" >> "$GITHUB_ENV"
+          python -c "import secrets; value=secrets.token_urlsafe(32); print('SCENARA_S3_SECRET_KEY=' + value); print('SCENARA_INTEGRATION_S3_SECRET_KEY=' + value)" >> "$GITHUB_ENV"
+      - name: Start PostgreSQL, Redis, and MinIO
+        run: |
+          docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml up -d --wait postgres redis minio
+          docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml run --rm migrate
+          docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml run --rm minio-init
+      - run: python -m pytest -q -m integration tests/integration --junitxml=integration-services.junit.xml
+      - name: Capture service logs
+        if: always()
+        run: docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml logs --no-color > integration-services.compose.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-services
+          path: |
+            integration-services.junit.xml
+            integration-services.compose.log
+      - name: Stop integration services
+        if: always()
+        run: docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml down --volumes --remove-orphans
+
+  supply-chain:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -r requirements/dev.txt -r requirements/prod-optional.txt pip-licenses==5.5.5
+      - run: pip-licenses --format=json --with-urls --with-license-file --output-file=python-licenses.json
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm licenses list --json > javascript-licenses.json
+      - uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: supply-chain-evidence
+          path: |
+            sbom.cdx.json
+            python-licenses.json
+            javascript-licenses.json
+
+  secret-scan:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  security-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install -r requirements/dev.txt pip-audit==2.10.1
+      - name: Security contract tests
+        run: >-
+          python -m pytest -q
+          tests/test_security_media.py
+          tests/test_platform_extensions.py
+          tests/test_platform_kernel.py
+          tests/test_portrait_analysis.py
+          tests/test_portrait_identity.py
+          tests/test_api.py
+          --junitxml=security-tests.junit.xml
+      - run: python -m pip_audit -r requirements/dev.txt --format json --output python-audit.json
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.32.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level high --json > javascript-audit.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-tests
+          path: |
+            security-tests.junit.xml
+            python-audit.json
+            javascript-audit.json
+
+  backup-restore-drill:
+    runs-on: ubuntu-24.04
+    env:
+      COMPOSE_PROJECT_NAME: scenara-backup-drill
+      SCENARA_POSTGRES_PASSWORD: scenara-backup-drill
+      SCENARA_API_TOKEN: backup-drill-api-token
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Configure drill
+        run: |
+          encryption_key="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '\n')"
+          s3_secret="$(openssl rand -base64 32 | tr -d '\n')"
+          cat > "$RUNNER_TEMP/scenara.env" <<EOF
+          SCENARA_POSTGRES_PASSWORD=$SCENARA_POSTGRES_PASSWORD
+          SCENARA_S3_SECRET_KEY=$s3_secret
+          SCENARA_API_TOKEN=$SCENARA_API_TOKEN
+          SCENARA_SECRET_ENCRYPTION_KEY=$encryption_key
+          EOF
+          chmod 600 "$RUNNER_TEMP/scenara.env"
+          echo "SCENARA_COMPOSE_ENV_FILE=$RUNNER_TEMP/scenara.env" >> "$GITHUB_ENV"
+      - name: Seed PostgreSQL and MinIO
+        run: |
+          docker compose --env-file "$SCENARA_COMPOSE_ENV_FILE" -f deploy/compose.yml up -d --wait postgres minio
+          docker compose --env-file "$SCENARA_COMPOSE_ENV_FILE" -f deploy/compose.yml run --rm migrate
+          docker compose --env-file "$SCENARA_COMPOSE_ENV_FILE" -f deploy/compose.yml run --rm minio-init
+          docker compose --env-file "$SCENARA_COMPOSE_ENV_FILE" -f deploy/compose.yml exec -T postgres \
+            psql -U scenara -d scenara -v ON_ERROR_STOP=1 \
+            -c "CREATE TABLE qualification_marker(value text PRIMARY KEY); INSERT INTO qualification_marker VALUES ('scenara-backup-ok');"
+          docker compose --env-file "$SCENARA_COMPOSE_ENV_FILE" -f deploy/compose.yml run --rm --no-deps -T \
+            --entrypoint /bin/sh minio-init -c \
+            'mc alias set local http://minio:9000 "$ACCESS_KEY" "$SECRET_KEY" >/dev/null && printf scenara-object-ok | mc pipe local/scenara/qualification/marker.txt'
+      - name: Backup, mutate, and restore
+        run: |
+          bash deploy/scripts/backup.sh "$RUNNER_TEMP/backup"
+          docker compose --env-file "$SCENARA_COMPOSE_ENV_FILE" -f deploy/compose.yml exec -T postgres \
+            psql -U scenara -d scenara -v ON_ERROR_STOP=1 -c "DROP TABLE qualification_marker;"
+          docker compose --env-file "$SCENARA_COMPOSE_ENV_FILE" -f deploy/compose.yml run --rm --no-deps -T \
+            --entrypoint /bin/sh minio-init -c \
+            'mc alias set local http://minio:9000 "$ACCESS_KEY" "$SECRET_KEY" >/dev/null && mc rm local/scenara/qualification/marker.txt'
+          SCENARA_RESTORE_DATA_ONLY=true bash deploy/scripts/restore.sh "$RUNNER_TEMP/backup" --confirm
+      - name: Verify restored records
+        run: |
+          test "$(docker compose --env-file "$SCENARA_COMPOSE_ENV_FILE" -f deploy/compose.yml exec -T postgres \
+            psql -U scenara -d scenara -tAc "SELECT value FROM qualification_marker")" = "scenara-backup-ok"
+          test "$(docker compose --env-file "$SCENARA_COMPOSE_ENV_FILE" -f deploy/compose.yml run --rm --no-deps -T \
+            --entrypoint /bin/sh minio-init -c \
+            'mc alias set local http://minio:9000 "$ACCESS_KEY" "$SECRET_KEY" >/dev/null && mc cat local/scenara/qualification/marker.txt')" = "scenara-object-ok"
+          printf 'backup_restore=passed\nverified_at=%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$RUNNER_TEMP/backup-restore-drill.txt"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backup-restore-drill
+          path: |
+            ${{ runner.temp }}/backup/SHA256SUMS
+            ${{ runner.temp }}/backup/container-images.txt
+            ${{ runner.temp }}/backup/compose-version.txt
+            ${{ runner.temp }}/backup/compose-file.sha256
+            ${{ runner.temp }}/backup/source-commit.txt
+            ${{ runner.temp }}/backup/created-at.txt
+            ${{ runner.temp }}/backup-restore-drill.txt
+      - name: Stop drill services
+        if: always()
+        run: docker compose --env-file "$SCENARA_COMPOSE_ENV_FILE" -f deploy/compose.yml down --volumes --remove-orphans

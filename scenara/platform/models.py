@@ -18,6 +18,7 @@ class MediaKind(StrEnum):
     IMAGE = "image"
     VIDEO = "video"
     DOCUMENT = "document"
+    STREAM = "stream"
 
 
 class SourceKind(StrEnum):
@@ -46,6 +47,9 @@ class PipelineStatus(StrEnum):
     RETIRED = "retired"
 
 
+type DomainId = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.-]{1,63}$")]
+
+
 class PrincipalContext(StrictModel):
     tenant_id: str
     project_id: str
@@ -62,9 +66,14 @@ class MediaAsset(StrictModel):
     size_bytes: int = Field(ge=0)
     sha256: str = Field(min_length=64, max_length=64)
     object_key: str
+    preview_object_key: str | None = None
+    preview_content_type: str | None = None
+    preview_sha256: str | None = Field(default=None, min_length=64, max_length=64)
     temporary: bool = False
     created_at: float
     expires_at: float | None = None
+    original_deleted_at: float | None = None
+    deleted_at: float | None = None
 
 
 class CreateMediaSourceRequest(StrictModel):
@@ -85,13 +94,63 @@ class MediaSource(StrictModel):
     created_at: float
 
 
+class CreateWebhookSubscriptionRequest(StrictModel):
+    name: str = Field(min_length=1, max_length=128)
+    url: str = Field(min_length=1, max_length=2048)
+    secret: str = Field(min_length=16, max_length=512)
+    event_types: frozenset[str] = Field(min_length=1, max_length=32)
+
+
+class WebhookSubscription(StrictModel):
+    endpoint_id: str
+    tenant_id: str
+    project_id: str
+    name: str
+    url: str
+    secret_ref: str
+    event_types: frozenset[str]
+    enabled: bool = True
+    created_at: float
+
+
+class WebhookSubscriptionView(StrictModel):
+    endpoint_id: str
+    name: str
+    url: str
+    event_types: frozenset[str]
+    enabled: bool
+    created_at: float
+
+
+class WebhookDeliveryRecord(StrictModel):
+    delivery_id: str
+    tenant_id: str
+    project_id: str
+    endpoint_id: str
+    event_id: str
+    event_type: str
+    payload: dict[str, Any]
+    status: Literal["pending", "delivering", "delivered", "dead_letter"] = "pending"
+    attempts: int = Field(default=0, ge=0, le=100)
+    next_attempt_at: float
+    status_code: int | None = None
+    last_error: str | None = None
+    created_at: float
+    updated_at: float
+    delivered_at: float | None = None
+
+
 class PipelineRef(StrictModel):
     pipeline_id: str = Field(min_length=1, max_length=128)
     version: str = Field(min_length=1, max_length=32)
 
 
+class PipelineTransitionRequest(StrictModel):
+    status: PipelineStatus
+
+
 class CreateRunRequest(StrictModel):
-    domain: Literal["portrait", "ocr"]
+    domain: DomainId
     pipeline: PipelineRef
     asset_id: str | None = None
     source_id: str | None = None
@@ -104,7 +163,8 @@ class RunRecord(StrictModel):
     run_id: str
     tenant_id: str
     project_id: str
-    domain: Literal["portrait", "ocr"]
+    principal_id: str = "anonymous"
+    domain: DomainId
     pipeline: PipelineRef
     asset_id: str | None = None
     source_id: str | None = None
@@ -167,7 +227,7 @@ class OcrTextBlock(ExtensibleModel):
     text: str
     score: float | None = Field(default=None, ge=0, le=1)
     polygon: list[Point] = Field(default_factory=list)
-    block_type: str = "text"
+    block_type: Literal["text", "title", "paragraph", "image", "table"] = "text"
     reading_order: int | None = Field(default=None, ge=0)
 
 
@@ -201,18 +261,42 @@ class ModelProvenance(StrictModel):
     production_ready: bool = False
 
 
+class ResultRelation(StrictModel):
+    relation_type: str
+    source_object_id: str
+    target_object_id: str
+    score: float | None = Field(default=None, ge=0, le=1)
+
+
+class ResultArtifact(StrictModel):
+    artifact_id: str
+    artifact_type: str
+    object_key: str
+    content_type: str
+    sha256: str = Field(min_length=64, max_length=64)
+
+
+class ProvenanceEvidence(StrictModel):
+    source_sha256: str | None = None
+    generated_by: str = "scenara"
+    development_substitutes: list[str] = Field(default_factory=list)
+
+
 class ResultEnvelope(StrictModel):
     schema_version: Literal["1.0"] = "1.0"
     run_id: str
-    domain: Literal["portrait", "ocr"]
+    domain: DomainId
     pipeline: PipelineRef
     asset_id: str | None = None
     source_id: str | None = None
     units: list[MediaUnitResult] = Field(default_factory=list)
     domain_payload: DomainPayload
+    relations: list[ResultRelation] = Field(default_factory=list)
+    artifacts: list[ResultArtifact] = Field(default_factory=list)
     models: list[ModelProvenance] = Field(default_factory=list)
     timings: dict[str, float] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
+    provenance: ProvenanceEvidence = Field(default_factory=ProvenanceEvidence)
     created_at: float
 
 
@@ -222,8 +306,22 @@ class ResultReference(StrictModel):
     object_key: str
     sha256: str = Field(min_length=64, max_length=64)
     unit_count: int = Field(ge=0)
-    domain: Literal["portrait", "ocr"]
+    shard_keys: list[str] = Field(default_factory=list)
+    shard_sha256: list[str] = Field(default_factory=list)
+    domain: DomainId
     created_at: float
+
+
+class ObjectRetentionRecord(StrictModel):
+    tenant_id: str
+    project_id: str
+    object_key: str
+    category: Literal["raw_media", "preview", "structured_result", "biometric"]
+    owner_type: Literal["media_asset", "run_result", "portrait_enrollment"]
+    owner_id: str
+    created_at: float
+    expires_at: float | None = None
+    deleted_at: float | None = None
 
 
 class ApiEnvelope[T](StrictModel):
@@ -274,7 +372,7 @@ class SystemStatus(StrictModel):
     queue_backend: str
     production_models_required: bool
     auth_required: bool
-    enterprise_policy_provider: Literal["not_configured"] = "not_configured"
+    enterprise_policy_provider: str = "not_configured"
 
 
 class ApiErrorDetail(StrictModel):

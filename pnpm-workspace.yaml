@@ -1,3 +1,6 @@
 packages:
   - frontend/console
   - sdk/typescript
+
+overrides:
+  brace-expansion: 5.0.8

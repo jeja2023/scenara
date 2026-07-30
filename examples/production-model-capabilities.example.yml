@@ -1,7 +1,7 @@
 capabilities:
   face_detection:
     status: production
-    model_id: portrait_hub/scrfd_10g.onnx
+    model_id: scenara.portrait.scrfd_10g
     adapter: scrfd
     production_adapter: scrfd
     input_size: [640, 640]
@@ -14,28 +14,28 @@ capabilities:
 
   face_embedding:
     status: production
-    model_id: portrait_hub/arcface_r100.onnx
+    model_id: scenara.portrait.arcface_r100
     adapter: arcface
     production_adapter: arcface
     input_size: [112, 112]
     preprocess: rgb_minus_127p5_div_128
     embedding_dim: 512
     normalize: l2
-    fallback_model_id: portrait_hub/image_fingerprint_v1
+    fallback_model_id: scenara.development.image_fingerprint_v1
 
   pose:
     status: production
-    model_id: portrait_hub/rtmpose_coco17.onnx
+    model_id: scenara.portrait.rtmpose_coco17
     adapter: rtmpose
     production_adapter: rtmpose
     input_size: [256, 192]
     keypoint_schema: coco17
     preprocess: imagenet
-    fallback_model_id: portrait_hub/geometric_pose_placeholder
+    fallback_model_id: scenara.development.geometric_pose
 
   person_detection:
     status: production
-    model_id: portrait_hub/yolov8n.onnx
+    model_id: scenara.portrait.yolov8n
     adapter: yolo
     production_adapter: yolo
     input_size: [640, 640]
@@ -46,37 +46,37 @@ capabilities:
       confidence: 0.25
       iou: 0.45
       max_detections: 100
-    fallback_model_id: portrait_hub/whole_image_person_fallback
+    fallback_model_id: scenara.development.whole_image_person
 
   gait:
     status: production
-    model_id: portrait_hub/opengait_gait3d.onnx
+    model_id: scenara.portrait.opengait_gait3d
     adapter: opengait
     production_adapter: opengait
     input_size: [64, 44]
     sequence_layout: ntchw
     embedding_dim: 256
     normalize: l2
-    fallback_model_id: portrait_hub/tracklet_fingerprint_v1
+    fallback_model_id: scenara.development.tracklet_fingerprint_v1
 
   body_embedding:
     status: production
-    model_id: portrait_hub/osnet_ibn_x1_0.onnx
+    model_id: scenara.portrait.osnet_ibn_x1_0
     adapter: reid
     production_adapter: reid
     input_size: [256, 128]
     preprocess: imagenet
     embedding_dim: 512
     normalize: l2
-    fallback_model_id: portrait_hub/image_fingerprint_v1
+    fallback_model_id: scenara.development.image_fingerprint_v1
 
   appearance:
     status: production
-    model_id: portrait_hub/attribute_reid.onnx
+    model_id: scenara.portrait.attribute_reid
     adapter: attribute_reid
     production_adapter: attribute_reid
     input_size: [256, 128]
     preprocess: imagenet
     embedding_dim: 256
     normalize: l2
-    fallback_model_id: portrait_hub/color_histogram_v1
+    fallback_model_id: scenara.development.color_histogram_v1

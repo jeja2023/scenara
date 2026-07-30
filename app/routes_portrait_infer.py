@@ -218,7 +218,7 @@ async def v1_infer_pose(
         "frames": results,
         "frame_count": len(results),
         "model": {
-            "id": "portrait_hub/geometric_pose_placeholder",
+            "id": "scenara.development.geometric_pose",
             "status": "placeholder",
         },
     }

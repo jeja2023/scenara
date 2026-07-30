@@ -33,7 +33,7 @@ from app.settings import (
 try:  # pragma: no cover - 可选的生产环境依赖
     import jwt as pyjwt
 except Exception:  # pragma: no cover - 当依赖不存在时执行
-    pyjwt = None
+    pyjwt = None  # type: ignore[assignment]
 
 
 ROLE_PERMISSIONS = {

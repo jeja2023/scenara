@@ -48,7 +48,7 @@ onMounted(checkConnection);
       <button class="icon-button mobile-menu" title="打开导航" @click="mobileOpen = true"><Menu :size="19" /></button>
       <div class="mobile-brand"><img :src="brandMark" alt="" /><strong>Scenara</strong></div>
       <div class="topbar-context">
-        <span class="context-product">统一视觉解析平台</span>
+        <span class="context-product">企业视觉 AI 中枢平台</span>
         <span class="context-separator"></span>
         <strong>{{ route.meta.title }}</strong>
       </div>
@@ -63,7 +63,7 @@ onMounted(checkConnection);
     <aside class="sidebar" :class="{ open: mobileOpen }">
       <div class="brand">
         <img :src="brandMark" alt="" />
-        <div><strong>Scenara</strong><span>景析</span></div>
+        <div><strong>Scenara</strong><span>景枢</span></div>
         <button class="icon-button sidebar-close" title="关闭导航" @click="mobileOpen = false"><X :size="19" /></button>
       </div>
       <nav aria-label="主导航">
@@ -75,7 +75,7 @@ onMounted(checkConnection);
           </RouterLink>
         </section>
       </nav>
-      <div class="sidebar-footer"><span>0.1 development</span><i></i><span>API v1</span></div>
+      <div class="sidebar-footer"><span>0.1 开发版</span><i></i><span>接口 v1</span></div>
     </aside>
     <button v-if="mobileOpen" class="nav-scrim" aria-label="关闭导航" @click="mobileOpen = false"></button>
 
@@ -85,10 +85,10 @@ onMounted(checkConnection);
       <form method="dialog" @submit.prevent="applySettings">
         <div class="modal-header"><div><h2>连接设置</h2><p>当前浏览器会话</p></div><button class="icon-button" title="关闭" @click="settingsOpen = false"><X :size="18" /></button></div>
         <div class="form-grid">
-          <label class="span-2"><span>API 地址</span><input id="api-base" v-model="draft.apiBase" placeholder="同源" /></label>
+          <label class="span-2"><span>接口地址</span><input id="api-base" v-model="draft.apiBase" placeholder="同源" /></label>
           <label><span>租户</span><input v-model="draft.tenantId" required /></label>
           <label><span>项目</span><input v-model="draft.projectId" required /></label>
-          <label class="span-2"><span>Bearer Token</span><input v-model="draft.token" type="password" autocomplete="off" /></label>
+          <label class="span-2"><span>访问令牌</span><input v-model="draft.token" type="password" autocomplete="off" /></label>
         </div>
         <div class="modal-actions"><button type="button" class="button secondary" @click="checkConnection"><RefreshCw :size="16" />测试</button><button class="button primary" type="submit">应用</button></div>
       </form>

@@ -2,6 +2,7 @@ import vue from "@vitejs/plugin-vue";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  base: "/console/",
   plugins: [vue()],
   server: {
     host: "127.0.0.1",

@@ -2,6 +2,7 @@
 import { RefreshCw, Upload } from "@lucide/vue";
 import { onMounted, reactive, ref } from "vue";
 import { api } from "../api";
+import { labelMediaKind } from "../labels";
 import type { MediaAsset, MediaSource } from "../types";
 
 const loading = ref(false);
@@ -59,13 +60,13 @@ onMounted(refresh);
     </div>
     <p v-if="error" class="callout error">{{ error }}</p>
     <div class="two-column">
-      <section class="panel"><div class="panel-header"><h2>资产</h2><span class="badge">{{ assets.length }}</span></div><div class="table-scroll"><table class="data-table"><thead><tr><th>ID</th><th>类型</th><th>文件</th><th>大小</th><th>创建时间</th></tr></thead><tbody>
-        <tr v-for="asset in assets" :key="asset.asset_id"><td class="mono">{{ asset.asset_id }}</td><td>{{ asset.kind }}</td><td class="truncate">{{ asset.filename }}</td><td>{{ (asset.size_bytes / 1024).toFixed(1) }} KB</td><td>{{ new Date(asset.created_at * 1000).toLocaleString() }}</td></tr>
+      <section class="panel"><div class="panel-header"><h2>资产</h2><span class="badge">{{ assets.length }}</span></div><div class="table-scroll"><table class="data-table"><thead><tr><th>标识</th><th>类型</th><th>文件</th><th>大小</th><th>创建时间</th></tr></thead><tbody>
+        <tr v-for="asset in assets" :key="asset.asset_id"><td class="mono">{{ asset.asset_id }}</td><td>{{ labelMediaKind(asset.kind) }}</td><td class="truncate">{{ asset.filename }}</td><td>{{ (asset.size_bytes / 1024).toFixed(1) }} KB</td><td>{{ new Date(asset.created_at * 1000).toLocaleString() }}</td></tr>
       </tbody></table><div v-if="!assets.length" class="empty">暂无资产</div></div></section>
       <section class="panel"><div class="panel-header"><h2>源</h2><span class="badge">{{ sources.length }}</span></div><div class="panel-body">
-        <div class="form-grid"><label><span>名称</span><input v-model="sourceForm.name" /></label><label><span>URL</span><input v-model="sourceForm.url" /></label></div>
+        <div class="form-grid"><label><span>名称</span><input v-model="sourceForm.name" /></label><label><span>地址</span><input v-model="sourceForm.url" /></label></div>
         <button class="button primary source-submit" :disabled="!sourceForm.name || !sourceForm.url" @click="createSource">登记</button>
-        <table class="data-table"><tbody><tr v-for="source in sources" :key="source.source_id"><td class="mono">{{ source.source_id }}</td><td>{{ source.name }}</td><td class="truncate">{{ source.masked_url }}</td></tr></tbody></table>
+        <div class="table-scroll"><table class="data-table"><tbody><tr v-for="source in sources" :key="source.source_id"><td class="mono">{{ source.source_id }}</td><td>{{ source.name }}</td><td class="truncate">{{ source.masked_url }}</td></tr></tbody></table></div>
       </div></section>
     </div>
   </section>

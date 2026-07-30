@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from io import BytesIO
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -20,7 +21,7 @@ class FixedOcrEngine:
         assert image.size == (32, 24)
         return [
             {
-                "text": "Scenara 景析",
+                "text": "Scenara 景枢",
                 "score": 0.99,
                 "polygon": [[1, 1], [30, 1], [30, 10], [1, 10]],
             }
@@ -74,7 +75,7 @@ async def test_ocr_run_is_idempotent_and_returns_typed_result(client) -> None:
     assert result.status_code == 200
     payload = result.json()["data"]["result"]["domain_payload"]
     assert payload["domain"] == "ocr"
-    assert payload["text"] == "Scenara 景析"
+    assert payload["text"] == "Scenara 景枢"
     assert payload["blocks"][0]["reading_order"] == 0
 
 
@@ -144,6 +145,38 @@ async def test_tenant_scope_hides_assets(client) -> None:
     assert response.status_code == 404
 
 
+@pytest.mark.asyncio
+async def test_console_bundle_is_served_with_spa_fallback(
+    development_settings,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    import scenara.server as server_module
+
+    console_dist = tmp_path / "console"
+    (console_dist / "assets").mkdir(parents=True)
+    (console_dist / "index.html").write_text(
+        "<!doctype html><html><head><title>Scenara 景枢</title></head><body>控制台</body></html>",
+        encoding="utf-8",
+    )
+    (console_dist / "favicon.svg").write_text("<svg xmlns='http://www.w3.org/2000/svg'/>", encoding="utf-8")
+    monkeypatch.setattr(server_module, "CONSOLE_DIST", console_dist)
+    app = create_app(runtime=build_runtime(development_settings))
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app),
+        base_url="http://test",
+        follow_redirects=False,
+    ) as api:
+        redirect = await api.get("/")
+        assert redirect.status_code == 307
+        assert redirect.headers["location"] == "/console/"
+        console = await api.get("/console/media")
+        assert console.status_code == 200
+        assert "Scenara 景枢" in console.text
+        assert "frame-ancestors 'none'" in console.headers["content-security-policy"]
+        assert (await api.get("/console/favicon.svg")).status_code == 200
+
+
 def test_openapi_exposes_domain_union(development_settings) -> None:
     schema = create_app(runtime=build_runtime(development_settings, ocr_engine=FixedOcrEngine())).openapi()
     components = schema["components"]["schemas"]
@@ -151,3 +184,111 @@ def test_openapi_exposes_domain_union(development_settings) -> None:
     domain_payload = result_schema["properties"]["domain_payload"]
     assert domain_payload["discriminator"]["propertyName"] == "domain"
     assert len(domain_payload["oneOf"]) == 2
+
+
+@pytest.mark.asyncio
+async def test_pipeline_and_model_catalog_endpoints_use_state_store(client) -> None:
+    api, runtime = client
+    pipelines = await api.get("/api/v1/pipelines")
+    assert pipelines.status_code == 200
+    assert {item["pipeline_id"] for item in pipelines.json()["data"]} == {
+        "ocr.document",
+        "portrait.analysis",
+        "portrait.person-detection",
+    }
+    assert len(await runtime.state.list_pipeline_definitions()) == 3
+    models = await api.get("/api/v1/models")
+    assert models.status_code == 200
+    assert models.json()["data"] == []
+
+
+@pytest.mark.asyncio
+async def test_webhook_subscription_outbox_delivery_and_secret_cleanup(
+    client, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    api, runtime = client
+
+    async def allow_target(url: str, **kwargs: object) -> str:
+        del kwargs
+        return url
+
+    monkeypatch.setattr("scenara.platform.webhook_service.validate_external_url", allow_target)
+    created = await api.post(
+        "/api/v1/webhooks/subscriptions",
+        json={
+            "name": "result sink",
+            "url": "https://events.example.test/scenara",
+            "secret": "webhook-test-secret-1234",
+            "event_types": ["result.available"],
+        },
+    )
+    assert created.status_code == 201, created.text
+    endpoint = created.json()["data"]
+    assert "secret" not in created.text
+    stored_endpoint = await runtime.state.get_webhook_subscription(
+        "default", "default", endpoint["endpoint_id"]
+    )
+    assert stored_endpoint is not None
+
+    asset_id = await upload_image(api)
+    run = await api.post(
+        "/api/v1/runs",
+        json={
+            "domain": "ocr",
+            "pipeline": {"pipeline_id": "ocr.document", "version": "0.1.0"},
+            "asset_id": asset_id,
+            "wait_ms": 2000,
+        },
+        headers={"Idempotency-Key": "webhook-outbox"},
+    )
+    assert run.status_code == 202
+    pending = await api.get("/api/v1/webhooks/deliveries")
+    assert pending.json()["data"][0]["status"] == "pending"
+
+    sent: list[tuple[str, str, str]] = []
+
+    class Sender:
+        async def deliver(self, target, event_id, event_type, payload, *, max_attempts=5):
+            del payload, max_attempts
+            sent.append((target.secret, event_id, event_type))
+            return SimpleNamespace(status_code=204)
+
+    runtime.webhooks._sender = Sender()
+    assert await runtime.webhooks.deliver_due() == (1, 0)
+    delivered = await api.get("/api/v1/webhooks/deliveries")
+    assert delivered.json()["data"][0]["status"] == "delivered"
+    assert sent[0][0] == "webhook-test-secret-1234"
+    assert sent[0][2] == "result.available"
+
+    deleted = await api.delete(f"/api/v1/webhooks/subscriptions/{endpoint['endpoint_id']}")
+    assert deleted.status_code == 204
+    from scenara.platform.secrets import SecretNotFound
+
+    with pytest.raises(SecretNotFound):
+        await runtime.secrets.get(stored_endpoint.secret_ref)
+
+
+@pytest.mark.asyncio
+async def test_pipeline_transition_is_persisted_and_retired_version_rejects_new_run(client) -> None:
+    api, runtime = client
+    retired = await api.post(
+        "/api/v1/pipelines/ocr.document/versions/0.1.0/transition",
+        json={"status": "retired"},
+    )
+    assert retired.status_code == 200, retired.text
+    assert retired.json()["data"]["status"] == "retired"
+    persisted = await runtime.state.get_pipeline_definition("ocr.document", "0.1.0")
+    assert persisted is not None and persisted.status.value == "retired"
+
+    asset_id = await upload_image(api)
+    rejected = await api.post(
+        "/api/v1/runs",
+        json={
+            "domain": "ocr",
+            "pipeline": {"pipeline_id": "ocr.document", "version": "0.1.0"},
+            "asset_id": asset_id,
+        },
+        headers={"Idempotency-Key": "retired-pipeline"},
+    )
+    assert rejected.status_code == 422
+    assert "pipeline is not active" in rejected.text

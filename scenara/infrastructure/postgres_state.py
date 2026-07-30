@@ -1,9 +1,31 @@
 from __future__ import annotations
 
 from typing import Any
+from uuid import uuid4
 
-from scenara.platform.models import MediaAsset, MediaSource, ResultReference, RunEvent, RunRecord
+from scenara.platform.audit import AuditEvent
+from scenara.platform.model_runtime import ModelPackageManifest
+from scenara.platform.models import (
+    MediaAsset,
+    MediaSource,
+    ObjectRetentionRecord,
+    PipelineStatus,
+    ResultReference,
+    RunEvent,
+    RunRecord,
+    WebhookDeliveryRecord,
+    WebhookSubscription,
+)
+from scenara.platform.pipeline import PipelineDefinition
 from scenara.platform.store import StateConflict
+
+
+async def _register_pgvector(connection: Any) -> None:
+    try:
+        from pgvector.psycopg import register_vector_async
+    except ImportError as exc:  # pragma: no cover - production dependency
+        raise RuntimeError("pgvector is required for the PostgreSQL state backend") from exc
+    await register_vector_async(connection)
 
 
 class PostgresStateStore:
@@ -14,13 +36,271 @@ class PostgresStateStore:
             from psycopg_pool import AsyncConnectionPool
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError("psycopg-pool is required for the PostgreSQL state backend") from exc
-        self._pool: Any = AsyncConnectionPool(dsn, open=False, min_size=1, max_size=10)
+        self._pool: Any = AsyncConnectionPool(dsn, open=False, min_size=1, max_size=10, configure=_register_pgvector)
+
+    @property
+    def pool(self) -> Any:
+        return self._pool
 
     async def open(self) -> None:
         await self._pool.open()
 
     async def close(self) -> None:
         await self._pool.close()
+
+    async def register_pipeline_definition(self, pipeline: PipelineDefinition) -> None:
+        from psycopg.types.json import Jsonb
+
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """SELECT definition_sha256 FROM scenara_pipeline_versions
+                   WHERE pipeline_id = %s AND version = %s FOR UPDATE""",
+                (pipeline.pipeline_id, pipeline.version),
+            )
+            row = await cursor.fetchone()
+            if row is not None:
+                if str(row[0]) != pipeline.definition_sha256:
+                    raise StateConflict("pipeline version definition is immutable")
+                return
+            try:
+                await conn.execute(
+                    """INSERT INTO scenara_pipeline_versions
+                       (pipeline_id, version, domain, status, definition, definition_sha256, activated_at)
+                       VALUES (%s, %s, %s, %s, %s, %s,
+                               CASE WHEN %s = 'active' THEN now() ELSE NULL END)""",
+                    (
+                        pipeline.pipeline_id,
+                        pipeline.version,
+                        pipeline.domain,
+                        pipeline.status.value,
+                        Jsonb(pipeline.model_dump(mode="json")),
+                        pipeline.definition_sha256,
+                        pipeline.status.value,
+                    ),
+                )
+            except Exception as exc:
+                if exc.__class__.__name__ in {"UniqueViolation", "IntegrityError"}:
+                    raise StateConflict("pipeline already has an active version") from exc
+                raise
+
+    async def get_pipeline_definition(self, pipeline_id: str, version: str) -> PipelineDefinition | None:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT definition || jsonb_build_object('status', status) FROM scenara_pipeline_versions
+                   WHERE pipeline_id = %s AND version = %s""",
+                (pipeline_id, version),
+            )
+            row = await cursor.fetchone()
+        return PipelineDefinition.model_validate(row[0]) if row else None
+
+    async def list_pipeline_definitions(self) -> list[PipelineDefinition]:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT definition || jsonb_build_object('status', status)
+                   FROM scenara_pipeline_versions ORDER BY pipeline_id, version"""
+            )
+            rows = await cursor.fetchall()
+        return [PipelineDefinition.model_validate(row[0]) for row in rows]
+
+    async def transition_pipeline_definition(
+        self, pipeline_id: str, version: str, target: PipelineStatus
+    ) -> PipelineDefinition:
+        allowed = {
+            PipelineStatus.DRAFT: {PipelineStatus.VALIDATED},
+            PipelineStatus.VALIDATED: {PipelineStatus.APPROVED, PipelineStatus.DRAFT},
+            PipelineStatus.APPROVED: {PipelineStatus.ACTIVE, PipelineStatus.DRAFT},
+            PipelineStatus.ACTIVE: {PipelineStatus.RETIRED},
+            PipelineStatus.RETIRED: set(),
+        }
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """SELECT status, definition FROM scenara_pipeline_versions
+                   WHERE pipeline_id = %s AND version = %s FOR UPDATE""",
+                (pipeline_id, version),
+            )
+            row = await cursor.fetchone()
+            if row is None:
+                raise StateConflict("pipeline version does not exist")
+            current = PipelineStatus(str(row[0]))
+            if target not in allowed[current]:
+                raise StateConflict(f"invalid pipeline transition: {current.value} -> {target.value}")
+            if target == PipelineStatus.ACTIVE:
+                await conn.execute(
+                    """UPDATE scenara_pipeline_versions
+                       SET status = 'retired' WHERE pipeline_id = %s AND status = 'active'""",
+                    (pipeline_id,),
+                )
+            await conn.execute(
+                """UPDATE scenara_pipeline_versions
+                   SET status = %s, activated_at = CASE WHEN %s = 'active' THEN now() ELSE activated_at END
+                   WHERE pipeline_id = %s AND version = %s""",
+                (target.value, target.value, pipeline_id, version),
+            )
+            payload = dict(row[1])
+            payload["status"] = target.value
+        return PipelineDefinition.model_validate(payload)
+
+    async def register_model_package(self, package: ModelPackageManifest) -> None:
+        from psycopg.types.json import Jsonb
+
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """SELECT sha256, manifest FROM scenara_model_packages
+                   WHERE model_id = %s AND version = %s FOR UPDATE""",
+                (package.model_id, package.version),
+            )
+            row = await cursor.fetchone()
+            if row is not None:
+                if str(row[0]) != package.sha256 or ModelPackageManifest.model_validate(row[1]) != package:
+                    raise StateConflict("model package version is immutable")
+                return
+            await conn.execute(
+                """INSERT INTO scenara_model_packages
+                   (model_id, version, capability, adapter, sha256, license_id, source_uri,
+                    vram_mb, production_ready, manifest)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                (
+                    package.model_id,
+                    package.version,
+                    package.capability,
+                    package.adapter,
+                    package.sha256,
+                    package.license_id,
+                    package.source_uri,
+                    package.vram_mb,
+                    package.production_ready,
+                    Jsonb(package.model_dump(mode="json")),
+                ),
+            )
+
+    async def list_model_packages(self) -> list[ModelPackageManifest]:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute("SELECT manifest FROM scenara_model_packages ORDER BY model_id, version")
+            rows = await cursor.fetchall()
+        return [ModelPackageManifest.model_validate(row[0]) for row in rows]
+
+    async def create_webhook_subscription(self, endpoint: WebhookSubscription) -> WebhookSubscription:
+        from psycopg.types.json import Jsonb
+
+        async with self._pool.connection() as conn, conn.transaction():
+            try:
+                await conn.execute(
+                    """INSERT INTO scenara_webhook_subscriptions
+                       (tenant_id, project_id, endpoint_id, url, enabled, event_types, created_at, document)
+                       VALUES (%s, %s, %s, %s, %s, %s, to_timestamp(%s), %s)""",
+                    (
+                        endpoint.tenant_id,
+                        endpoint.project_id,
+                        endpoint.endpoint_id,
+                        endpoint.url,
+                        endpoint.enabled,
+                        list(endpoint.event_types),
+                        endpoint.created_at,
+                        Jsonb(endpoint.model_dump(mode="json")),
+                    ),
+                )
+            except Exception as exc:
+                if exc.__class__.__name__ in {"UniqueViolation", "IntegrityError"}:
+                    raise StateConflict("webhook subscription already exists") from exc
+                raise
+        return endpoint.model_copy(deep=True)
+
+    async def get_webhook_subscription(
+        self, tenant_id: str, project_id: str, endpoint_id: str
+    ) -> WebhookSubscription | None:
+        row = await self._get_document(
+            "scenara_webhook_subscriptions", "endpoint_id", tenant_id, project_id, endpoint_id
+        )
+        return WebhookSubscription.model_validate(row) if row else None
+
+    async def list_webhook_subscriptions(self, tenant_id: str, project_id: str) -> list[WebhookSubscription]:
+        rows = await self._list_documents(
+            "scenara_webhook_subscriptions", "endpoint_id", tenant_id, project_id
+        )
+        return [WebhookSubscription.model_validate(row) for row in rows]
+
+    async def delete_webhook_subscription(
+        self, tenant_id: str, project_id: str, endpoint_id: str
+    ) -> WebhookSubscription | None:
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """DELETE FROM scenara_webhook_subscriptions
+                   WHERE tenant_id = %s AND project_id = %s AND endpoint_id = %s RETURNING document""",
+                (tenant_id, project_id, endpoint_id),
+            )
+            row = await cursor.fetchone()
+        return WebhookSubscription.model_validate(row[0]) if row else None
+
+    async def claim_webhook_deliveries(
+        self, before: float, lease_until: float, limit: int
+    ) -> list[WebhookDeliveryRecord]:
+        from psycopg.types.json import Jsonb
+
+        claimed: list[WebhookDeliveryRecord] = []
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """SELECT document FROM scenara_webhook_deliveries
+                   WHERE status IN ('pending', 'delivering') AND next_attempt_at <= to_timestamp(%s)
+                   ORDER BY next_attempt_at, created_at, delivery_id
+                   FOR UPDATE SKIP LOCKED LIMIT %s""",
+                (before, limit),
+            )
+            for row in await cursor.fetchall():
+                delivery = WebhookDeliveryRecord.model_validate(row[0]).model_copy(
+                    update={"status": "delivering", "next_attempt_at": lease_until, "updated_at": before}
+                )
+                await conn.execute(
+                    """UPDATE scenara_webhook_deliveries
+                       SET status = %s, next_attempt_at = to_timestamp(%s), updated_at = to_timestamp(%s), document = %s
+                       WHERE tenant_id = %s AND project_id = %s AND delivery_id = %s""",
+                    (
+                        delivery.status,
+                        delivery.next_attempt_at,
+                        delivery.updated_at,
+                        Jsonb(delivery.model_dump(mode="json")),
+                        delivery.tenant_id,
+                        delivery.project_id,
+                        delivery.delivery_id,
+                    ),
+                )
+                claimed.append(delivery)
+        return claimed
+
+    async def save_webhook_delivery(self, delivery: WebhookDeliveryRecord) -> None:
+        from psycopg.types.json import Jsonb
+
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """UPDATE scenara_webhook_deliveries
+                   SET status = %s, attempts = %s, next_attempt_at = to_timestamp(%s),
+                       updated_at = to_timestamp(%s), document = %s
+                   WHERE tenant_id = %s AND project_id = %s AND delivery_id = %s""",
+                (
+                    delivery.status,
+                    delivery.attempts,
+                    delivery.next_attempt_at,
+                    delivery.updated_at,
+                    Jsonb(delivery.model_dump(mode="json")),
+                    delivery.tenant_id,
+                    delivery.project_id,
+                    delivery.delivery_id,
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise StateConflict("webhook delivery does not exist")
+
+    async def list_webhook_deliveries(
+        self, tenant_id: str, project_id: str, limit: int
+    ) -> list[WebhookDeliveryRecord]:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT document FROM scenara_webhook_deliveries
+                   WHERE tenant_id = %s AND project_id = %s
+                   ORDER BY created_at DESC, delivery_id DESC LIMIT %s""",
+                (tenant_id, project_id, limit),
+            )
+            rows = await cursor.fetchall()
+        return [WebhookDeliveryRecord.model_validate(row[0]) for row in rows]
 
     async def create_asset(self, asset: MediaAsset) -> MediaAsset:
         await self._insert_document("scenara_media_assets", "asset_id", asset.asset_id, asset)
@@ -34,6 +314,16 @@ class PostgresStateStore:
         rows = await self._list_documents("scenara_media_assets", "asset_id", tenant_id, project_id)
         return [MediaAsset.model_validate(row) for row in rows]
 
+    async def delete_asset(self, tenant_id: str, project_id: str, asset_id: str) -> MediaAsset | None:
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """DELETE FROM scenara_media_assets
+                   WHERE tenant_id = %s AND project_id = %s AND asset_id = %s RETURNING document""",
+                (tenant_id, project_id, asset_id),
+            )
+            row = await cursor.fetchone()
+        return MediaAsset.model_validate(row[0]) if row else None
+
     async def create_source(self, source: MediaSource) -> MediaSource:
         await self._insert_document("scenara_media_sources", "source_id", source.source_id, source)
         return source.model_copy(deep=True)
@@ -45,6 +335,16 @@ class PostgresStateStore:
     async def list_sources(self, tenant_id: str, project_id: str) -> list[MediaSource]:
         rows = await self._list_documents("scenara_media_sources", "source_id", tenant_id, project_id)
         return [MediaSource.model_validate(row) for row in rows]
+
+    async def delete_source(self, tenant_id: str, project_id: str, source_id: str) -> MediaSource | None:
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """DELETE FROM scenara_media_sources
+                   WHERE tenant_id = %s AND project_id = %s AND source_id = %s RETURNING document""",
+                (tenant_id, project_id, source_id),
+            )
+            row = await cursor.fetchone()
+        return MediaSource.model_validate(row[0]) if row else None
 
     async def create_run_idempotent(
         self,
@@ -119,6 +419,16 @@ class PostgresStateStore:
             rows = await cursor.fetchall()
         return [RunRecord.model_validate(row[0]) for row in rows]
 
+    async def delete_run(self, tenant_id: str, project_id: str, run_id: str) -> RunRecord | None:
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """DELETE FROM scenara_runs
+                   WHERE tenant_id = %s AND project_id = %s AND run_id = %s RETURNING document""",
+                (tenant_id, project_id, run_id),
+            )
+            row = await cursor.fetchone()
+        return RunRecord.model_validate(row[0]) if row else None
+
     async def save_run(self, run: RunRecord, *, expected_revision: int) -> RunRecord:
         from psycopg.types.json import Jsonb
 
@@ -175,6 +485,47 @@ class PostgresStateStore:
                     Jsonb(stored.model_dump(mode="json")),
                 ),
             )
+            cursor = await conn.execute(
+                """SELECT document FROM scenara_webhook_subscriptions
+                   WHERE tenant_id = %s AND project_id = %s AND enabled
+                     AND %s = ANY(event_types)""",
+                (tenant_id, project_id, stored.event_type),
+            )
+            for row in await cursor.fetchall():
+                endpoint = WebhookSubscription.model_validate(row[0])
+                delivery = WebhookDeliveryRecord(
+                    delivery_id=f"whd_{uuid4().hex}",
+                    tenant_id=tenant_id,
+                    project_id=project_id,
+                    endpoint_id=endpoint.endpoint_id,
+                    event_id=f"{stored.run_id}:{stored.event_id}",
+                    event_type=stored.event_type,
+                    payload=stored.model_dump(mode="json"),
+                    next_attempt_at=stored.created_at,
+                    created_at=stored.created_at,
+                    updated_at=stored.created_at,
+                )
+                await conn.execute(
+                    """INSERT INTO scenara_webhook_deliveries
+                       (tenant_id, project_id, delivery_id, endpoint_id, event_id, event_type,
+                        status, attempts, next_attempt_at, created_at, updated_at, document)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, to_timestamp(%s),
+                               to_timestamp(%s), to_timestamp(%s), %s)""",
+                    (
+                        delivery.tenant_id,
+                        delivery.project_id,
+                        delivery.delivery_id,
+                        delivery.endpoint_id,
+                        delivery.event_id,
+                        delivery.event_type,
+                        delivery.status,
+                        delivery.attempts,
+                        delivery.next_attempt_at,
+                        delivery.created_at,
+                        delivery.updated_at,
+                        Jsonb(delivery.model_dump(mode="json")),
+                    ),
+                )
         return stored
 
     async def events_after(self, tenant_id: str, project_id: str, run_id: str, event_id: int) -> list[RunEvent]:
@@ -214,6 +565,152 @@ class PostgresStateStore:
                 ),
             )
 
+    async def append_audit(self, event: AuditEvent) -> None:
+        from psycopg.types.json import Jsonb
+
+        async with self._pool.connection() as conn, conn.transaction():
+            await conn.execute(
+                """INSERT INTO scenara_audit_events
+                   (tenant_id, project_id, principal_id, action, resource_type, resource_id,
+                    outcome, request_id, evidence, created_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, to_timestamp(%s))""",
+                (
+                    event.tenant_id,
+                    event.project_id,
+                    event.principal_id,
+                    event.action,
+                    event.resource_type,
+                    event.resource_id,
+                    event.outcome,
+                    event.request_id,
+                    Jsonb(event.evidence),
+                    event.created_at,
+                ),
+            )
+
+    async def audit_events(self, tenant_id: str, project_id: str) -> list[AuditEvent]:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT audit_id, principal_id, action, resource_type, resource_id, outcome,
+                          request_id, evidence, extract(epoch from created_at)
+                   FROM scenara_audit_events
+                   WHERE tenant_id = %s AND project_id = %s ORDER BY audit_id DESC""",
+                (tenant_id, project_id),
+            )
+            rows = await cursor.fetchall()
+        return [
+            AuditEvent(
+                event_id=f"aud_{row[0]}",
+                tenant_id=tenant_id,
+                project_id=project_id,
+                principal_id=row[1],
+                action=row[2],
+                resource_type=row[3],
+                resource_id=row[4],
+                outcome=row[5],
+                request_id=row[6],
+                evidence=row[7],
+                created_at=row[8],
+            )
+            for row in rows
+        ]
+
+    async def track_object(self, record: ObjectRetentionRecord) -> None:
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """INSERT INTO scenara_object_retention
+                   (tenant_id, project_id, object_key, category, owner_type, owner_id,
+                    created_at, expires_at, deleted_at)
+                   VALUES (%s, %s, %s, %s, %s, %s,
+                           to_timestamp(%s), to_timestamp(%s::double precision), to_timestamp(%s::double precision))
+                   ON CONFLICT (tenant_id, project_id, object_key) DO NOTHING""",
+                (
+                    record.tenant_id,
+                    record.project_id,
+                    record.object_key,
+                    record.category,
+                    record.owner_type,
+                    record.owner_id,
+                    record.created_at,
+                    record.expires_at,
+                    record.deleted_at,
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise StateConflict("object retention record already exists")
+
+    async def expired_object_keys(self, before: float, limit: int) -> list[str]:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT object_key FROM scenara_object_retention
+                   WHERE expires_at IS NOT NULL AND expires_at <= to_timestamp(%s) AND deleted_at IS NULL
+                   ORDER BY expires_at ASC, object_key ASC LIMIT %s""",
+                (before, limit),
+            )
+            rows = await cursor.fetchall()
+        return [str(row[0]) for row in rows]
+
+    async def mark_objects_deleted(self, object_keys: list[str], deleted_at: float) -> None:
+        from psycopg.types.json import Jsonb
+
+        if not object_keys:
+            return
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """UPDATE scenara_object_retention SET deleted_at = to_timestamp(%s)
+                   WHERE object_key = ANY(%s) AND deleted_at IS NULL
+                   RETURNING tenant_id, project_id, category, owner_type, owner_id""",
+                (deleted_at, object_keys),
+            )
+            owners = await cursor.fetchall()
+            asset_categories: dict[tuple[str, str, str], set[str]] = {}
+            for tenant_id, project_id, category, owner_type, owner_id in set(owners):
+                if owner_type == "media_asset":
+                    asset_categories.setdefault((tenant_id, project_id, owner_id), set()).add(category)
+                if owner_type != "run_result":
+                    continue
+                cursor = await conn.execute(
+                    """SELECT 1 FROM scenara_object_retention
+                       WHERE tenant_id = %s AND project_id = %s AND owner_type = 'run_result'
+                         AND owner_id = %s AND deleted_at IS NULL LIMIT 1""",
+                    (tenant_id, project_id, owner_id),
+                )
+                if await cursor.fetchone() is None:
+                    await conn.execute(
+                        """DELETE FROM scenara_run_results
+                           WHERE tenant_id = %s AND project_id = %s AND run_id = %s""",
+                        (tenant_id, project_id, owner_id),
+                    )
+            for (tenant_id, project_id, asset_id), categories in asset_categories.items():
+                cursor = await conn.execute(
+                    """SELECT document FROM scenara_media_assets
+                       WHERE tenant_id = %s AND project_id = %s AND asset_id = %s FOR UPDATE""",
+                    (tenant_id, project_id, asset_id),
+                )
+                row = await cursor.fetchone()
+                if row is None:
+                    continue
+                asset = MediaAsset.model_validate(row[0])
+                updates: dict[str, object] = {}
+                if "raw_media" in categories:
+                    updates["original_deleted_at"] = deleted_at
+                if "preview" in categories:
+                    updates.update(
+                        {
+                            "preview_object_key": None,
+                            "preview_content_type": None,
+                            "preview_sha256": None,
+                        }
+                    )
+                    if "raw_media" in categories or asset.original_deleted_at is not None:
+                        updates["deleted_at"] = deleted_at
+                updated = asset.model_copy(update=updates)
+                await conn.execute(
+                    """UPDATE scenara_media_assets SET document = %s
+                       WHERE tenant_id = %s AND project_id = %s AND asset_id = %s""",
+                    (Jsonb(updated.model_dump(mode="json")), tenant_id, project_id, asset_id),
+                )
+
     async def get_result_reference(self, tenant_id: str, project_id: str, run_id: str) -> ResultReference | None:
         async with self._pool.connection() as conn:
             cursor = await conn.execute(
@@ -232,7 +729,13 @@ class PostgresStateStore:
                 await conn.execute(
                     f"""INSERT INTO {table} (tenant_id, project_id, {id_column}, created_at, document)
                         VALUES (%s, %s, %s, to_timestamp(%s), %s)""",
-                    (model.tenant_id, model.project_id, value_id, model.created_at, Jsonb(model.model_dump(mode="json"))),
+                    (
+                        model.tenant_id,
+                        model.project_id,
+                        value_id,
+                        model.created_at,
+                        Jsonb(model.model_dump(mode="json")),
+                    ),
                 )
             except Exception as exc:
                 if exc.__class__.__name__ in {"UniqueViolation", "IntegrityError"}:

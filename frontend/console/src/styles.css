@@ -52,7 +52,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .button { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 12px; border: 1px solid transparent; border-radius: 5px; font-weight: 650; font-size: 13px; cursor: pointer; }
 .button.primary { background: var(--teal); color: #fff; }.button.primary:hover { background: #076771; }.button.secondary { background: #fff; color: var(--graphite); border-color: var(--line); }.button.danger { background: #fff; color: #b34132; border-color: #e8bcb5; }
 .button:disabled { opacity: .5; cursor: not-allowed; }
-.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+.panel { min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
 .panel-header { min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px; border-bottom: 1px solid var(--line); }.panel-header h2 { margin: 0; font-size: 14px; }.panel-body { padding: 16px; }
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
 .stat { min-height: 104px; padding: 15px; background: #fff; border: 1px solid var(--line); border-top: 3px solid #9aacA6; border-radius: 6px; }.stat.teal { border-top-color: var(--teal); }.stat.coral { border-top-color: var(--coral); }.stat.green { border-top-color: var(--green); }

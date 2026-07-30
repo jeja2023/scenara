@@ -28,24 +28,29 @@ class InlineRunQueue:
     async def enqueue(self, run: RunRecord) -> None:
         if self._handler is None:
             raise RuntimeError("inline run queue handler is not configured")
-        task = asyncio.create_task(
-            self._handler(run.tenant_id, run.project_id, run.run_id),
-            name=f"scenara:{run.run_id}",
-        )
+
+        async def invoke() -> None:
+            assert self._handler is not None
+            await self._handler(run.tenant_id, run.project_id, run.run_id)
+
+        task: asyncio.Task[None] = asyncio.create_task(invoke(), name=f"scenara:{run.run_id}")
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
 
 
 class RedisRunQueue:
-    def __init__(self, redis_url: str, *, stream: str = "scenara:runs", group: str = "scenara-workers") -> None:
-        try:
-            import redis.asyncio as redis
-        except ImportError as exc:  # pragma: no cover - optional production dependency
-            raise RuntimeError("redis is required for the Redis run queue") from exc
-        self._redis_module = redis
+    def __init__(
+        self,
+        redis_url: str,
+        *,
+        stream: str = "scenara:runs",
+        group: str = "scenara-workers",
+        visibility_timeout_ms: int = 60_000,
+    ) -> None:
         self._url = redis_url
         self._stream = stream
         self._group = group
+        self._visibility_timeout_ms = max(1, visibility_timeout_ms)
         self._client: Any = None
         self._handler: RunHandler | None = None
 
@@ -53,12 +58,22 @@ class RedisRunQueue:
         self._handler = handler
 
     async def open(self) -> None:
-        self._client = self._redis_module.from_url(self._url, decode_responses=True)
         try:
-            await self._client.xgroup_create(self._stream, self._group, id="0", mkstream=True)
-        except Exception as exc:
-            if "BUSYGROUP" not in str(exc):
-                raise
+            import redis.asyncio as redis
+        except ImportError as exc:  # pragma: no cover - optional production dependency
+            raise RuntimeError("redis is required for the Redis run queue") from exc
+        self._client = redis.from_url(self._url, decode_responses=True)  # type: ignore[no-untyped-call]
+        for lane in ("batch", "stream"):
+            try:
+                await self._client.xgroup_create(
+                    f"{self._stream}:{lane}",
+                    f"{self._group}:{lane}",
+                    id="0",
+                    mkstream=True,
+                )
+            except Exception as exc:
+                if "BUSYGROUP" not in str(exc):
+                    raise
 
     async def close(self) -> None:
         if self._client is not None:
@@ -69,7 +84,7 @@ class RedisRunQueue:
         if self._client is None:
             raise RuntimeError("Redis run queue is not open")
         await self._client.xadd(
-            self._stream,
+            f"{self._stream}:{'stream' if run.source_id else 'batch'}",
             {
                 "tenant_id": run.tenant_id,
                 "project_id": run.project_id,
@@ -80,28 +95,108 @@ class RedisRunQueue:
             approximate=True,
         )
 
-    async def consume_forever(self, *, consumer: str, block_ms: int = 5_000) -> None:
+    async def _renew_lease(
+        self,
+        *,
+        stream: str,
+        group: str,
+        consumer: str,
+        message_id: str,
+    ) -> None:
+        delay_seconds = max(0.001, self._visibility_timeout_ms / 3_000)
+        while True:
+            await asyncio.sleep(delay_seconds)
+            renewed = await self._client.xclaim(
+                stream,
+                group,
+                consumer,
+                0,
+                [message_id],
+                justid=True,
+            )
+            if message_id not in renewed:
+                raise RuntimeError("Redis run queue lease was lost")
+
+    async def _handle_message(
+        self,
+        *,
+        stream: str,
+        group: str,
+        consumer: str,
+        message_id: str,
+        fields: dict[str, str],
+    ) -> None:
+        handler = self._handler
+        if handler is None:
+            raise RuntimeError("Redis run queue handler is not configured")
+        lease_task = asyncio.create_task(
+            self._renew_lease(
+                stream=stream,
+                group=group,
+                consumer=consumer,
+                message_id=message_id,
+            ),
+            name=f"scenara:lease:{message_id}",
+        )
+        try:
+            await handler(fields["tenant_id"], fields["project_id"], fields["run_id"])
+        except BaseException:
+            lease_task.cancel()
+            await asyncio.gather(lease_task, return_exceptions=True)
+            raise
+        lease_task.cancel()
+        try:
+            await lease_task
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            raise RuntimeError("Redis run queue lease renewal failed") from exc
+        await self._client.xack(stream, group, message_id)
+
+    async def consume_forever(
+        self,
+        *,
+        consumer: str,
+        lane: str = "batch",
+        block_ms: int = 5_000,
+    ) -> None:
         if self._client is None:
             raise RuntimeError("Redis run queue is not open")
         if self._handler is None:
             raise RuntimeError("Redis run queue handler is not configured")
+        if lane not in {"batch", "stream"}:
+            raise ValueError("queue lane must be batch or stream")
+        stream = f"{self._stream}:{lane}"
+        group = f"{self._group}:{lane}"
         while True:
-            messages = await self._client.xreadgroup(
-                self._group,
+            claimed = await self._client.xautoclaim(
+                stream,
+                group,
                 consumer,
-                {self._stream: ">"},
+                self._visibility_timeout_ms,
+                start_id="0-0",
                 count=1,
-                block=block_ms,
             )
+            claimed_entries = claimed[1] if len(claimed) > 1 else []
+            if claimed_entries:
+                messages = [(stream, claimed_entries)]
+            else:
+                messages = await self._client.xreadgroup(
+                    group,
+                    consumer,
+                    {stream: ">"},
+                    count=1,
+                    block=block_ms,
+                )
             for _stream_name, entries in messages:
                 for message_id, fields in entries:
-                    try:
-                        await self._handler(fields["tenant_id"], fields["project_id"], fields["run_id"])
-                    except Exception:
-                        # Keep the message pending for explicit operational replay.
-                        raise
-                    else:
-                        await self._client.xack(self._stream, self._group, message_id)
+                    await self._handle_message(
+                        stream=stream,
+                        group=group,
+                        consumer=consumer,
+                        message_id=message_id,
+                        fields=fields,
+                    )
 
 
 __all__ = ["InlineRunQueue", "RedisRunQueue"]

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+import hashlib
+import json
 import re
 from collections import defaultdict, deque
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -27,9 +30,12 @@ class OperatorDefinition(BaseModel):
     input_types: dict[str, str]
     output_types: dict[str, str]
     timeout_seconds: float = Field(default=30.0, gt=0, le=3600)
-    resource_class: str = "cpu"
+    resource_class: Literal["cpu", "gpu", "io"] = "cpu"
+    resource_budget: dict[str, float] = Field(default_factory=dict)
     batchable: bool = False
-    failure_policy: str = "fail"
+    max_batch_size: int = Field(default=1, ge=1, le=4096)
+    failure_policy: Literal["fail", "retry"] = "fail"
+    max_attempts: int = Field(default=1, ge=1, le=5)
 
 
 @dataclass(slots=True)
@@ -43,6 +49,7 @@ class ExecutionContext:
     source_id: str | None
     filename: str | None
     content_type: str
+    production: bool = False
 
 
 class Operator(Protocol):
@@ -77,12 +84,20 @@ class PipelineDefinition(BaseModel):
     allowed_parameters: set[str] = Field(default_factory=set)
     pausable: bool = False
 
+    @property
+    def definition_sha256(self) -> str:
+        payload = self.model_dump(mode="json", exclude={"status"})
+        payload["allowed_parameters"] = sorted(self.allowed_parameters)
+        encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        return hashlib.sha256(encoded).hexdigest()
+
 
 class PipelineRegistry:
     def __init__(self) -> None:
         self._operators: dict[str, Operator] = {}
         self._pipelines: dict[tuple[str, str], PipelineDefinition] = {}
         self._orders: dict[tuple[str, str], list[str]] = {}
+        self._digests: dict[tuple[str, str], str] = {}
 
     def register_operator(self, operator: Operator) -> None:
         definition = operator.definition
@@ -94,8 +109,14 @@ class PipelineRegistry:
         key = (pipeline.pipeline_id, pipeline.version)
         if key in self._pipelines:
             raise PipelineError(f"pipeline already registered: {pipeline.pipeline_id}@{pipeline.version}")
+        if pipeline.status == PipelineStatus.ACTIVE and any(
+            item.pipeline_id == pipeline.pipeline_id and item.status == PipelineStatus.ACTIVE
+            for item in self._pipelines.values()
+        ):
+            raise PipelineError(f"pipeline already has an active version: {pipeline.pipeline_id}")
         self._orders[key] = self._validate(pipeline)
-        self._pipelines[key] = pipeline
+        self._pipelines[key] = pipeline.model_copy(deep=True)
+        self._digests[key] = pipeline.definition_sha256
 
     def pipeline(self, pipeline_id: str, version: str, *, active_only: bool = True) -> PipelineDefinition:
         pipeline = self._pipelines.get((pipeline_id, version))
@@ -103,10 +124,34 @@ class PipelineRegistry:
             raise PipelineError(f"pipeline not found: {pipeline_id}@{version}")
         if active_only and pipeline.status != PipelineStatus.ACTIVE:
             raise PipelineError(f"pipeline is not active: {pipeline_id}@{version}")
-        return pipeline
+        return pipeline.model_copy(deep=True)
 
     def pipelines(self) -> list[PipelineDefinition]:
         return [item.model_copy(deep=True) for item in self._pipelines.values()]
+
+    def transition(self, pipeline_id: str, version: str, target: PipelineStatus) -> PipelineDefinition:
+        key = (pipeline_id, version)
+        pipeline = self._pipelines.get(key)
+        if pipeline is None:
+            raise PipelineError(f"pipeline not found: {pipeline_id}@{version}")
+        allowed = {
+            PipelineStatus.DRAFT: {PipelineStatus.VALIDATED},
+            PipelineStatus.VALIDATED: {PipelineStatus.APPROVED, PipelineStatus.DRAFT},
+            PipelineStatus.APPROVED: {PipelineStatus.ACTIVE, PipelineStatus.DRAFT},
+            PipelineStatus.ACTIVE: {PipelineStatus.RETIRED},
+            PipelineStatus.RETIRED: set(),
+        }
+        if target not in allowed[pipeline.status]:
+            raise PipelineError(f"invalid pipeline transition: {pipeline.status.value} -> {target.value}")
+        if pipeline.definition_sha256 != self._digests[key]:
+            raise PipelineError("pipeline definition was mutated after registration")
+        if target == PipelineStatus.ACTIVE:
+            for other_key, other in list(self._pipelines.items()):
+                if other.pipeline_id == pipeline_id and other.status == PipelineStatus.ACTIVE:
+                    self._pipelines[other_key] = other.model_copy(update={"status": PipelineStatus.RETIRED})
+        updated = pipeline.model_copy(update={"status": target})
+        self._pipelines[key] = updated
+        return updated.model_copy(deep=True)
 
     def validate_run_parameters(self, pipeline: PipelineDefinition, parameters: dict[str, Any]) -> None:
         unexpected = sorted(set(parameters) - pipeline.allowed_parameters)
@@ -122,16 +167,40 @@ class PipelineRegistry:
         checkpoint: Any,
     ) -> Any:
         self.validate_run_parameters(pipeline, run_parameters)
+        key = (pipeline.pipeline_id, pipeline.version)
+        registered = self._pipelines.get(key)
+        if registered is None or registered.definition_sha256 != self._digests[key]:
+            raise PipelineError("pipeline definition is not immutable")
         outputs: dict[str, Any] = dict(initial_inputs)
         nodes = {node.node_id: node for node in pipeline.nodes}
-        for node_id in self._orders[(pipeline.pipeline_id, pipeline.version)]:
+        for node_id in self._orders[key]:
             await checkpoint()
             node = nodes[node_id]
             operator = self._operators[node.operator_id]
             inputs = {name: outputs[source] for name, source in node.inputs.items()}
             parameters = {**node.parameters, **run_parameters}
-            result = await operator.execute(context, inputs, parameters)
-            missing = sorted(set(operator.definition.output_types) - set(result))
+            definition = operator.definition
+            attempts = definition.max_attempts if definition.failure_policy == "retry" else 1
+            result: dict[str, Any] | None = None
+            for attempt in range(attempts):
+                try:
+                    result = await asyncio.wait_for(
+                        operator.execute(context, inputs, parameters),
+                        timeout=definition.timeout_seconds,
+                    )
+                    break
+                except TimeoutError as exc:
+                    if attempt + 1 == attempts:
+                        raise PipelineError(f"operator timed out: {node.operator_id}") from exc
+                except DomainUnavailable:
+                    raise
+                except Exception as exc:
+                    if attempt + 1 == attempts:
+                        raise PipelineError(f"operator failed: {node.operator_id}") from exc
+                await asyncio.sleep(min(1.0, 0.05 * (2**attempt)))
+            if result is None:
+                raise PipelineError(f"operator did not produce a result: {node.operator_id}")
+            missing = sorted(set(definition.output_types) - set(result))
             if missing:
                 raise PipelineError(f"operator {node.operator_id} omitted outputs: {', '.join(missing)}")
             for name, value in result.items():
@@ -153,7 +222,7 @@ class PipelineRegistry:
 
         dependencies: dict[str, set[str]] = defaultdict(set)
         children: dict[str, set[str]] = defaultdict(set)
-        available_types = {"$media.bytes": "bytes"}
+        available_types = {"$media.bytes": "bytes", "$media.input": "media/input"}
         for node in pipeline.nodes:
             operator = self._operators.get(node.operator_id)
             if operator is None:

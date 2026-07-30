@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { api } from "../api";
+import { labelDomain, labelRunStatus } from "../labels";
 import type { Run, RunPage, RunStatus } from "../types";
 
 const runs = ref<Run[]>([]);
@@ -62,8 +63,8 @@ onMounted(refresh);
       <div class="panel-header"><h2>筛选</h2><span class="badge">{{ total }}</span></div>
       <div class="panel-body">
         <div class="toolbar">
-          <select v-model="domain" @change="refresh"><option value="">全部领域</option><option value="portrait">portrait</option><option value="ocr">ocr</option></select>
-          <select v-model="status" @change="refresh"><option value="">全部状态</option><option value="queued">queued</option><option value="running">running</option><option value="paused">paused</option><option value="completed">completed</option><option value="failed">failed</option><option value="cancelled">cancelled</option></select>
+          <select v-model="domain" @change="refresh"><option value="">全部领域</option><option value="portrait">人像</option><option value="ocr">OCR 文档</option></select>
+          <select v-model="status" @change="refresh"><option value="">全部状态</option><option value="queued">排队中</option><option value="running">运行中</option><option value="paused">已暂停</option><option value="completed">已完成</option><option value="failed">失败</option><option value="cancelled">已取消</option></select>
           <button class="button secondary" @click="status = ''; domain = ''; refresh()">重置</button>
         </div>
       </div>
@@ -72,12 +73,12 @@ onMounted(refresh);
     <section class="panel runs-panel">
       <div class="table-scroll">
         <table class="data-table">
-          <thead><tr><th>Run</th><th>领域</th><th>状态</th><th>Pipeline</th><th>资产/源</th><th>时间</th><th>操作</th></tr></thead>
+          <thead><tr><th>运行</th><th>领域</th><th>状态</th><th>流水线</th><th>资产/源</th><th>时间</th><th>操作</th></tr></thead>
           <tbody>
             <tr v-for="run in runs" :key="run.run_id">
               <td class="mono">{{ run.run_id }}</td>
-              <td>{{ run.domain }}</td>
-              <td><span class="badge" :class="run.status">{{ run.status }}</span><div v-if="run.error_code" class="muted">{{ run.error_code }}</div></td>
+              <td>{{ labelDomain(run.domain) }}</td>
+              <td><span class="badge" :class="run.status">{{ labelRunStatus(run.status) }}</span><div v-if="run.error_code" class="muted">{{ run.error_code }}</div></td>
               <td class="truncate">{{ run.pipeline.pipeline_id }}@{{ run.pipeline.version }}</td>
               <td class="mono truncate">{{ run.asset_id || run.source_id }}</td>
               <td>{{ new Date(run.created_at * 1000).toLocaleString() }}</td>
@@ -97,7 +98,7 @@ onMounted(refresh);
     </section>
     <dialog :open="!!selected" class="modal result-modal">
       <form method="dialog">
-        <div class="modal-header"><div><h2>{{ selected?.run_id }}</h2><p>{{ selected?.status }}</p></div><button class="icon-button" @click="selected = null">x</button></div>
+        <div class="modal-header"><div><h2>{{ selected?.run_id }}</h2><p>{{ selected ? labelRunStatus(selected.status) : "" }}</p></div><button class="icon-button" title="关闭" aria-label="关闭" @click="selected = null">×</button></div>
         <pre v-if="rawResult">{{ rawResult }}</pre><div v-else class="empty">暂无结果</div>
       </form>
     </dialog>

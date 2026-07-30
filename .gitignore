@@ -51,11 +51,14 @@ models/*
 
 # Codex 临时文件
 .codex-tmp/
+.omx/
 temp_gov_check_probe.txt
 # Node.js build output
 node_modules/
+package-lock.json
 frontend/console-next/dist/
 frontend/console-next/test-results/
+.pnpm-store/
 frontend/console-next/playwright-report/
 # Local-only imported Portrait Hub console reference; Scenara ships frontend/console.
 frontend/console-next/

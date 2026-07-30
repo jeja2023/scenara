@@ -1,10 +1,10 @@
 aliases:
   person_detector_default:
-    target: portrait_hub/yolov8n.onnx
+    target: scenara.portrait.yolov8n
   person_reid_default:
-    target: portrait_hub/osnet_ibn_x1_0.onnx
+    target: scenara.portrait.osnet_ibn_x1_0
 models:
-  portrait_hub/yolov8n.onnx:
+  scenara.portrait.yolov8n:
     task: detection
     type: yolo
     runtime: onnxruntime
@@ -35,7 +35,7 @@ models:
     rollout:
       status: active
       warmup: false
-  portrait_hub/osnet_ibn_x1_0.onnx:
+  scenara.portrait.osnet_ibn_x1_0:
     task: reid
     type: reid
     runtime: onnxruntime

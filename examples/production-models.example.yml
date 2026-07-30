@@ -1,5 +1,5 @@
 models:
-  portrait_hub/yolov8n.onnx:
+  scenara.portrait.yolov8n:
     task: detection
     type: yolo
     runtime: onnxruntime
@@ -21,7 +21,7 @@ models:
       path: yolov8n.onnx
       sha256: replace-with-real-sha256
 
-  portrait_hub/osnet_ibn_x1_0.onnx:
+  scenara.portrait.osnet_ibn_x1_0:
     task: body_embedding
     type: reid
     runtime: onnxruntime
@@ -39,7 +39,7 @@ models:
       path: osnet_ibn_x1_0.onnx
       sha256: replace-with-real-sha256
 
-  portrait_hub/attribute_reid.onnx:
+  scenara.portrait.attribute_reid:
     task: appearance
     type: attribute_reid
     runtime: onnxruntime
@@ -57,7 +57,7 @@ models:
       path: attribute_reid.onnx
       sha256: replace-with-real-sha256
 
-  portrait_hub/scrfd_10g.onnx:
+  scenara.portrait.scrfd_10g:
     task: face_detection
     type: scrfd
     runtime: onnxruntime
@@ -77,7 +77,7 @@ models:
       path: scrfd_10g.onnx
       sha256: replace-with-real-sha256
 
-  portrait_hub/arcface_r100.onnx:
+  scenara.portrait.arcface_r100:
     task: face_embedding
     type: arcface
     runtime: onnxruntime
@@ -95,7 +95,7 @@ models:
       path: arcface_r100.onnx
       sha256: replace-with-real-sha256
 
-  portrait_hub/rtmpose_coco17.onnx:
+  scenara.portrait.rtmpose_coco17:
     task: pose
     type: rtmpose
     runtime: onnxruntime
@@ -112,7 +112,7 @@ models:
       path: rtmpose_coco17.onnx
       sha256: replace-with-real-sha256
 
-  portrait_hub/opengait_gait3d.onnx:
+  scenara.portrait.opengait_gait3d:
     task: gait
     type: opengait
     runtime: onnxruntime

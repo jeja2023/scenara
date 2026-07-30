@@ -12,6 +12,11 @@ def _bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _optional_path(name: str) -> Path | None:
+    raw = os.getenv(name, "").strip()
+    return Path(raw).resolve() if raw else None
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     profile: str
@@ -31,8 +36,22 @@ class Settings:
     default_tenant_id: str
     default_project_id: str
     max_image_bytes: int
+    max_media_bytes: int
+    max_media_units: int
+    media_sample_interval_ms: int
+    enterprise_license_path: Path | None
+    enterprise_public_key_path: Path | None
+    result_shard_units: int
     image_wait_timeout_ms: int
     production_models_required: bool
+    secret_encryption_key: str
+    enterprise_policy_required: bool
+    raw_media_retention_days: int
+    preview_retention_days: int
+    structured_result_retention_days: int
+    allow_private_media_sources: bool
+    allow_private_webhook_targets: bool
+    ocr_engine_factory: str
 
     @property
     def production(self) -> bool:
@@ -58,6 +77,14 @@ class Settings:
             errors.append("production API authentication is required")
         if not self.production_models_required:
             errors.append("SCENARA_PRODUCTION_MODELS_REQUIRED must be true")
+        if self.production_models_required and not self.ocr_engine_factory:
+            errors.append("SCENARA_OCR_ENGINE_FACTORY is required for the approved private OCR adapter")
+        if not self.secret_encryption_key:
+            errors.append("SCENARA_SECRET_ENCRYPTION_KEY is required")
+        if self.enterprise_policy_required and (
+            self.enterprise_license_path is None or self.enterprise_public_key_path is None
+        ):
+            errors.append("enterprise policy requires license and public key paths")
         if errors:
             raise RuntimeError("invalid Scenara production configuration: " + "; ".join(errors))
 
@@ -82,8 +109,28 @@ def load_settings() -> Settings:
         default_tenant_id=os.getenv("SCENARA_DEFAULT_TENANT_ID", "default").strip(),
         default_project_id=os.getenv("SCENARA_DEFAULT_PROJECT_ID", "default").strip(),
         max_image_bytes=max(1, int(os.getenv("SCENARA_MAX_IMAGE_BYTES", str(25 * 1024 * 1024)))),
+        max_media_bytes=max(1, int(os.getenv("SCENARA_MAX_MEDIA_BYTES", str(512 * 1024 * 1024)))),
+        max_media_units=max(1, min(10_000, int(os.getenv("SCENARA_MAX_MEDIA_UNITS", "256")))),
+        media_sample_interval_ms=max(
+            1,
+            min(3_600_000, int(os.getenv("SCENARA_MEDIA_SAMPLE_INTERVAL_MS", "1000"))),
+        ),
+        result_shard_units=max(1, min(10_000, int(os.getenv("SCENARA_RESULT_SHARD_UNITS", "100")))),
         image_wait_timeout_ms=max(0, min(30_000, int(os.getenv("SCENARA_IMAGE_WAIT_TIMEOUT_MS", "10000")))),
         production_models_required=_bool("SCENARA_PRODUCTION_MODELS_REQUIRED", False),
+        secret_encryption_key=os.getenv("SCENARA_SECRET_ENCRYPTION_KEY", "").strip(),
+        enterprise_policy_required=_bool("SCENARA_ENTERPRISE_POLICY_REQUIRED", False),
+        allow_private_media_sources=_bool("SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES", False),
+        allow_private_webhook_targets=_bool("SCENARA_ALLOW_PRIVATE_WEBHOOK_TARGETS", False),
+        ocr_engine_factory=os.getenv("SCENARA_OCR_ENGINE_FACTORY", "").strip(),
+        enterprise_license_path=_optional_path("SCENARA_ENTERPRISE_LICENSE_PATH"),
+        enterprise_public_key_path=_optional_path("SCENARA_ENTERPRISE_PUBLIC_KEY_PATH"),
+        raw_media_retention_days=max(1, min(3650, int(os.getenv("SCENARA_RAW_MEDIA_RETENTION_DAYS", "7")))),
+        preview_retention_days=max(1, min(3650, int(os.getenv("SCENARA_PREVIEW_RETENTION_DAYS", "30")))),
+        structured_result_retention_days=max(
+            1,
+            min(3650, int(os.getenv("SCENARA_STRUCTURED_RESULT_RETENTION_DAYS", "180"))),
+        ),
     )
     settings.validate()
     return settings

@@ -10,7 +10,7 @@ from app.portrait_compare import l2_normalize_vector
 
 Array = npt.NDArray[Any]
 
-FALLBACK_EMBEDDING_MODEL_ID = "portrait_hub/image_fingerprint_v1"
+FALLBACK_EMBEDDING_MODEL_ID = "scenara.development.image_fingerprint_v1"
 FALLBACK_EMBEDDING_VERSION = "1.0.0"
 FACE_DETECT_MAX_SIDE = 640
 FACE_DETECT_MIN_TEXTURE = 6.0

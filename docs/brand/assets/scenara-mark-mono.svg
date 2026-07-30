@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Scenara monochrome mark</title>
+  <path d="M8 25V8h17M39 56h17V39" fill="none" stroke="currentColor" stroke-width="5"/>
+  <path d="M45 16H27c-7 0-12 4-12 10s5 9 12 9h10c7 0 12 4 12 10s-5 11-12 11H19" fill="none" stroke="currentColor" stroke-width="7"/>
+  <rect x="46" y="9" width="7" height="7" fill="currentColor"/>
+  <rect x="11" y="48" width="14" height="6" fill="currentColor"/>
+</svg>

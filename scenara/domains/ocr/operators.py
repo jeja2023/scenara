@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol, cast
 
-from scenara.platform.media import DecodedImage
+from scenara.platform.media_batch import DecodedMedia
 from scenara.platform.models import (
     MediaUnitResult,
     ModelProvenance,
@@ -12,6 +12,7 @@ from scenara.platform.models import (
     OcrTextBlock,
     PipelineRef,
     Point,
+    ProvenanceEvidence,
     ResultEnvelope,
 )
 from scenara.platform.pipeline import DomainUnavailable, ExecutionContext, OperatorDefinition
@@ -19,6 +20,7 @@ from scenara.platform.pipeline import DomainUnavailable, ExecutionContext, Opera
 
 class OcrEngine(Protocol):
     model_id: str
+    production_ready: bool
     version: str
 
     def predict(self, image: Any) -> list[dict[str, Any]]: ...
@@ -26,6 +28,7 @@ class OcrEngine(Protocol):
 
 class PaddleOcrEngine:
     model_id = "paddleocr"
+    production_ready = False
 
     def __init__(self) -> None:
         try:
@@ -34,7 +37,9 @@ class PaddleOcrEngine:
         except ImportError as exc:
             raise DomainUnavailable("PaddleOCR is not installed") from exc
         self.version = str(getattr(paddleocr, "__version__", "unknown"))
-        self._engine = PaddleOCR(use_doc_orientation_classify=True, use_doc_unwarping=False, use_textline_orientation=True)
+        self._engine = PaddleOCR(
+            use_doc_orientation_classify=True, use_doc_unwarping=False, use_textline_orientation=True
+        )
 
     def predict(self, image: Any) -> list[dict[str, Any]]:
         import numpy as np
@@ -58,12 +63,87 @@ class PaddleOcrEngine:
         return blocks
 
 
+OCR_BLOCK_TYPES = {"text", "title", "paragraph", "image", "table"}
+
+
+def _polygon(value: object) -> list[list[float]]:
+    if not isinstance(value, (list, tuple)):
+        return []
+    points: list[list[float]] = []
+    for point in value:
+        if isinstance(point, (list, tuple)) and len(point) >= 2:
+            points.append([float(point[0]), float(point[1])])
+    return points
+
+
+def _bounds(item: dict[str, Any]) -> tuple[float, float, float, float]:
+    points = _polygon(item.get("polygon"))
+    if not points:
+        return (float("inf"), float("inf"), float("inf"), float("inf"))
+    xs = [point[0] for point in points]
+    ys = [point[1] for point in points]
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
+def _contains(region: dict[str, Any], block: dict[str, Any]) -> bool:
+    left, top, right, bottom = _bounds(region)
+    block_left, block_top, block_right, block_bottom = _bounds(block)
+    if block_left == float("inf"):
+        return False
+    center_x = (block_left + block_right) / 2
+    center_y = (block_top + block_bottom) / 2
+    return left <= center_x <= right and top <= center_y <= bottom
+
+
+def _merge_layout(
+    raw_blocks: list[dict[str, Any]],
+    regions: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    normalized_regions = [
+        {
+            **region,
+            "polygon": _polygon(region.get("polygon")),
+            "block_type": (
+                str(region.get("block_type")) if str(region.get("block_type")) in OCR_BLOCK_TYPES else "text"
+            ),
+        }
+        for region in regions
+    ]
+    merged: list[dict[str, Any]] = []
+    used_regions: set[int] = set()
+    for block in raw_blocks:
+        normalized = {**block, "polygon": _polygon(block.get("polygon"))}
+        explicit_type = str(normalized.get("block_type", ""))
+        if explicit_type not in OCR_BLOCK_TYPES:
+            candidates = [
+                (index, region) for index, region in enumerate(normalized_regions) if _contains(region, normalized)
+            ]
+            if candidates:
+                index, region = min(
+                    candidates,
+                    key=lambda pair: (
+                        (_bounds(pair[1])[2] - _bounds(pair[1])[0]) * (_bounds(pair[1])[3] - _bounds(pair[1])[1])
+                    ),
+                )
+                normalized["block_type"] = region["block_type"]
+                used_regions.add(index)
+            else:
+                normalized["block_type"] = "text"
+        merged.append(normalized)
+    for index, region in enumerate(normalized_regions):
+        if index not in used_regions and region["block_type"] in {"image", "table"}:
+            merged.append({**region, "text": "", "score": region.get("score")})
+    return sorted(merged, key=lambda item: (_bounds(item)[1], _bounds(item)[0]))
+
+
 class OcrDocumentOperator:
     definition = OperatorDefinition(
         operator_id="ocr.document-recognition",
         version="1.0.0",
         domain="ocr",
-        input_types={"image": "media/image"},
+        input_types={"batch": "media/batch"},
+        resource_budget={"vram_mb": 4096, "cpu_cores": 2},
+        max_batch_size=256,
         output_types={"result": "result/ocr"},
         timeout_seconds=120,
         resource_class="gpu",
@@ -79,25 +159,84 @@ class OcrDocumentOperator:
         inputs: dict[str, Any],
         parameters: dict[str, Any],
     ) -> dict[str, Any]:
-        del parameters
-        decoded = inputs["image"]
-        if not isinstance(decoded, DecodedImage):
-            raise TypeError("OCR requires a decoded image")
+        decoded = inputs["batch"]
+        if not isinstance(decoded, DecodedMedia):
+            raise TypeError("OCR requires a decoded media batch")
+        if self._engine is None:
+            loaded_engine = await asyncio.to_thread(lambda: PaddleOcrEngine())
+            self._engine = loaded_engine
         engine = self._engine
-        if engine is None:
-            engine = await asyncio.to_thread(PaddleOcrEngine)
-            self._engine = engine
-        raw_blocks = await asyncio.to_thread(engine.predict, decoded.image)
+        assert engine is not None
+        production_ready = bool(getattr(engine, "production_ready", False))
+        layout_predictor = getattr(engine, "predict_layout", None)
+        layout_capabilities = frozenset(getattr(engine, "production_capabilities", ()))
+        layout_ready = callable(layout_predictor) and "layout_analysis" in layout_capabilities
+        layout_required = bool(parameters.get("layout_required", True))
+        if context.production and not production_ready:
+            raise DomainUnavailable("OCR engine is not approved for production")
+        if context.production and layout_required and not layout_ready:
+            raise DomainUnavailable("OCR layout engine is not approved for production")
+
         blocks: list[OcrTextBlock] = []
-        for index, item in enumerate(raw_blocks):
-            points = [Point(x=float(point[0]), y=float(point[1])) for point in item.get("polygon", []) if len(point) >= 2]
-            blocks.append(
-                OcrTextBlock(
-                    block_id=f"text_{index}",
-                    text=str(item.get("text", "")),
-                    score=item.get("score"),
-                    polygon=points,
-                    reading_order=index,
+        units: list[MediaUnitResult] = []
+        reading_order = 0
+        for unit in decoded.units:
+            raw_blocks = await asyncio.to_thread(engine.predict, unit.image)
+            regions: list[dict[str, Any]] = []
+            if callable(layout_predictor):
+                predicted = await asyncio.to_thread(layout_predictor, unit.image)
+                if not isinstance(predicted, list):
+                    raise TypeError("OCR layout engine must return a list")
+                regions = [item for item in predicted if isinstance(item, dict)]
+            ordered_blocks = _merge_layout(raw_blocks, regions)
+            for block_index, item in enumerate(ordered_blocks):
+                points = [Point(x=point[0], y=point[1]) for point in _polygon(item.get("polygon"))]
+                block_type = str(item.get("block_type", "text"))
+                if block_type not in OCR_BLOCK_TYPES:
+                    block_type = "text"
+                blocks.append(
+                    OcrTextBlock(
+                        block_id=f"{unit.unit_id}_block_{block_index}",
+                        text=str(item.get("text", "")),
+                        score=item.get("score"),
+                        polygon=points,
+                        block_type=cast(Literal["text", "title", "paragraph", "image", "table"], block_type),
+                        reading_order=reading_order,
+                    )
+                )
+                reading_order += 1
+            units.append(
+                MediaUnitResult(
+                    unit_id=unit.unit_id,
+                    unit_type=unit.unit_type,
+                    index=unit.index,
+                    pts_ms=unit.pts_ms,
+                    page_number=unit.page_number,
+                    width=unit.width,
+                    height=unit.height,
+                )
+            )
+
+        substitutes: list[str] = []
+        if not production_ready:
+            substitutes.append("ocr_engine")
+        if layout_required and not layout_ready:
+            substitutes.append("ocr_layout")
+        models = [
+            ModelProvenance(
+                capability="ocr_recognition",
+                model_id=engine.model_id,
+                version=engine.version,
+                production_ready=production_ready,
+            )
+        ]
+        if callable(layout_predictor):
+            models.append(
+                ModelProvenance(
+                    capability="ocr_layout",
+                    model_id=str(getattr(engine, "layout_model_id", engine.model_id)),
+                    version=str(getattr(engine, "layout_version", engine.version)),
+                    production_ready=layout_ready,
                 )
             )
         result = ResultEnvelope(
@@ -106,25 +245,15 @@ class OcrDocumentOperator:
             pipeline=PipelineRef(pipeline_id=context.pipeline_id, version=context.pipeline_version),
             asset_id=context.asset_id,
             source_id=context.source_id,
-            units=[
-                MediaUnitResult(
-                    unit_id="page_1",
-                    unit_type="page",
-                    index=0,
-                    page_number=1,
-                    width=decoded.width,
-                    height=decoded.height,
-                )
-            ],
-            domain_payload=OcrDomainPayload(text="\n".join(block.text for block in blocks), blocks=blocks),
-            models=[
-                ModelProvenance(
-                    capability="ocr_recognition",
-                    model_id=engine.model_id,
-                    version=engine.version,
-                    production_ready=True,
-                )
-            ],
+            units=units,
+            domain_payload=OcrDomainPayload(
+                text="\n".join(block.text for block in blocks if block.text),
+                blocks=blocks,
+            ),
+            models=models,
+            warnings=[f"development_substitute:{item}" for item in substitutes]
+            + ([f"media_termination:{decoded.termination_reason}"] if decoded.termination_reason else []),
+            provenance=ProvenanceEvidence(development_substitutes=substitutes),
             created_at=time.time(),
         )
         return {"result": result}

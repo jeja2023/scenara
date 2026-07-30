@@ -1,6 +1,6 @@
-# Scenara 景析
+# Scenara 景枢
 
-Scenara 是面向企业私有化部署的统一视觉解析平台。平台以版本化 Media、Run、Pipeline 和 Result 契约接收图片、视频、PDF 与实时流，并通过可安装的 Domain 提供强类型视觉能力。
+Scenara 是面向企业私有化部署的企业视觉 AI 中枢平台。平台以版本化 Media、Run、Pipeline 和 Result 契约接收图片、视频、PDF 与实时流，并通过可安装的 Domain 提供强类型视觉能力。
 
 当前产品阶段：`0.1.0-dev`
 
@@ -38,13 +38,15 @@ python -m pip install -r requirements.txt -r requirements/dev.txt
 python -m uvicorn scenara.server:app --host 127.0.0.1 --port 8000
 ```
 
+前端构建完成后，服务会在 `http://127.0.0.1:8000/console/` 提供同版本中文控制台；根路径会自动跳转到该地址。
+
 健康检查：`GET /healthz`。新公共契约统一位于 `/api/v1`，旧 Portrait Hub `/v1` 契约不属于 Scenara。
 
 ## 仓库边界
 
 `app/` 是从 Portrait Hub 筛选导入的迁移适配层，只能被 `scenara.domains.portrait` 使用。新平台能力必须进入 `scenara/`，不得继续向 `app/portrait_*` 增加通用平台职责。
 
-来源与筛选规则见 [PROVENANCE.md](PROVENANCE.md)，品牌规范见 [docs/brand/BRAND.md](docs/brand/BRAND.md)，模型资产政策见 [MODEL_ASSETS.md](MODEL_ASSETS.md)。
+来源与筛选规则见 [PROVENANCE.md](PROVENANCE.md)，品牌规范见 [docs/brand/BRAND.md](docs/brand/BRAND.md)，模型资产政策见 [MODEL_ASSETS.md](MODEL_ASSETS.md)，本次升级内容见 [更新日志.md](更新日志.md)。
 
 ## 授权
 

@@ -1,0 +1,43 @@
+from __future__ import annotations
+
+import argparse
+import asyncio
+import time
+
+from scenara.bootstrap import build_runtime
+from scenara.platform.retention import RetentionScheduler
+
+
+async def run_once() -> tuple[int, int, int, int]:
+    runtime = build_runtime()
+    await runtime.open()
+    try:
+        if not hasattr(runtime.state, "expired_object_keys"):
+            raise RuntimeError("the configured state backend does not support retention sweeps")
+        scheduler = RetentionScheduler(runtime.state, runtime.objects)
+        retained = await scheduler.sweep()
+        expired_features = await runtime.features.delete_expired(time.time(), 1000)
+        delivered, failed = await runtime.webhooks.deliver_due()
+        return retained, expired_features, delivered, failed
+    finally:
+        await runtime.close()
+
+
+async def run_forever(interval_seconds: int) -> None:
+    while True:
+        await run_once()
+        await asyncio.sleep(interval_seconds)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Scenara governance scheduler")
+    parser.add_argument("--once", action="store_true", help="run one governance sweep and exit")
+    parser.add_argument("--interval-seconds", type=int, default=60)
+    args = parser.parse_args()
+    if args.interval_seconds < 60:
+        parser.error("--interval-seconds must be at least 60")
+    asyncio.run(run_once() if args.once else run_forever(args.interval_seconds))
+
+
+if __name__ == "__main__":
+    main()
