@@ -4,7 +4,12 @@ import hashlib
 import json
 from pathlib import Path
 
-from scripts.release_gate import REQUIRED_EVIDENCE_TYPES, evidence_errors, implementation_errors
+from scripts.release_gate import (
+    REQUIRED_EVIDENCE_TYPES,
+    evidence_errors,
+    implementation_errors,
+    license_errors,
+)
 
 
 def test_release_implementation_gate_is_complete() -> None:
@@ -61,6 +66,11 @@ def valid_metadata(evidence_type: str) -> dict[str, object]:
             ]
         },
         "model_rights": {"all_rights_cleared": True, "models": ["portrait-1.0.0"]},
+        "software_license_approval": {
+            "license_sha256": "set-by-fixture",
+            "reviewed_by_legal": True,
+            "approval_reference": "LEGAL-2026-001",
+        },
         "offline_install": {
             "blank_host": True,
             "isolated_network": True,
@@ -89,9 +99,23 @@ def valid_metadata(evidence_type: str) -> dict[str, object]:
 def write_valid_manifest(root: Path) -> tuple[Path, dict[str, object]]:
     reports = root / "docs/release/evidence/reports"
     reports.mkdir(parents=True)
+    license_path = root / "LICENSE"
+    license_path.write_text("Scenara approved test license\n", encoding="utf-8")
+    openapi_path = root / "docs/openapi.json"
+    openapi_path.write_text("{}\n", encoding="utf-8")
+    release_identity = {
+        "source_commit": "a" * 40,
+        "image_digest": "sha256:" + "b" * 64,
+        "offline_bundle_sha256": "c" * 64,
+        "openapi_sha256": hashlib.sha256(openapi_path.read_bytes()).hexdigest(),
+        "model_set_sha256": "d" * 64,
+    }
     entries: list[dict[str, object]] = []
     for evidence_type in sorted(REQUIRED_EVIDENCE_TYPES):
         report = reports / f"{evidence_type}.json"
+        metadata = valid_metadata(evidence_type)
+        if evidence_type == "software_license_approval":
+            metadata["license_sha256"] = hashlib.sha256(license_path.read_bytes()).hexdigest()
         entry: dict[str, object] = {
             "evidence_type": evidence_type,
             "report": report.relative_to(root).as_posix(),
@@ -100,7 +124,8 @@ def write_valid_manifest(root: Path) -> tuple[Path, dict[str, object]]:
             "approved_at": "2026-07-30T02:00:00Z",
             "signed_by": "测试负责人（仅单元测试）",
             "target": "qualification-target",
-            "metadata": valid_metadata(evidence_type),
+            "release_identity": release_identity,
+            "metadata": metadata,
         }
         report.write_text(
             json.dumps({"schema_version": "1.0", **entry}, ensure_ascii=False),
@@ -108,7 +133,12 @@ def write_valid_manifest(root: Path) -> tuple[Path, dict[str, object]]:
         )
         entry["sha256"] = hashlib.sha256(report.read_bytes()).hexdigest()
         entries.append(entry)
-    manifest: dict[str, object] = {"schema_version": "1.0", "release": "1.0.0", "entries": entries}
+    manifest: dict[str, object] = {
+        "schema_version": "1.1",
+        "release": "1.0.0",
+        "release_identity": release_identity,
+        "entries": entries,
+    }
     manifest_path = root / "docs/release/evidence/manifest.json"
     manifest_path.write_text(json.dumps(manifest, ensure_ascii=False), encoding="utf-8")
     return manifest_path, manifest
@@ -116,7 +146,32 @@ def write_valid_manifest(root: Path) -> tuple[Path, dict[str, object]]:
 
 def test_release_evidence_gate_accepts_complete_structured_reports(tmp_path: Path) -> None:
     manifest_path, _ = write_valid_manifest(tmp_path)
-    assert evidence_errors(manifest_path, root=tmp_path) == []
+    assert evidence_errors(manifest_path, root=tmp_path, expected_source_commit="a" * 40) == []
+
+
+def test_release_evidence_gate_binds_reports_to_the_checked_out_release(tmp_path: Path) -> None:
+    manifest_path, manifest = write_valid_manifest(tmp_path)
+    errors = evidence_errors(manifest_path, root=tmp_path, expected_source_commit="f" * 40)
+    assert "release identity source_commit does not match the checked-out commit" in errors
+
+    entries = manifest["entries"]
+    assert isinstance(entries, list)
+    entry = entries[0]
+    assert isinstance(entry, dict)
+    entry["release_identity"] = {**entry["release_identity"], "model_set_sha256": "e" * 64}
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    errors = evidence_errors(manifest_path, root=tmp_path, expected_source_commit="a" * 40)
+    assert any("release identity does not match the manifest" in error for error in errors)
+
+
+def test_strict_release_rejects_placeholder_software_license(tmp_path: Path) -> None:
+    (tmp_path / "LICENSE").write_text(
+        "This license is an engineering placeholder and must receive legal review.",
+        encoding="utf-8",
+    )
+    assert license_errors(tmp_path) == [
+        "software license still contains the engineering legal-review placeholder"
+    ]
 
 
 def test_release_evidence_gate_rejects_duplicate_and_placeholder_signatures(tmp_path: Path) -> None:

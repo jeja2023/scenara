@@ -18,6 +18,10 @@ class LocalObjectStore:
     async def close(self) -> None:
         return None
 
+    async def health_check(self) -> None:
+        if not self.root.is_dir():
+            raise RuntimeError("local object store is unavailable")
+
     def _path(self, object_key: str) -> Path:
         target = (self.root / validate_object_key(object_key)).resolve()
         if self.root not in target.parents:
@@ -69,6 +73,9 @@ class S3ObjectStore:
 
     async def close(self) -> None:
         self.client.close()
+
+    async def health_check(self) -> None:
+        await asyncio.to_thread(self.client.head_bucket, Bucket=self.bucket)
 
     async def put(self, object_key: str, data: bytes, content_type: str) -> None:
         validate_object_key(object_key)

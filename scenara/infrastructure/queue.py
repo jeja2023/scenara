@@ -26,6 +26,9 @@ class InlineRunQueue:
             await asyncio.gather(*self._tasks, return_exceptions=True)
         self._tasks.clear()
 
+    async def health_check(self) -> None:
+        return None
+
     async def enqueue(self, run: RunRecord) -> None:
         if self._handler is None:
             raise RuntimeError("inline run queue handler is not configured")
@@ -80,6 +83,12 @@ class RedisRunQueue:
         if self._client is not None:
             await self._client.aclose()
             self._client = None
+
+    async def health_check(self) -> None:
+        if self._client is None:
+            raise RuntimeError("Redis run queue is not open")
+        if not await self._client.ping():
+            raise RuntimeError("Redis run queue ping failed")
 
     async def enqueue(self, run: RunRecord) -> None:
         if self._client is None:

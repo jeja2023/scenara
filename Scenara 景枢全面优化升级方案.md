@@ -1,6 +1,6 @@
 # Scenara（景枢）企业级视觉 AI 平台优化升级方案
 
-**版本：V2.1（项目落地版）**
+**版本：V2.3（0.2.0-dev.0 工程收口版）**
 
 **基线日期：2026-07-30**
 
@@ -23,8 +23,8 @@
 
 | 维度 | 当前事实 | 结论 |
 |---|---|---|
-| 品牌现状 | 当前仓库的 `README.md`、`docs/brand/BRAND.md`、控制台和品牌资产仍使用旧中文品牌 | 这是待迁移的现状，不是目标状态；Phase 0 统一切换为“景枢” |
-| 产品阶段 | 当前版本为 `0.1.0-dev`，仓库明确声明尚未发布 1.0（`README.md:5-12`） | 所有生产级宣传均受发布门禁约束 |
+| 品牌现状 | `README.md`、品牌规范、控制台、OpenAPI、SDK 文档和品牌资产已统一为“景枢” | 品牌迁移已完成；仓库门禁阻止旧品牌重新进入当前产品表面 |
+| 产品阶段 | 当前版本为 `0.2.0-dev`，仓库明确声明尚未发布 1.0（`README.md:5-12`） | 所有生产级宣传均受发布门禁约束 |
 | 架构边界 | `platform` 定义契约，`domains` 实现领域，`infrastructure` 实现端口，`enterprise` 通过 Policy Hook 接入（`docs/adr/0001-platform-domain-boundaries.md:14-29`） | 继续采用模块化单体，不拆微服务平台 |
 | 正式领域 | Portrait 为正式领域；OCR/Document 为验证领域（`README.md:7-8`） | 2026 年不同时扩张多个新领域 |
 | 媒体范围 | Media/Run/Pipeline/Result 契约已覆盖图片、视频、PDF 和实时流（`README.md:3`） | 以统一媒体与运行契约对外，不为每种媒体另建 API 体系 |
@@ -39,21 +39,21 @@
 
 | 阶段 | 当前状态 | 仍缺的关键证据 |
 |---|---|---|
-| 0.1 仓库与架构基线 | 完成 | 持续通过仓库、契约与 Compose 配置门禁 |
+| 0.1 仓库与架构基线 | 工程完成，软件许可证法务批准待完成 | 持续通过仓库、契约与 Compose 配置门禁，并取得绑定 LICENSE 摘要的法务批准 |
 | 0.2 Portrait/OCR 垂直链路 | 完成 | 保持确定性领域契约测试 |
 | 0.3 媒体、运行、队列、Webhook、Feature Store、留存 | 已实现，待服务资格验证 | PostgreSQL/pgvector、Redis、MinIO 真实集成报告 |
 | 0.4 Portrait 能力 | 已实现，待模型资格验证 | 合法模型包、固定评估集和签署报告 |
 | 0.5 OCR/Document 能力 | 已实现，待模型资格验证 | 中文、旋转、PDF、版面固定评估报告 |
 | 0.6 企业策略与治理 | 完成 | 正式 License、配额失败关闭和合规证据演练 |
-| 0.7 Console 与 SDK | 主体完成，但当前前端质量门禁未通过 | 修复或移除未使用的 `EnterpriseView.vue` 重复 `<script setup>`，重新通过完整前端检查 |
+| 0.7 Console 与 SDK | 完成 | 持续通过前端单测、类型检查、构建、SDK 漂移检查和桌面/移动浏览器验收 |
 | 1.0 私有化交付 | 已实现，待目标环境资格验证 | GPU 容量、离线安装、备份恢复和安全评估报告 |
 
 ### 2.3 2026-07-30 质量快照
 
-- `python -m pytest -q`：**54 passed，4 skipped**。跳过项为需要真实外部服务的集成测试，不能计作 1.0 已通过。
+- `python -m pytest -q --cov=scenara --cov=sdk/python/scenara_sdk --cov-fail-under=75`：**81 passed，5 skipped，77.12% coverage**。跳过项为需要真实外部服务的集成测试，不能计作 1.0 已通过。
 - `python scripts/release_gate.py --implementation-only`：通过，说明所需实现文件与生成契约当前齐全。
 - `python scripts/repository_gate.py`：通过，说明仓库来源、敏感信息、模型资产和公共命名门禁当前通过。
-- `npm run check`：未通过。ESLint 在 `frontend/console/src/views/EnterpriseView.vue:2` 发现重复的 `<script setup>`；因此“Console 完成”只能理解为主体实现完成，不能理解为发布质量门禁已通过。
+- `npm run check`：通过；`pnpm run console:e2e` 在桌面 Chrome 与 Pixel 7 两个视口完成 26 项浏览器验收，无页面异常或横向溢出。
 
 以上结果是当前工作区快照，不替代 CI、目标环境报告或正式签署证据。
 
@@ -169,11 +169,11 @@ flowchart TB
 - 将 `README.md`、`docs/brand/BRAND.md`、发布文档、部署文档、OpenAPI 标题、SDK 文档、示例客户端和控制台可见文案中的旧中文品牌统一替换为“景枢”。
 - 更新中文横版/竖版字标、应用展示图和品牌资产说明；保留现有抽象 `S` 图形标志、色彩和安全留白规则，除非单独通过视觉评审决定重做。
 - 使用仓库级检索生成品牌迁移清单；旧中文品牌只允许出现在经批准的历史迁移记录中，不能继续出现在当前产品界面、接口描述或交付材料中。
-- 修复或删除未被路由使用的 `frontend/console/src/views/EnterpriseView.vue`，确保 `npm run check` 全链路通过。
+- 保持 `npm run check` 与 Playwright 桌面/移动浏览器验收全链路通过。
 - 在干净环境重跑 Python、前端、SDK、仓库和实现门禁，记录 commit SHA、依赖锁文件和执行环境。
 - 将 `docs/release/IMPLEMENTATION_MATRIX.md` 的状态与实际 CI 结果对齐；“complete”必须同时满足实现和命名的证据要求。
 - 固定 1.0 支持矩阵：Ubuntu 版本、Docker/Compose 版本、NVIDIA Driver/CUDA 组合、GPU 显存下限、浏览器和 SDK 运行时版本。
-- 为八类发布证据建立模板、负责人、签署人和存放路径。
+- 为九类发布证据建立模板、负责人、签署人和存放路径，其中软件许可证批准必须绑定 LICENSE SHA-256。
 
 **退出条件**：
 
@@ -235,7 +235,7 @@ flowchart TB
 - 在隔离网络中从离线包完成全新安装，校验镜像、配置、模型包和所有 SHA-256。
 - 执行 PostgreSQL + MinIO 备份恢复演练；建议 1.0 默认目标为 RPO 不超过 24 小时、RTO 不超过 4 小时，合同有更严要求时向下收紧。
 - 生成 SBOM、依赖许可证清单、模型权属清单、安全评估、升级/回滚说明、运维手册和已知限制。
-- 通过 `docs/release/evidence/manifest.json` 聚合八类证据：`backup_restore`、`gpu_capacity`、`integration_services`、`model_rights`、`ocr_evaluation`、`offline_install`、`portrait_evaluation`、`security_assessment`。
+- 通过 `docs/release/evidence/manifest.json` 聚合九类证据：`backup_restore`、`gpu_capacity`、`integration_services`、`model_rights`、`ocr_evaluation`、`offline_install`、`portrait_evaluation`、`security_assessment`、`software_license_approval`。
 
 **退出条件**：
 
@@ -313,7 +313,7 @@ flowchart TB
 | 模型 | 合法模型包、固定评估集、预声明阈值、两次可复现评估和生产禁用 fallback |
 | 性能 | 单卡目标机完成持续负载、突发、显存压力、背压和恢复，报告包含 p50/p95/p99、吞吐、错误率和峰值显存 |
 | 运维 | 离线安装、升级/回滚、监控告警、备份恢复和已知限制文档通过演练 |
-| 证据 | 八类证据均为 passed，包含 target、executed_at、approved_at、signed_by、SHA-256 和必需元数据 |
+| 证据 | 九类证据均为 passed，包含 release identity、target、executed_at、approved_at、signed_by、SHA-256 和必需元数据 |
 | 产品 | Console 核心路由与示例客户端完成冒烟；生产支持矩阵与实际 Qualified 能力一致 |
 
 ## 9. 运营指标
@@ -341,7 +341,7 @@ flowchart TB
 
 ## 11. 推荐决策顺序
 
-1. 立即完成 Phase 0，恢复全部工程门禁。
+1. 保持 Phase 0 工程门禁持续通过，并完成软件许可证法务批准。
 2. 并行推进真实服务资格验证与合法模型/固定评估集准备，但分别产出独立证据。
 3. 证据齐备后完成单节点 Scenara 1.0 私有化发布，不等待 Data Hub、AutoML 或新领域。
 4. 1.0 稳定后建设最小 Feedback/Hard Sample/Model Package 闭环，与人像训练平台打通。
@@ -355,7 +355,7 @@ flowchart TB
 - 将四个独立 Hub 收敛为一个平台内的能力域，避免当前阶段重复建设。
 - 将 Model Hub/Data Hub 从近期自建目标改为与现有人像训练平台的契约化协作。
 - 将“未来三年功能列表”改为五个有明确退出条件的阶段，1.0 由证据门禁而不是日期决定。
-- 增加当前测试快照、前端门禁缺口、真实服务/模型/硬件资格验证和八类发布证据。
+- 增加当前测试快照、浏览器质量门禁、真实服务/模型/硬件资格验证和九类发布证据。
 - 明确 1.0 非目标、架构约束、生产宣传规则、量化验收项和新领域触发条件。
 
 ## 13. 依据文件

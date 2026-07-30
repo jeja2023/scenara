@@ -56,7 +56,7 @@ docker load --input "$bundle_dir/images/scenara-images.tar"
 compose=(docker compose --env-file "$env_file" -f "$bundle_dir/deploy/compose.yml")
 "${compose[@]}" config --quiet
 "${compose[@]}" up -d --no-build --wait
-curl --fail --silent --show-error http://127.0.0.1:8000/healthz >/dev/null
+curl --fail --silent --show-error http://127.0.0.1:8000/readyz >/dev/null
 curl --fail --silent --show-error http://127.0.0.1:8000/console/ | grep -q "Scenara 景枢"
 for service in api batch-worker stream-worker scheduler postgres redis minio; do
   "${compose[@]}" ps --status running --services | grep -qx "$service" || {

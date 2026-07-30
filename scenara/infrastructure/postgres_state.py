@@ -48,6 +48,10 @@ class PostgresStateStore:
     async def close(self) -> None:
         await self._pool.close()
 
+    async def health_check(self) -> None:
+        async with self._pool.connection() as conn:
+            await conn.execute("SELECT 1")
+
     async def register_pipeline_definition(self, pipeline: PipelineDefinition) -> None:
         from psycopg.types.json import Jsonb
 

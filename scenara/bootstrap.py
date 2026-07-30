@@ -71,6 +71,12 @@ class Runtime:
         await self.objects.close()
         await self.state.close()
 
+    async def health_check(self) -> dict[str, str]:
+        await self.state.health_check()
+        await self.objects.health_check()
+        await self.queue.health_check()
+        return {"state": "ok", "objects": "ok", "queue": "ok"}
+
 
 def build_runtime(
     settings: Settings | None = None,

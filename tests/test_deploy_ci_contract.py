@@ -10,6 +10,10 @@ COMPOSE = ROOT / "deploy" / "compose.yml"
 WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 BACKUP_SCRIPT = ROOT / "deploy" / "scripts" / "backup.sh"
 RESTORE_SCRIPT = ROOT / "deploy" / "scripts" / "restore.sh"
+MIGRATE_SCRIPT = ROOT / "deploy" / "scripts" / "migrate.sh"
+OFFLINE_BUILD_SCRIPT = ROOT / "deploy" / "scripts" / "build-offline-bundle.sh"
+DOCKERFILE = ROOT / "Dockerfile"
+PRODUCTION_LOCK = ROOT / "requirements" / "production.lock"
 REQUIRED_VARIABLE = re.compile(r"\$\{(SCENARA_[A-Z0-9_]+):\?")
 NODE24_ACTION_MAJORS = {
     "actions/checkout": 7,
@@ -71,3 +75,58 @@ def test_backup_verifier_does_not_require_an_executable_file_mode() -> None:
     invocation = 'bash "$(dirname "$0")/verify-backup.sh" "$backup_dir"'
     assert invocation in BACKUP_SCRIPT.read_text(encoding="utf-8")
     assert invocation in RESTORE_SCRIPT.read_text(encoding="utf-8")
+
+
+def test_compose_runs_all_versioned_migrations_and_checks_readiness() -> None:
+    compose = COMPOSE.read_text(encoding="utf-8")
+    migration = MIGRATE_SCRIPT.read_text(encoding="utf-8")
+    assert '["sh", "/deploy-scripts/migrate.sh"]' in compose
+    assert "for migration in /migrations/*.sql" in migration
+    assert "scenara_schema_migrations" in migration
+    assert "migration did not atomically record its version" in migration
+    assert "unsupported migration filename" in migration
+    assert "http://localhost:8000/readyz" in compose
+
+
+def test_production_data_service_images_are_digest_pinned() -> None:
+    document = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
+    services = document["services"]
+    for name in ("postgres", "migrate", "redis", "minio", "minio-init"):
+        image = str(services[name]["image"])
+        assert re.fullmatch(r"[^@]+@sha256:[0-9a-f]{64}", image), f"{name} image is not digest-pinned"
+
+
+def test_production_dependencies_are_hash_locked_everywhere() -> None:
+    lock = PRODUCTION_LOCK.read_text(encoding="utf-8")
+    dockerfile = DOCKERFILE.read_text(encoding="utf-8")
+    offline_build = OFFLINE_BUILD_SCRIPT.read_text(encoding="utf-8")
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    assert "--hash=sha256:" in lock
+    assert "--require-hashes -r requirements/production.lock" in dockerfile
+    assert "--require-hashes" in offline_build
+    assert '-r "$repo_root/requirements/production.lock"' in offline_build
+    assert "uv pip compile requirements/production.in --python-version 3.12" in workflow
+    assert "--python-platform x86_64-manylinux_2_28" in workflow
+    assert "git diff --exit-code -- requirements/production.lock" in workflow
+
+
+def test_offline_builder_emits_release_identity_and_model_manifest() -> None:
+    offline_build = OFFLINE_BUILD_SCRIPT.read_text(encoding="utf-8")
+    for field in (
+        "source_commit",
+        "image_digest",
+        "offline_bundle_sha256",
+        "openapi_sha256",
+        "model_set_sha256",
+    ):
+        assert f'"{field}"' in offline_build
+    assert "model-SHA256SUMS" in offline_build
+    assert "container-images.txt" in offline_build
+    assert "release-identity.json" in offline_build
+
+
+def test_ci_checks_legacy_adapter_code_and_enforces_coverage() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    assert "ruff check --select E4,E7,E9,F app" in workflow
+    assert "mypy scenara app sdk/python/scenara_sdk" in workflow
+    assert "--cov-fail-under=75" in workflow

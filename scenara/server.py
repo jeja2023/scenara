@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import re
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -15,6 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Stre
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.staticfiles import StaticFiles
 
+from scenara import __version__
 from scenara.bootstrap import Runtime, build_runtime
 from scenara.domains.portrait.service import (
     CreateIdentityRequest,
@@ -82,6 +84,7 @@ from scenara.platform.models import (
     WebhookDeliveryRecord,
     WebhookSubscriptionView,
 )
+from scenara.platform.observability import RequestMetrics
 from scenara.platform.pipeline import PipelineError
 from scenara.platform.policy import PolicyDenied, PolicyUnavailable
 from scenara.platform.services import InvalidTransition, ResourceNotFound, sse_payload
@@ -147,13 +150,14 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
 
     app = FastAPI(
         title="Scenara API",
-        version="0.1.0",
+        version=__version__,
         description="Scenara 景枢企业视觉 AI 中枢平台",
         docs_url="/docs" if not runtime.settings.production else None,
         redoc_url=None,
         lifespan=lifespan,
     )
     app.state.runtime = runtime
+    app.state.request_metrics = RequestMetrics()
     console_assets = CONSOLE_DIST / "assets"
     if console_assets.is_dir():
         app.mount("/console/assets", StaticFiles(directory=console_assets), name="console-assets")
@@ -161,7 +165,20 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     @app.middleware("http")
     async def request_context(request: Request, call_next: RequestResponseEndpoint) -> Response:
         request.state.request_id = request.headers.get("X-Request-Id", f"req_{uuid4().hex}")[:128]
-        response = await call_next(request)
+        started = time.perf_counter()
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+        finally:
+            route = request.scope.get("route")
+            route_path = str(getattr(route, "path", "unmatched"))
+            app.state.request_metrics.observe(
+                request.method,
+                route_path,
+                status_code,
+                time.perf_counter() - started,
+            )
         response.headers["X-Request-Id"] = request.state.request_id
         return response
 
@@ -249,7 +266,26 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
 
     @app.get("/healthz", tags=["Operations"])
     async def health(request: Request) -> ApiEnvelope[dict[str, str]]:
-        return _envelope(request, {"status": "ok", "version": "0.1.0"})  # type: ignore[return-value]
+        return _envelope(request, {"status": "ok", "version": __version__})  # type: ignore[return-value]
+
+    @app.get("/livez", tags=["Operations"])
+    async def live(request: Request) -> ApiEnvelope[dict[str, str]]:
+        return _envelope(request, {"status": "ok", "version": __version__})  # type: ignore[return-value]
+
+    @app.get("/readyz", tags=["Operations"])
+    async def ready(request: Request) -> ApiEnvelope[dict[str, object]]:
+        try:
+            components = await asyncio.wait_for(runtime.health_check(), timeout=5)
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail="runtime dependency is unavailable") from exc
+        return _envelope(request, {"status": "ready", "components": components})  # type: ignore[return-value]
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics(_: PrincipalContext = Depends(principal_context)) -> Response:
+        return Response(
+            content=app.state.request_metrics.render(),
+            media_type="text/plain; version=0.0.4; charset=utf-8",
+        )
 
     @app.post("/api/v1/media/assets", status_code=201, tags=["Media"])
     async def create_media_asset(
@@ -811,7 +847,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         return _envelope(
             request,
             SystemStatus(
-                version="0.1.0",
+                version=__version__,
                 profile=settings.profile,
                 state_backend=settings.state_backend,
                 object_backend=settings.object_backend,

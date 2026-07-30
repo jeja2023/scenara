@@ -7,6 +7,7 @@
 | `integration_services` | 平台工程 | 架构负责人 | PostgreSQL/pgvector、Redis、MinIO、幂等、恢复、删除 |
 | `security_assessment` | 安全工程 | 安全负责人 | SSRF、恶意媒体、越权、凭证、审计失败关闭、生物信息删除 |
 | `model_rights` | 模型治理 | 法务/合规负责人 | 全部生产模型来源、许可证、再分发与使用权 |
+| `software_license_approval` | 法务/合规 | 法务负责人 | 软件许可证正文、商业分发权、LICENSE SHA-256 与受控批准记录 |
 | `portrait_evaluation` | 人像算法 | 产品与算法负责人 | 固定、合法、脱敏、版本化评估集与预声明阈值 |
 | `ocr_evaluation` | 文档算法 | 产品与算法负责人 | 中文、旋转、多页 PDF、阅读顺序与版面 |
 | `gpu_capacity` | 性能工程 | 交付负责人 | 持续负载、突发、显存压力、背压、故障恢复 |

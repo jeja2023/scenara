@@ -1,6 +1,8 @@
 # Scenara 景枢私有化部署
 
-The supported 1.0 target is Ubuntu x86_64 with Docker Engine, Docker Compose v2, and exactly one NVIDIA GPU with at least 23,000 MiB reported memory. PostgreSQL/pgvector, Redis, and MinIO are part of the production Compose topology.
+升级、恢复式回滚、运行探针、指标和告警基线见 [OPERATIONS.md](OPERATIONS.md)。
+
+The supported 1.0 target is Ubuntu x86_64 with Docker Engine, Docker Compose v2, and exactly one NVIDIA GPU with at least 23,000 MiB reported memory. PostgreSQL/pgvector, Redis, and MinIO are part of the production Compose topology. The data-service images are pinned by manifest digest. Python production dependencies are installed only from `requirements/production.lock` with SHA-256 verification.
 
 ## Configure
 
@@ -32,9 +34,11 @@ On a connected Ubuntu build host:
 
 Transfer the generated tar archive through the approved channel, extract it, then install on the target:
 
-    deploy/scripts/install-offline.sh /srv/scenara-offline-1.0.0 /secure/scenara.env
+    deploy/scripts/install-offline.sh /srv/scenara-offline-0.2.0-dev.0 /secure/scenara.env
 
-The approved model package directory is mandatory and is copied into the checksummed offline bundle; the repository never supplies or substitutes model weights. The installer verifies Ubuntu 24.04 x86_64, Docker Engine 27+, Docker Compose 2.29+, CUDA 12.8 driver compatibility, exactly one NVIDIA GPU, and the 24 GB memory class before loading images. It starts Compose with `--no-build --wait`, verifies the health endpoint and Chinese console, and rejects any required service that is not running.
+The approved model package directory is mandatory and is copied into the checksummed offline bundle; the repository never supplies or substitutes model weights. The installer verifies Ubuntu 24.04 x86_64, Docker Engine 27+, Docker Compose 2.29+, CUDA 12.8 driver compatibility, exactly one NVIDIA GPU, and the 24 GB memory class before loading images. It starts Compose with `--no-build --wait`, verifies the dependency readiness endpoint and Chinese console, and rejects any required service that is not running.
+
+The builder also writes `scenara-offline-<tag>.release-identity.json` beside the archive. It records the source commit, application image digest, archive SHA-256, OpenAPI SHA-256, and aggregate approved-model-set SHA-256 required by the strict release manifest. Keep this companion file with the controlled release record.
 
 Model weights are not bundled by this repository. Install only packages that pass MODEL_ASSETS.md and the strict release evidence gate.
 

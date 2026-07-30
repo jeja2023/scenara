@@ -4089,7 +4089,7 @@
   "info": {
     "description": "Scenara 景枢企业视觉 AI 中枢平台",
     "title": "Scenara API",
-    "version": "0.1.0"
+    "version": "0.2.0.dev0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -9626,6 +9626,48 @@
           }
         },
         "summary": "Health",
+        "tags": [
+          "Operations"
+        ]
+      }
+    },
+    "/livez": {
+      "get": {
+        "operationId": "live_livez_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_dict_str__str__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Live",
+        "tags": [
+          "Operations"
+        ]
+      }
+    },
+    "/readyz": {
+      "get": {
+        "operationId": "ready_readyz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_dict_str__object__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ready",
         "tags": [
           "Operations"
         ]

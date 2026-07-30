@@ -5,9 +5,12 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until signed, reproducible evidence is committed.
 
+Current development version: `0.2.0-dev.0` (`0.2.0.dev0` for Python packages).
+This version is an engineering qualification snapshot, not a `1.0.0` production release.
+
 | Stage | Deliverable | Status | Evidence required |
 |---|---|---|---|
-| 0.1 | Brand, license, provenance, boundaries, ADR, OpenAPI, migration, CI, production Compose | complete | repository, contract, and Compose configuration gates |
+| 0.1 | Brand, license, provenance, boundaries, ADR, OpenAPI, migration, CI, production Compose | engineering complete; legal license approval pending | repository, contract, Compose gates, and signed software-license approval |
 | 0.2 | Portrait and OCR vertical Media/Run/Operator/Pipeline/Result paths | complete | deterministic domain contract tests |
 | 0.3 | Image, video, PDF, stream, scheduling, checkpoint, SSE, webhook, feature store, retention, result shards | locally qualified; release sign-off pending | local Docker integration suite passes; signed real-service integration report required |
 | 0.4 | Detection, ReID, face, pose, parsing, apparel, segmentation, gait, quality fusion | implemented; model qualification pending | licensed model packages and fixed Portrait evaluation report required |
@@ -34,6 +37,7 @@ until signed, reproducible evidence is committed.
 - [x] Repository gates cover secret patterns, model asset policy, proprietary
   license, provenance, security policy, and legacy brand identifiers. CI also
   generates dependency license inventories and an SBOM.
+- [ ] The exact software `LICENSE` text has legal approval for commercial distribution and a signed report bound to its SHA-256.
 - [ ] Signed offline installation and backup/restore evidence exists (the local
   PostgreSQL + MinIO recovery drill passes).
 
@@ -45,13 +49,14 @@ The following checks were executed on 2026-07-30 and are supporting implementati
 
 | Check | Result |
 |---|---|
-| `python -m pytest -q` | 64 passed, 5 integration tests skipped by default; each skip requires `SCENARA_RUN_INTEGRATION=1` |
+| `python -m pytest -q --cov=scenara --cov=sdk/python/scenara_sdk --cov-fail-under=75` | 81 passed, 5 integration tests skipped by default; 77.12% coverage |
 | `SCENARA_RUN_INTEGRATION=1 python -m pytest -q -m integration tests/integration` | 5 passed against Docker PostgreSQL/pgvector, Redis and MinIO |
 | `scripts/local_backup_restore_drill.ps1` | passed; PostgreSQL and MinIO markers restored and verified |
 | `npm run check` | passed; console lint, 6 console tests, typecheck, build and TypeScript SDK check |
-| Ruff, Mypy, OpenAPI/SDK drift, repository gate, implementation release gate | all passed |
+| `pnpm run console:e2e` | 26 passed across desktop Chrome and Pixel 7 viewports; all 12 routes checked for page errors and horizontal overflow |
+| Ruff (including `app/` correctness rules), Mypy over 208 files, OpenAPI/SDK drift, repository gate, implementation release gate | all passed |
 | `python -m pip_audit -r requirements/dev.txt` and `pnpm audit --audit-level high` | no known vulnerabilities in the committed dependency definitions |
 | Deployment script syntax | all `deploy/scripts/*.sh` files passed `bash -n` in a cached Linux container |
-| Strict `python scripts/release_gate.py` | intentionally failed closed because `docs/release/evidence/manifest.json` and signed reports are not present |
+| Strict `python scripts/release_gate.py` | intentionally failed closed because the software license is not legally approved and the nine signed reports are not present |
 
-Local results do not satisfy the target GPU, licensed model, fixed evaluation-set, offline-install or named approval requirements. Those items remain unchecked until the responsible owners produce reproducible signed evidence.
+Local results do not satisfy software-license legal approval, the target GPU, licensed model, fixed evaluation-set, offline-install, or named approval requirements. Those items remain unchecked until the responsible owners produce reproducible signed evidence.

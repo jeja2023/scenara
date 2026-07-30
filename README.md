@@ -2,7 +2,7 @@
 
 Scenara 是面向企业私有化部署的企业视觉 AI 中枢平台。平台以版本化 Media、Run、Pipeline 和 Result 契约接收图片、视频、PDF 与实时流，并通过可安装的 Domain 提供强类型视觉能力。
 
-当前产品阶段：`0.1.0-dev`
+当前产品阶段：`0.2.0-dev`
 
 - 正式领域：Portrait（迁移中）
 - 验证领域：OCR / Document
@@ -34,19 +34,21 @@ flowchart LR
 ## 本地启动
 
 ```powershell
-python -m pip install -r requirements.txt -r requirements/dev.txt
+python -m pip install -r requirements/dev.txt
 python -m uvicorn scenara.server:app --host 127.0.0.1 --port 8000
 ```
 
 前端构建完成后，服务会在 `http://127.0.0.1:8000/console/` 提供同版本中文控制台；根路径会自动跳转到该地址。
 
-健康检查：`GET /healthz`。新公共契约统一位于 `/api/v1`，旧 Portrait Hub `/v1` 契约不属于 Scenara。
+存活探针：`GET /livez`；依赖就绪探针：`GET /readyz`；兼容探针：`GET /healthz`。经接口认证的 Prometheus 指标位于 `GET /metrics`。新公共契约统一位于 `/api/v1`，旧 Portrait Hub `/v1` 契约不属于 Scenara。
+
+生产镜像和离线轮子只使用带 SHA-256 的 `requirements/production.lock`。修改 `requirements.txt` 或 `requirements/prod-optional.txt` 后，运行 `uv pip compile requirements/production.in --python-version 3.12 --python-platform x86_64-manylinux_2_28 --generate-hashes --no-emit-index-url --output-file requirements/production.lock` 并提交锁文件。
 
 ## 仓库边界
 
 `app/` 是从 Portrait Hub 筛选导入的迁移适配层，只能被 `scenara.domains.portrait` 使用。新平台能力必须进入 `scenara/`，不得继续向 `app/portrait_*` 增加通用平台职责。
 
-来源与筛选规则见 [PROVENANCE.md](PROVENANCE.md)，品牌规范见 [docs/brand/BRAND.md](docs/brand/BRAND.md)，模型资产政策见 [MODEL_ASSETS.md](MODEL_ASSETS.md)，本次升级内容见 [更新日志.md](更新日志.md)。
+来源与筛选规则见 [PROVENANCE.md](PROVENANCE.md)，品牌规范见 [docs/brand/BRAND.md](docs/brand/BRAND.md)，模型资产政策见 [MODEL_ASSETS.md](MODEL_ASSETS.md)，升级、回滚、探针和告警见 [deploy/OPERATIONS.md](deploy/OPERATIONS.md)，本次升级内容见 [更新日志.md](更新日志.md)。
 
 ## 授权
 

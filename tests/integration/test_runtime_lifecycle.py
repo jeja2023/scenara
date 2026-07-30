@@ -32,6 +32,15 @@ pytestmark = pytest.mark.integration
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
+POSTGRES_DSN = os.getenv(
+    "SCENARA_INTEGRATION_POSTGRES_DSN",
+    "postgresql://scenara:scenara-integration@127.0.0.1:55432/scenara",
+)
+REDIS_URL = os.getenv("SCENARA_INTEGRATION_REDIS_URL", "redis://127.0.0.1:56379/14")
+S3_ENDPOINT = os.getenv("SCENARA_INTEGRATION_S3_ENDPOINT", "http://127.0.0.1:59000")
+S3_ACCESS_KEY = os.getenv("SCENARA_INTEGRATION_S3_ACCESS_KEY", "scenara")
+S3_SECRET_KEY = os.getenv("SCENARA_INTEGRATION_S3_SECRET_KEY", "scenara-integration-secret")
+
 
 @pytest.fixture(autouse=True)
 def require_integration_services() -> None:
@@ -129,14 +138,15 @@ async def test_real_services_pause_resume_cancel_and_result_persistence(tmp_path
         object_backend="s3",
         queue_backend="redis",
         data_dir=tmp_path,
-        postgres_dsn="postgresql://scenara:scenara-integration@127.0.0.1:55432/scenara",
-        redis_url="redis://127.0.0.1:56379/14",
-        s3_endpoint_url="http://127.0.0.1:59000",
+        postgres_dsn=POSTGRES_DSN,
+        redis_url=REDIS_URL,
+        s3_endpoint_url=S3_ENDPOINT,
         s3_bucket="scenara",
-        s3_access_key="scenara",
-        s3_secret_key=os.getenv("SCENARA_INTEGRATION_S3_SECRET_KEY", "scenara-integration-secret"),
+        s3_access_key=S3_ACCESS_KEY,
+        s3_secret_key=S3_SECRET_KEY,
         auth_required=False,
         production_models_required=False,
+        ocr_engine_factory="",
         secret_encryption_key="",
     )
     runtime = build_runtime(settings)

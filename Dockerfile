@@ -22,9 +22,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/scenara
-COPY requirements.txt requirements.txt
-COPY requirements requirements
-RUN python3 -m pip install --break-system-packages -r requirements.txt -r requirements/prod-optional.txt
+COPY requirements/production.lock requirements/production.lock
+RUN python3 -m pip install --break-system-packages --require-hashes -r requirements/production.lock
 
 COPY . .
 COPY --from=console-builder /build/frontend/console/dist frontend/console/dist

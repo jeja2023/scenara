@@ -9,6 +9,7 @@ import httpx
 import pytest
 from PIL import Image
 
+from scenara import __version__
 from scenara.bootstrap import build_runtime
 from scenara.server import create_app
 
@@ -50,6 +51,38 @@ async def upload_image(api: httpx.AsyncClient) -> str:
     )
     assert response.status_code == 201, response.text
     return response.json()["data"]["asset_id"]
+
+
+@pytest.mark.asyncio
+async def test_operational_probes_and_metrics_report_runtime_health(client) -> None:
+    api, _ = client
+    live = await api.get("/livez")
+    assert live.status_code == 200
+    assert live.json()["data"]["version"] == __version__
+
+    ready = await api.get("/readyz")
+    assert ready.status_code == 200
+    assert ready.json()["data"]["components"] == {"state": "ok", "objects": "ok", "queue": "ok"}
+
+    metrics = await api.get("/metrics")
+    assert metrics.status_code == 200
+    assert 'scenara_http_requests_total{method="GET",route="/livez",status="200"} 1' in metrics.text
+    assert 'scenara_http_request_duration_seconds_bucket{method="GET",route="/livez",le="+Inf"} 1' in metrics.text
+    assert 'scenara_http_request_duration_seconds_count{method="GET",route="/readyz"} 1' in metrics.text
+    assert (await api.get("/openapi.json")).json()["info"]["version"] == __version__
+
+
+@pytest.mark.asyncio
+async def test_readiness_fails_when_a_required_backend_is_unavailable(client, monkeypatch: pytest.MonkeyPatch) -> None:
+    api, runtime = client
+
+    async def unavailable() -> None:
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(runtime.state, "health_check", unavailable)
+    response = await api.get("/readyz")
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "HTTP_ERROR"
 
 
 @pytest.mark.asyncio

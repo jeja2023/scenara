@@ -9,6 +9,7 @@ from PIL import Image
 from scenara.bootstrap import build_runtime
 from scenara.domains.portrait.analysis import (
     PORTRAIT_CAPABILITIES,
+    LegacyPortraitAnalysisBackend,
     PortraitBackendOutput,
 )
 from scenara.platform.models import ModelProvenance
@@ -81,6 +82,86 @@ def portrait_image() -> bytes:
     output = BytesIO()
     Image.new("RGB", (40, 30), "white").save(output, format="PNG")
     return output.getvalue()
+
+
+@pytest.mark.asyncio
+async def test_legacy_portrait_backend_composes_migrated_runtime_capabilities(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    backend = LegacyPortraitAnalysisBackend()
+    capabilities = frozenset(
+        {
+            "person_detection",
+            "body_reid",
+            "face_detection",
+            "face_embedding",
+            "pose",
+            "human_parsing",
+            "apparel_attributes",
+            "silhouette_segmentation",
+            "gait",
+            "tracking",
+            "quality_fusion",
+        }
+    )
+
+    async def persons(*args, **kwargs):
+        del args, kwargs
+        return [{"box": [1, 2, 21, 28], "score": 0.9, "embedding": [0.2, 0.8]}]
+
+    async def body(*args, **kwargs):
+        del args, kwargs
+        return {"embedding": [0.1, 0.9], "quality": 0.8}
+
+    async def faces(*args, **kwargs):
+        del args, kwargs
+        return [{"box": [4, 3, 14, 13], "score": 0.88, "embedding": [0.3, 0.7]}]
+
+    async def pose(*args, **kwargs):
+        del args, kwargs
+        return {"keypoints": [{"name": "nose", "point": [8, 6], "score": 0.9}]}
+
+    async def appearance(*args, **kwargs):
+        del args, kwargs
+        return {"upper_color": "black", "embedding": [0.4, 0.6]}
+
+    async def gait(*args, **kwargs):
+        del args, kwargs
+        return [0.5, 0.5], {"quality": 0.75, "embedding": [0.5, 0.5]}
+
+    monkeypatch.setattr(backend, "_persons", persons)
+    monkeypatch.setattr(backend, "production_capabilities", lambda: capabilities)
+    monkeypatch.setattr("app.media.quality.assess_image_quality", lambda image: {"score": image.width / 40})
+    monkeypatch.setattr(
+        "app.portrait_model_capabilities.capability_status",
+        lambda name: {"model_id": f"approved.{name}", "version": "1.0.0"},
+    )
+    monkeypatch.setattr("app.portrait_model_runtime.infer_body_record_for_image", body)
+    monkeypatch.setattr("app.portrait_model_runtime.infer_face_records_for_image", faces)
+    monkeypatch.setattr("app.portrait_model_runtime.infer_pose_record_for_image", pose)
+    monkeypatch.setattr("app.portrait_model_runtime.infer_appearance_record_for_image", appearance)
+    monkeypatch.setattr("app.portrait_model_runtime.infer_gait_embedding_for_images", gait)
+    monkeypatch.setattr(
+        "app.tracking_association.associate_person_tracks",
+        lambda frames, include_template_embeddings: {
+            "tracks": [{"track_id": "track-1", "frame_count": len(frames)}]
+        },
+    )
+
+    images = [Image.new("RGB", (40, 30), "white") for _ in range(8)]
+    result = await backend.analyze(images, [f"frame-{index}.png" for index in range(8)], capabilities)
+
+    assert len(result.units) == 8
+    assert result.units[0]["persons"][0]["quality"]["score"] == 0.935
+    assert result.units[0]["persons"][0]["embedding"] == [0.2, 0.8]
+    assert result.units[0]["persons"][0]["body_quality"] == 0.8
+    assert result.units[0]["silhouettes"][0]["model_status"] == "development_bbox_silhouette_substitute"
+    assert result.tracks == [
+        {"track_id": "track-1", "frame_count": 8},
+        {"track_id": "gait_sequence_0", "gait": {"quality": 0.75, "embedding_available": True}},
+    ]
+    assert result.development_substitutes == []
+    assert all(model.production_ready for model in result.models)
 
 
 @pytest.mark.asyncio

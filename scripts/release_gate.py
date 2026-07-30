@@ -5,6 +5,7 @@ import hashlib
 import importlib
 import json
 import re
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -26,10 +27,15 @@ REQUIRED_IMPLEMENTATION = (
     "sdk/python/scenara_sdk/client.py",
     "sdk/typescript/src/generated.ts",
     "deploy/compose.yml",
+    "deploy/OPERATIONS.md",
     "deploy/scripts/build-offline-bundle.sh",
     "deploy/scripts/install-offline.sh",
+    "deploy/scripts/migrate.sh",
     "deploy/scripts/backup.sh",
     "deploy/scripts/restore.sh",
+    "requirements/production.lock",
+    "frontend/console/playwright.config.ts",
+    "frontend/console/e2e/workspaces.spec.ts",
     "docs/release/SUPPORT_MATRIX.md",
     "docs/release/EVIDENCE_OWNERS.md",
     "docs/release/evidence/manifest.example.json",
@@ -43,9 +49,20 @@ REQUIRED_EVIDENCE_TYPES = {
     "offline_install",
     "portrait_evaluation",
     "security_assessment",
+    "software_license_approval",
 }
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
+IMAGE_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
+SOURCE_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 PLACEHOLDER = re.compile(r"(?:<[^>]+>|\b(?:example|replace|todo|tbd)\b|待填写|占位)", re.IGNORECASE)
+LICENSE_PLACEHOLDER = re.compile(r"engineering placeholder|must receive legal review", re.IGNORECASE)
+RELEASE_IDENTITY_FIELDS = {
+    "source_commit",
+    "image_digest",
+    "offline_bundle_sha256",
+    "openapi_sha256",
+    "model_set_sha256",
+}
 
 
 def digest(path: Path) -> str:
@@ -73,6 +90,27 @@ def implementation_errors() -> list[str]:
         if generated.read_text(encoding="utf-8") != render_typescript_sdk(document):
             errors.append("generated TypeScript schemas do not match docs/openapi.json")
     return errors
+
+
+def repository_commit(root: Path = ROOT) -> str | None:
+    try:
+        return subprocess.check_output(
+            ["git", "rev-parse", "HEAD"],
+            cwd=root,
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None
+
+
+def license_errors(root: Path = ROOT) -> list[str]:
+    path = root / "LICENSE"
+    if not path.is_file():
+        return ["software license is missing"]
+    if LICENSE_PLACEHOLDER.search(path.read_text(encoding="utf-8", errors="ignore")):
+        return ["software license still contains the engineering legal-review placeholder"]
+    return []
 
 
 def _timestamp(value: Any, field: str, evidence_type: str, errors: list[str]) -> datetime | None:
@@ -158,6 +196,12 @@ def _metadata_errors(evidence_type: str, metadata: dict[str, Any]) -> list[str]:
         models = _string_set(metadata, "models", evidence_type, errors)
         if metadata.get("all_rights_cleared") is not True or not models:
             errors.append("model_rights: every production model must have cleared rights")
+    elif evidence_type == "software_license_approval":
+        errors.extend(
+            _required_values(metadata, {"license_sha256", "approval_reference"}, evidence_type)
+        )
+        if metadata.get("reviewed_by_legal") is not True:
+            errors.append("software_license_approval: legal review must be confirmed")
     elif evidence_type == "offline_install":
         required = {"health", "console", "example_clients", "core_parse"}
         if metadata.get("blank_host") is not True or metadata.get("isolated_network") is not True:
@@ -176,7 +220,12 @@ def _metadata_errors(evidence_type: str, metadata: dict[str, Any]) -> list[str]:
     return errors
 
 
-def validate_entry(entry: Any, *, root: Path = ROOT) -> list[str]:
+def validate_entry(
+    entry: Any,
+    *,
+    release_identity: dict[str, str] | None = None,
+    root: Path = ROOT,
+) -> list[str]:
     if not isinstance(entry, dict):
         return ["evidence manifest entry must be an object"]
     evidence_type = str(entry.get("evidence_type", ""))
@@ -198,7 +247,19 @@ def validate_entry(entry: Any, *, root: Path = ROOT) -> list[str]:
         except (json.JSONDecodeError, UnicodeDecodeError):
             errors.append(f"{evidence_type}: report must be UTF-8 JSON")
         else:
-            expected = {key: entry.get(key) for key in ("evidence_type", "status", "executed_at", "approved_at", "signed_by", "target", "metadata")}
+            expected = {
+                key: entry.get(key)
+                for key in (
+                    "evidence_type",
+                    "status",
+                    "executed_at",
+                    "approved_at",
+                    "signed_by",
+                    "target",
+                    "release_identity",
+                    "metadata",
+                )
+            }
             actual = {key: report_document.get(key) for key in expected} if isinstance(report_document, dict) else {}
             if not isinstance(report_document, dict) or report_document.get("schema_version") != "1.0":
                 errors.append(f"{evidence_type}: report schema_version must be 1.0")
@@ -219,10 +280,21 @@ def validate_entry(entry: Any, *, root: Path = ROOT) -> list[str]:
         errors.append(f"{evidence_type}: metadata must be an object")
         metadata = {}
     errors.extend(_metadata_errors(evidence_type, metadata))
+    if release_identity is not None and entry.get("release_identity") != release_identity:
+        errors.append(f"{evidence_type}: release identity does not match the manifest")
+    if evidence_type == "software_license_approval":
+        license_path = root / "LICENSE"
+        if license_path.is_file() and metadata.get("license_sha256") != digest(license_path):
+            errors.append("software_license_approval: LICENSE SHA-256 does not match")
     return errors
 
 
-def evidence_errors(manifest_path: Path, *, root: Path = ROOT) -> list[str]:
+def evidence_errors(
+    manifest_path: Path,
+    *,
+    root: Path = ROOT,
+    expected_source_commit: str | None = None,
+) -> list[str]:
     if not manifest_path.is_file():
         return [f"release evidence manifest is missing: {manifest_path}"]
     try:
@@ -233,13 +305,33 @@ def evidence_errors(manifest_path: Path, *, root: Path = ROOT) -> list[str]:
     if not isinstance(entries, list):
         return ["release evidence manifest entries must be a list"]
     errors: list[str] = []
-    if not isinstance(manifest, dict) or manifest.get("schema_version") != "1.0":
-        errors.append("release evidence manifest schema_version must be 1.0")
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != "1.1":
+        errors.append("release evidence manifest schema_version must be 1.1")
     if not isinstance(manifest, dict) or not re.fullmatch(r"\d+\.\d+\.\d+", str(manifest.get("release", ""))):
         errors.append("release evidence manifest release must be a semantic version")
+    release_identity_value = manifest.get("release_identity") if isinstance(manifest, dict) else None
+    release_identity: dict[str, str] | None = None
+    if not isinstance(release_identity_value, dict):
+        errors.append("release evidence manifest release_identity must be an object")
+    else:
+        release_identity = {key: str(release_identity_value.get(key, "")) for key in RELEASE_IDENTITY_FIELDS}
+        if set(release_identity_value) != RELEASE_IDENTITY_FIELDS:
+            errors.append("release identity must contain exactly the required artifact fields")
+        if not SOURCE_COMMIT.fullmatch(release_identity["source_commit"]):
+            errors.append("release identity source_commit must be a full lowercase Git SHA")
+        if expected_source_commit is not None and release_identity["source_commit"] != expected_source_commit:
+            errors.append("release identity source_commit does not match the checked-out commit")
+        if not IMAGE_DIGEST.fullmatch(release_identity["image_digest"]):
+            errors.append("release identity image_digest must be a sha256 container digest")
+        for field in ("offline_bundle_sha256", "openapi_sha256", "model_set_sha256"):
+            if not SHA256.fullmatch(release_identity[field]):
+                errors.append(f"release identity {field} must be a lowercase SHA-256")
+        openapi = root / "docs/openapi.json"
+        if openapi.is_file() and release_identity["openapi_sha256"] != digest(openapi):
+            errors.append("release identity openapi_sha256 does not match docs/openapi.json")
     present: set[str] = set()
     for entry in entries:
-        errors.extend(validate_entry(entry, root=root))
+        errors.extend(validate_entry(entry, release_identity=release_identity, root=root))
         if isinstance(entry, dict):
             evidence_type = str(entry.get("evidence_type", ""))
             if evidence_type in present:
@@ -261,7 +353,13 @@ def main() -> None:
     args = parser.parse_args()
     errors = implementation_errors()
     if not args.implementation_only:
-        errors.extend(evidence_errors(args.manifest.resolve()))
+        errors.extend(license_errors())
+        errors.extend(
+            evidence_errors(
+                args.manifest.resolve(),
+                expected_source_commit=repository_commit(),
+            )
+        )
     if errors:
         raise SystemExit("\n".join(errors))
 

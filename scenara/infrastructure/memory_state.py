@@ -45,6 +45,9 @@ class MemoryStateStore:
     async def close(self) -> None:
         return None
 
+    async def health_check(self) -> None:
+        return None
+
     async def register_pipeline_definition(self, pipeline: PipelineDefinition) -> None:
         async with self._lock:
             key = (pipeline.pipeline_id, pipeline.version)

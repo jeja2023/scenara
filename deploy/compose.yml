@@ -26,7 +26,7 @@ x-scenara-environment: &scenara-environment
 
 services:
   postgres:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
     environment:
       POSTGRES_DB: scenara
       POSTGRES_USER: scenara
@@ -41,19 +41,24 @@ services:
     restart: unless-stopped
 
   migrate:
-    image: pgvector/pgvector:pg16
+    image: pgvector/pgvector@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       PGPASSWORD: ${SCENARA_POSTGRES_PASSWORD:?set SCENARA_POSTGRES_PASSWORD}
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: scenara
+      PGUSER: scenara
     volumes:
       - ../migrations:/migrations:ro
-    command: ["psql", "-v", "ON_ERROR_STOP=1", "-h", "postgres", "-U", "scenara", "-d", "scenara", "-f", "/migrations/0001_initial.sql"]
+      - ./scripts:/deploy-scripts:ro
+    command: ["sh", "/deploy-scripts/migrate.sh"]
     restart: "no"
 
   redis:
-    image: redis:7.4-alpine
+    image: redis@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
     command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
     volumes:
       - redis-data:/data
@@ -65,7 +70,7 @@ services:
     restart: unless-stopped
 
   minio:
-    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    image: minio/minio@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0
     environment:
       MINIO_ROOT_USER: ${SCENARA_S3_ACCESS_KEY:-scenara}
       MINIO_ROOT_PASSWORD: ${SCENARA_S3_SECRET_KEY:?set SCENARA_S3_SECRET_KEY}
@@ -80,7 +85,7 @@ services:
     restart: unless-stopped
 
   minio-init:
-    image: minio/mc:RELEASE.2025-07-21T05-28-08Z
+    image: minio/mc@sha256:fb8f773eac8ef9d6da0486d5dec2f42f219358bcb8de579d1623d518c9ebd4cc
     depends_on:
       minio:
         condition: service_healthy
@@ -93,7 +98,7 @@ services:
     restart: "no"
 
   api:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-1.0.0}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.2.0-dev.0}
     build:
       context: ..
     environment: *scenara-environment
@@ -109,14 +114,14 @@ services:
     volumes:
       - ../models:/opt/scenara/models:ro
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/readyz"]
       interval: 10s
       timeout: 5s
       retries: 12
     restart: unless-stopped
 
   batch-worker:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-1.0.0}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.2.0-dev.0}
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "batch-gpu-1", "--lane", "batch"]
@@ -136,7 +141,7 @@ services:
     restart: unless-stopped
 
   stream-worker:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-1.0.0}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.2.0-dev.0}
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "stream-gpu-1", "--lane", "stream"]
@@ -156,7 +161,7 @@ services:
     restart: unless-stopped
 
   scheduler:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-1.0.0}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.2.0-dev.0}
     build:
       context: ..
     command: ["python3", "-m", "scenara.scheduler", "--interval-seconds", "60"]
