@@ -28,4 +28,4 @@ date -u +%Y-%m-%dT%H:%M:%SZ > "$backup_dir/created-at.txt"
   cd "$backup_dir"
   find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
 )
-"$(dirname "$0")/verify-backup.sh" "$backup_dir"
+bash "$(dirname "$0")/verify-backup.sh" "$backup_dir"

@@ -134,7 +134,7 @@ async def test_real_services_pause_resume_cancel_and_result_persistence(tmp_path
         s3_endpoint_url="http://127.0.0.1:59000",
         s3_bucket="scenara",
         s3_access_key="scenara",
-        s3_secret_key="scenara-" + "integration-secret",
+        s3_secret_key=os.getenv("SCENARA_INTEGRATION_S3_SECRET_KEY", "scenara-integration-secret"),
         auth_required=False,
         production_models_required=False,
         secret_encryption_key="",

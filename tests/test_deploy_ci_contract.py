@@ -8,6 +8,8 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = ROOT / "deploy" / "compose.yml"
 WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
+BACKUP_SCRIPT = ROOT / "deploy" / "scripts" / "backup.sh"
+RESTORE_SCRIPT = ROOT / "deploy" / "scripts" / "restore.sh"
 REQUIRED_VARIABLE = re.compile(r"\$\{(SCENARA_[A-Z0-9_]+):\?")
 NODE24_ACTION_MAJORS = {
     "actions/checkout": 7,
@@ -63,3 +65,9 @@ def test_ci_actions_use_node24_compatible_releases() -> None:
         versions = [int(value) for value in re.findall(rf"{re.escape(action)}@v(\d+)", workflow)]
         assert versions, f"CI workflow does not use {action}"
         assert min(versions) >= minimum_major, f"{action} must use v{minimum_major} or newer"
+
+
+def test_backup_verifier_does_not_require_an_executable_file_mode() -> None:
+    invocation = 'bash "$(dirname "$0")/verify-backup.sh" "$backup_dir"'
+    assert invocation in BACKUP_SCRIPT.read_text(encoding="utf-8")
+    assert invocation in RESTORE_SCRIPT.read_text(encoding="utf-8")

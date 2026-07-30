@@ -13,7 +13,7 @@ compose_file="${SCENARA_COMPOSE_FILE:-$(dirname "$0")/../compose.yml}"
 env_file="${SCENARA_COMPOSE_ENV_FILE:?set SCENARA_COMPOSE_ENV_FILE}"
 compose=(docker compose --env-file "$env_file" -f "$compose_file")
 
-"$(dirname "$0")/verify-backup.sh" "$backup_dir"
+bash "$(dirname "$0")/verify-backup.sh" "$backup_dir"
 data_only="${SCENARA_RESTORE_DATA_ONLY:-false}"
 if test "$data_only" != "true"; then
   "${compose[@]}" stop api batch-worker stream-worker scheduler
