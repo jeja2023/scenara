@@ -190,7 +190,7 @@ jobs:
           SCENARA_S3_SECRET_KEY=$s3_secret
           SCENARA_API_TOKEN=$SCENARA_API_TOKEN
           SCENARA_SECRET_ENCRYPTION_KEY=$encryption_key
-          SCENARA_OCR_ENGINE_FACTORY=drill_unused_ocr_adapter:create_engine
+          SCENARA_OCR_ENGINE_FACTORY=compose_interpolation_only:create_engine
           EOF
           chmod 600 "$RUNNER_TEMP/scenara.env"
           echo "SCENARA_COMPOSE_ENV_FILE=$RUNNER_TEMP/scenara.env" >> "$GITHUB_ENV"
