@@ -13,6 +13,8 @@ RESTORE_SCRIPT = ROOT / "deploy" / "scripts" / "restore.sh"
 MIGRATE_SCRIPT = ROOT / "deploy" / "scripts" / "migrate.sh"
 OFFLINE_BUILD_SCRIPT = ROOT / "deploy" / "scripts" / "build-offline-bundle.sh"
 DOCKERFILE = ROOT / "Dockerfile"
+MODEL_CONFIG = ROOT / "models.yml"
+MODEL_CAPABILITIES = ROOT / "model-capabilities.yml"
 PRODUCTION_LOCK = ROOT / "requirements" / "production.lock"
 REQUIRED_VARIABLE = re.compile(r"\$\{(SCENARA_[A-Z0-9_]+):\?")
 NODE24_ACTION_MAJORS = {
@@ -108,6 +110,28 @@ def test_production_dependencies_are_hash_locked_everywhere() -> None:
     assert "uv pip compile requirements/production.in --python-version 3.12" in workflow
     assert "--python-platform x86_64-manylinux_2_28" in workflow
     assert "git diff --exit-code -- requirements/production.lock" in workflow
+
+
+def test_docker_build_copies_workspace_sources_before_installing_dependencies() -> None:
+    dockerfile_lines = DOCKERFILE.read_text(encoding="utf-8").splitlines()
+    source_copy = dockerfile_lines.index("COPY frontend/console frontend/console")
+    dependency_install = dockerfile_lines.index("RUN pnpm install --frozen-lockfile")
+    assert source_copy < dependency_install
+
+
+def test_default_runtime_model_references_use_cache_key_contract() -> None:
+    models_document = yaml.safe_load(MODEL_CONFIG.read_text(encoding="utf-8"))
+    capabilities_document = yaml.safe_load(MODEL_CAPABILITIES.read_text(encoding="utf-8"))
+    models = models_document["models"]
+    aliases = models_document["aliases"]
+    assert set(models) == {
+        "scenara.portrait/yolov8n",
+        "scenara.portrait/osnet_ibn_x1_0",
+    }
+    assert aliases["person_detector_default"]["target"] in models
+    assert aliases["person_reid_default"]["target"] in models
+    assert capabilities_document["capabilities"]["person_detection"]["model_id"] == "person_detector_default"
+    assert capabilities_document["capabilities"]["body_embedding"]["model_id"] == "person_reid_default"
 
 
 def test_offline_builder_emits_release_identity_and_model_manifest() -> None:

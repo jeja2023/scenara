@@ -132,7 +132,7 @@ describe("console information architecture", () => {
     expect(labelAccessCapability("api_authentication").name).toBe("接口认证");
     expect(labelEntitlementSource("manual")).toBe("手动配置");
     expect(labelWarning("gait_requires_at_least_8_frames")).toBe("步态分析至少需要 8 帧画面");
-    expect(labelVersion("0.3.0.dev2")).toBe("0.3.0 开发版 2");
+    expect(labelVersion("0.3.0.dev3")).toBe("0.3.0 开发版 3");
     expect(userFacingError(new TypeError("Failed to fetch"))).toBe("操作失败，请稍后重试");
     // Portrait Intelligence Foundation Platform labels
     expect(labelPortraitModule("data_governance")).toBe("数据治理");

@@ -5,7 +5,7 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until signed, reproducible evidence is committed.
 
-Current development version: `0.3.0-dev.2` (`0.3.0.dev2` for Python packages).
+Current development version: `0.3.0-dev.3` (`0.3.0.dev3` for Python packages).
 This version is an engineering qualification snapshot, not a `1.0.0` production release.
 
 | Stage | Deliverable | Status | Evidence required |

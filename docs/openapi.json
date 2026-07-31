@@ -7162,7 +7162,7 @@
   "info": {
     "description": "Scenara 景枢企业视觉 AI 中枢平台",
     "title": "Scenara API",
-    "version": "0.3.0.dev2"
+    "version": "0.3.0.dev3"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -9668,6 +9668,122 @@
           }
         },
         "summary": "Get Media Source",
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/api/v1/media/sources/{source_id}/preview": {
+      "get": {
+        "operationId": "get_media_source_preview_api_v1_media_sources__source_id__preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timeout_ms",
+            "required": false,
+            "schema": {
+              "default": 10000,
+              "maximum": 30000,
+              "minimum": 100,
+              "title": "Timeout Ms",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Media Source Preview",
         "tags": [
           "Media"
         ]

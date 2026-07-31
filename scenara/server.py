@@ -476,6 +476,15 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             await runtime.runs.probe_source(context, source_id, timeout_ms=timeout_ms),
         )  # type: ignore[return-value]
 
+    @app.get("/api/v1/media/sources/{source_id}/preview", tags=["Media"])
+    async def get_media_source_preview(
+        source_id: str,
+        timeout_ms: Annotated[int, Query(ge=100, le=30_000)] = 10_000,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> Response:
+        data, content_type = await runtime.runs.get_source_preview(context, source_id, timeout_ms=timeout_ms)
+        return Response(content=data, media_type=content_type)
+
     @app.delete("/api/v1/media/sources/{source_id}", status_code=204, tags=["Media"])
     async def delete_media_source(
         source_id: str,

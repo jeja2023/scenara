@@ -360,6 +360,10 @@ async def test_stream_shortcut_runs_decode_and_result_end_to_end(
         json={"name": "stream-run", "url": "rtsp://1.1.1.1/live"},
     )
     source = created.json()["data"]
+    preview = await api.get(f"/api/v1/media/sources/{source['source_id']}/preview")
+    assert preview.status_code == 200
+    assert preview.headers["content-type"].startswith("image/jpeg")
+    assert preview.content
     response = await api.post(
         "/api/v1/parse/stream",
         json={

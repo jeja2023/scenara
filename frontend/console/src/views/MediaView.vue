@@ -18,7 +18,6 @@ const probes = reactive<Record<string, MediaSourceProbe>>({});
 const sourceForm = reactive({ name: "", url: "" });
 const selectedAsset = ref<MediaAsset | null>(null);
 const previewUrl = ref("");
-const previewIsVideo = ref(false);
 const kindFilter = ref<AssetKindFilter>("");
 const expandedAssets = reactive<Set<string>>(new Set());
 const selectedForDelete = reactive<Set<string>>(new Set());
@@ -33,6 +32,22 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(2)} MiB`;
+}
+
+function readBlobAsDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("media preview did not produce a data URL"));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("media preview could not be read"));
+    reader.readAsDataURL(blob);
+  });
+}
+
+function revokePreviewUrl(): void {
+  if (previewUrl.value.startsWith("blob:")) URL.revokeObjectURL(previewUrl.value);
 }
 
 function clearFeedback(): void {
@@ -107,8 +122,7 @@ async function preview(asset: MediaAsset): Promise<void> {
   clearFeedback();
   try {
     const blob = await apiBlob(`/api/v1/media/assets/${encodeURIComponent(asset.asset_id)}/preview`);
-    previewUrl.value = URL.createObjectURL(blob);
-    previewIsVideo.value = asset.kind === "video";
+    previewUrl.value = await readBlobAsDataUrl(blob);
     selectedAsset.value = asset;
   } catch (caught) {
     error.value = userFacingError(caught, "媒体预览加载失败");
@@ -116,10 +130,9 @@ async function preview(asset: MediaAsset): Promise<void> {
 }
 
 function closePreview(): void {
-  if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
+  revokePreviewUrl();
   previewUrl.value = "";
   selectedAsset.value = null;
-  previewIsVideo.value = false;
 }
 
 async function deleteAsset(asset: MediaAsset): Promise<void> {
@@ -294,7 +307,7 @@ onBeforeUnmount(closePreview);
                       <component :is="expandedAssets.has(asset.asset_id) ? ChevronDown : ChevronRight" :size="15" />
                     </button>
                     <button class="icon-button" title="预览" aria-label="预览" @click="preview(asset)"><Eye :size="15" /></button>
-                    <button v-if="asset.kind === 'video'" class="icon-button" title="预览视频" aria-label="预览视频" @click="preview(asset)"><Video :size="15" /></button>
+                    <button v-if="asset.kind === 'video'" class="icon-button" title="预览视频首帧" aria-label="预览视频首帧" @click="preview(asset)"><Video :size="15" /></button>
                     <button class="button secondary" @click="launch(asset.kind === 'document' ? 'ocr' : 'portrait', asset)"><Play :size="14" />{{ labelDomain(asset.kind === 'document' ? 'ocr' : 'portrait') }}</button>
                     <button v-if="asset.kind !== 'document'" class="button secondary" @click="launch('ocr', asset)">OCR</button>
                     <button class="icon-button danger-icon" title="删除" aria-label="删除" @click="deleteAsset(asset)"><Trash2 :size="15" /></button>
@@ -332,8 +345,7 @@ onBeforeUnmount(closePreview);
         <div><h2>{{ selectedAsset?.filename || selectedAsset?.asset_id }}</h2><p>{{ selectedAsset ? formatBytes(selectedAsset.size_bytes) + " · " + labelMediaKind(selectedAsset.kind) : "" }}</p></div>
         <button class="icon-button" title="关闭" aria-label="关闭" @click="closePreview"><X :size="18" /></button>
       </div>
-      <video v-if="previewIsVideo && previewUrl" :src="previewUrl" controls class="preview-media" />
-      <img v-else-if="previewUrl" :src="previewUrl" alt="媒体预览" class="preview-media" />
+      <img v-if="previewUrl" :src="previewUrl" alt="媒体预览" class="preview-media" />
     </dialog>
   </section>
 </template>

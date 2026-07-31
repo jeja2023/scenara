@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { AlertTriangle, ChevronDown, ChevronUp, Clock3, Download, FileImage, FileText, Pause, Play, Radio, RefreshCw, Square, Video } from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { api, apiStream, idempotencyKey, streamJsonEvents, userFacingError } from "../api";
+import { api, apiBlob, apiStream, idempotencyKey, streamJsonEvents, userFacingError } from "../api";
 import { labelDomain, labelPipeline, labelRunError, labelRunStatus, labelSampleStrategy, labelTerminationReason, labelWarning } from "../labels";
 import type { Domain, MediaAsset, MediaSource, ResultEnvelope, ResultPage, Run } from "../types";
 
@@ -19,6 +19,10 @@ const props = defineProps<{ domain: Domain }>();
 const mode = ref<MediaMode>("image");
 const file = ref<File | null>(null);
 const mediaUrl = ref("");
+const serverPreviewUrl = ref("");
+const streamPreviewUrl = ref("");
+const fileDataUrl = ref("");
+const videoPlaybackFailed = ref(false);
 const videoElement = ref<HTMLVideoElement | null>(null);
 const overlayCanvas = ref<HTMLCanvasElement | null>(null);
 const sources = ref<MediaSource[]>([]);
@@ -96,9 +100,22 @@ const warnings = computed(() => result.value?.warnings ?? []);
 const totalObjects = computed(() => result.value?.units.reduce((s, u) => s + u.objects.length, 0) ?? 0);
 const hasResult = computed(() => !!result.value);
 
+const displayedMediaUrl = computed(() => serverPreviewUrl.value || mediaUrl.value);
+const canvasMediaUrl = computed(() => displayedMediaUrl.value || streamPreviewUrl.value);
+
+function revokeObjectUrl(value: string): void {
+  if (value.startsWith("blob:")) URL.revokeObjectURL(value);
+}
+
 function clearMediaUrl(): void {
-  if (mediaUrl.value) URL.revokeObjectURL(mediaUrl.value);
+  revokeObjectUrl(mediaUrl.value);
+  revokeObjectUrl(serverPreviewUrl.value);
+  revokeObjectUrl(streamPreviewUrl.value);
   mediaUrl.value = "";
+  serverPreviewUrl.value = "";
+  streamPreviewUrl.value = "";
+  fileDataUrl.value = "";
+  videoPlaybackFailed.value = false;
 }
 
 function resetResult(): void {
@@ -136,6 +153,63 @@ function selectFile(event: Event): void {
   resetResult();
 }
 
+function readBlobAsDataUrl(selected: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("file preview did not produce a data URL"));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("file preview could not be read"));
+    reader.readAsDataURL(selected);
+  });
+}
+
+async function handleImageError(): Promise<void> {
+  if (!file.value || fileDataUrl.value) return;
+  revokeObjectUrl(serverPreviewUrl.value);
+  serverPreviewUrl.value = "";
+  try {
+    fileDataUrl.value = await readBlobAsDataUrl(file.value);
+    mediaUrl.value = fileDataUrl.value;
+  } catch {
+    // The parser still reports a useful validation error when the file cannot be decoded.
+  }
+}
+
+function handleVideoError(): void {
+  videoPlaybackFailed.value = true;
+}
+
+async function loadServerPreview(assetId: string | null | undefined): Promise<void> {
+  if (!assetId) return;
+  try {
+    const blob = await apiBlob(`/api/v1/media/assets/${encodeURIComponent(assetId)}/preview`);
+    const dataUrl = await readBlobAsDataUrl(blob);
+    revokeObjectUrl(serverPreviewUrl.value);
+    serverPreviewUrl.value = dataUrl;
+  } catch {
+    // Preview generation is best-effort; parsing and result rendering remain available.
+  }
+}
+
+async function loadStreamPreview(sourceIdValue: string): Promise<void> {
+  if (!sourceIdValue) {
+    revokeObjectUrl(streamPreviewUrl.value);
+    streamPreviewUrl.value = "";
+    return;
+  }
+  try {
+    const blob = await apiBlob(`/api/v1/media/sources/${encodeURIComponent(sourceIdValue)}/preview`);
+    const dataUrl = await readBlobAsDataUrl(blob);
+    revokeObjectUrl(streamPreviewUrl.value);
+    streamPreviewUrl.value = dataUrl;
+  } catch {
+    revokeObjectUrl(streamPreviewUrl.value);
+    streamPreviewUrl.value = "";
+  }
+}
+
 async function refreshSources(): Promise<void> {
   loadingSources.value = true;
   try {
@@ -171,6 +245,7 @@ async function loadResult(runId: string): Promise<void> {
     units.push(...page.result.units);
   }
   result.value = { ...first.result, units };
+  if (mode.value === "stream" && sourceId.value) void loadStreamPreview(sourceId.value);
   drawOverlay();
 }
 
@@ -256,6 +331,7 @@ async function execute(): Promise<void> {
         headers: { "Idempotency-Key": idempotencyKey(props.domain + "_image") },
         body: form,
       });
+      void loadServerPreview(parsed.asset.asset_id);
       run.value = parsed.run;
       result.value = parsed.result;
       if (parsed.result) drawOverlay();
@@ -286,6 +362,7 @@ async function execute(): Promise<void> {
         headers: { "Idempotency-Key": idempotencyKey(props.domain + "_" + mode.value) },
         body: form,
       });
+      void loadServerPreview(parsed.asset.asset_id);
       await pollRun(parsed.run);
     } else {
       const selectedId = await ensureSource();
@@ -459,6 +536,9 @@ function formatBox(item: { x: number; y: number; width: number; height: number }
 
 watch(() => props.domain, resetResult);
 watch(selectedUnitIndex, drawOverlay);
+watch(sourceId, (value) => {
+  if (mode.value === "stream") void loadStreamPreview(value);
+});
 onMounted(refreshSources);
 onBeforeUnmount(() => {
   pollGeneration += 1;
@@ -497,20 +577,27 @@ onBeforeUnmount(() => {
       </div>
       <div class="panel-body input-layout">
         <div class="media-stage">
-          <img v-if="mode === 'image' && mediaUrl" :src="mediaUrl" alt="待解析图片" />
-          <video v-else-if="mode === 'video' && mediaUrl" ref="videoElement" :src="mediaUrl" controls preload="metadata" />
+          <img v-if="mode === 'image' && displayedMediaUrl" :src="displayedMediaUrl" alt="待解析图片" @error="handleImageError" />
+          <template v-else-if="mode === 'video' && displayedMediaUrl">
+            <video v-if="mediaUrl && !videoPlaybackFailed" ref="videoElement" :src="mediaUrl" controls preload="metadata" @error="handleVideoError" />
+            <img v-else-if="serverPreviewUrl" :src="serverPreviewUrl" alt="视频首帧预览" />
+            <div v-else class="empty">视频文件无法在浏览器中播放，解析后将显示首帧</div>
+          </template>
           <div v-else-if="mode === 'document' && file" class="stream-stage">
             <FileText :size="28" />
             <strong>{{ file.name }}</strong>
             <span>{{ (file.size / 1024 / 1024).toFixed(2) }} MiB · 解析后按页浏览结果</span>
           </div>
-          <div v-else-if="mode === 'stream'" class="stream-stage">
-            <Radio :size="28" />
-            <strong>{{ selectedSource?.name || sourceName || "未选择视频流" }}</strong>
-            <span>{{ selectedSource?.masked_url || sourceUrl || "登记或选择一个视频流源" }}</span>
-          </div>
+          <template v-else-if="mode === 'stream'">
+            <img v-if="streamPreviewUrl" :src="streamPreviewUrl" alt="实时流首帧预览" />
+            <div v-else class="stream-stage">
+              <Radio :size="28" />
+              <strong>{{ selectedSource?.name || sourceName || "未选择视频流" }}</strong>
+              <span>{{ selectedSource?.masked_url || sourceUrl || "登记或选择一个视频流源" }}</span>
+            </div>
+          </template>
           <div v-else class="empty">等待{{ mode === "image" ? "图片" : mode === "document" ? "PDF 文档" : "视频文件" }}</div>
-          <canvas v-show="mediaUrl && selectedObjects.length" ref="overlayCanvas" class="overlay" aria-hidden="true" />
+          <canvas v-show="canvasMediaUrl && selectedObjects.length" ref="overlayCanvas" class="overlay" aria-hidden="true" />
         </div>
 
         <div class="input-controls">

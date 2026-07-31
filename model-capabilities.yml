@@ -61,7 +61,7 @@ capabilities:
     fallback_model_id: scenara.development.tracklet_fingerprint_v1
   body_embedding:
     status: ready
-    model_id: scenara.portrait.osnet_ibn_x1_0
+    model_id: person_reid_default
     adapter: reid
     production_adapter: reid
     production_model: OSNet IBN person ReID ONNX

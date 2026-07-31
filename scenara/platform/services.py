@@ -446,6 +446,34 @@ class RunService:
         )
         return probe
 
+    async def get_source_preview(
+        self,
+        context: PrincipalContext,
+        source_id: str,
+        *,
+        timeout_ms: int = 10_000,
+    ) -> tuple[bytes, str]:
+        source = await self.get_source(context, source_id)
+        await require_allowed(self.policy, context, "execute", "media_source", {"source_id": source_id})
+        source_url = await self.secrets.get(source.secret_ref)
+        await validate_external_url(
+            source_url,
+            allowed_schemes=frozenset({"rtsp", "rtmp", "http", "https"}),
+            allow_private=self.allow_private_media_sources,
+            allow_credentials=True,
+        )
+        try:
+            _metadata, preview = await asyncio.wait_for(
+                asyncio.to_thread(
+                    inspect_media,
+                    MediaInput(kind=MediaKind.STREAM, content_type="application/octet-stream", source_url=source_url),
+                ),
+                timeout=timeout_ms / 1000 + 1,
+            )
+        except TimeoutError as exc:
+            raise ValueError("media source preview timed out") from exc
+        return preview, "image/jpeg"
+
     async def create_run(
         self,
         context: PrincipalContext,

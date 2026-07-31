@@ -350,7 +350,7 @@ const runErrorLabels: Record<string, string> = {
 const terminationReasonLabels: Record<string, string> = {
   source_ended: "媒体源已结束",
   reconnect_exhausted: "媒体源重连次数已用尽",
-  max_units_reached: "已达到最大处理单元数",
+  max_units_reached: "已达到最大处理单元数（达到上限后主动停止）",
   sample_window_completed: "已完成指定采样时间窗口",
   cancelled_by_user: "已由用户取消",
 };
@@ -636,6 +636,9 @@ export function labelTerminationReason(value?: string | null): string {
 
 export function labelWarning(value: string): string {
   if (value === "gait_requires_at_least_8_frames") return "步态分析至少需要 8 帧画面";
+  if (value === "media_termination:max_units_reached") {
+    return "已达到最大分析单元上限，本次任务已正常完成；如需继续处理，请提高“最大分析单元”或缩小采样间隔。";
+  }
   if (value.startsWith("development_substitute:")) {
     return `使用开发替代能力：${labelCapability(value.slice("development_substitute:".length))}`;
   }

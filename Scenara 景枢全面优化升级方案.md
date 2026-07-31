@@ -1,6 +1,6 @@
 # Scenara（景枢）企业级视觉 AI 平台优化升级方案
 
-**版本：V2.5（0.3.0-dev.2 媒体解析与发布收口版）**
+**版本：V2.6（0.3.0-dev.3 媒体预览与 GPU 验证版）**
 
 **基线日期：2026-07-31**
 
@@ -24,7 +24,7 @@
 | 维度 | 当前事实 | 结论 |
 |---|---|---|
 | 品牌现状 | `README.md`、品牌规范、控制台、OpenAPI、SDK 文档和品牌资产已统一为“景枢” | 品牌迁移已完成；仓库门禁阻止旧品牌重新进入当前产品表面 |
-| 产品阶段 | 当前版本为 `0.3.0-dev.2`，仓库明确声明尚未发布 1.0（`README.md`） | 所有生产级宣传均受发布门禁约束 |
+| 产品阶段 | 当前版本为 `0.3.0-dev.3`，仓库明确声明尚未发布 1.0（`README.md`） | 所有生产级宣传均受发布门禁约束 |
 | 产品与访问底座 | 11 项产品目录、Organization、Project、User、Role、Membership、Service Account、API Key 与 Product Entitlement 已成为公共契约 | 产品继续共享 IAM、授权、审计和部署栈；身份联邦与商业生命周期仍受门禁约束 |
 | 架构边界 | `platform` 定义契约，`domains` 实现领域，`infrastructure` 实现端口，`enterprise` 通过 Policy Hook 接入（`docs/adr/0001-platform-domain-boundaries.md:14-29`） | 继续采用模块化单体，不拆微服务平台 |
 | 正式领域 | Portrait 为正式领域；OCR/Document 为验证领域（`README.md:7-8`） | 2026 年不同时扩张多个新领域 |
