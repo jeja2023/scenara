@@ -108,6 +108,8 @@ async def test_feedback_and_model_release_postgres_persistence() -> None:
             project_id=project_id,
             model_id="scenara.portrait.integration",
             version="1.0.0",
+            capability="person_detection",
+            runtime_model_id="scenara.portrait/integration",
             package_sha256="b" * 64,
             created_by="integration",
             created_at=time.time(),
@@ -133,6 +135,9 @@ async def test_feedback_and_model_release_postgres_persistence() -> None:
             project_id=project_id,
             model_id=release.model_id,
             version=release.version,
+            capability=release.capability,
+            runtime_model_id=release.runtime_model_id,
+            package_sha256=release.package_sha256,
             action="transition",
             from_status=ModelReleaseStatus.APPROVED,
             to_status=ModelReleaseStatus.ACTIVE,
@@ -153,4 +158,3 @@ async def test_feedback_and_model_release_postgres_persistence() -> None:
             ):
                 await connection.execute(f"DELETE FROM {table} WHERE tenant_id = %s", (tenant_id,))
         await state.close()
-

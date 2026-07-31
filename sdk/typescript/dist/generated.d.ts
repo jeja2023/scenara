@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "35dd908147ea0390f99a2dbbd786d1733f432309f8f8f1bd2e8b13930dafb1eb";
+export declare const OPENAPI_SHA256 = "e129b304130390bb7158ce7d38c7c45ba233479250b2557b5885263b16dfda82";
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
@@ -81,13 +81,23 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
-    type ApiEnvelope_MediaSource_ = {
-        data: MediaSource;
+    type ApiEnvelope_MediaSourceProbe_ = {
+        data: MediaSourceProbe;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_MediaSourceView_ = {
+        data: MediaSourceView;
         request_id: string;
         schema_version?: "1.0";
     };
     type ApiEnvelope_Membership_ = {
         data: Membership;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_ModelPackageManifest_ = {
+        data: ModelPackageManifest;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -101,8 +111,18 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_ParseDocumentResponse_ = {
+        data: ParseDocumentResponse;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_ParseImageResponse_ = {
         data: ParseImageResponse;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_ParseVideoResponse_ = {
+        data: ParseVideoResponse;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -126,6 +146,11 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_PortraitIntelligenceStatus_ = {
+        data: PortraitIntelligenceStatus;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_PortraitSearchResponse_ = {
         data: PortraitSearchResponse;
         request_id: string;
@@ -138,6 +163,11 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_Project_ = {
         data: Project;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_RepositoryContractCatalog_ = {
+        data: RepositoryContractCatalog;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -325,11 +355,35 @@ export declare namespace OpenApi {
         file: string;
         kind?: MediaKind;
     };
+    type Body_parse_document_api_v1_parse_document_post = {
+        domain?: "portrait" | "ocr";
+        file: string;
+        max_units?: number;
+        page_scale?: number;
+        pipeline_id?: (string) | (null);
+        pipeline_version?: (string) | (null);
+        wait_ms?: number;
+    };
     type Body_parse_image_api_v1_parse_image_post = {
         domain?: "portrait" | "ocr";
         file: string;
         pipeline_id?: (string) | (null);
-        pipeline_version?: string;
+        pipeline_version?: (string) | (null);
+    };
+    type Body_parse_video_api_v1_parse_video_post = {
+        domain?: "portrait" | "ocr";
+        file: string;
+        frame_max_edge?: (number) | (null);
+        max_units?: number;
+        page_scale?: number;
+        pipeline_id?: (string) | (null);
+        pipeline_version?: (string) | (null);
+        sample_end_ms?: (number) | (null);
+        sample_interval_ms?: number;
+        sample_start_ms?: number;
+        sample_strategy?: SampleStrategy;
+        scene_change_threshold?: number;
+        wait_ms?: number;
     };
     type BoundingBox = {
         height: number;
@@ -600,6 +654,7 @@ export declare namespace OpenApi {
         expires_at?: (number) | (null);
         filename?: (string) | (null);
         kind: MediaKind;
+        metadata?: MediaTechnicalMetadata;
         object_key: string;
         original_deleted_at?: (number) | (null);
         preview_content_type?: (string) | (null);
@@ -618,7 +673,20 @@ export declare namespace OpenApi {
         total: number;
     };
     type MediaKind = "image" | "video" | "document" | "stream";
-    type MediaSource = {
+    type MediaSourcePage = {
+        items: Array<MediaSourceView>;
+        limit: number;
+        offset: number;
+        total: number;
+    };
+    type MediaSourceProbe = {
+        checked_at: number;
+        latency_ms: number;
+        metadata?: MediaTechnicalMetadata;
+        reachable: boolean;
+        source_id: string;
+    };
+    type MediaSourceView = {
         created_at: number;
         kind?: SourceKind;
         masked_url: string;
@@ -626,16 +694,31 @@ export declare namespace OpenApi {
             [key: string]: unknown;
         };
         name: string;
-        project_id: string;
-        secret_ref: string;
         source_id: string;
-        tenant_id: string;
     };
-    type MediaSourcePage = {
-        items: Array<MediaSource>;
-        limit: number;
-        offset: number;
-        total: number;
+    type MediaTechnicalMetadata = {
+        codec?: (string) | (null);
+        container?: (string) | (null);
+        decode_seek_used?: (boolean) | (null);
+        duration_ms?: (number) | (null);
+        elapsed_ms?: (number) | (null);
+        format?: (string) | (null);
+        fps?: (number) | (null);
+        frame_count?: (number) | (null);
+        frame_max_edge?: (number) | (null);
+        frames_read?: (number) | (null);
+        height?: (number) | (null);
+        keyframe_count?: (number) | (null);
+        page_count?: (number) | (null);
+        reconnect_count?: (number) | (null);
+        sample_end_ms?: (number) | (null);
+        sample_interval_ms?: (number) | (null);
+        sample_start_ms?: (number) | (null);
+        sample_strategy?: (SampleStrategy) | (null);
+        sampled_units?: (number) | (null);
+        scene_change_count?: (number) | (null);
+        timestamp_source?: ("decoder_pts" | "position_msec" | "monotonic_clock") | (null);
+        width?: (number) | (null);
     };
     type MediaUnitResult = {
         height: number;
@@ -659,17 +742,36 @@ export declare namespace OpenApi {
     type ModelDeploymentEvent = {
         action: string;
         audit_id: string;
+        capability: string;
         created_at: number;
         event_id: string;
         from_status: (ModelReleaseStatus) | (null);
         model_id: string;
         operator_id: string;
+        package_sha256: string;
         project_id: string;
         reason: string;
+        runtime_model_id: string;
         schema_version?: "1.0";
         tenant_id: string;
         to_status: ModelReleaseStatus;
         version: string;
+    };
+    type ModelPackageManifest = {
+        adapter: string;
+        capability: string;
+        evaluation_evidence: Array<string>;
+        license_id: string;
+        model_card: string;
+        model_id: string;
+        production_ready?: boolean;
+        regression_samples: Array<string>;
+        runtime_model_id: string;
+        schema_version?: "1.0";
+        sha256: string;
+        source_uri: string;
+        version: string;
+        vram_mb: number;
     };
     type ModelProvenance = {
         capability: string;
@@ -680,6 +782,7 @@ export declare namespace OpenApi {
     };
     type ModelRelease = {
         activated_at?: (number) | (null);
+        capability: string;
         created_at: number;
         created_by: string;
         evidence_refs?: Array<string>;
@@ -687,6 +790,7 @@ export declare namespace OpenApi {
         package_sha256: string;
         project_id: string;
         retired_at?: (number) | (null);
+        runtime_model_id: string;
         schema_version?: "1.0";
         status?: ModelReleaseStatus;
         tenant_id: string;
@@ -717,7 +821,27 @@ export declare namespace OpenApi {
         tenant_id: AccessId;
         updated_at: number;
     };
+    type ParseDocumentResponse = {
+        asset: MediaAsset;
+        result?: (ResultEnvelope) | (null);
+        run: RunRecord;
+    };
     type ParseImageResponse = {
+        asset: MediaAsset;
+        result?: (ResultEnvelope) | (null);
+        run: RunRecord;
+    };
+    type ParseStreamRequest = {
+        domain: DomainId;
+        parameters?: {
+            [key: string]: unknown;
+        };
+        pipeline: PipelineSelection;
+        priority?: number;
+        source_id: string;
+        wait_ms?: number;
+    };
+    type ParseVideoResponse = {
         asset: MediaAsset;
         result?: (ResultEnvelope) | (null);
         run: RunRecord;
@@ -725,6 +849,10 @@ export declare namespace OpenApi {
     type PipelineRef = {
         pipeline_id: string;
         version: string;
+    };
+    type PipelineSelection = {
+        pipeline_id: string;
+        version?: (string) | (null);
     };
     type PipelineStatus = "draft" | "validated" | "approved" | "active" | "retired";
     type PipelineTransitionRequest = {
@@ -734,6 +862,24 @@ export declare namespace OpenApi {
         x: number;
         y: number;
     };
+    type PortraitAssetItem = {
+        asset_id: PortraitModuleId;
+        depends_on_modules?: Array<PortraitModuleId>;
+        maturity: PortraitModuleMaturity;
+        name: string;
+        next_gate: string;
+        summary: string;
+    };
+    type PortraitCapabilityItem = {
+        capability_id: string;
+        current_model?: (string) | (null);
+        embedding_dimension?: (number) | (null);
+        production_ready: boolean;
+        readiness: PortraitCapabilityReadiness;
+        target_embedding_dimension?: (number) | (null);
+        target_model?: (string) | (null);
+    };
+    type PortraitCapabilityReadiness = "ready" | "fallback" | "placeholder" | "not_configured";
     type PortraitCompareRequest = {
         feature_space_id: string;
         left: Array<number>;
@@ -785,6 +931,25 @@ export declare namespace OpenApi {
         offset: number;
         total: number;
     };
+    type PortraitIntelligenceStatus = {
+        assets: Array<PortraitAssetItem>;
+        capabilities: Array<PortraitCapabilityItem>;
+        modules: Array<PortraitModuleItem>;
+        positioning?: "portrait_intelligence_foundation_platform";
+        schema_version?: "1.0";
+    };
+    type PortraitModuleId = string;
+    type PortraitModuleItem = {
+        current_scope?: Array<string>;
+        maturity: PortraitModuleMaturity;
+        module_id: PortraitModuleId;
+        name: string;
+        next_gate: string;
+        not_in_scope_yet?: Array<string>;
+        owner_repository_id: RepositoryId;
+        summary: string;
+    };
+    type PortraitModuleMaturity = "available" | "partial" | "seed" | "planned" | "external";
     type PortraitSearchMatch = {
         distance: number;
         enrollment_id: string;
@@ -841,14 +1006,37 @@ export declare namespace OpenApi {
         source_sha256?: (string) | (null);
     };
     type RepositoryBoundaryRule = "versioned_contracts_only" | "no_shared_database" | "no_cross_repository_source_imports" | "immutable_artifact_references";
+    type RepositoryContractArtifact = {
+        compatibility?: "backward";
+        consumer_repository_id: string;
+        contract_id: string;
+        example_path: string;
+        example_sha256: string;
+        payload_schema_version: string;
+        payload_type: string;
+        producer_repository_id: string;
+        release_version: string;
+        schema_path: string;
+        schema_sha256: string;
+        transport: "versioned_api" | "event" | "immutable_manifest";
+    };
+    type RepositoryContractCatalog = {
+        contracts: Array<RepositoryContractArtifact>;
+        package_name: string;
+        release_version: string;
+        schema_version?: "1.0";
+    };
     type RepositoryContractTransport = "versioned_api" | "event" | "immutable_manifest";
     type RepositoryId = string;
     type RepositoryIntegrationContract = {
+        compatibility?: "backward";
         consumer_repository_id: RepositoryId;
         contract_id: string;
         invariants?: Array<RepositoryResponsibilityId>;
         payload_type: string;
         producer_repository_id: RepositoryId;
+        release_version: string;
+        schema_path: string;
         transport: RepositoryContractTransport;
     };
     type RepositoryKind = "platform_integration" | "specialized_product";
@@ -889,6 +1077,7 @@ export declare namespace OpenApi {
         created_at: number;
         domain: DomainId;
         domain_payload: (PortraitDomainPayload) | (OcrDomainPayload);
+        media_metadata?: MediaTechnicalMetadata;
         models?: Array<ModelProvenance>;
         pipeline: PipelineRef;
         provenance?: ProvenanceEvidence;
@@ -961,6 +1150,7 @@ export declare namespace OpenApi {
         updated_at: number;
     };
     type RunStatus = "queued" | "running" | "pausing" | "paused" | "completed" | "failed" | "cancelling" | "cancelled";
+    type SampleStrategy = "interval" | "keyframe" | "scene_change" | "uniform";
     type ServiceAccount = {
         created_at: number;
         disabled?: boolean;

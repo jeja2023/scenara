@@ -5,11 +5,13 @@ import os
 import sys
 import time
 from dataclasses import replace
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 import pytest
+from PIL import Image
 
 from scenara.bootstrap import build_runtime
 from scenara.infrastructure.postgres_state import PostgresStateStore
@@ -40,6 +42,12 @@ REDIS_URL = os.getenv("SCENARA_INTEGRATION_REDIS_URL", "redis://127.0.0.1:56379/
 S3_ENDPOINT = os.getenv("SCENARA_INTEGRATION_S3_ENDPOINT", "http://127.0.0.1:59000")
 S3_ACCESS_KEY = os.getenv("SCENARA_INTEGRATION_S3_ACCESS_KEY", "scenara")
 S3_SECRET_KEY = os.getenv("SCENARA_INTEGRATION_S3_SECRET_KEY", "scenara-integration-secret")
+
+
+def sample_png() -> bytes:
+    output = BytesIO()
+    Image.new("RGB", (4, 4), "white").save(output, format="PNG")
+    return output.getvalue()
 
 
 @pytest.fixture(autouse=True)
@@ -193,10 +201,10 @@ async def test_real_services_pause_resume_cancel_and_result_persistence(tmp_path
     try:
         first_asset = await runtime.runs.create_asset(
             context,
-            data=b"first lifecycle payload",
-            filename="first.bin",
-            content_type="application/octet-stream",
-            kind=MediaKind.VIDEO,
+            data=sample_png(),
+            filename="first.png",
+            content_type="image/png",
+            kind=MediaKind.IMAGE,
         )
         assets.append(first_asset)
         first = (
@@ -224,10 +232,10 @@ async def test_real_services_pause_resume_cancel_and_result_persistence(tmp_path
 
         second_asset = await runtime.runs.create_asset(
             context,
-            data=b"second lifecycle payload",
-            filename="second.bin",
-            content_type="application/octet-stream",
-            kind=MediaKind.VIDEO,
+            data=sample_png(),
+            filename="second.png",
+            content_type="image/png",
+            kind=MediaKind.IMAGE,
         )
         assets.append(second_asset)
         second = (

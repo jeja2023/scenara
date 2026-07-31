@@ -3,9 +3,13 @@ from __future__ import annotations
 import time
 from dataclasses import replace
 from io import BytesIO
+from pathlib import Path
+from tempfile import NamedTemporaryFile
 from typing import Any
 
+import cv2
 import httpx
+import numpy as np
 import pytest
 from PIL import Image
 
@@ -50,6 +54,22 @@ def sample_png(width: int = 800, height: int = 400) -> bytes:
     output = BytesIO()
     Image.new("RGB", (width, height), "teal").save(output, format="PNG")
     return output.getvalue()
+
+
+def sample_video() -> bytes:
+    path = ""
+    try:
+        with NamedTemporaryFile(delete=False, suffix=".avi") as handle:
+            path = handle.name
+        writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*"MJPG"), 5.0, (64, 48))
+        assert writer.isOpened()
+        for index in range(10):
+            writer.write(np.full((48, 64, 3), index * 20, dtype=np.uint8))
+        writer.release()
+        return Path(path).read_bytes()
+    finally:
+        if path:
+            Path(path).unlink(missing_ok=True)
 
 
 @pytest.fixture
@@ -104,12 +124,16 @@ async def test_asset_deletion_removes_object_and_records_audit(kernel_client) ->
     api, runtime = kernel_client
     uploaded = await api.post(
         "/api/v1/media/assets",
-        files={"file": ("sample.png", b"image-bytes", "application/octet-stream")},
+        files={"file": ("sample.avi", sample_video(), "video/x-msvideo")},
         data={"kind": "video"},
         headers={"X-Principal-Id": "operator-1"},
     )
     assert uploaded.status_code == 201, uploaded.text
     asset = uploaded.json()["data"]
+    assert asset["metadata"]["width"] == 64
+    assert asset["metadata"]["height"] == 48
+    assert asset["metadata"]["fps"] == 5.0
+    assert asset["metadata"]["duration_ms"] == 2000
 
     deleted = await api.delete(
         f"/api/v1/media/assets/{asset['asset_id']}",
@@ -136,6 +160,9 @@ async def test_asset_preview_is_generated_served_and_deleted_independently(kerne
     )
     assert uploaded.status_code == 201, uploaded.text
     asset = uploaded.json()["data"]
+    assert asset["metadata"]["width"] == 800
+    assert asset["metadata"]["height"] == 400
+    assert asset["metadata"]["format"] == "png"
     assert asset["preview_object_key"].endswith("/preview.jpg")
     assert len(asset["preview_sha256"]) == 64
 
@@ -176,6 +203,19 @@ async def test_asset_preview_is_generated_served_and_deleted_independently(kerne
 
 
 @pytest.mark.asyncio
+async def test_invalid_video_is_rejected_before_asset_persistence(kernel_client) -> None:
+    api, runtime = kernel_client
+    response = await api.post(
+        "/api/v1/media/assets",
+        files={"file": ("not-video.mp4", b"not-a-video", "video/mp4")},
+        data={"kind": "video"},
+    )
+    assert response.status_code == 400
+    assert response.json()["error"]["code"] == "INVALID_ARGUMENT"
+    assert await runtime.state.list_assets("default", "default") == []
+
+
+@pytest.mark.asyncio
 async def test_source_credentials_are_not_returned(kernel_client) -> None:
     api, runtime = kernel_client
     response = await api.post(
@@ -189,9 +229,157 @@ async def test_source_credentials_are_not_returned(kernel_client) -> None:
     source = response.json()["data"]
     assert source["masked_url"] == "rtsp://1.1.1.1/live"
     assert "camera-password" not in response.text
-    assert await runtime.secrets.get(source["secret_ref"]) == (
+    assert "secret_ref" not in source
+    stored_source = (await runtime.state.list_sources("default", "default"))[0]
+    assert await runtime.secrets.get(stored_source.secret_ref) == (
         "rtsp://camera-user:camera-password@1.1.1.1/live?token=private"
     )
+
+    fetched = await api.get(f"/api/v1/media/sources/{source['source_id']}")
+    assert fetched.status_code == 200
+    assert "camera-password" not in fetched.text
+
+    deleted = await api.delete(f"/api/v1/media/sources/{source['source_id']}")
+    assert deleted.status_code == 204
+    assert (await api.get(f"/api/v1/media/sources/{source['source_id']}")).status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_source_probe_returns_sanitized_technical_metadata(kernel_client, monkeypatch: pytest.MonkeyPatch) -> None:
+    api, _runtime = kernel_client
+    created = await api.post(
+        "/api/v1/media/sources",
+        json={"name": "probe-source", "url": "rtsp://user:secret@1.1.1.1/live?token=hidden"},
+    )
+    source = created.json()["data"]
+
+    def inspect(media):
+        assert media.source_url == "rtsp://user:secret@1.1.1.1/live?token=hidden"
+        return {"width": 1920, "height": 1080, "fps": 25.0, "codec": "h264", "sampled_units": 1}, b"jpeg"
+
+    monkeypatch.setattr("scenara.platform.services.inspect_media", inspect)
+    response = await api.post(f"/api/v1/media/sources/{source['source_id']}/probe")
+    assert response.status_code == 200, response.text
+    probe = response.json()["data"]
+    assert probe["reachable"] is True
+    assert probe["metadata"]["width"] == 1920
+    assert "secret" not in response.text
+
+
+@pytest.mark.asyncio
+async def test_video_shortcut_runs_sampled_timeline_end_to_end(kernel_client) -> None:
+    api, _runtime = kernel_client
+    response = await api.post(
+        "/api/v1/parse/video",
+        files={"file": ("timeline.avi", sample_video(), "video/x-msvideo")},
+        data={
+            "domain": "ocr",
+            "pipeline_id": "ocr.document",
+            "sample_interval_ms": "400",
+            "max_units": "3",
+            "wait_ms": "2000",
+        },
+        headers={"Idempotency-Key": "video-shortcut"},
+    )
+    assert response.status_code == 202, response.text
+    payload = response.json()["data"]
+    assert payload["asset"]["kind"] == "video"
+    assert payload["run"]["status"] == "completed"
+    assert payload["run"]["pipeline"] == {"pipeline_id": "ocr.document", "version": "0.1.0"}
+    result = payload["result"]
+    assert [unit["pts_ms"] for unit in result["units"]] == [0, 400, 800]
+    assert result["media_metadata"]["sampled_units"] == 3
+    assert result["media_metadata"]["duration_ms"] == 2000
+
+
+@pytest.mark.asyncio
+async def test_document_shortcut_has_a_document_specific_contract(kernel_client) -> None:
+    api, _runtime = kernel_client
+    response = await api.post(
+        "/api/v1/parse/document",
+        files={"file": ("pages.pdf", multipage_pdf(), "application/pdf")},
+        data={"domain": "ocr", "max_units": "2", "page_scale": "1.0", "wait_ms": "2000"},
+        headers={"Idempotency-Key": "document-shortcut"},
+    )
+    assert response.status_code == 202, response.text
+    payload = response.json()["data"]
+    assert payload["asset"]["kind"] == "document"
+    assert payload["run"]["pipeline"] == {"pipeline_id": "ocr.document", "version": "0.1.0"}
+    assert payload["run"]["status"] == "completed"
+    assert [unit["unit_type"] for unit in payload["result"]["units"]] == ["page", "page"]
+
+
+@pytest.mark.asyncio
+async def test_video_shortcut_rejects_unknown_sampling_strategy_before_creating_an_asset(kernel_client) -> None:
+    api, runtime = kernel_client
+    response = await api.post(
+        "/api/v1/parse/video",
+        files={"file": ("timeline.avi", sample_video(), "video/x-msvideo")},
+        data={"sample_strategy": "every-other-frame"},
+    )
+    assert response.status_code == 422
+    assert await runtime.state.list_assets("default", "default") == []
+
+
+@pytest.mark.asyncio
+async def test_stream_shortcut_runs_decode_and_result_end_to_end(
+    kernel_client,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api, _runtime = kernel_client
+    frame = np.zeros((48, 64, 3), dtype=np.uint8)
+
+    class Capture:
+        def __init__(self, *_args: object) -> None:
+            self.reads = 0
+
+        def isOpened(self) -> bool:
+            return True
+
+        def get(self, field: int) -> float:
+            if field == cv2.CAP_PROP_FPS:
+                return 25.0
+            if field == cv2.CAP_PROP_FRAME_WIDTH:
+                return 64.0
+            if field == cv2.CAP_PROP_FRAME_HEIGHT:
+                return 48.0
+            if field == cv2.CAP_PROP_POS_MSEC:
+                return float(max(0, self.reads - 1))
+            return 0.0
+
+        def read(self):
+            self.reads += 1
+            return True, frame
+
+        def release(self) -> None:
+            return None
+
+    monkeypatch.setattr("scenara.platform.media_batch.cv2.VideoCapture", Capture)
+    created = await api.post(
+        "/api/v1/media/sources",
+        json={"name": "stream-run", "url": "rtsp://1.1.1.1/live"},
+    )
+    source = created.json()["data"]
+    response = await api.post(
+        "/api/v1/parse/stream",
+        json={
+            "source_id": source["source_id"],
+            "domain": "ocr",
+            "pipeline": {"pipeline_id": "ocr.document"},
+            "parameters": {"sample_interval_ms": 1, "max_units": 2},
+            "wait_ms": 2000,
+        },
+        headers={"Idempotency-Key": "stream-shortcut"},
+    )
+    assert response.status_code == 202, response.text
+    run = response.json()["data"]
+    assert run["status"] == "completed"
+    assert run["pipeline"] == {"pipeline_id": "ocr.document", "version": "0.1.0"}
+    result = (await api.get(f"/api/v1/runs/{run['run_id']}/result")).json()["data"]["result"]
+    assert result["source_id"] == source["source_id"]
+    assert len(result["units"]) == 2
+    assert result["media_metadata"]["sampled_units"] == 2
+    assert "media_termination:max_units_reached" in result["warnings"]
 
 
 @pytest.mark.asyncio
@@ -223,8 +411,9 @@ async def test_media_source_is_revalidated_immediately_before_fetch(kernel_clien
     )
     assert response.status_code == 201
     source = response.json()["data"]
+    stored_source = (await runtime.state.list_sources("default", "default"))[0]
     await runtime.secrets.put(
-        source["secret_ref"],
+        stored_source.secret_ref,
         "http://169.254.169.254/latest/meta-data",
     )
     created = await api.post(
@@ -249,7 +438,7 @@ async def test_retention_sweep_deletes_expired_media(kernel_client) -> None:
     api, runtime = kernel_client
     uploaded = await api.post(
         "/api/v1/media/assets",
-        files={"file": ("sample.bin", b"video", "application/octet-stream")},
+        files={"file": ("sample.avi", sample_video(), "video/x-msvideo")},
         data={"kind": "video"},
     )
     assert uploaded.status_code == 201
@@ -309,14 +498,14 @@ async def test_authenticated_principal_cannot_be_spoofed(development_settings) -
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as api:
         spoofed = await api.post(
             "/api/v1/media/assets",
-            files={"file": ("sample.bin", b"video", "application/octet-stream")},
+            files={"file": ("sample.avi", sample_video(), "video/x-msvideo")},
             data={"kind": "video"},
             headers={"Authorization": "Bearer test-token", "X-Principal-Id": "admin"},
         )
         assert spoofed.status_code == 400
         accepted = await api.post(
             "/api/v1/media/assets",
-            files={"file": ("sample.bin", b"video", "application/octet-stream")},
+            files={"file": ("sample.avi", sample_video(), "video/x-msvideo")},
             data={"kind": "video"},
             headers={"Authorization": "Bearer test-token"},
         )

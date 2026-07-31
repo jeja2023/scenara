@@ -259,6 +259,12 @@ async def test_platform_product_catalog_exposes_matrix_boundaries(client) -> Non
     assert by_id["parse"]["maturity"] == "available"
     assert by_id["parse"]["console_route"] == "/parse"
     assert "OCR document parsing" in by_id["parse"]["current_scope"]
+    assert set(by_id["parse"]["api_paths"]) >= {
+        "/api/v1/parse/image",
+        "/api/v1/parse/video",
+        "/api/v1/parse/document",
+        "/api/v1/parse/stream",
+    }
     assert by_id["model"]["maturity"] == "seed"
     assert "training jobs" in by_id["model"]["not_in_scope_yet"]
     assert by_id["console"]["layer"] == "control_plane"
@@ -304,6 +310,11 @@ async def test_platform_repository_topology_exposes_ownership_and_integration_bo
     assert contracts["model-package-admission"]["producer_repository_id"] == "scenara-model"
     assert contracts["model-package-admission"]["consumer_repository_id"] == "scenara"
     assert contracts["model-package-admission"]["payload_type"] == "ModelPackageManifest"
+    assert contracts["model-package-admission"]["release_version"] == "1.0.0"
+    assert contracts["model-package-admission"]["compatibility"] == "backward"
+    assert contracts["model-package-admission"]["schema_path"].endswith(
+        "/model-package-admission.schema.json"
+    )
     assert contracts["hard-sample-handoff"]["payload_type"] == "HardSampleManifest"
     assert set(topology["boundary_rules"]) == {
         "immutable_artifact_references",
@@ -311,6 +322,32 @@ async def test_platform_repository_topology_exposes_ownership_and_integration_bo
         "no_shared_database",
         "versioned_contracts_only",
     }
+
+
+@pytest.mark.asyncio
+async def test_repository_contract_catalog_exposes_verified_schema_artifacts(client) -> None:
+    api, _ = client
+    response = await api.get("/api/v1/platform/contracts")
+    assert response.status_code == 200, response.text
+    catalog = response.json()["data"]
+    assert catalog["release_version"] == "1.0.0"
+    contracts = {item["contract_id"]: item for item in catalog["contracts"]}
+    assert set(contracts) == {
+        "dataset-version-input",
+        "deployment-feedback",
+        "hard-sample-handoff",
+        "model-package-admission",
+    }
+    assert all(len(item["schema_sha256"]) == 64 for item in contracts.values())
+
+    schema = await api.get("/api/v1/platform/contracts/deployment-feedback/schema")
+    assert schema.status_code == 200
+    assert schema.headers["content-type"].startswith("application/schema+json")
+    assert schema.headers["etag"] == f'"sha256:{contracts["deployment-feedback"]["schema_sha256"]}"'
+    assert schema.json()["$schema"] == "https://json-schema.org/draft/2020-12/schema"
+
+    missing = await api.get("/api/v1/platform/contracts/not-a-contract/schema")
+    assert missing.status_code == 404
 
 
 @pytest.mark.asyncio
@@ -334,6 +371,72 @@ async def test_platform_access_foundation_exposes_current_identity_boundary(clie
     assert by_id["policy_provider"]["status"] == "available"
     assert "service account API keys" in by_id["api_authentication"]["current_scope"]
     assert by_id["sso"]["status"] == "planned"
+
+
+@pytest.mark.asyncio
+async def test_platform_portrait_intelligence_contract(client) -> None:
+    api, _ = client
+    response = await api.get("/api/v1/platform/portrait-intelligence")
+    assert response.status_code == 200, response.text
+    payload = response.json()["data"]
+
+    # Schema envelope
+    assert payload["schema_version"] == "1.0"
+    assert payload["positioning"] == "portrait_intelligence_foundation_platform"
+
+    # Six modules — IDs, uniqueness, and key invariants
+    modules = {m["module_id"]: m for m in payload["modules"]}
+    assert set(modules) == {
+        "data_governance",
+        "annotation",
+        "training",
+        "algorithms",
+        "vector_retrieval",
+        "mlops",
+    }
+    # Data governance and annotation must be gated behind scenara-data (not yet built)
+    assert modules["data_governance"]["maturity"] in {"planned", "seed"}
+    assert modules["data_governance"]["owner_repository_id"] == "scenara-data"
+    assert modules["annotation"]["owner_repository_id"] == "scenara-data"
+    # Training lives in the external training repository
+    assert modules["training"]["maturity"] == "external"
+    assert modules["training"]["owner_repository_id"] == "scenara-model"
+    # Platform-owned modules
+    assert modules["vector_retrieval"]["owner_repository_id"] == "scenara"
+    assert modules["mlops"]["owner_repository_id"] == "scenara"
+    # Nothing may be marked available when it is still gated
+    assert modules["data_governance"]["maturity"] != "available"
+    assert modules["annotation"]["maturity"] != "available"
+
+    # Three strategic assets
+    assets = {a["asset_id"]: a for a in payload["assets"]}
+    assert set(assets) == {"data_lake", "foundation_model", "intelligence_engine"}
+    # Data lake must not be available before data governance is built
+    assert assets["data_lake"]["maturity"] != "available"
+    assert assets["foundation_model"]["maturity"] != "available"
+    # Assets must reference only known module IDs
+    known_modules = set(modules)
+    for asset in assets.values():
+        for dep in asset["depends_on_modules"]:
+            assert dep in known_modules, f"asset {asset['asset_id']} references unknown module {dep}"
+
+    # Seven capability items
+    capabilities = {c["capability_id"]: c for c in payload["capabilities"]}
+    expected_caps = {
+        "person_detection",
+        "body_embedding",
+        "face_detection",
+        "face_embedding",
+        "pose",
+        "gait",
+        "appearance",
+    }
+    assert set(capabilities) == expected_caps
+    # person_detection and body_embedding are the only ready capabilities in this test setup
+    # (app layer absent → all capabilities are not_configured, which is still a valid state)
+    for cap in capabilities.values():
+        assert cap["readiness"] in {"ready", "fallback", "placeholder", "not_configured"}
+        assert isinstance(cap["production_ready"], bool)
 
 
 @pytest.mark.asyncio

@@ -65,6 +65,17 @@ class StateStore(Protocol):
         self, tenant_id: str, project_id: str, limit: int
     ) -> list[WebhookDeliveryRecord]: ...
 
+    async def enqueue_webhook_event(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        event_id: str,
+        event_type: str,
+        payload: dict[str, object],
+        created_at: float,
+    ) -> None: ...
+
     async def create_asset(self, asset: MediaAsset) -> MediaAsset: ...
 
     async def get_asset(self, tenant_id: str, project_id: str, asset_id: str) -> MediaAsset | None: ...

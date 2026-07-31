@@ -351,8 +351,122 @@ const terminationReasonLabels: Record<string, string> = {
   source_ended: "媒体源已结束",
   reconnect_exhausted: "媒体源重连次数已用尽",
   max_units_reached: "已达到最大处理单元数",
+  sample_window_completed: "已完成指定采样时间窗口",
   cancelled_by_user: "已由用户取消",
 };
+
+const sampleStrategyLabels: Record<string, string> = {
+  interval: "固定间隔",
+  keyframe: "关键帧",
+  scene_change: "场景切换",
+  uniform: "均匀分布",
+};
+
+const portraitMaturityLabels: Record<string, string> = {
+  available: "可用",
+  partial: "部分可用",
+  seed: "种子能力",
+  planned: "规划中",
+  external: "外部仓库承担",
+};
+
+const portraitReadinessLabels: Record<string, string> = {
+  ready: "已就绪",
+  fallback: "开发替代",
+  placeholder: "占位实现",
+  not_configured: "未配置",
+};
+
+const portraitModuleLabels: Record<string, string> = {
+  data_governance: "数据治理",
+  annotation: "标注平台",
+  training: "模型训练",
+  algorithms: "人像算法",
+  vector_retrieval: "向量检索",
+  mlops: "模型运维",
+};
+
+const portraitModuleSummaryLabels: Record<string, string> = {
+  data_governance: "建立版本不可变、血缘完整的人像训练与评估数据资产。",
+  annotation: "支持图片、视频和流截帧的标注与质量复核，打通难例闭环。",
+  training: "统一训练框架覆盖检测、识别、姿态、行人重识别与属性任务。",
+  algorithms: "构建完整人像能力矩阵：人员检测、人脸检测与识别、姿态、步态与外观属性。",
+  vector_retrieval: "支撑海量人像库的高速近似检索、跨摄像头关联与聚类。",
+  mlops: "覆盖实验、准入、部署、监控与反馈的模型全生命周期治理。",
+};
+
+const portraitModuleGateLabels: Record<string, string> = {
+  data_governance: "数据集、版本、血缘、授权与导出形成稳定归属后再创建独立数据仓库。",
+  annotation: "先完成数据治理底座，标注工具集成属于独立数据仓库的职责范围。",
+  training: "由训练仓库发布带摘要、模型卡和评估证据的不可变模型制品清单。",
+  algorithms: "通过模型准入接口提交全部能力的正式制品，附摘要与模型卡。",
+  vector_retrieval: "把既有向量后端迁移为平台特征存储协议的标准实现。",
+  mlops: "先以单节点推理完成 1.0 资格验证，再接入高并发推理服务。",
+};
+
+const portraitAssetLabels: Record<string, string> = {
+  data_lake: "人像数据湖",
+  foundation_model: "人像基础模型",
+  intelligence_engine: "人像智能引擎",
+};
+
+const portraitAssetSummaryLabels: Record<string, string> = {
+  data_lake: "统一管理原始媒体、标注结果、特征向量、质量标签与版本血缘。",
+  foundation_model: "持续训练覆盖检测、识别、属性、姿态、重识别与步态的多任务模型，替代割裂的小模型。",
+  intelligence_engine: "融合检索、聚类、知识图谱、事件分析与持续学习，形成可持续演进的平台能力。",
+};
+
+const portraitAssetGateLabels: Record<string, string> = {
+  data_lake: "先建成数据治理与标注能力，数据湖从稳定的数据集版本与血缘归属中沉淀。",
+  foundation_model: "先让各独立任务模型全部达到就绪，再在后续版本收敛为共享骨干网络。",
+  intelligence_engine: "先完成向量后端迁移并交付人脸与人体多模态融合检索。",
+};
+
+const portraitCapabilityLabels: Record<string, string> = {
+  person_detection: "人员检测",
+  body_embedding: "人体重识别特征",
+  face_detection: "人脸检测",
+  face_embedding: "人脸识别特征",
+  pose: "姿态估计",
+  gait: "步态识别",
+  appearance: "外观属性",
+};
+
+export function labelPortraitMaturity(value: string): string {
+  return portraitMaturityLabels[value] ?? "未知成熟度";
+}
+
+export function labelPortraitReadiness(value: string): string {
+  return portraitReadinessLabels[value] ?? "未知状态";
+}
+
+export function labelPortraitModule(value: string): string {
+  return portraitModuleLabels[value] ?? "其他能力模块";
+}
+
+export function labelPortraitModuleSummary(value: string): string {
+  return portraitModuleSummaryLabels[value] ?? "该模块尚未提供中文说明。";
+}
+
+export function labelPortraitModuleGate(value: string): string {
+  return portraitModuleGateLabels[value] ?? "等待模块负责人补充下一阶段门禁。";
+}
+
+export function labelPortraitAsset(value: string): string {
+  return portraitAssetLabels[value] ?? "其他平台资产";
+}
+
+export function labelPortraitAssetSummary(value: string): string {
+  return portraitAssetSummaryLabels[value] ?? "该资产尚未提供中文说明。";
+}
+
+export function labelPortraitAssetGate(value: string): string {
+  return portraitAssetGateLabels[value] ?? "等待资产负责人补充下一阶段门禁。";
+}
+
+export function labelPortraitCapability(value: string): string {
+  return portraitCapabilityLabels[value] ?? "未命名能力";
+}
 
 export function labelDomain(value: Domain | string): string {
   return domainLabels[value as Domain] ?? "其他领域";
@@ -507,6 +621,11 @@ export function labelScope(value: string): string {
 
 export function labelRunError(value: string): string {
   return runErrorLabels[value] ?? "运行失败";
+}
+
+export function labelSampleStrategy(value?: string | null): string {
+  if (!value) return "固定间隔";
+  return sampleStrategyLabels[value] ?? "自定义采样策略";
 }
 
 export function labelTerminationReason(value?: string | null): string {

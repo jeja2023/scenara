@@ -6,20 +6,31 @@ import type {
   FeedbackRecord,
   HardSampleManifest,
   IamSummary,
+  MediaAsset,
+  MediaAssetPage,
+  MediaSource,
+  MediaSourcePage,
+  MediaSourceProbe,
   Membership,
   ModelDeploymentEvent,
   ModelPackage,
   ModelRelease,
   Organization,
+  ParseDocumentResponse,
+  ParseImageResponse,
+  ParseVideoResponse,
+  PortraitIntelligenceStatus,
   ProductCatalogItem,
   ProductEntitlement,
   Project,
+  RepositoryContractCatalog,
   RepositoryTopology,
   ResultEnvelope,
   ResultPage,
   Run,
   RunPage,
   RunStatus,
+  SampleStrategy,
   Role,
   ServiceAccount,
   UserAccount,
@@ -47,6 +58,53 @@ export interface CreateRunInput {
 
 export interface ScenaraClientOptions {
   transport: ScenaraTransport;
+}
+
+export interface ParseFileInput {
+  file: Blob;
+  filename: string;
+  domain?: Domain;
+  pipelineId?: string;
+  pipelineVersion?: string;
+  idempotencyKey?: string;
+}
+
+export interface ParseVideoInput extends ParseFileInput {
+  sampleIntervalMs?: number;
+  maxUnits?: number;
+  sampleStrategy?: SampleStrategy;
+  sampleStartMs?: number;
+  sampleEndMs?: number;
+  sceneChangeThreshold?: number;
+  frameMaxEdge?: number;
+  pageScale?: number;
+  waitMs?: number;
+}
+
+export interface ParseDocumentInput extends ParseFileInput {
+  maxUnits?: number;
+  pageScale?: number;
+  waitMs?: number;
+}
+
+export interface ParseStreamInput {
+  sourceId: string;
+  domain?: Domain;
+  pipelineId?: string;
+  pipelineVersion?: string;
+  sampleIntervalMs?: number;
+  maxUnits?: number;
+  sampleStrategy?: SampleStrategy;
+  sampleStartMs?: number;
+  sampleEndMs?: number;
+  sceneChangeThreshold?: number;
+  frameMaxEdge?: number;
+  maxReconnectAttempts?: number;
+  connectTimeoutMs?: number;
+  readTimeoutMs?: number;
+  priority?: number;
+  waitMs?: number;
+  idempotencyKey?: string;
 }
 
 export class ScenaraError extends Error {
@@ -107,12 +165,143 @@ export class ScenaraClient {
     return this.transport<Run>("POST", "/api/v1/runs/" + encodeURIComponent(runId) + "/resume");
   }
 
+  listAssets(offset = 0, limit = 50): Promise<MediaAssetPage> {
+    return this.transport<MediaAssetPage>(
+      "GET",
+      "/api/v1/media/assets?offset=" + String(offset) + "&limit=" + String(limit),
+    );
+  }
+
+  uploadAsset(input: {
+    file: Blob;
+    filename: string;
+    kind?: "image" | "video" | "document";
+  }): Promise<MediaAsset> {
+    const form = new FormData();
+    form.append("file", input.file, input.filename);
+    form.append("kind", input.kind ?? "image");
+    return this.transport<MediaAsset>("POST", "/api/v1/media/assets", { body: form });
+  }
+
+  parseImage(input: ParseFileInput): Promise<ParseImageResponse> {
+    const form = new FormData();
+    form.append("file", input.file, input.filename);
+    form.append("domain", input.domain ?? "portrait");
+    if (input.pipelineId) form.append("pipeline_id", input.pipelineId);
+    if (input.pipelineVersion) form.append("pipeline_version", input.pipelineVersion);
+    return this.transport<ParseImageResponse>("POST", "/api/v1/parse/image", {
+      body: form,
+      idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
+    });
+  }
+
+  parseVideo(input: ParseVideoInput): Promise<ParseVideoResponse> {
+    const form = new FormData();
+    form.append("file", input.file, input.filename);
+    form.append("domain", input.domain ?? "portrait");
+    if (input.pipelineId) form.append("pipeline_id", input.pipelineId);
+    if (input.pipelineVersion) form.append("pipeline_version", input.pipelineVersion);
+    form.append("sample_interval_ms", String(input.sampleIntervalMs ?? 1000));
+    form.append("max_units", String(input.maxUnits ?? 64));
+    form.append("sample_strategy", input.sampleStrategy ?? "interval");
+    form.append("sample_start_ms", String(input.sampleStartMs ?? 0));
+    if (input.sampleEndMs !== undefined) form.append("sample_end_ms", String(input.sampleEndMs));
+    form.append("scene_change_threshold", String(input.sceneChangeThreshold ?? 0.35));
+    if (input.frameMaxEdge !== undefined) form.append("frame_max_edge", String(input.frameMaxEdge));
+    form.append("page_scale", String(input.pageScale ?? 1.5));
+    form.append("wait_ms", String(input.waitMs ?? 0));
+    return this.transport<ParseVideoResponse>("POST", "/api/v1/parse/video", {
+      body: form,
+      idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
+    });
+  }
+
+  parseDocument(input: ParseDocumentInput): Promise<ParseDocumentResponse> {
+    const form = new FormData();
+    form.append("file", input.file, input.filename);
+    form.append("domain", input.domain ?? "ocr");
+    if (input.pipelineId) form.append("pipeline_id", input.pipelineId);
+    if (input.pipelineVersion) form.append("pipeline_version", input.pipelineVersion);
+    form.append("max_units", String(input.maxUnits ?? 64));
+    form.append("page_scale", String(input.pageScale ?? 1.5));
+    form.append("wait_ms", String(input.waitMs ?? 0));
+    return this.transport<ParseDocumentResponse>("POST", "/api/v1/parse/document", {
+      body: form,
+      idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
+    });
+  }
+
+  parseStream(input: ParseStreamInput): Promise<Run> {
+    const domain = input.domain ?? "portrait";
+    const pipelineId = input.pipelineId ?? (
+      domain === "portrait" ? "portrait.person-detection" : "ocr.document"
+    );
+    const pipeline = {
+      pipeline_id: pipelineId,
+      ...(input.pipelineVersion === undefined ? {} : { version: input.pipelineVersion }),
+    };
+    return this.transport<Run>("POST", "/api/v1/parse/stream", {
+      idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
+      body: {
+        source_id: input.sourceId,
+        domain,
+        pipeline,
+        parameters: {
+          sample_interval_ms: input.sampleIntervalMs ?? 1000,
+          max_units: input.maxUnits ?? 64,
+          sample_strategy: input.sampleStrategy ?? "interval",
+          sample_start_ms: input.sampleStartMs ?? 0,
+          ...(input.sampleEndMs === undefined ? {} : { sample_end_ms: input.sampleEndMs }),
+          scene_change_threshold: input.sceneChangeThreshold ?? 0.35,
+          ...(input.frameMaxEdge === undefined ? {} : { frame_max_edge: input.frameMaxEdge }),
+          max_reconnect_attempts: input.maxReconnectAttempts ?? 3,
+          connect_timeout_ms: input.connectTimeoutMs ?? 10000,
+          read_timeout_ms: input.readTimeoutMs ?? 10000,
+        },
+        priority: input.priority ?? 0,
+        wait_ms: input.waitMs ?? 0,
+      },
+    });
+  }
+
   deleteAsset(assetId: string): Promise<void> {
     return this.transport<void>("DELETE", "/api/v1/media/assets/" + encodeURIComponent(assetId));
   }
 
   getAssetPreview(assetId: string): Promise<Uint8Array> {
     return this.transport<Uint8Array>("GET", "/api/v1/media/assets/" + encodeURIComponent(assetId) + "/preview");
+  }
+
+  listSources(offset = 0, limit = 50): Promise<MediaSourcePage> {
+    return this.transport<MediaSourcePage>(
+      "GET",
+      "/api/v1/media/sources?offset=" + String(offset) + "&limit=" + String(limit),
+    );
+  }
+
+  createSource(input: {
+    name: string;
+    url: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<MediaSource> {
+    return this.transport<MediaSource>("POST", "/api/v1/media/sources", {
+      body: { name: input.name, url: input.url, metadata: input.metadata ?? {} },
+    });
+  }
+
+  getSource(sourceId: string): Promise<MediaSource> {
+    return this.transport<MediaSource>("GET", "/api/v1/media/sources/" + encodeURIComponent(sourceId));
+  }
+
+  probeSource(sourceId: string, timeoutMs = 10000): Promise<MediaSourceProbe> {
+    return this.transport<MediaSourceProbe>(
+      "POST",
+      "/api/v1/media/sources/" + encodeURIComponent(sourceId) + "/probe?timeout_ms=" + String(timeoutMs),
+    );
+  }
+
+  deleteSource(sourceId: string): Promise<void> {
+    return this.transport<void>("DELETE", "/api/v1/media/sources/" + encodeURIComponent(sourceId));
   }
 
   listPipelines(): Promise<Record<string, unknown>[]> {
@@ -131,8 +320,21 @@ export class ScenaraClient {
     return this.transport<RepositoryTopology>("GET", "/api/v1/platform/repositories");
   }
 
+  getRepositoryContracts(): Promise<RepositoryContractCatalog> {
+    return this.transport<RepositoryContractCatalog>("GET", "/api/v1/platform/contracts");
+  }
+
   getAccessFoundation(): Promise<AccessFoundationStatus> {
     return this.transport<AccessFoundationStatus>("GET", "/api/v1/platform/access-foundation");
+  }
+
+  /**
+   * Returns the Portrait Intelligence Foundation Platform contract: the six
+   * strategic capability modules, three core assets, and per-capability
+   * readiness state for the portrait domain.
+   */
+  getPortraitIntelligence(): Promise<PortraitIntelligenceStatus> {
+    return this.transport<PortraitIntelligenceStatus>("GET", "/api/v1/platform/portrait-intelligence");
   }
 
   getIamSummary(): Promise<IamSummary> {
@@ -400,6 +602,10 @@ export class ScenaraClient {
 
   createModelRelease(release: Record<string, unknown>): Promise<ModelRelease> {
     return this.transport<ModelRelease>("POST", "/api/v1/model-releases", { body: release });
+  }
+
+  admitModelPackage(modelPackage: ModelPackage): Promise<ModelPackage> {
+    return this.transport<ModelPackage>("POST", "/api/v1/model-packages/admissions", { body: modelPackage });
   }
 
   listModelReleases(): Promise<ModelRelease[]> {

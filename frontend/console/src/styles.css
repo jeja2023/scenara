@@ -7,6 +7,7 @@
   --teal: #087682;
   --teal-soft: #e4f1f1;
   --coral: #d85c4a;
+  --danger: #b34132;
   --green: #27764c;
   --amber: #a96b12;
   --line: #d9dfdc;
@@ -66,7 +67,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 label { display: grid; gap: 6px; color: #45534f; font-size: 12px; font-weight: 650; }input, select, textarea { width: 100%; min-height: 36px; padding: 7px 10px; border: 1px solid #cbd3d0; border-radius: 4px; background: #fff; color: var(--graphite); }textarea { min-height: 92px; resize: vertical; }
 .segmented { display: inline-flex; padding: 3px; background: #e9edeb; border-radius: 5px; }.segmented button { height: 30px; padding: 0 12px; border: 0; border-radius: 3px; background: transparent; color: var(--muted); cursor: pointer; font-size: 12px; }.segmented button.active { background: #fff; color: var(--graphite); box-shadow: 0 1px 3px #17211f1a; font-weight: 700; }
 .modal { position: fixed; inset: 0; width: min(520px, calc(100% - 32px)); margin: auto; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: #fff; box-shadow: 0 20px 60px #111a1838; }.modal::backdrop { background: #111a1866; }.modal form { padding: 18px; }.modal-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }.modal-header h2 { margin: 0; font-size: 17px; }.modal-header p { margin: 4px 0 0; color: var(--muted); font-size: 12px; }.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); }
-.callout { padding: 12px 14px; border-left: 3px solid var(--teal); background: #edf6f5; color: #27534f; font-size: 12px; }.callout.error { border-left-color: var(--coral); background: #fbefed; color: #843c32; }
+.callout { padding: 12px 14px; border-left: 3px solid var(--teal); background: #edf6f5; color: #27534f; font-size: 12px; }.callout.error { border-left-color: var(--coral); background: #fbefed; color: #843c32; }.callout.success { border-left-color: var(--green); background: #e9f4ed; color: #245e3e; }
 @media (max-width: 900px) {
   .topbar { left: 0; padding: 0 14px; }.sidebar { transform: translateX(-100%); transition: transform .18s ease; }.sidebar.open { transform: translateX(0); }.sidebar-close { display: inline-grid !important; margin-left: auto; background: transparent; color: #fff; border-color: #394743; }.nav-scrim { display: block !important; position: fixed; z-index: 25; inset: 0; border: 0; background: #111a186b; }.main-content { margin-left: 0; padding: 78px 14px 28px; }.mobile-menu { display: inline-grid !important; }.mobile-brand { display: flex !important; align-items: center; gap: 8px; }.mobile-brand img { width: 31px; height: 31px; }.topbar-context { display: none; }.stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }.two-column { grid-template-columns: 1fr; }
 }

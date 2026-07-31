@@ -20,7 +20,7 @@ from scenara.enterprise.license import (
 from scenara.server import create_app
 
 
-def signed_license(tmp_path: Path, *, media_limit: int = 5) -> tuple[Path, Path]:
+def signed_license(tmp_path: Path, *, media_limit: int = 100) -> tuple[Path, Path]:
     now = int(time.time())
     claims = LicenseClaims(
         license_id="lic-test-1",
@@ -78,6 +78,9 @@ async def enterprise_client(development_settings, tmp_path: Path):
 @pytest.mark.asyncio
 async def test_signed_enterprise_policy_quota_and_resources(enterprise_client) -> None:
     api, runtime = enterprise_client
+    one_pixel_png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+    )
     status = await api.get("/api/v1/enterprise/status")
     assert status.status_code == 200
     assert status.json()["data"]["license_id"] == "lic-test-1"
@@ -85,14 +88,14 @@ async def test_signed_enterprise_policy_quota_and_resources(enterprise_client) -
 
     first = await api.post(
         "/api/v1/media/assets",
-        files={"file": ("a.bin", b"abc", "application/octet-stream")},
-        data={"kind": "video"},
+        files={"file": ("a.png", one_pixel_png, "image/png")},
+        data={"kind": "image"},
     )
     assert first.status_code == 201, first.text
     exceeded = await api.post(
         "/api/v1/media/assets",
-        files={"file": ("b.bin", b"def", "application/octet-stream")},
-        data={"kind": "video"},
+        files={"file": ("b.png", one_pixel_png, "image/png")},
+        data={"kind": "image"},
     )
     assert exceeded.status_code == 403
     assert exceeded.json()["error"]["code"] == "POLICY_DENIED"

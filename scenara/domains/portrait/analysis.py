@@ -8,6 +8,7 @@ from uuid import uuid4
 from PIL import Image
 
 from scenara.platform.media_batch import DecodedMedia
+from scenara.platform.model_runtime import current_runtime_binding
 from scenara.platform.models import (
     BoundingBox,
     MediaUnitResult,
@@ -106,7 +107,7 @@ class LegacyPortraitAnalysisBackend:
         ready = {
             capability
             for capability, legacy_name in self._legacy_capabilities.items()
-            if production_model_ready(legacy_name)
+            if production_model_ready(legacy_name) or current_runtime_binding(legacy_name) is not None
         }
         if {"person_detection", "body_reid"} <= ready:
             ready.add("tracking")
@@ -198,12 +199,20 @@ class LegacyPortraitAnalysisBackend:
         models = []
         for capability in sorted(capabilities):
             legacy_name = self._legacy_capabilities.get(capability)
+            binding = current_runtime_binding(legacy_name) if legacy_name else None
             status = capability_status(legacy_name) if legacy_name else {}
             models.append(
                 ModelProvenance(
                     capability=capability,
-                    model_id=str(status.get("model_id") or f"scenara.development.{capability}"),
-                    version=str(status.get("version") or "unversioned"),
+                    model_id=(
+                        binding.model_id
+                        if binding is not None
+                        else str(status.get("model_id") or f"scenara.development.{capability}")
+                    ),
+                    version=(
+                        binding.version if binding is not None else str(status.get("version") or "unversioned")
+                    ),
+                    sha256=binding.sha256 if binding is not None else None,
                     production_ready=capability in production_ready,
                 )
             )
@@ -398,6 +407,7 @@ class PortraitFullAnalysisOperator:
             relations=relations,
             models=output.models,
             timings=output.timings,
+            media_metadata=decoded.metadata,
             warnings=warnings,
             provenance=ProvenanceEvidence(development_substitutes=sorted(output.development_substitutes)),
             created_at=time.time(),

@@ -532,6 +532,61 @@ class PostgresStateStore:
                 )
         return stored
 
+    async def enqueue_webhook_event(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        event_id: str,
+        event_type: str,
+        payload: dict[str, object],
+        created_at: float,
+    ) -> None:
+        from psycopg.types.json import Jsonb
+
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """SELECT document FROM scenara_webhook_subscriptions
+                   WHERE tenant_id = %s AND project_id = %s AND enabled
+                     AND %s = ANY(event_types)""",
+                (tenant_id, project_id, event_type),
+            )
+            for row in await cursor.fetchall():
+                endpoint = WebhookSubscription.model_validate(row[0])
+                delivery = WebhookDeliveryRecord(
+                    delivery_id=f"whd_{uuid4().hex}",
+                    tenant_id=tenant_id,
+                    project_id=project_id,
+                    endpoint_id=endpoint.endpoint_id,
+                    event_id=event_id,
+                    event_type=event_type,
+                    payload=payload,
+                    next_attempt_at=created_at,
+                    created_at=created_at,
+                    updated_at=created_at,
+                )
+                await conn.execute(
+                    """INSERT INTO scenara_webhook_deliveries
+                       (tenant_id, project_id, delivery_id, endpoint_id, event_id, event_type,
+                        status, attempts, next_attempt_at, created_at, updated_at, document)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s, %s, to_timestamp(%s),
+                               to_timestamp(%s), to_timestamp(%s), %s)""",
+                    (
+                        delivery.tenant_id,
+                        delivery.project_id,
+                        delivery.delivery_id,
+                        delivery.endpoint_id,
+                        delivery.event_id,
+                        delivery.event_type,
+                        delivery.status,
+                        delivery.attempts,
+                        delivery.next_attempt_at,
+                        delivery.created_at,
+                        delivery.updated_at,
+                        Jsonb(delivery.model_dump(mode="json")),
+                    ),
+                )
+
     async def events_after(self, tenant_id: str, project_id: str, run_id: str, event_id: int) -> list[RunEvent]:
         async with self._pool.connection() as conn:
             cursor = await conn.execute(

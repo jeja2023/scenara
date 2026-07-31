@@ -414,11 +414,11 @@
         "title": "ApiEnvelope[MediaSourcePage]",
         "type": "object"
       },
-      "ApiEnvelope_MediaSource_": {
+      "ApiEnvelope_MediaSourceProbe_": {
         "additionalProperties": false,
         "properties": {
           "data": {
-            "$ref": "#/components/schemas/MediaSource"
+            "$ref": "#/components/schemas/MediaSourceProbe"
           },
           "request_id": {
             "title": "Request Id",
@@ -435,7 +435,31 @@
           "request_id",
           "data"
         ],
-        "title": "ApiEnvelope[MediaSource]",
+        "title": "ApiEnvelope[MediaSourceProbe]",
+        "type": "object"
+      },
+      "ApiEnvelope_MediaSourceView_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/MediaSourceView"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[MediaSourceView]",
         "type": "object"
       },
       "ApiEnvelope_Membership_": {
@@ -460,6 +484,30 @@
           "data"
         ],
         "title": "ApiEnvelope[Membership]",
+        "type": "object"
+      },
+      "ApiEnvelope_ModelPackageManifest_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ModelPackageManifest"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[ModelPackageManifest]",
         "type": "object"
       },
       "ApiEnvelope_ModelRelease_": {
@@ -510,6 +558,30 @@
         "title": "ApiEnvelope[Organization]",
         "type": "object"
       },
+      "ApiEnvelope_ParseDocumentResponse_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ParseDocumentResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[ParseDocumentResponse]",
+        "type": "object"
+      },
       "ApiEnvelope_ParseImageResponse_": {
         "additionalProperties": false,
         "properties": {
@@ -532,6 +604,30 @@
           "data"
         ],
         "title": "ApiEnvelope[ParseImageResponse]",
+        "type": "object"
+      },
+      "ApiEnvelope_ParseVideoResponse_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ParseVideoResponse"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[ParseVideoResponse]",
         "type": "object"
       },
       "ApiEnvelope_PortraitCompareResponse_": {
@@ -630,6 +726,30 @@
         "title": "ApiEnvelope[PortraitIdentity]",
         "type": "object"
       },
+      "ApiEnvelope_PortraitIntelligenceStatus_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PortraitIntelligenceStatus"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[PortraitIntelligenceStatus]",
+        "type": "object"
+      },
       "ApiEnvelope_PortraitSearchResponse_": {
         "additionalProperties": false,
         "properties": {
@@ -700,6 +820,30 @@
           "data"
         ],
         "title": "ApiEnvelope[Project]",
+        "type": "object"
+      },
+      "ApiEnvelope_RepositoryContractCatalog_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RepositoryContractCatalog"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[RepositoryContractCatalog]",
         "type": "object"
       },
       "ApiEnvelope_RepositoryTopology_": {
@@ -1667,6 +1811,72 @@
         "title": "Body_create_media_asset_api_v1_media_assets_post",
         "type": "object"
       },
+      "Body_parse_document_api_v1_parse_document_post": {
+        "properties": {
+          "domain": {
+            "default": "ocr",
+            "enum": [
+              "portrait",
+              "ocr"
+            ],
+            "title": "Domain",
+            "type": "string"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          },
+          "max_units": {
+            "default": 64,
+            "maximum": 1000.0,
+            "minimum": 1.0,
+            "title": "Max Units",
+            "type": "integer"
+          },
+          "page_scale": {
+            "default": 1.5,
+            "maximum": 4.0,
+            "minimum": 0.5,
+            "title": "Page Scale",
+            "type": "number"
+          },
+          "pipeline_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Id"
+          },
+          "pipeline_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Version"
+          },
+          "wait_ms": {
+            "default": 0,
+            "maximum": 30000.0,
+            "minimum": 0.0,
+            "title": "Wait Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_parse_document_api_v1_parse_document_post",
+        "type": "object"
+      },
       "Body_parse_image_api_v1_parse_image_post": {
         "properties": {
           "domain": {
@@ -1695,15 +1905,136 @@
             "title": "Pipeline Id"
           },
           "pipeline_version": {
-            "default": "0.1.0",
-            "title": "Pipeline Version",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Version"
           }
         },
         "required": [
           "file"
         ],
         "title": "Body_parse_image_api_v1_parse_image_post",
+        "type": "object"
+      },
+      "Body_parse_video_api_v1_parse_video_post": {
+        "properties": {
+          "domain": {
+            "default": "portrait",
+            "enum": [
+              "portrait",
+              "ocr"
+            ],
+            "title": "Domain",
+            "type": "string"
+          },
+          "file": {
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "type": "string"
+          },
+          "frame_max_edge": {
+            "anyOf": [
+              {
+                "maximum": 8192.0,
+                "minimum": 64.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frame Max Edge"
+          },
+          "max_units": {
+            "default": 64,
+            "maximum": 10000.0,
+            "minimum": 1.0,
+            "title": "Max Units",
+            "type": "integer"
+          },
+          "page_scale": {
+            "default": 1.5,
+            "maximum": 4.0,
+            "minimum": 0.5,
+            "title": "Page Scale",
+            "type": "number"
+          },
+          "pipeline_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Id"
+          },
+          "pipeline_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pipeline Version"
+          },
+          "sample_end_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample End Ms"
+          },
+          "sample_interval_ms": {
+            "default": 1000,
+            "maximum": 3600000.0,
+            "minimum": 1.0,
+            "title": "Sample Interval Ms",
+            "type": "integer"
+          },
+          "sample_start_ms": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Sample Start Ms",
+            "type": "integer"
+          },
+          "sample_strategy": {
+            "$ref": "#/components/schemas/SampleStrategy",
+            "default": "interval"
+          },
+          "scene_change_threshold": {
+            "default": 0.35,
+            "maximum": 1.0,
+            "minimum": 0.01,
+            "title": "Scene Change Threshold",
+            "type": "number"
+          },
+          "wait_ms": {
+            "default": 0,
+            "maximum": 30000.0,
+            "minimum": 0.0,
+            "title": "Wait Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_parse_video_api_v1_parse_video_post",
         "type": "object"
       },
       "BoundingBox": {
@@ -3226,6 +3557,9 @@
           "kind": {
             "$ref": "#/components/schemas/MediaKind"
           },
+          "metadata": {
+            "$ref": "#/components/schemas/MediaTechnicalMetadata"
+          },
           "object_key": {
             "title": "Object Key",
             "type": "string"
@@ -3357,65 +3691,12 @@
         "title": "MediaKind",
         "type": "string"
       },
-      "MediaSource": {
-        "additionalProperties": false,
-        "properties": {
-          "created_at": {
-            "title": "Created At",
-            "type": "number"
-          },
-          "kind": {
-            "$ref": "#/components/schemas/SourceKind",
-            "default": "stream"
-          },
-          "masked_url": {
-            "title": "Masked Url",
-            "type": "string"
-          },
-          "metadata": {
-            "additionalProperties": true,
-            "title": "Metadata",
-            "type": "object"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "project_id": {
-            "title": "Project Id",
-            "type": "string"
-          },
-          "secret_ref": {
-            "title": "Secret Ref",
-            "type": "string"
-          },
-          "source_id": {
-            "title": "Source Id",
-            "type": "string"
-          },
-          "tenant_id": {
-            "title": "Tenant Id",
-            "type": "string"
-          }
-        },
-        "required": [
-          "source_id",
-          "tenant_id",
-          "project_id",
-          "name",
-          "masked_url",
-          "secret_ref",
-          "created_at"
-        ],
-        "title": "MediaSource",
-        "type": "object"
-      },
       "MediaSourcePage": {
         "additionalProperties": false,
         "properties": {
           "items": {
             "items": {
-              "$ref": "#/components/schemas/MediaSource"
+              "$ref": "#/components/schemas/MediaSourceView"
             },
             "title": "Items",
             "type": "array"
@@ -3440,6 +3721,346 @@
           "total"
         ],
         "title": "MediaSourcePage",
+        "type": "object"
+      },
+      "MediaSourceProbe": {
+        "additionalProperties": false,
+        "properties": {
+          "checked_at": {
+            "title": "Checked At",
+            "type": "number"
+          },
+          "latency_ms": {
+            "minimum": 0.0,
+            "title": "Latency Ms",
+            "type": "integer"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/MediaTechnicalMetadata"
+          },
+          "reachable": {
+            "title": "Reachable",
+            "type": "boolean"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "reachable",
+          "latency_ms",
+          "checked_at"
+        ],
+        "title": "MediaSourceProbe",
+        "type": "object"
+      },
+      "MediaSourceView": {
+        "additionalProperties": false,
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/SourceKind",
+            "default": "stream"
+          },
+          "masked_url": {
+            "title": "Masked Url",
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "name",
+          "masked_url",
+          "created_at"
+        ],
+        "title": "MediaSourceView",
+        "type": "object"
+      },
+      "MediaTechnicalMetadata": {
+        "additionalProperties": false,
+        "properties": {
+          "codec": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Codec"
+          },
+          "container": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Container"
+          },
+          "decode_seek_used": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decode Seek Used"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Ms"
+          },
+          "elapsed_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Elapsed Ms"
+          },
+          "format": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Format"
+          },
+          "fps": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fps"
+          },
+          "frame_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frame Count"
+          },
+          "frame_max_edge": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frame Max Edge"
+          },
+          "frames_read": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frames Read"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height"
+          },
+          "keyframe_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Keyframe Count"
+          },
+          "page_count": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Count"
+          },
+          "reconnect_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reconnect Count"
+          },
+          "sample_end_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample End Ms"
+          },
+          "sample_interval_ms": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Interval Ms"
+          },
+          "sample_start_ms": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sample Start Ms"
+          },
+          "sample_strategy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SampleStrategy"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sampled_units": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sampled Units"
+          },
+          "scene_change_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scene Change Count"
+          },
+          "timestamp_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "decoder_pts",
+                  "position_msec",
+                  "monotonic_clock"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp Source"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width"
+          }
+        },
+        "title": "MediaTechnicalMetadata",
         "type": "object"
       },
       "MediaUnitResult": {
@@ -3571,6 +4192,10 @@
             "title": "Audit Id",
             "type": "string"
           },
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
           "created_at": {
             "title": "Created At",
             "type": "number"
@@ -3597,12 +4222,21 @@
             "title": "Operator Id",
             "type": "string"
           },
+          "package_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Package Sha256",
+            "type": "string"
+          },
           "project_id": {
             "title": "Project Id",
             "type": "string"
           },
           "reason": {
             "title": "Reason",
+            "type": "string"
+          },
+          "runtime_model_id": {
+            "title": "Runtime Model Id",
             "type": "string"
           },
           "schema_version": {
@@ -3629,6 +4263,9 @@
           "project_id",
           "model_id",
           "version",
+          "capability",
+          "runtime_model_id",
+          "package_sha256",
           "action",
           "from_status",
           "to_status",
@@ -3638,6 +4275,111 @@
           "created_at"
         ],
         "title": "ModelDeploymentEvent",
+        "type": "object"
+      },
+      "ModelPackageManifest": {
+        "additionalProperties": false,
+        "properties": {
+          "adapter": {
+            "maxLength": 64,
+            "minLength": 2,
+            "title": "Adapter",
+            "type": "string"
+          },
+          "capability": {
+            "pattern": "^[a-z][a-z0-9_.-]{1,127}$",
+            "title": "Capability",
+            "type": "string"
+          },
+          "evaluation_evidence": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Evaluation Evidence",
+            "type": "array"
+          },
+          "license_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "License Id",
+            "type": "string"
+          },
+          "model_card": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Model Card",
+            "type": "string"
+          },
+          "model_id": {
+            "pattern": "^[a-z][a-z0-9_.-]{1,127}$",
+            "title": "Model Id",
+            "type": "string"
+          },
+          "production_ready": {
+            "default": false,
+            "title": "Production Ready",
+            "type": "boolean"
+          },
+          "regression_samples": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Regression Samples",
+            "type": "array"
+          },
+          "runtime_model_id": {
+            "maxLength": 384,
+            "pattern": "^[^/\\\\\\s]+/[^/\\\\\\s]+$",
+            "title": "Runtime Model Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "source_uri": {
+            "maxLength": 2048,
+            "minLength": 1,
+            "title": "Source Uri",
+            "type": "string"
+          },
+          "version": {
+            "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[a-z0-9.-]+)?$",
+            "title": "Version",
+            "type": "string"
+          },
+          "vram_mb": {
+            "maximum": 196608.0,
+            "minimum": 0.0,
+            "title": "Vram Mb",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "model_id",
+          "version",
+          "capability",
+          "adapter",
+          "runtime_model_id",
+          "sha256",
+          "source_uri",
+          "license_id",
+          "model_card",
+          "evaluation_evidence",
+          "vram_mb",
+          "regression_samples"
+        ],
+        "title": "ModelPackageManifest",
         "type": "object"
       },
       "ModelProvenance": {
@@ -3694,6 +4436,10 @@
             ],
             "title": "Activated At"
           },
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
           "created_at": {
             "title": "Created At",
             "type": "number"
@@ -3733,6 +4479,10 @@
             ],
             "title": "Retired At"
           },
+          "runtime_model_id": {
+            "title": "Runtime Model Id",
+            "type": "string"
+          },
           "schema_version": {
             "const": "1.0",
             "default": "1.0",
@@ -3761,6 +4511,8 @@
           "project_id",
           "model_id",
           "version",
+          "capability",
+          "runtime_model_id",
           "package_sha256",
           "created_by",
           "created_at",
@@ -3915,6 +4667,33 @@
         "title": "Organization",
         "type": "object"
       },
+      "ParseDocumentResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/MediaAsset"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResultEnvelope"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunRecord"
+          }
+        },
+        "required": [
+          "asset",
+          "run"
+        ],
+        "title": "ParseDocumentResponse",
+        "type": "object"
+      },
       "ParseImageResponse": {
         "additionalProperties": false,
         "properties": {
@@ -3942,6 +4721,76 @@
         "title": "ParseImageResponse",
         "type": "object"
       },
+      "ParseStreamRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "domain": {
+            "$ref": "#/components/schemas/DomainId"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "title": "Parameters",
+            "type": "object"
+          },
+          "pipeline": {
+            "$ref": "#/components/schemas/PipelineSelection"
+          },
+          "priority": {
+            "default": 0,
+            "maximum": 100.0,
+            "minimum": -100.0,
+            "title": "Priority",
+            "type": "integer"
+          },
+          "source_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Source Id",
+            "type": "string"
+          },
+          "wait_ms": {
+            "default": 0,
+            "maximum": 30000.0,
+            "minimum": 0.0,
+            "title": "Wait Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "source_id",
+          "domain",
+          "pipeline"
+        ],
+        "title": "ParseStreamRequest",
+        "type": "object"
+      },
+      "ParseVideoResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "asset": {
+            "$ref": "#/components/schemas/MediaAsset"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ResultEnvelope"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "run": {
+            "$ref": "#/components/schemas/RunRecord"
+          }
+        },
+        "required": [
+          "asset",
+          "run"
+        ],
+        "title": "ParseVideoResponse",
+        "type": "object"
+      },
       "PipelineRef": {
         "additionalProperties": false,
         "properties": {
@@ -3963,6 +4812,35 @@
           "version"
         ],
         "title": "PipelineRef",
+        "type": "object"
+      },
+      "PipelineSelection": {
+        "additionalProperties": false,
+        "properties": {
+          "pipeline_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Pipeline Id",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          }
+        },
+        "required": [
+          "pipeline_id"
+        ],
+        "title": "PipelineSelection",
         "type": "object"
       },
       "PipelineStatus": {
@@ -4007,6 +4885,126 @@
         ],
         "title": "Point",
         "type": "object"
+      },
+      "PortraitAssetItem": {
+        "additionalProperties": false,
+        "description": "One of the three long-term strategic assets.",
+        "properties": {
+          "asset_id": {
+            "$ref": "#/components/schemas/PortraitModuleId"
+          },
+          "depends_on_modules": {
+            "items": {
+              "$ref": "#/components/schemas/PortraitModuleId"
+            },
+            "title": "Depends On Modules",
+            "type": "array"
+          },
+          "maturity": {
+            "$ref": "#/components/schemas/PortraitModuleMaturity"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_gate": {
+            "title": "Next Gate",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_id",
+          "name",
+          "maturity",
+          "summary",
+          "next_gate"
+        ],
+        "title": "PortraitAssetItem",
+        "type": "object"
+      },
+      "PortraitCapabilityItem": {
+        "additionalProperties": false,
+        "description": "Readiness record for a single portrait AI capability.",
+        "properties": {
+          "capability_id": {
+            "pattern": "^[a-z][a-z0-9_.-]{1,127}$",
+            "title": "Capability Id",
+            "type": "string"
+          },
+          "current_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Model"
+          },
+          "embedding_dimension": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Embedding Dimension"
+          },
+          "production_ready": {
+            "title": "Production Ready",
+            "type": "boolean"
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/PortraitCapabilityReadiness"
+          },
+          "target_embedding_dimension": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Embedding Dimension"
+          },
+          "target_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Model"
+          }
+        },
+        "required": [
+          "capability_id",
+          "readiness",
+          "production_ready"
+        ],
+        "title": "PortraitCapabilityItem",
+        "type": "object"
+      },
+      "PortraitCapabilityReadiness": {
+        "description": "Maps directly to the ``status`` field in model-capabilities.yml.",
+        "enum": [
+          "ready",
+          "fallback",
+          "placeholder",
+          "not_configured"
+        ],
+        "title": "PortraitCapabilityReadiness",
+        "type": "string"
       },
       "PortraitCompareRequest": {
         "additionalProperties": false,
@@ -4279,6 +5277,119 @@
         ],
         "title": "PortraitIdentityPage",
         "type": "object"
+      },
+      "PortraitIntelligenceStatus": {
+        "additionalProperties": false,
+        "description": "Machine-readable projection of the Portrait Intelligence Foundation Platform strategy.\n\nConsumed by ``GET /api/v1/platform/portrait-intelligence``,\n``get_portrait_intelligence()`` in both SDKs, and the Console overview panel.\nThis contract describes *intent and current readiness*, not deployed capability.\nDeployed model capability truth is in ``model-capabilities.yml``.",
+        "properties": {
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/PortraitAssetItem"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "capabilities": {
+            "items": {
+              "$ref": "#/components/schemas/PortraitCapabilityItem"
+            },
+            "title": "Capabilities",
+            "type": "array"
+          },
+          "modules": {
+            "items": {
+              "$ref": "#/components/schemas/PortraitModuleItem"
+            },
+            "title": "Modules",
+            "type": "array"
+          },
+          "positioning": {
+            "const": "portrait_intelligence_foundation_platform",
+            "default": "portrait_intelligence_foundation_platform",
+            "title": "Positioning",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "modules",
+          "assets",
+          "capabilities"
+        ],
+        "title": "PortraitIntelligenceStatus",
+        "type": "object"
+      },
+      "PortraitModuleId": {
+        "pattern": "^[a-z][a-z0-9_.-]{1,63}$",
+        "type": "string"
+      },
+      "PortraitModuleItem": {
+        "additionalProperties": false,
+        "description": "One of the six strategic capability modules.",
+        "properties": {
+          "current_scope": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Current Scope",
+            "type": "array"
+          },
+          "maturity": {
+            "$ref": "#/components/schemas/PortraitModuleMaturity"
+          },
+          "module_id": {
+            "$ref": "#/components/schemas/PortraitModuleId"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "next_gate": {
+            "title": "Next Gate",
+            "type": "string"
+          },
+          "not_in_scope_yet": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Not In Scope Yet",
+            "type": "array"
+          },
+          "owner_repository_id": {
+            "$ref": "#/components/schemas/RepositoryId"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "module_id",
+          "name",
+          "maturity",
+          "summary",
+          "owner_repository_id",
+          "next_gate"
+        ],
+        "title": "PortraitModuleItem",
+        "type": "object"
+      },
+      "PortraitModuleMaturity": {
+        "description": "Six-value maturity ladder for portrait AI modules.\n\n``external`` means the responsibility belongs to another repository\n(e.g. model training → scenara-model).  The platform contract records\nthe gap explicitly rather than omitting the module.",
+        "enum": [
+          "available",
+          "partial",
+          "seed",
+          "planned",
+          "external"
+        ],
+        "title": "PortraitModuleMaturity",
+        "type": "string"
       },
       "PortraitSearchMatch": {
         "additionalProperties": false,
@@ -4613,6 +5724,116 @@
         "title": "RepositoryBoundaryRule",
         "type": "string"
       },
+      "RepositoryContractArtifact": {
+        "additionalProperties": false,
+        "properties": {
+          "compatibility": {
+            "const": "backward",
+            "default": "backward",
+            "title": "Compatibility",
+            "type": "string"
+          },
+          "consumer_repository_id": {
+            "title": "Consumer Repository Id",
+            "type": "string"
+          },
+          "contract_id": {
+            "title": "Contract Id",
+            "type": "string"
+          },
+          "example_path": {
+            "title": "Example Path",
+            "type": "string"
+          },
+          "example_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Example Sha256",
+            "type": "string"
+          },
+          "payload_schema_version": {
+            "title": "Payload Schema Version",
+            "type": "string"
+          },
+          "payload_type": {
+            "title": "Payload Type",
+            "type": "string"
+          },
+          "producer_repository_id": {
+            "title": "Producer Repository Id",
+            "type": "string"
+          },
+          "release_version": {
+            "title": "Release Version",
+            "type": "string"
+          },
+          "schema_path": {
+            "title": "Schema Path",
+            "type": "string"
+          },
+          "schema_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Schema Sha256",
+            "type": "string"
+          },
+          "transport": {
+            "enum": [
+              "versioned_api",
+              "event",
+              "immutable_manifest"
+            ],
+            "title": "Transport",
+            "type": "string"
+          }
+        },
+        "required": [
+          "contract_id",
+          "payload_type",
+          "release_version",
+          "payload_schema_version",
+          "producer_repository_id",
+          "consumer_repository_id",
+          "transport",
+          "schema_path",
+          "schema_sha256",
+          "example_path",
+          "example_sha256"
+        ],
+        "title": "RepositoryContractArtifact",
+        "type": "object"
+      },
+      "RepositoryContractCatalog": {
+        "additionalProperties": false,
+        "properties": {
+          "contracts": {
+            "items": {
+              "$ref": "#/components/schemas/RepositoryContractArtifact"
+            },
+            "title": "Contracts",
+            "type": "array"
+          },
+          "package_name": {
+            "title": "Package Name",
+            "type": "string"
+          },
+          "release_version": {
+            "title": "Release Version",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "release_version",
+          "package_name",
+          "contracts"
+        ],
+        "title": "RepositoryContractCatalog",
+        "type": "object"
+      },
       "RepositoryContractTransport": {
         "enum": [
           "versioned_api",
@@ -4629,6 +5850,12 @@
       "RepositoryIntegrationContract": {
         "additionalProperties": false,
         "properties": {
+          "compatibility": {
+            "const": "backward",
+            "default": "backward",
+            "title": "Compatibility",
+            "type": "string"
+          },
           "consumer_repository_id": {
             "$ref": "#/components/schemas/RepositoryId"
           },
@@ -4652,6 +5879,16 @@
           "producer_repository_id": {
             "$ref": "#/components/schemas/RepositoryId"
           },
+          "release_version": {
+            "pattern": "^\\d+\\.\\d+\\.\\d+$",
+            "title": "Release Version",
+            "type": "string"
+          },
+          "schema_path": {
+            "pattern": "^contracts/repository/[^/]+/[^/]+\\.schema\\.json$",
+            "title": "Schema Path",
+            "type": "string"
+          },
           "transport": {
             "$ref": "#/components/schemas/RepositoryContractTransport"
           }
@@ -4661,7 +5898,9 @@
           "producer_repository_id",
           "consumer_repository_id",
           "transport",
-          "payload_type"
+          "payload_type",
+          "release_version",
+          "schema_path"
         ],
         "title": "RepositoryIntegrationContract",
         "type": "object"
@@ -4888,6 +6127,9 @@
               }
             ],
             "title": "Domain Payload"
+          },
+          "media_metadata": {
+            "$ref": "#/components/schemas/MediaTechnicalMetadata"
           },
           "models": {
             "items": {
@@ -5305,6 +6547,17 @@
           "cancelled"
         ],
         "title": "RunStatus",
+        "type": "string"
+      },
+      "SampleStrategy": {
+        "description": "视频与实时流的抽帧策略。",
+        "enum": [
+          "interval",
+          "keyframe",
+          "scene_change",
+          "uniform"
+        ],
+        "title": "SampleStrategy",
         "type": "string"
       },
       "ServiceAccount": {
@@ -5909,7 +7162,7 @@
   "info": {
     "description": "Scenara 景枢企业视觉 AI 中枢平台",
     "title": "Scenara API",
-    "version": "0.3.0.dev0"
+    "version": "0.3.0.dev2"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -8194,7 +9447,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiEnvelope_MediaSource_"
+                  "$ref": "#/components/schemas/ApiEnvelope_MediaSourceView_"
                 }
               }
             },
@@ -8212,6 +9465,327 @@
           }
         },
         "summary": "Create Media Source",
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/api/v1/media/sources/{source_id}": {
+      "delete": {
+        "operationId": "delete_media_source_api_v1_media_sources__source_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Media Source",
+        "tags": [
+          "Media"
+        ]
+      },
+      "get": {
+        "operationId": "get_media_source_api_v1_media_sources__source_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_MediaSourceView_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Media Source",
+        "tags": [
+          "Media"
+        ]
+      }
+    },
+    "/api/v1/media/sources/{source_id}/probe": {
+      "post": {
+        "operationId": "probe_media_source_api_v1_media_sources__source_id__probe_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "title": "Source Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "timeout_ms",
+            "required": false,
+            "schema": {
+              "default": 10000,
+              "maximum": 30000,
+              "minimum": 100,
+              "title": "Timeout Ms",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_MediaSourceProbe_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Probe Media Source",
         "tags": [
           "Media"
         ]
@@ -8321,6 +9895,113 @@
           }
         },
         "summary": "List Model Deployment Events",
+        "tags": [
+          "Model Governance"
+        ]
+      }
+    },
+    "/api/v1/model-packages/admissions": {
+      "post": {
+        "operationId": "admit_model_package_api_v1_model_packages_admissions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelPackageManifest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_ModelPackageManifest_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admit Model Package",
         "tags": [
           "Model Governance"
         ]
@@ -8866,6 +10547,129 @@
         ]
       }
     },
+    "/api/v1/parse/document": {
+      "post": {
+        "operationId": "parse_document_api_v1_parse_document_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_parse_document_api_v1_parse_document_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_ParseDocumentResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Parse Document",
+        "tags": [
+          "Parsing"
+        ]
+      }
+    },
     "/api/v1/parse/image": {
       "post": {
         "operationId": "parse_image_api_v1_parse_image_post",
@@ -8984,6 +10788,252 @@
           }
         },
         "summary": "Parse Image",
+        "tags": [
+          "Parsing"
+        ]
+      }
+    },
+    "/api/v1/parse/stream": {
+      "post": {
+        "operationId": "parse_stream_api_v1_parse_stream_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParseStreamRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_RunRecord_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Parse Stream",
+        "tags": [
+          "Parsing"
+        ]
+      }
+    },
+    "/api/v1/parse/video": {
+      "post": {
+        "operationId": "parse_video_api_v1_parse_video_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Idempotency-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_parse_video_api_v1_parse_video_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_ParseVideoResponse_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Parse Video",
         "tags": [
           "Parsing"
         ]
@@ -9511,6 +11561,207 @@
         ]
       }
     },
+    "/api/v1/platform/contracts": {
+      "get": {
+        "operationId": "platform_repository_contracts_api_v1_platform_contracts_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_RepositoryContractCatalog_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Platform Repository Contracts",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
+    "/api/v1/platform/contracts/{contract_id}/schema": {
+      "get": {
+        "operationId": "platform_repository_contract_schema_api_v1_platform_contracts__contract_id__schema_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "contract_id",
+            "required": true,
+            "schema": {
+              "title": "Contract Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Platform Repository Contract Schema",
+        "tags": [
+          "Platform"
+        ]
+      }
+    },
     "/api/v1/platform/iam/summary": {
       "get": {
         "operationId": "iam_summary_api_v1_platform_iam_summary_get",
@@ -10009,6 +12260,104 @@
         "summary": "Create Organization",
         "tags": [
           "IAM"
+        ]
+      }
+    },
+    "/api/v1/platform/portrait-intelligence": {
+      "get": {
+        "description": "Portrait Intelligence Foundation Platform contract.\n\nReturns the six strategic modules, three core assets, and per-capability\nreadiness state derived from the installed model-capabilities configuration.\nThis endpoint reflects *intent and current readiness*, not deployed model\nquality.  Refer to ``model-capabilities.yml`` for the authoritative\ncapability status used at inference time.",
+        "operationId": "platform_portrait_intelligence_api_v1_platform_portrait_intelligence_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_PortraitIntelligenceStatus_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Platform Portrait Intelligence",
+        "tags": [
+          "Platform"
         ]
       }
     },

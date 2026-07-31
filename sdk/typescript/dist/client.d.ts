@@ -1,4 +1,4 @@
-import type { AccessFoundationStatus, ApiKeyRecord, CreateApiKeyResponse, Domain, FeedbackRecord, HardSampleManifest, IamSummary, Membership, ModelDeploymentEvent, ModelPackage, ModelRelease, Organization, ProductCatalogItem, ProductEntitlement, Project, RepositoryTopology, ResultEnvelope, Run, RunPage, RunStatus, Role, ServiceAccount, UserAccount, WebhookDelivery, WebhookSubscription } from "./types.js";
+import type { AccessFoundationStatus, ApiKeyRecord, CreateApiKeyResponse, Domain, FeedbackRecord, HardSampleManifest, IamSummary, MediaAsset, MediaAssetPage, MediaSource, MediaSourcePage, MediaSourceProbe, Membership, ModelDeploymentEvent, ModelPackage, ModelRelease, Organization, ParseDocumentResponse, ParseImageResponse, ParseVideoResponse, PortraitIntelligenceStatus, ProductCatalogItem, ProductEntitlement, Project, RepositoryContractCatalog, RepositoryTopology, ResultEnvelope, Run, RunPage, RunStatus, SampleStrategy, Role, ServiceAccount, UserAccount, WebhookDelivery, WebhookSubscription } from "./types.js";
 export type ScenaraTransport = <T>(method: "GET" | "POST" | "PUT" | "DELETE", path: string, options?: {
     body?: unknown;
     idempotencyKey?: string;
@@ -16,6 +16,49 @@ export interface CreateRunInput {
 }
 export interface ScenaraClientOptions {
     transport: ScenaraTransport;
+}
+export interface ParseFileInput {
+    file: Blob;
+    filename: string;
+    domain?: Domain;
+    pipelineId?: string;
+    pipelineVersion?: string;
+    idempotencyKey?: string;
+}
+export interface ParseVideoInput extends ParseFileInput {
+    sampleIntervalMs?: number;
+    maxUnits?: number;
+    sampleStrategy?: SampleStrategy;
+    sampleStartMs?: number;
+    sampleEndMs?: number;
+    sceneChangeThreshold?: number;
+    frameMaxEdge?: number;
+    pageScale?: number;
+    waitMs?: number;
+}
+export interface ParseDocumentInput extends ParseFileInput {
+    maxUnits?: number;
+    pageScale?: number;
+    waitMs?: number;
+}
+export interface ParseStreamInput {
+    sourceId: string;
+    domain?: Domain;
+    pipelineId?: string;
+    pipelineVersion?: string;
+    sampleIntervalMs?: number;
+    maxUnits?: number;
+    sampleStrategy?: SampleStrategy;
+    sampleStartMs?: number;
+    sampleEndMs?: number;
+    sceneChangeThreshold?: number;
+    frameMaxEdge?: number;
+    maxReconnectAttempts?: number;
+    connectTimeoutMs?: number;
+    readTimeoutMs?: number;
+    priority?: number;
+    waitMs?: number;
+    idempotencyKey?: string;
 }
 export declare class ScenaraError extends Error {
     readonly code: string;
@@ -36,13 +79,39 @@ export declare class ScenaraClient {
     getResult(runId: string): Promise<ResultEnvelope>;
     pauseRun(runId: string): Promise<Run>;
     resumeRun(runId: string): Promise<Run>;
+    listAssets(offset?: number, limit?: number): Promise<MediaAssetPage>;
+    uploadAsset(input: {
+        file: Blob;
+        filename: string;
+        kind?: "image" | "video" | "document";
+    }): Promise<MediaAsset>;
+    parseImage(input: ParseFileInput): Promise<ParseImageResponse>;
+    parseVideo(input: ParseVideoInput): Promise<ParseVideoResponse>;
+    parseDocument(input: ParseDocumentInput): Promise<ParseDocumentResponse>;
+    parseStream(input: ParseStreamInput): Promise<Run>;
     deleteAsset(assetId: string): Promise<void>;
     getAssetPreview(assetId: string): Promise<Uint8Array>;
+    listSources(offset?: number, limit?: number): Promise<MediaSourcePage>;
+    createSource(input: {
+        name: string;
+        url: string;
+        metadata?: Record<string, unknown>;
+    }): Promise<MediaSource>;
+    getSource(sourceId: string): Promise<MediaSource>;
+    probeSource(sourceId: string, timeoutMs?: number): Promise<MediaSourceProbe>;
+    deleteSource(sourceId: string): Promise<void>;
     listPipelines(): Promise<Record<string, unknown>[]>;
     listDomains(): Promise<Record<string, unknown>[]>;
     listProducts(): Promise<ProductCatalogItem[]>;
     getRepositoryTopology(): Promise<RepositoryTopology>;
+    getRepositoryContracts(): Promise<RepositoryContractCatalog>;
     getAccessFoundation(): Promise<AccessFoundationStatus>;
+    /**
+     * Returns the Portrait Intelligence Foundation Platform contract: the six
+     * strategic capability modules, three core assets, and per-capability
+     * readiness state for the portrait domain.
+     */
+    getPortraitIntelligence(): Promise<PortraitIntelligenceStatus>;
     getIamSummary(): Promise<IamSummary>;
     createOrganization(displayName: string): Promise<Organization>;
     listOrganizations(): Promise<Organization[]>;
@@ -126,6 +195,7 @@ export declare class ScenaraClient {
         split?: "train" | "validation" | "test";
     }): Promise<HardSampleManifest>;
     createModelRelease(release: Record<string, unknown>): Promise<ModelRelease>;
+    admitModelPackage(modelPackage: ModelPackage): Promise<ModelPackage>;
     listModelReleases(): Promise<ModelRelease[]>;
     transitionModelRelease(modelId: string, version: string, status: "validated" | "approved" | "active" | "retired" | "candidate", reason: string): Promise<ModelRelease>;
     rollbackModelRelease(modelId: string, targetVersion: string, reason: string): Promise<ModelRelease>;

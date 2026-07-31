@@ -12,8 +12,11 @@ from typing import Any, Literal
 import cv2
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from scenara.platform.models import MediaKind
-from scenara.platform.pipeline import ExecutionContext, OperatorDefinition, PipelineError
+from scenara.platform.models import MediaKind, MediaTechnicalMetadata, SampleStrategy
+from scenara.platform.pipeline import ExecutionContext, ExecutionControl, OperatorDefinition, PipelineError
+
+MAX_PIXELS = 80_000_000
+SCENE_CHANGE_HISTOGRAM_BINS = 32
 
 
 @dataclass(slots=True)
@@ -22,6 +25,37 @@ class MediaInput:
     content_type: str
     data: bytes | None = None
     source_url: str | None = None
+    filename: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SamplePlan:
+    """描述一次视频或实时流解码的抽帧计划。"""
+
+    strategy: SampleStrategy = SampleStrategy.INTERVAL
+    sample_interval_ms: int = 1000
+    max_units: int = 64
+    start_ms: int = 0
+    end_ms: int | None = None
+    scene_change_threshold: float = 0.35
+    frame_max_edge: int | None = None
+
+    def validate(self) -> None:
+        if not 1 <= self.max_units <= 10_000:
+            raise PipelineError("max_units must be between 1 and 10000")
+        if not 1 <= self.sample_interval_ms <= 3_600_000:
+            raise PipelineError("sample_interval_ms is outside the supported range")
+        if self.start_ms < 0:
+            raise PipelineError("sample_start_ms must not be negative")
+        if self.end_ms is not None:
+            if self.end_ms < 0:
+                raise PipelineError("sample_end_ms must not be negative")
+            if self.end_ms <= self.start_ms:
+                raise PipelineError("sample_end_ms must be greater than sample_start_ms")
+        if not 0.0 < self.scene_change_threshold <= 1.0:
+            raise PipelineError("scene_change_threshold must be between 0 and 1")
+        if self.frame_max_edge is not None and not 64 <= self.frame_max_edge <= 8192:
+            raise PipelineError("frame_max_edge must be between 64 and 8192")
 
 
 @dataclass(slots=True)
@@ -46,98 +80,346 @@ class DecodedMediaUnit:
 class DecodedMedia:
     kind: MediaKind
     units: list[DecodedMediaUnit]
+    metadata: MediaTechnicalMetadata
     termination_reason: str | None = None
 
 
-def _safe_image(data: bytes) -> Image.Image:
+def _safe_image(data: bytes) -> tuple[Image.Image, str]:
     try:
         with Image.open(BytesIO(data)) as opened:
             opened.verify()
         with Image.open(BytesIO(data)) as opened:
             image = ImageOps.exif_transpose(opened).convert("RGB")
+            image_format = str(opened.format or "unknown").lower()
     except (Image.DecompressionBombError, UnidentifiedImageError, OSError, ValueError) as exc:
         raise PipelineError("media is not a valid supported image") from exc
-    if image.width <= 0 or image.height <= 0 or image.width * image.height > 80_000_000:
+    if image.width <= 0 or image.height <= 0 or image.width * image.height > MAX_PIXELS:
         raise PipelineError("image dimensions exceed the safety limit")
-    return image
+    return image, image_format
+
+
+def _downscale(image: Image.Image, max_edge: int | None) -> Image.Image:
+    if max_edge is None or max(image.width, image.height) <= max_edge:
+        return image
+    scale = max_edge / max(image.width, image.height)
+    size = (max(1, round(image.width * scale)), max(1, round(image.height * scale)))
+    return image.resize(size, Image.Resampling.LANCZOS)
+
+
+def _frame_signature(frame: Any) -> Any:
+    """计算灰度直方图签名，用于检测镜头切换。"""
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    histogram = cv2.calcHist([gray], [0], None, [SCENE_CHANGE_HISTOGRAM_BINS], [0, 256])
+    cv2.normalize(histogram, histogram, 0, 1, cv2.NORM_MINMAX)
+    return histogram
+
+
+def _signature_distance(previous: Any, current: Any) -> float:
+    correlation = float(cv2.compareHist(previous, current, cv2.HISTCMP_CORREL))
+    return max(0.0, min(1.0, 1.0 - correlation))
+
+
+def _is_keyframe(capture: Any) -> bool | None:
+    """Read the decoded frame type; None means the backend cannot report it."""
+
+    property_id = getattr(cv2, "CAP_PROP_FRAME_TYPE", None)
+    if property_id is None:
+        return None
+    try:
+        frame_type = int(capture.get(property_id))
+    except (AttributeError, TypeError, ValueError, cv2.error):
+        return None
+    if frame_type in {0, ord("?")}:
+        return None
+    return frame_type == ord("I")
+
+
+def _check_control(control: ExecutionControl | None, *, delay_seconds: float = 0.0) -> None:
+    if control is None:
+        if delay_seconds > 0:
+            time.sleep(delay_seconds)
+        return
+    if not control.wait_until_runnable(delay_seconds):
+        raise PipelineError("media decoding cancelled")
+
+
+def _capture_position_ms(capture: Any, fps: float) -> tuple[int, Literal["decoder_pts", "position_msec"]]:
+    property_id = getattr(cv2, "CAP_PROP_PTS", None)
+    if property_id is not None and fps > 0:
+        try:
+            pts = float(capture.get(property_id))
+        except (AttributeError, TypeError, ValueError, cv2.error):
+            pts = 0.0
+        if pts > 0:
+            return max(0, round(pts * 1000 / fps)), "decoder_pts"
+    try:
+        position_ms = int(capture.get(cv2.CAP_PROP_POS_MSEC) or 0)
+    except (AttributeError, TypeError, ValueError, cv2.error):
+        position_ms = 0
+    return max(0, position_ms), "position_msec"
+
+
+def _capture_frame_number(capture: Any, fallback: int) -> int:
+    try:
+        next_frame = int(capture.get(cv2.CAP_PROP_POS_FRAMES) or 0)
+    except (AttributeError, TypeError, ValueError, cv2.error):
+        next_frame = 0
+    return max(0, next_frame - 1) if next_frame > 0 else fallback
+
+
+def _video_suffix(media: MediaInput) -> str:
+    if media.filename:
+        suffix = os.path.splitext(media.filename)[1].lower()
+        if suffix in {".avi", ".m4v", ".mkv", ".mov", ".mp4", ".mpeg", ".mpg", ".ts", ".webm"}:
+            return suffix
+    return {
+        "video/mp4": ".mp4",
+        "video/quicktime": ".mov",
+        "video/webm": ".webm",
+        "video/x-matroska": ".mkv",
+        "video/x-msvideo": ".avi",
+        "video/mpeg": ".mpeg",
+        "video/mp2t": ".ts",
+    }.get(media.content_type.split(";", 1)[0].lower(), ".mp4")
+
+
+def _sniff_video_container(data: bytes, media: MediaInput) -> str:
+    if len(data) >= 12 and data[4:8] == b"ftyp":
+        return "mp4"
+    if len(data) >= 12 and data[:4] == b"RIFF" and data[8:12] == b"AVI ":
+        return "avi"
+    if data.startswith(b"\x1aE\xdf\xa3"):
+        return "webm" if _video_suffix(media) == ".webm" else "matroska"
+    if data.startswith((b"\x00\x00\x01\xba", b"\x00\x00\x01\xb3")):
+        return "mpeg"
+    if len(data) >= 188 and data[0] == 0x47 and (len(data) < 376 or data[188] == 0x47):
+        return "mpeg-ts"
+    raise PipelineError("media is not a supported video container")
+
+
+def _capture_metadata(capture: Any) -> dict[str, Any]:
+    width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+    height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
+    fps = float(capture.get(cv2.CAP_PROP_FPS) or 0)
+    frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    fourcc = int(capture.get(cv2.CAP_PROP_FOURCC) or 0)
+    codec = "".join(chr((fourcc >> (8 * index)) & 0xFF) for index in range(4)).strip("\x00 ")
+    duration_ms = int(frame_count / fps * 1000) if frame_count > 0 and fps > 0 else 0
+    return {
+        "width": width or None,
+        "height": height or None,
+        "fps": round(fps, 6) if 0.1 <= fps <= 240 else None,
+        "frame_count": frame_count if frame_count > 0 else None,
+        "duration_ms": duration_ms if duration_ms > 0 else None,
+        "codec": codec or None,
+    }
 
 
 def _decode_video(
-    data: bytes | None,
-    source_url: str | None,
+    media: MediaInput,
     *,
-    max_units: int,
-    sample_interval_ms: int,
+    plan: SamplePlan,
     max_reconnect_attempts: int = 3,
+    connect_timeout_ms: int = 10_000,
+    read_timeout_ms: int = 10_000,
+    control: ExecutionControl | None = None,
 ) -> DecodedMedia:
+    plan.validate()
+    _check_control(control)
+    started = time.monotonic()
     path: str | None = None
-    if data is not None:
-        with tempfile.NamedTemporaryFile(prefix="scenara-media-", suffix=".video", delete=False) as handle:
-            handle.write(data)
+    container: str | None = None
+    if media.data is not None:
+        container = _sniff_video_container(media.data, media)
+        with tempfile.NamedTemporaryFile(prefix="scenara-media-", suffix=_video_suffix(media), delete=False) as handle:
+            handle.write(media.data)
             path = handle.name
         target = path
-    elif source_url:
-        target = source_url
+    elif media.source_url:
+        target = media.source_url
     else:
         raise PipelineError("video or stream input is empty")
+    is_stream = media.data is None
+
     def open_capture(attempts: int) -> Any | None:
         for attempt in range(attempts):
-            candidate = cv2.VideoCapture(target)
+            _check_control(control)
+            try:
+                candidate = cv2.VideoCapture(
+                    target,
+                    cv2.CAP_ANY,
+                    [
+                        cv2.CAP_PROP_OPEN_TIMEOUT_MSEC,
+                        connect_timeout_ms,
+                        cv2.CAP_PROP_READ_TIMEOUT_MSEC,
+                        read_timeout_ms,
+                    ],
+                )
+            except (TypeError, cv2.error):
+                candidate = cv2.VideoCapture(target)
             if candidate.isOpened():
                 return candidate
             candidate.release()
             if attempt + 1 < attempts:
-                time.sleep(min(1.0, 0.1 * (2**attempt)))
+                _check_control(control, delay_seconds=min(1.0, 0.1 * (2**attempt)))
         return None
 
-    capture = open_capture(max_reconnect_attempts if data is None else 1)
+    capture = open_capture(max(1, max_reconnect_attempts) if is_stream else 1)
     if capture is None:
         raise PipelineError("video or stream could not be opened")
     try:
-        fps = float(capture.get(cv2.CAP_PROP_FPS))
-        fps = fps if 0.1 <= fps <= 240 else 25.0
-        step = max(1, round(sample_interval_ms / 1000 * fps))
+        metadata = _capture_metadata(capture)
+        if container is not None:
+            metadata.update({"format": container, "container": container})
+        fps = float(metadata.get("fps") or 25.0)
+        frame_count = int(metadata.get("frame_count") or 0)
+        duration_ms = int(metadata.get("duration_ms") or 0)
+        step = max(1, round(plan.sample_interval_ms / 1000 * fps))
+        uniform_step = step
+        if plan.strategy == SampleStrategy.UNIFORM and not is_stream and frame_count > 0:
+            window_start = min(frame_count - 1, max(0, round(plan.start_ms / 1000 * fps)))
+            window_end = frame_count if plan.end_ms is None else min(frame_count, round(plan.end_ms / 1000 * fps))
+            span = max(1, window_end - window_start)
+            uniform_step = max(1, span // plan.max_units)
+
+        seek_used = False
+        if plan.start_ms > 0 and not is_stream:
+            seek_used = bool(capture.set(cv2.CAP_PROP_POS_MSEC, float(plan.start_ms)))
+
         units: list[DecodedMediaUnit] = []
         frame_index = 0
         consecutive_failures = 0
+        reconnects = 0
+        keyframe_count = 0
+        scene_change_count = 0
+        previous_signature: Any | None = None
+        last_stream_pts_ms: int | None = None
+        last_output_pts_ms = -1
+        timestamp_source: Literal["decoder_pts", "position_msec", "monotonic_clock"] = "monotonic_clock" if is_stream else "position_msec"
+        next_interval_ms = plan.start_ms
         termination_reason = "source_ended"
-        while len(units) < max_units:
+        while len(units) < plan.max_units:
+            _check_control(control)
             ok, frame = capture.read()
+            _check_control(control)
             if not ok:
                 consecutive_failures += 1
-                if data is not None:
+                if not is_stream:
                     break
                 if consecutive_failures < 3:
                     continue
-                capture.release()
-                replacement = open_capture(max_reconnect_attempts)
-                if replacement is None:
+                if reconnects >= max_reconnect_attempts:
                     termination_reason = "reconnect_exhausted"
                     break
+                capture.release()
+                _check_control(control)
+                replacement = open_capture(1)
+                reconnects += 1
+                if replacement is None:
+                    continue
                 capture = replacement
                 consecutive_failures = 0
                 continue
             consecutive_failures = 0
-            if frame_index % step == 0:
-                height, width = frame.shape[:2]
-                if width <= 0 or height <= 0 or width * height > 80_000_000:
-                    raise PipelineError("video frame dimensions exceed the safety limit")
-                image = Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
-                pts_ms = int(capture.get(cv2.CAP_PROP_POS_MSEC))
-                units.append(
-                    DecodedMediaUnit(
-                        unit_id=f"frame_{frame_index}",
-                        unit_type="frame",
-                        index=len(units),
-                        pts_ms=max(0, pts_ms),
-                        image=image,
-                    )
-                )
             frame_index += 1
+            frame_number = _capture_frame_number(capture, frame_index - 1) if not is_stream else frame_index - 1
+            if is_stream:
+                frame_duration_ms = max(1, round(1000 / fps))
+                wall_clock_ms = int((time.monotonic() - started) * 1000)
+                position_ms = wall_clock_ms if last_stream_pts_ms is None else max(
+                    wall_clock_ms,
+                    last_stream_pts_ms + frame_duration_ms,
+                )
+                last_stream_pts_ms = position_ms
+                elapsed_ms = position_ms
+            else:
+                position_ms, detected_timestamp_source = _capture_position_ms(capture, fps)
+                if detected_timestamp_source == "decoder_pts":
+                    timestamp_source = detected_timestamp_source
+                elapsed_ms = position_ms
+            if not seek_used and plan.start_ms > 0 and elapsed_ms < plan.start_ms:
+                continue
+            if plan.end_ms is not None and elapsed_ms > plan.end_ms:
+                termination_reason = "sample_window_completed"
+                break
+
+            selected = False
+            if plan.strategy == SampleStrategy.KEYFRAME:
+                is_keyframe = _is_keyframe(capture)
+                if is_keyframe is None:
+                    raise PipelineError("video backend does not expose decoded frame types for keyframe sampling")
+                if is_keyframe:
+                    keyframe_count += 1
+                selected = is_keyframe
+            elif plan.strategy == SampleStrategy.SCENE_CHANGE:
+                signature = _frame_signature(frame)
+                if previous_signature is None:
+                    selected = True
+                else:
+                    distance = _signature_distance(previous_signature, signature)
+                    selected = distance >= plan.scene_change_threshold
+                    if selected:
+                        scene_change_count += 1
+                if selected:
+                    previous_signature = signature
+            elif plan.strategy == SampleStrategy.UNIFORM:
+                selected = (frame_index - 1) % uniform_step == 0
+            else:
+                selected = elapsed_ms >= next_interval_ms
+                if selected:
+                    while next_interval_ms <= elapsed_ms:
+                        next_interval_ms += plan.sample_interval_ms
+
+            if not selected:
+                continue
+            height, width = frame.shape[:2]
+            if width <= 0 or height <= 0 or width * height > MAX_PIXELS:
+                raise PipelineError("video frame dimensions exceed the safety limit")
+            image = _downscale(Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)), plan.frame_max_edge)
+            output_pts_ms = max(position_ms, last_output_pts_ms + 1)
+            last_output_pts_ms = output_pts_ms
+            units.append(
+                DecodedMediaUnit(
+                    unit_id=f"frame_{frame_number}",
+                    unit_type="frame",
+                    index=len(units),
+                    pts_ms=output_pts_ms,
+                    image=image,
+                )
+            )
         if not units:
             raise PipelineError("video or stream did not yield a decodable frame")
-        reason = "max_units_reached" if len(units) == max_units else termination_reason
-        return DecodedMedia(kind=MediaKind.VIDEO, units=units, termination_reason=reason)
+        reason = "max_units_reached" if len(units) == plan.max_units else termination_reason
+        metadata.update(
+            {
+                "sampled_units": len(units),
+                "frames_read": frame_index,
+                "sample_interval_ms": plan.sample_interval_ms,
+                "sample_strategy": plan.strategy.value,
+                "sample_start_ms": plan.start_ms,
+                "sample_end_ms": plan.end_ms,
+                "decode_seek_used": seek_used,
+                "reconnect_count": reconnects,
+                "elapsed_ms": int((time.monotonic() - started) * 1000),
+                "timestamp_source": timestamp_source,
+            }
+        )
+        if plan.frame_max_edge is not None:
+            metadata["frame_max_edge"] = plan.frame_max_edge
+        if plan.strategy == SampleStrategy.KEYFRAME:
+            metadata["keyframe_count"] = keyframe_count
+        if plan.strategy == SampleStrategy.SCENE_CHANGE:
+            metadata["scene_change_count"] = scene_change_count
+        if duration_ms <= 0 and not is_stream and units and units[-1].pts_ms:
+            metadata["duration_ms"] = units[-1].pts_ms
+        return DecodedMedia(
+            kind=media.kind,
+            units=units,
+            metadata=MediaTechnicalMetadata.model_validate(
+                {key: value for key, value in metadata.items() if value is not None}
+            ),
+            termination_reason=reason,
+        )
     finally:
         capture.release()
         if path:
@@ -145,9 +427,17 @@ def _decode_video(
                 os.unlink(path)
 
 
-def _decode_pdf(data: bytes, *, max_units: int) -> DecodedMedia:
+def _decode_pdf(
+    data: bytes,
+    *,
+    max_units: int,
+    page_scale: float = 1.5,
+    control: ExecutionControl | None = None,
+) -> DecodedMedia:
     if not data.startswith(b"%PDF-"):
         raise PipelineError("document is not a PDF")
+    if not 0.5 <= page_scale <= 4.0:
+        raise PipelineError("page_scale must be between 0.5 and 4.0")
     try:
         import pypdfium2 as pdfium
 
@@ -157,10 +447,11 @@ def _decode_pdf(data: bytes, *, max_units: int) -> DecodedMedia:
             raise PipelineError("PDF page count exceeds the safety limit")
         units: list[DecodedMediaUnit] = []
         for index in range(min(page_count, max_units)):
+            _check_control(control)
             page = document[index]
-            bitmap = page.render(scale=1.5)
+            bitmap = page.render(scale=page_scale)
             image = bitmap.to_pil().convert("RGB")
-            if image.width * image.height > 80_000_000:
+            if image.width * image.height > MAX_PIXELS:
                 raise PipelineError("PDF page dimensions exceed the safety limit")
             units.append(
                 DecodedMediaUnit(
@@ -176,25 +467,90 @@ def _decode_pdf(data: bytes, *, max_units: int) -> DecodedMedia:
         raise
     except Exception as exc:
         raise PipelineError("PDF could not be decoded safely") from exc
-    return DecodedMedia(kind=MediaKind.DOCUMENT, units=units)
+    first = units[0] if units else None
+    return DecodedMedia(
+        kind=MediaKind.DOCUMENT,
+        units=units,
+        metadata=MediaTechnicalMetadata(
+            format="pdf",
+            container="pdf",
+            page_count=page_count,
+            sampled_units=len(units),
+            width=first.width if first else None,
+            height=first.height if first else None,
+        ),
+        termination_reason="max_units_reached" if page_count > len(units) else None,
+    )
 
 
-def decode_media(media: MediaInput, *, max_units: int, sample_interval_ms: int) -> DecodedMedia:
+def decode_media(
+    media: MediaInput,
+    *,
+    max_units: int,
+    sample_interval_ms: int,
+    max_reconnect_attempts: int = 3,
+    connect_timeout_ms: int = 10_000,
+    read_timeout_ms: int = 10_000,
+    sample_strategy: SampleStrategy | str = SampleStrategy.INTERVAL,
+    sample_start_ms: int = 0,
+    sample_end_ms: int | None = None,
+    scene_change_threshold: float = 0.35,
+    frame_max_edge: int | None = None,
+    page_scale: float = 1.5,
+    control: ExecutionControl | None = None,
+) -> DecodedMedia:
+    _check_control(control)
     if not 1 <= max_units <= 10_000:
         raise PipelineError("max_units must be between 1 and 10000")
     if media.kind == MediaKind.IMAGE:
         if media.data is None:
             raise PipelineError("image input is empty")
-        image = _safe_image(media.data)
+        image, image_format = _safe_image(media.data)
+        image = _downscale(image, frame_max_edge)
         return DecodedMedia(
             kind=media.kind,
             units=[DecodedMediaUnit(unit_id="frame_0", unit_type="frame", index=0, pts_ms=0, image=image)],
+            metadata=MediaTechnicalMetadata(
+                format=image_format,
+                width=image.width,
+                height=image.height,
+                sampled_units=1,
+                frame_max_edge=frame_max_edge,
+            ),
         )
     if media.kind == MediaKind.DOCUMENT:
         if media.data is None:
             raise PipelineError("document input is empty")
-        return _decode_pdf(media.data, max_units=max_units)
-    return _decode_video(media.data, media.source_url, max_units=max_units, sample_interval_ms=sample_interval_ms)
+        return _decode_pdf(media.data, max_units=max_units, page_scale=page_scale, control=control)
+    try:
+        strategy = SampleStrategy(sample_strategy)
+    except ValueError as exc:
+        raise PipelineError(f"unsupported sample_strategy: {sample_strategy}") from exc
+    return _decode_video(
+        media,
+        plan=SamplePlan(
+            strategy=strategy,
+            sample_interval_ms=sample_interval_ms,
+            max_units=max_units,
+            start_ms=sample_start_ms,
+            end_ms=sample_end_ms,
+            scene_change_threshold=scene_change_threshold,
+            frame_max_edge=frame_max_edge,
+        ),
+        max_reconnect_attempts=max_reconnect_attempts,
+        connect_timeout_ms=connect_timeout_ms,
+        read_timeout_ms=read_timeout_ms,
+        control=control,
+    )
+
+
+def inspect_media(media: MediaInput) -> tuple[dict[str, Any], bytes]:
+    decoded = decode_media(media, max_units=1, sample_interval_ms=1)
+    image = decoded.units[0].image.copy()
+    image.thumbnail((640, 640), Image.Resampling.LANCZOS)
+    output = BytesIO()
+    image.save(output, format="JPEG", quality=85, optimize=True)
+    return decoded.metadata.model_dump(exclude_none=True), output.getvalue()
 
 
 def create_media_preview(media: MediaInput, *, max_edge: int = 640) -> bytes:
@@ -213,7 +569,7 @@ def create_media_preview(media: MediaInput, *, max_edge: int = 640) -> bytes:
 class DecodeMediaOperator:
     definition = OperatorDefinition(
         operator_id="platform.media.decode",
-        version="1.0.0",
+        version="1.1.0",
         input_types={"media": "media/input"},
         output_types={"batch": "media/batch"},
         timeout_seconds=3600,
@@ -228,19 +584,43 @@ class DecodeMediaOperator:
         inputs: dict[str, Any],
         parameters: dict[str, Any],
     ) -> dict[str, Any]:
-        del context
         media = inputs.get("media")
         if not isinstance(media, MediaInput):
             raise PipelineError("decode-media requires MediaInput")
         max_units = int(parameters.get("max_units", 64))
         sample_interval_ms = int(parameters.get("sample_interval_ms", 1000))
+        max_reconnect_attempts = int(parameters.get("max_reconnect_attempts", 3))
+        connect_timeout_ms = int(parameters.get("connect_timeout_ms", 10_000))
+        read_timeout_ms = int(parameters.get("read_timeout_ms", 10_000))
+        sample_strategy = str(parameters.get("sample_strategy", SampleStrategy.INTERVAL))
+        sample_start_ms = int(parameters.get("sample_start_ms", 0))
+        sample_end_ms_raw = parameters.get("sample_end_ms")
+        sample_end_ms = int(sample_end_ms_raw) if sample_end_ms_raw is not None else None
+        scene_change_threshold = float(parameters.get("scene_change_threshold", 0.35))
+        frame_max_edge_raw = parameters.get("frame_max_edge")
+        frame_max_edge = int(frame_max_edge_raw) if frame_max_edge_raw is not None else None
+        page_scale = float(parameters.get("page_scale", 1.5))
         if sample_interval_ms < 1 or sample_interval_ms > 3_600_000:
             raise PipelineError("sample_interval_ms is outside the supported range")
+        if not 0 <= max_reconnect_attempts <= 20:
+            raise PipelineError("max_reconnect_attempts is outside the supported range")
+        if not 100 <= connect_timeout_ms <= 120_000 or not 100 <= read_timeout_ms <= 120_000:
+            raise PipelineError("media timeout is outside the supported range")
         decoded = await asyncio.to_thread(
             decode_media,
             media,
             max_units=max_units,
             sample_interval_ms=sample_interval_ms,
+            max_reconnect_attempts=max_reconnect_attempts,
+            connect_timeout_ms=connect_timeout_ms,
+            read_timeout_ms=read_timeout_ms,
+            sample_strategy=sample_strategy,
+            sample_start_ms=sample_start_ms,
+            sample_end_ms=sample_end_ms,
+            scene_change_threshold=scene_change_threshold,
+            frame_max_edge=frame_max_edge,
+            page_scale=page_scale,
+            control=context.control,
         )
         return {"batch": decoded}
 
@@ -250,6 +630,9 @@ __all__ = [
     "DecodedMedia",
     "DecodedMediaUnit",
     "MediaInput",
+    "SamplePlan",
+    "SampleStrategy",
     "create_media_preview",
     "decode_media",
+    "inspect_media",
 ]

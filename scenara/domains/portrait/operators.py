@@ -116,6 +116,7 @@ class PortraitPersonDetectionOperator:
                 )
             ],
             timings=timings,
+            media_metadata=decoded.metadata,
             created_at=time.time(),
         )
         return {"result": result}

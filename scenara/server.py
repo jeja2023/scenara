@@ -61,6 +61,7 @@ from scenara.platform.feedback import (
     RollbackModelReleaseRequest,
     TransitionModelReleaseRequest,
 )
+from scenara.platform.model_runtime import ModelPackageManifest
 from scenara.platform.models import (
     TERMINAL_RUN_STATUSES,
     AccessFoundationStatus,
@@ -86,11 +87,16 @@ from scenara.platform.models import (
     MediaKind,
     MediaSource,
     MediaSourcePage,
+    MediaSourceProbe,
+    MediaSourceView,
     Membership,
     Organization,
+    ParseDocumentResponse,
     ParseImageResponse,
-    PipelineRef,
+    ParseStreamRequest,
+    ParseVideoResponse,
     PipelineTransitionRequest,
+    PortraitIntelligenceStatus,
     PrincipalContext,
     ProductCatalogItem,
     ProductEntitlement,
@@ -101,6 +107,7 @@ from scenara.platform.models import (
     RunPage,
     RunRecord,
     RunStatus,
+    SampleStrategy,
     ServiceAccount,
     SystemStatus,
     UpdateProductEntitlementRequest,
@@ -111,7 +118,13 @@ from scenara.platform.models import (
 from scenara.platform.observability import RequestMetrics
 from scenara.platform.pipeline import PipelineError
 from scenara.platform.policy import PolicyDenied, PolicyUnavailable, require_allowed
+from scenara.platform.portrait_intelligence import CapabilitySnapshot, build_portrait_intelligence
 from scenara.platform.product_catalog import build_product_catalog
+from scenara.platform.repository_contracts import (
+    CONTRACT_ROOT,
+    RepositoryContractCatalog,
+    load_repository_contract_catalog,
+)
 from scenara.platform.repository_topology import build_repository_topology
 from scenara.platform.services import InvalidTransition, ResourceNotFound, sse_payload
 from scenara.platform.store import StateConflict
@@ -136,6 +149,17 @@ def _request_id(request: Request) -> str:
 
 def _envelope(request: Request, data: object) -> ApiEnvelope[object]:
     return ApiEnvelope(request_id=_request_id(request), data=data)
+
+
+def _media_source_view(source: MediaSource) -> MediaSourceView:
+    return MediaSourceView(
+        source_id=source.source_id,
+        kind=source.kind,
+        name=source.name,
+        masked_url=source.masked_url,
+        metadata=source.metadata,
+        created_at=source.created_at,
+    )
 
 
 async def principal_context(
@@ -408,9 +432,9 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         body: CreateMediaSourceRequest,
         request: Request,
         context: PrincipalContext = Depends(principal_context),
-    ) -> ApiEnvelope[MediaSource]:
+    ) -> ApiEnvelope[MediaSourceView]:
         source = await runtime.runs.create_source(context, body)
-        return _envelope(request, source)  # type: ignore[return-value]
+        return _envelope(request, _media_source_view(source))  # type: ignore[return-value]
 
     @app.get("/api/v1/media/sources", tags=["Media"])
     async def list_media_sources(
@@ -423,8 +447,42 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         rows = await runtime.state.list_sources(context.tenant_id, context.project_id)
         return _envelope(
             request,
-            MediaSourcePage(items=rows[offset : offset + limit], offset=offset, limit=limit, total=len(rows)),
+            MediaSourcePage(
+                items=[_media_source_view(item) for item in rows[offset : offset + limit]],
+                offset=offset,
+                limit=limit,
+                total=len(rows),
+            ),
         )  # type: ignore[return-value]
+
+    @app.get("/api/v1/media/sources/{source_id}", tags=["Media"])
+    async def get_media_source(
+        source_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[MediaSourceView]:
+        source = await runtime.runs.get_source(context, source_id)
+        return _envelope(request, _media_source_view(source))  # type: ignore[return-value]
+
+    @app.post("/api/v1/media/sources/{source_id}/probe", tags=["Media"])
+    async def probe_media_source(
+        source_id: str,
+        request: Request,
+        timeout_ms: Annotated[int, Query(ge=100, le=30_000)] = 10_000,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[MediaSourceProbe]:
+        return _envelope(
+            request,
+            await runtime.runs.probe_source(context, source_id, timeout_ms=timeout_ms),
+        )  # type: ignore[return-value]
+
+    @app.delete("/api/v1/media/sources/{source_id}", status_code=204, tags=["Media"])
+    async def delete_media_source(
+        source_id: str,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> Response:
+        await runtime.runs.delete_source(context, source_id)
+        return Response(status_code=204)
 
     @app.post("/api/v1/runs", status_code=202, tags=["Runs"])
     async def create_run(
@@ -541,7 +599,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         file: Annotated[UploadFile, File()],
         domain: Annotated[Literal["portrait", "ocr"], Form()] = "portrait",
         pipeline_id: Annotated[str | None, Form()] = None,
-        pipeline_version: Annotated[str, Form()] = "0.1.0",
+        pipeline_version: Annotated[str | None, Form()] = None,
         idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[ParseImageResponse]:
@@ -555,9 +613,10 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             temporary=True,
         )
         selected_pipeline = pipeline_id or ("portrait.person-detection" if domain == "portrait" else "ocr.document")
+        selected_pipeline_ref = await runtime.runs.resolve_pipeline_ref(selected_pipeline, pipeline_version)
         create = CreateRunRequest(
             domain=domain,
-            pipeline=PipelineRef(pipeline_id=selected_pipeline, version=pipeline_version),
+            pipeline=selected_pipeline_ref,
             asset_id=asset.asset_id,
             wait_ms=runtime.settings.image_wait_timeout_ms,
         )
@@ -570,6 +629,133 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         if outcome.run.status == RunStatus.COMPLETED:
             result = await runtime.runs.result(context, outcome.run.run_id)
         return _envelope(request, ParseImageResponse(asset=asset, run=outcome.run, result=result))  # type: ignore[return-value]
+
+    @app.post("/api/v1/parse/video", status_code=202, tags=["Parsing"])
+    async def parse_video(
+        request: Request,
+        file: Annotated[UploadFile, File()],
+        domain: Annotated[Literal["portrait", "ocr"], Form()] = "portrait",
+        pipeline_id: Annotated[str | None, Form()] = None,
+        pipeline_version: Annotated[str | None, Form()] = None,
+        sample_interval_ms: Annotated[int, Form(ge=1, le=3_600_000)] = 1000,
+        max_units: Annotated[int, Form(ge=1, le=10_000)] = 64,
+        sample_strategy: Annotated[SampleStrategy, Form()] = SampleStrategy.INTERVAL,
+        sample_start_ms: Annotated[int, Form(ge=0)] = 0,
+        sample_end_ms: Annotated[int | None, Form(ge=0)] = None,
+        scene_change_threshold: Annotated[float, Form(ge=0.01, le=1.0)] = 0.35,
+        frame_max_edge: Annotated[int | None, Form(ge=64, le=8192)] = None,
+        page_scale: Annotated[float, Form(ge=0.5, le=4.0)] = 1.5,
+        wait_ms: Annotated[int, Form(ge=0, le=30_000)] = 0,
+        idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[ParseVideoResponse]:
+        data = await file.read(runtime.settings.max_media_bytes + 1)
+        asset = await runtime.runs.create_asset(
+            context,
+            data=data,
+            filename=file.filename,
+            content_type=file.content_type or "application/octet-stream",
+            kind=MediaKind.VIDEO,
+            temporary=True,
+        )
+        selected_pipeline = pipeline_id or ("portrait.person-detection" if domain == "portrait" else "ocr.document")
+        selected_pipeline_ref = await runtime.runs.resolve_pipeline_ref(selected_pipeline, pipeline_version)
+        params: dict[str, object] = {
+            "sample_interval_ms": sample_interval_ms,
+            "max_units": max_units,
+            "sample_strategy": sample_strategy.value,
+            "sample_start_ms": sample_start_ms,
+            "scene_change_threshold": scene_change_threshold,
+        }
+        if sample_end_ms is not None:
+            params["sample_end_ms"] = sample_end_ms
+        if frame_max_edge is not None:
+            params["frame_max_edge"] = frame_max_edge
+        if page_scale != 1.5:
+            params["page_scale"] = page_scale
+        outcome = await runtime.runs.create_run(
+            context,
+            CreateRunRequest(
+                domain=domain,
+                pipeline=selected_pipeline_ref,
+                asset_id=asset.asset_id,
+                parameters=params,
+                wait_ms=wait_ms,
+            ),
+            idempotency_key=idempotency_key or f"shortcut_{uuid4().hex}",
+        )
+        result = None
+        if outcome.run.status == RunStatus.COMPLETED:
+            result = await runtime.runs.result(context, outcome.run.run_id)
+        return _envelope(
+            request,
+            ParseVideoResponse(asset=asset, run=outcome.run, result=result),
+        )  # type: ignore[return-value]
+
+    @app.post("/api/v1/parse/document", status_code=202, tags=["Parsing"])
+    async def parse_document(
+        request: Request,
+        file: Annotated[UploadFile, File()],
+        domain: Annotated[Literal["portrait", "ocr"], Form()] = "ocr",
+        pipeline_id: Annotated[str | None, Form()] = None,
+        pipeline_version: Annotated[str | None, Form()] = None,
+        max_units: Annotated[int, Form(ge=1, le=1000)] = 64,
+        page_scale: Annotated[float, Form(ge=0.5, le=4.0)] = 1.5,
+        wait_ms: Annotated[int, Form(ge=0, le=30_000)] = 0,
+        idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[ParseDocumentResponse]:
+        data = await file.read(runtime.settings.max_media_bytes + 1)
+        asset = await runtime.runs.create_asset(
+            context,
+            data=data,
+            filename=file.filename,
+            content_type=file.content_type or "application/pdf",
+            kind=MediaKind.DOCUMENT,
+            temporary=True,
+        )
+        selected_pipeline = pipeline_id or ("portrait.person-detection" if domain == "portrait" else "ocr.document")
+        selected_pipeline_ref = await runtime.runs.resolve_pipeline_ref(selected_pipeline, pipeline_version)
+        outcome = await runtime.runs.create_run(
+            context,
+            CreateRunRequest(
+                domain=domain,
+                pipeline=selected_pipeline_ref,
+                asset_id=asset.asset_id,
+                parameters={"max_units": max_units, "page_scale": page_scale},
+                wait_ms=wait_ms,
+            ),
+            idempotency_key=idempotency_key or f"shortcut_{uuid4().hex}",
+        )
+        result = None
+        if outcome.run.status == RunStatus.COMPLETED:
+            result = await runtime.runs.result(context, outcome.run.run_id)
+        return _envelope(
+            request,
+            ParseDocumentResponse(asset=asset, run=outcome.run, result=result),
+        )  # type: ignore[return-value]
+
+    @app.post("/api/v1/parse/stream", status_code=202, tags=["Parsing"])
+    async def parse_stream(
+        body: ParseStreamRequest,
+        request: Request,
+        idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[RunRecord]:
+        pipeline = await runtime.runs.resolve_pipeline_ref(body.pipeline.pipeline_id, body.pipeline.version)
+        outcome = await runtime.runs.create_run(
+            context,
+            CreateRunRequest(
+                domain=body.domain,
+                pipeline=pipeline,
+                source_id=body.source_id,
+                parameters=body.parameters,
+                priority=body.priority,
+                wait_ms=body.wait_ms,
+            ),
+            idempotency_key=idempotency_key or f"shortcut_{uuid4().hex}",
+        )
+        return _envelope(request, outcome.run)  # type: ignore[return-value]
 
     @app.post("/api/v1/portrait/identities", status_code=201, tags=["Portrait"])
     async def create_portrait_identity(
@@ -793,6 +979,15 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         result = await runtime.feedback.create_release(context, body)
         return _envelope(request, result)  # type: ignore[return-value]
 
+    @app.post("/api/v1/model-packages/admissions", status_code=201, tags=["Model Governance"])
+    async def admit_model_package(
+        body: ModelPackageManifest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[ModelPackageManifest]:
+        result = await runtime.feedback.admit_package(context, body)
+        return _envelope(request, result)  # type: ignore[return-value]
+
     @app.get("/api/v1/model-releases", tags=["Model Governance"])
     async def list_model_releases(
         request: Request,
@@ -908,6 +1103,32 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         del context
         return _envelope(request, build_repository_topology())  # type: ignore[return-value]
 
+    @app.get("/api/v1/platform/contracts", tags=["Platform"])
+    async def platform_repository_contracts(
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[RepositoryContractCatalog]:
+        del context
+        return _envelope(request, load_repository_contract_catalog())  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/contracts/{contract_id}/schema", tags=["Platform"])
+    async def platform_repository_contract_schema(
+        contract_id: str,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> FileResponse:
+        del context
+        catalog = load_repository_contract_catalog()
+        artifact = next((item for item in catalog.contracts if item.contract_id == contract_id), None)
+        if artifact is None:
+            raise HTTPException(status_code=404, detail="repository contract not found")
+        schema_path = CONTRACT_ROOT / Path(artifact.schema_path).name
+        return FileResponse(
+            schema_path,
+            media_type="application/schema+json",
+            filename=schema_path.name,
+            headers={"ETag": f'"sha256:{artifact.schema_sha256}"'},
+        )
+
     @app.get("/api/v1/platform/access-foundation", tags=["Platform"])
     async def platform_access_foundation(
         request: Request, context: PrincipalContext = Depends(principal_context)
@@ -916,6 +1137,44 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             request,
             build_access_foundation(runtime.settings, context, policy_provider=runtime.policy.provider_id),
         )  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/portrait-intelligence", tags=["Platform"])
+    async def platform_portrait_intelligence(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[PortraitIntelligenceStatus]:
+        """Portrait Intelligence Foundation Platform contract.
+
+        Returns the six strategic modules, three core assets, and per-capability
+        readiness state derived from the installed model-capabilities configuration.
+        This endpoint reflects *intent and current readiness*, not deployed model
+        quality.  Refer to ``model-capabilities.yml`` for the authoritative
+        capability status used at inference time.
+        """
+        del context
+        installed_domains = [manifest.domain_id for manifest in runtime.plugins.manifests()]
+        snapshot: dict[str, CapabilitySnapshot] = {}
+        if "portrait" in installed_domains:
+            try:
+                from app.portrait_model_capabilities import capability_status as _cap_status
+                from app.portrait_model_capabilities import production_model_ready as _prod_ready
+                from scenara.platform.portrait_intelligence import PORTRAIT_CAPABILITY_IDS
+
+                for cap_id in PORTRAIT_CAPABILITY_IDS:
+                    cap = _cap_status(cap_id)
+                    snapshot[cap_id] = CapabilitySnapshot(
+                        readiness=cap.get("status", "not_configured"),
+                        production_ready=bool(_prod_ready(cap_id)),
+                        current_model=cap.get("model_id") or None,
+                        target_model=cap.get("production_model") or None,
+                        embedding_dimension=cap.get("embedding_dim") or None,
+                        target_embedding_dimension=cap.get("production_embedding_dim") or None,
+                    )
+            except Exception:  # pragma: no cover — app layer may not be installed
+                pass
+        return _envelope(  # type: ignore[return-value]
+            request,
+            build_portrait_intelligence(snapshot, installed_domains=installed_domains),
+        )
 
     @app.get("/api/v1/platform/iam/summary", tags=["IAM"])
     async def iam_summary(

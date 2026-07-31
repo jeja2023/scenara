@@ -25,6 +25,15 @@ class SourceKind(StrEnum):
     STREAM = "stream"
 
 
+class SampleStrategy(StrEnum):
+    """视频与实时流的抽帧策略。"""
+
+    INTERVAL = "interval"
+    KEYFRAME = "keyframe"
+    SCENE_CHANGE = "scene_change"
+    UNIFORM = "uniform"
+
+
 class RunStatus(StrEnum):
     QUEUED = "queued"
     RUNNING = "running"
@@ -58,6 +67,31 @@ class PrincipalContext(StrictModel):
     product_ids: frozenset[str] = Field(default_factory=frozenset)
 
 
+class MediaTechnicalMetadata(StrictModel):
+    format: str | None = None
+    container: str | None = None
+    codec: str | None = None
+    width: int | None = Field(default=None, gt=0)
+    height: int | None = Field(default=None, gt=0)
+    fps: float | None = Field(default=None, gt=0)
+    frame_count: int | None = Field(default=None, ge=0)
+    duration_ms: int | None = Field(default=None, ge=0)
+    page_count: int | None = Field(default=None, ge=1)
+    sampled_units: int | None = Field(default=None, ge=0)
+    frames_read: int | None = Field(default=None, ge=0)
+    sample_interval_ms: int | None = Field(default=None, ge=1)
+    sample_strategy: SampleStrategy | None = None
+    sample_start_ms: int | None = Field(default=None, ge=0)
+    sample_end_ms: int | None = Field(default=None, ge=0)
+    keyframe_count: int | None = Field(default=None, ge=0)
+    scene_change_count: int | None = Field(default=None, ge=0)
+    frame_max_edge: int | None = Field(default=None, gt=0)
+    decode_seek_used: bool | None = None
+    reconnect_count: int | None = Field(default=None, ge=0)
+    elapsed_ms: int | None = Field(default=None, ge=0)
+    timestamp_source: Literal["decoder_pts", "position_msec", "monotonic_clock"] | None = None
+
+
 class MediaAsset(StrictModel):
     asset_id: str
     tenant_id: str
@@ -71,6 +105,7 @@ class MediaAsset(StrictModel):
     preview_object_key: str | None = None
     preview_content_type: str | None = None
     preview_sha256: str | None = Field(default=None, min_length=64, max_length=64)
+    metadata: MediaTechnicalMetadata = Field(default_factory=MediaTechnicalMetadata)
     temporary: bool = False
     created_at: float
     expires_at: float | None = None
@@ -94,6 +129,23 @@ class MediaSource(StrictModel):
     secret_ref: str
     metadata: dict[str, Any] = Field(default_factory=dict)
     created_at: float
+
+
+class MediaSourceView(StrictModel):
+    source_id: str
+    kind: SourceKind = SourceKind.STREAM
+    name: str
+    masked_url: str
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: float
+
+
+class MediaSourceProbe(StrictModel):
+    source_id: str
+    reachable: bool
+    latency_ms: int = Field(ge=0)
+    metadata: MediaTechnicalMetadata = Field(default_factory=MediaTechnicalMetadata)
+    checked_at: float
 
 
 class CreateWebhookSubscriptionRequest(StrictModel):
@@ -145,6 +197,11 @@ class WebhookDeliveryRecord(StrictModel):
 class PipelineRef(StrictModel):
     pipeline_id: str = Field(min_length=1, max_length=128)
     version: str = Field(min_length=1, max_length=32)
+
+
+class PipelineSelection(StrictModel):
+    pipeline_id: str = Field(min_length=1, max_length=128)
+    version: str | None = Field(default=None, min_length=1, max_length=32)
 
 
 class PipelineTransitionRequest(StrictModel):
@@ -297,6 +354,7 @@ class ResultEnvelope(StrictModel):
     artifacts: list[ResultArtifact] = Field(default_factory=list)
     models: list[ModelProvenance] = Field(default_factory=list)
     timings: dict[str, float] = Field(default_factory=dict)
+    media_metadata: MediaTechnicalMetadata = Field(default_factory=MediaTechnicalMetadata)
     warnings: list[str] = Field(default_factory=list)
     provenance: ProvenanceEvidence = Field(default_factory=ProvenanceEvidence)
     created_at: float
@@ -352,6 +410,27 @@ class ParseImageResponse(StrictModel):
     result: ResultEnvelope | None = None
 
 
+class ParseVideoResponse(StrictModel):
+    asset: MediaAsset
+    run: RunRecord
+    result: ResultEnvelope | None = None
+
+
+class ParseDocumentResponse(StrictModel):
+    asset: MediaAsset
+    run: RunRecord
+    result: ResultEnvelope | None = None
+
+
+class ParseStreamRequest(StrictModel):
+    source_id: str = Field(min_length=1, max_length=128)
+    domain: DomainId
+    pipeline: PipelineSelection
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    priority: int = Field(default=0, ge=-100, le=100)
+    wait_ms: int = Field(default=0, ge=0, le=30_000)
+
+
 class MediaAssetPage(StrictModel):
     items: list[MediaAsset]
     offset: int
@@ -360,7 +439,7 @@ class MediaAssetPage(StrictModel):
 
 
 class MediaSourcePage(StrictModel):
-    items: list[MediaSource]
+    items: list[MediaSourceView]
     offset: int
     limit: int
     total: int
@@ -455,6 +534,9 @@ class RepositoryIntegrationContract(StrictModel):
     consumer_repository_id: RepositoryId
     transport: RepositoryContractTransport
     payload_type: Annotated[str, Field(pattern=r"^[A-Z][A-Za-z0-9]{1,63}$")]
+    release_version: Annotated[str, Field(pattern=r"^\d+\.\d+\.\d+$")]
+    schema_path: Annotated[str, Field(pattern=r"^contracts/repository/[^/]+/[^/]+\.schema\.json$")]
+    compatibility: Literal["backward"] = "backward"
     invariants: list[RepositoryResponsibilityId] = Field(default_factory=list)
 
 
@@ -695,3 +777,106 @@ class ApiErrorEnvelope(StrictModel):
     schema_version: Literal["1.0"] = "1.0"
     request_id: str
     error: ApiErrorDetail
+
+
+# ---------------------------------------------------------------------------
+# Portrait Intelligence Foundation Platform contract types
+# ---------------------------------------------------------------------------
+
+type PortraitModuleId = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.-]{1,63}$")]
+
+
+class PortraitModuleMaturity(StrEnum):
+    """Six-value maturity ladder for portrait AI modules.
+
+    ``external`` means the responsibility belongs to another repository
+    (e.g. model training → scenara-model).  The platform contract records
+    the gap explicitly rather than omitting the module.
+    """
+
+    AVAILABLE = "available"
+    PARTIAL = "partial"
+    SEED = "seed"
+    PLANNED = "planned"
+    EXTERNAL = "external"
+
+
+class PortraitCapabilityReadiness(StrEnum):
+    """Maps directly to the ``status`` field in model-capabilities.yml."""
+
+    READY = "ready"
+    FALLBACK = "fallback"
+    PLACEHOLDER = "placeholder"
+    NOT_CONFIGURED = "not_configured"
+
+
+class PortraitCapabilityItem(StrictModel):
+    """Readiness record for a single portrait AI capability."""
+
+    capability_id: Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.-]{1,127}$")]
+    readiness: PortraitCapabilityReadiness
+    production_ready: bool
+    current_model: str | None = None
+    target_model: str | None = None
+    embedding_dimension: int | None = None
+    target_embedding_dimension: int | None = None
+
+
+class PortraitModuleItem(StrictModel):
+    """One of the six strategic capability modules."""
+
+    module_id: PortraitModuleId
+    name: str
+    maturity: PortraitModuleMaturity
+    summary: str
+    owner_repository_id: RepositoryId
+    current_scope: list[str] = Field(default_factory=list)
+    not_in_scope_yet: list[str] = Field(default_factory=list)
+    next_gate: str
+
+
+class PortraitAssetItem(StrictModel):
+    """One of the three long-term strategic assets."""
+
+    asset_id: PortraitModuleId
+    name: str
+    maturity: PortraitModuleMaturity
+    summary: str
+    depends_on_modules: list[PortraitModuleId] = Field(default_factory=list)
+    next_gate: str
+
+
+class PortraitIntelligenceStatus(StrictModel):
+    """Machine-readable projection of the Portrait Intelligence Foundation Platform strategy.
+
+    Consumed by ``GET /api/v1/platform/portrait-intelligence``,
+    ``get_portrait_intelligence()`` in both SDKs, and the Console overview panel.
+    This contract describes *intent and current readiness*, not deployed capability.
+    Deployed model capability truth is in ``model-capabilities.yml``.
+    """
+
+    schema_version: Literal["1.0"] = "1.0"
+    positioning: Literal["portrait_intelligence_foundation_platform"] = (
+        "portrait_intelligence_foundation_platform"
+    )
+    modules: list[PortraitModuleItem]
+    assets: list[PortraitAssetItem]
+    capabilities: list[PortraitCapabilityItem]
+
+    @model_validator(mode="after")
+    def validate_references(self) -> PortraitIntelligenceStatus:
+        module_ids = [m.module_id for m in self.modules]
+        if len(module_ids) != len(set(module_ids)):
+            raise ValueError("portrait module identifiers must be unique")
+        asset_ids = [a.asset_id for a in self.assets]
+        if len(asset_ids) != len(set(asset_ids)):
+            raise ValueError("portrait asset identifiers must be unique")
+        known = set(module_ids)
+        for asset in self.assets:
+            for dep in asset.depends_on_modules:
+                if dep not in known:
+                    raise ValueError(f"portrait asset references unknown module: {dep}")
+        capability_ids = [c.capability_id for c in self.capabilities]
+        if len(capability_ids) != len(set(capability_ids)):
+            raise ValueError("portrait capability identifiers must be unique")
+        return self

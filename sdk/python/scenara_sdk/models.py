@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Any, Literal, NotRequired, TypedDict
 
 Domain = Literal["portrait", "ocr"]
+SampleStrategy = Literal["interval", "keyframe", "scene_change", "uniform"]
+TimestampSource = Literal["decoder_pts", "position_msec", "monotonic_clock"]
 RunStatus = Literal["queued", "running", "pausing", "paused", "completed", "failed", "cancelling", "cancelled"]
 FeedbackStatus = Literal["pending", "approved", "rejected"]
 ModelReleaseStatus = Literal["candidate", "validated", "approved", "active", "retired"]
@@ -18,11 +20,38 @@ RepositoryBoundaryRule = Literal[
 ]
 RepositoryContractTransport = Literal["versioned_api", "event", "immutable_manifest"]
 AccessCapabilityStatus = Literal["available", "seed", "planned", "gated"]
+PortraitModuleMaturity = Literal["available", "partial", "seed", "planned", "external"]
+PortraitCapabilityReadiness = Literal["ready", "fallback", "placeholder", "not_configured"]
 
 
 class PipelineRef(TypedDict):
     pipeline_id: str
     version: str
+
+
+class MediaTechnicalMetadata(TypedDict):
+    format: NotRequired[str | None]
+    container: NotRequired[str | None]
+    codec: NotRequired[str | None]
+    width: NotRequired[int | None]
+    height: NotRequired[int | None]
+    fps: NotRequired[float | None]
+    frame_count: NotRequired[int | None]
+    duration_ms: NotRequired[int | None]
+    page_count: NotRequired[int | None]
+    sampled_units: NotRequired[int | None]
+    frames_read: NotRequired[int | None]
+    sample_interval_ms: NotRequired[int | None]
+    sample_strategy: NotRequired[SampleStrategy | None]
+    sample_start_ms: NotRequired[int | None]
+    sample_end_ms: NotRequired[int | None]
+    keyframe_count: NotRequired[int | None]
+    scene_change_count: NotRequired[int | None]
+    frame_max_edge: NotRequired[int | None]
+    decode_seek_used: NotRequired[bool | None]
+    reconnect_count: NotRequired[int | None]
+    elapsed_ms: NotRequired[int | None]
+    timestamp_source: NotRequired[TimestampSource | None]
 
 
 class MediaAsset(TypedDict):
@@ -35,20 +64,41 @@ class MediaAsset(TypedDict):
     preview_object_key: NotRequired[str | None]
     preview_content_type: NotRequired[str | None]
     preview_sha256: NotRequired[str | None]
+    metadata: MediaTechnicalMetadata
     original_deleted_at: NotRequired[float | None]
     temporary: bool
     created_at: float
 
 
+class MediaSource(TypedDict):
+    source_id: str
+    kind: Literal["stream"]
+    name: str
+    masked_url: str
+    metadata: dict[str, Any]
+    created_at: float
+
+
+class MediaSourceProbe(TypedDict):
+    source_id: str
+    reachable: bool
+    latency_ms: int
+    metadata: MediaTechnicalMetadata
+    checked_at: float
+
+
 class ModelPackage(TypedDict):
+    schema_version: Literal["1.0"]
     model_id: str
     version: str
     capability: str
     adapter: str
+    runtime_model_id: str
     sha256: str
     source_uri: str
     license_id: str
     model_card: str
+    evaluation_evidence: list[str]
     vram_mb: int
     regression_samples: list[str]
     production_ready: bool
@@ -87,7 +137,32 @@ class RepositoryIntegrationContract(TypedDict):
     consumer_repository_id: str
     transport: RepositoryContractTransport
     payload_type: str
+    release_version: str
+    schema_path: str
+    compatibility: Literal["backward"]
     invariants: list[str]
+
+
+class RepositoryContractArtifact(TypedDict):
+    contract_id: str
+    payload_type: str
+    release_version: str
+    payload_schema_version: str
+    producer_repository_id: str
+    consumer_repository_id: str
+    transport: RepositoryContractTransport
+    compatibility: Literal["backward"]
+    schema_path: str
+    schema_sha256: str
+    example_path: str
+    example_sha256: str
+
+
+class RepositoryContractCatalog(TypedDict):
+    schema_version: Literal["1.0"]
+    release_version: str
+    package_name: str
+    contracts: list[RepositoryContractArtifact]
 
 
 class RepositoryTopology(TypedDict):
@@ -117,6 +192,44 @@ class AccessFoundationStatus(TypedDict):
     principal_id: str
     policy_provider: str
     capabilities: list[AccessCapabilityItem]
+
+
+class PortraitCapabilityItem(TypedDict):
+    capability_id: str
+    readiness: PortraitCapabilityReadiness
+    production_ready: bool
+    current_model: NotRequired[str | None]
+    target_model: NotRequired[str | None]
+    embedding_dimension: NotRequired[int | None]
+    target_embedding_dimension: NotRequired[int | None]
+
+
+class PortraitModuleItem(TypedDict):
+    module_id: str
+    name: str
+    maturity: PortraitModuleMaturity
+    summary: str
+    owner_repository_id: str
+    current_scope: list[str]
+    not_in_scope_yet: list[str]
+    next_gate: str
+
+
+class PortraitAssetItem(TypedDict):
+    asset_id: str
+    name: str
+    maturity: PortraitModuleMaturity
+    summary: str
+    depends_on_modules: list[str]
+    next_gate: str
+
+
+class PortraitIntelligenceStatus(TypedDict):
+    schema_version: Literal["1.0"]
+    positioning: Literal["portrait_intelligence_foundation_platform"]
+    modules: list[PortraitModuleItem]
+    assets: list[PortraitAssetItem]
+    capabilities: list[PortraitCapabilityItem]
 
 
 class Organization(TypedDict):
@@ -286,6 +399,8 @@ class ModelRelease(TypedDict):
     schema_version: Literal["1.0"]
     model_id: str
     version: str
+    capability: str
+    runtime_model_id: str
     package_sha256: str
     evidence_refs: list[str]
     status: ModelReleaseStatus
@@ -299,8 +414,13 @@ class ModelRelease(TypedDict):
 class ModelDeploymentEvent(TypedDict):
     schema_version: Literal["1.0"]
     event_id: str
+    tenant_id: str
+    project_id: str
     model_id: str
     version: str
+    capability: str
+    runtime_model_id: str
+    package_sha256: str
     action: str
     from_status: ModelReleaseStatus | None
     to_status: ModelReleaseStatus
@@ -316,6 +436,8 @@ class Run(TypedDict):
     pipeline: PipelineRef
     asset_id: NotRequired[str | None]
     source_id: NotRequired[str | None]
+    parameters: dict[str, Any]
+    priority: int
     status: RunStatus
     revision: int
     progress: float
@@ -323,6 +445,8 @@ class Run(TypedDict):
     termination_reason: NotRequired[str | None]
     created_at: float
     updated_at: float
+    started_at: NotRequired[float | None]
+    completed_at: NotRequired[float | None]
 
 
 class ResultEnvelope(TypedDict):
@@ -330,9 +454,33 @@ class ResultEnvelope(TypedDict):
     run_id: str
     domain: Domain
     pipeline: PipelineRef
+    asset_id: str | None
+    source_id: str | None
     units: list[dict[str, Any]]
     domain_payload: dict[str, Any]
+    relations: list[dict[str, Any]]
+    artifacts: list[dict[str, Any]]
     models: list[dict[str, Any]]
     timings: dict[str, float]
+    media_metadata: MediaTechnicalMetadata
     warnings: list[str]
+    provenance: dict[str, Any]
     created_at: float
+
+
+class ParseImageResponse(TypedDict):
+    asset: MediaAsset
+    run: Run
+    result: ResultEnvelope | None
+
+
+class ParseVideoResponse(TypedDict):
+    asset: MediaAsset
+    run: Run
+    result: ResultEnvelope | None
+
+
+class ParseDocumentResponse(TypedDict):
+    asset: MediaAsset
+    run: Run
+    result: ResultEnvelope | None

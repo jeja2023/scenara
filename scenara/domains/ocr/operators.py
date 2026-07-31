@@ -251,6 +251,7 @@ class OcrDocumentOperator:
                 blocks=blocks,
             ),
             models=models,
+            media_metadata=decoded.metadata,
             warnings=[f"development_substitute:{item}" for item in substitutes]
             + ([f"media_termination:{decoded.termination_reason}"] if decoded.termination_reason else []),
             provenance=ProvenanceEvidence(development_substitutes=substitutes),

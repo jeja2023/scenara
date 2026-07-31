@@ -3,13 +3,18 @@ import { join } from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, api, saveConnection, userFacingError } from "../src/api";
+import { ApiError, api, apiStream, saveConnection, streamJsonEvents, userFacingError } from "../src/api";
 import {
   labelAccessCapability,
   labelCapability,
   labelDomain,
   labelEntitlementSource,
   labelPipeline,
+  labelPortraitAsset,
+  labelPortraitCapability,
+  labelPortraitMaturity,
+  labelPortraitModule,
+  labelPortraitReadiness,
   labelProductGate,
   labelProductSummary,
   labelRunStatus,
@@ -75,6 +80,44 @@ describe("console API contract", () => {
       message: "无法连接到服务，请检查接口地址和网络",
     });
   });
+
+  it("uses the configured connection for event streams", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response("data: {}\n\n", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const controller = new AbortController();
+    await apiStream("/api/v1/runs/run-1/events", controller.signal);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://scenara.example/api/v1/runs/run-1/events");
+    expect(init.signal).toBe(controller.signal);
+    const headers = new Headers(init.headers);
+    expect(headers.get("Accept")).toBe("text/event-stream");
+    expect(headers.get("Authorization")).toBe("Bearer token");
+    expect(headers.get("X-Tenant-Id")).toBe("tenant-a");
+    expect(headers.get("X-Project-Id")).toBe("project-a");
+  });
+
+  it("parses CRLF and multi-line event data", async () => {
+    const response = new Response(
+      "id: 1\r\nevent: run.running\r\ndata: {\"status\":\r\ndata: \"running\"}\r\n\r\n: heartbeat\r\n\r\ndata: {\"status\":\"completed\"}\r\n\r\n",
+    );
+    const events: Array<{ status: string }> = [];
+    for await (const event of streamJsonEvents<{ status: string }>(response)) events.push(event);
+    expect(events).toEqual([{ status: "running" }, { status: "completed" }]);
+  });
+
+  it("rejects event-stream HTTP errors as stable API errors", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ request_id: "req-stream", error: { code: "POLICY_DENIED" } }), { status: 403 }),
+      ),
+    );
+    await expect(apiStream("/api/v1/runs/run-1/events")).rejects.toMatchObject({
+      status: 403,
+      code: "POLICY_DENIED",
+      requestId: "req-stream",
+    });
+  });
 });
 
 describe("console information architecture", () => {
@@ -89,8 +132,30 @@ describe("console information architecture", () => {
     expect(labelAccessCapability("api_authentication").name).toBe("接口认证");
     expect(labelEntitlementSource("manual")).toBe("手动配置");
     expect(labelWarning("gait_requires_at_least_8_frames")).toBe("步态分析至少需要 8 帧画面");
-    expect(labelVersion("0.3.0.dev0")).toBe("0.3.0 开发版");
+    expect(labelVersion("0.3.0.dev2")).toBe("0.3.0 开发版 2");
     expect(userFacingError(new TypeError("Failed to fetch"))).toBe("操作失败，请稍后重试");
+    // Portrait Intelligence Foundation Platform labels
+    expect(labelPortraitModule("data_governance")).toBe("数据治理");
+    expect(labelPortraitModule("annotation")).toBe("标注平台");
+    expect(labelPortraitModule("training")).toBe("模型训练");
+    expect(labelPortraitModule("algorithms")).toBe("人像算法");
+    expect(labelPortraitModule("vector_retrieval")).toBe("向量检索");
+    expect(labelPortraitModule("mlops")).toBe("模型运维");
+    expect(labelPortraitModule("unknown-module")).toBe("其他能力模块");
+    expect(labelPortraitMaturity("available")).toBe("可用");
+    expect(labelPortraitMaturity("partial")).toBe("部分可用");
+    expect(labelPortraitMaturity("external")).toBe("外部仓库承担");
+    expect(labelPortraitMaturity("planned")).toBe("规划中");
+    expect(labelPortraitReadiness("ready")).toBe("已就绪");
+    expect(labelPortraitReadiness("fallback")).toBe("开发替代");
+    expect(labelPortraitReadiness("placeholder")).toBe("占位实现");
+    expect(labelPortraitReadiness("not_configured")).toBe("未配置");
+    expect(labelPortraitAsset("data_lake")).toBe("人像数据湖");
+    expect(labelPortraitAsset("foundation_model")).toBe("人像基础模型");
+    expect(labelPortraitAsset("intelligence_engine")).toBe("人像智能引擎");
+    expect(labelPortraitCapability("person_detection")).toBe("人员检测");
+    expect(labelPortraitCapability("face_embedding")).toBe("人脸识别特征");
+    expect(labelPortraitCapability("pose")).toBe("姿态估计");
   });
 
   it("includes every 0.7 workspace", () => {

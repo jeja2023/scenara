@@ -1,4 +1,5 @@
 export type Domain = "portrait" | "ocr";
+export type SampleStrategy = "interval" | "keyframe" | "scene_change" | "uniform";
 export type RunStatus = "queued" | "running" | "pausing" | "paused" | "completed" | "failed" | "cancelling" | "cancelled";
 export type FeedbackStatus = "pending" | "approved" | "rejected";
 export type ModelReleaseStatus = "candidate" | "validated" | "approved" | "active" | "retired";
@@ -11,6 +12,31 @@ export interface PipelineRef {
   version: string;
 }
 
+export interface MediaTechnicalMetadata {
+  format?: string | null;
+  container?: string | null;
+  codec?: string | null;
+  width?: number | null;
+  height?: number | null;
+  fps?: number | null;
+  frame_count?: number | null;
+  duration_ms?: number | null;
+  page_count?: number | null;
+  sampled_units?: number | null;
+  frames_read?: number | null;
+  sample_interval_ms?: number | null;
+  sample_strategy?: SampleStrategy | null;
+  sample_start_ms?: number | null;
+  sample_end_ms?: number | null;
+  keyframe_count?: number | null;
+  scene_change_count?: number | null;
+  frame_max_edge?: number | null;
+  decode_seek_used?: boolean | null;
+  reconnect_count?: number | null;
+  elapsed_ms?: number | null;
+  timestamp_source?: "decoder_pts" | "position_msec" | "monotonic_clock" | null;
+}
+
 export interface MediaAsset {
   asset_id: string;
   kind: "image" | "video" | "document";
@@ -21,20 +47,55 @@ export interface MediaAsset {
   preview_object_key?: string | null;
   preview_content_type?: string | null;
   preview_sha256?: string | null;
+  metadata: MediaTechnicalMetadata;
   original_deleted_at?: number | null;
   temporary: boolean;
   created_at: number;
 }
 
+export interface MediaAssetPage {
+  items: MediaAsset[];
+  offset: number;
+  limit: number;
+  total: number;
+}
+
+export interface MediaSource {
+  source_id: string;
+  kind: "stream";
+  name: string;
+  masked_url: string;
+  metadata: Record<string, unknown>;
+  created_at: number;
+}
+
+export interface MediaSourcePage {
+  items: MediaSource[];
+  offset: number;
+  limit: number;
+  total: number;
+}
+
+export interface MediaSourceProbe {
+  source_id: string;
+  reachable: boolean;
+  latency_ms: number;
+  metadata: MediaTechnicalMetadata;
+  checked_at: number;
+}
+
 export interface ModelPackage {
+  schema_version: "1.0";
   model_id: string;
   version: string;
   capability: string;
   adapter: string;
+  runtime_model_id: string;
   sha256: string;
   source_uri: string;
   license_id: string;
   model_card: string;
+  evaluation_evidence: string[];
   vram_mb: number;
   regression_samples: string[];
   production_ready: boolean;
@@ -82,7 +143,32 @@ export interface RepositoryIntegrationContract {
   consumer_repository_id: string;
   transport: RepositoryContractTransport;
   payload_type: string;
+  release_version: string;
+  schema_path: string;
+  compatibility: "backward";
   invariants: string[];
+}
+
+export interface RepositoryContractArtifact {
+  contract_id: string;
+  payload_type: string;
+  release_version: string;
+  payload_schema_version: string;
+  producer_repository_id: string;
+  consumer_repository_id: string;
+  transport: RepositoryContractTransport;
+  compatibility: "backward";
+  schema_path: string;
+  schema_sha256: string;
+  example_path: string;
+  example_sha256: string;
+}
+
+export interface RepositoryContractCatalog {
+  schema_version: "1.0";
+  release_version: string;
+  package_name: string;
+  contracts: RepositoryContractArtifact[];
 }
 
 export interface RepositoryTopology {
@@ -112,6 +198,47 @@ export interface AccessFoundationStatus {
   principal_id: string;
   policy_provider: string;
   capabilities: AccessCapabilityItem[];
+}
+
+export type PortraitModuleMaturity = "available" | "partial" | "seed" | "planned" | "external";
+export type PortraitCapabilityReadiness = "ready" | "fallback" | "placeholder" | "not_configured";
+
+export interface PortraitCapabilityItem {
+  capability_id: string;
+  readiness: PortraitCapabilityReadiness;
+  production_ready: boolean;
+  current_model: string | null;
+  target_model: string | null;
+  embedding_dimension: number | null;
+  target_embedding_dimension: number | null;
+}
+
+export interface PortraitModuleItem {
+  module_id: string;
+  name: string;
+  maturity: PortraitModuleMaturity;
+  summary: string;
+  owner_repository_id: string;
+  current_scope: string[];
+  not_in_scope_yet: string[];
+  next_gate: string;
+}
+
+export interface PortraitAssetItem {
+  asset_id: string;
+  name: string;
+  maturity: PortraitModuleMaturity;
+  summary: string;
+  depends_on_modules: string[];
+  next_gate: string;
+}
+
+export interface PortraitIntelligenceStatus {
+  schema_version: "1.0";
+  positioning: "portrait_intelligence_foundation_platform";
+  modules: PortraitModuleItem[];
+  assets: PortraitAssetItem[];
+  capabilities: PortraitCapabilityItem[];
 }
 
 export interface Organization {
@@ -281,6 +408,8 @@ export interface ModelRelease {
   schema_version: "1.0";
   model_id: string;
   version: string;
+  capability: string;
+  runtime_model_id: string;
   package_sha256: string;
   evidence_refs: string[];
   status: ModelReleaseStatus;
@@ -294,8 +423,13 @@ export interface ModelRelease {
 export interface ModelDeploymentEvent {
   schema_version: "1.0";
   event_id: string;
+  tenant_id: string;
+  project_id: string;
   model_id: string;
   version: string;
+  capability: string;
+  runtime_model_id: string;
+  package_sha256: string;
   action: string;
   from_status?: ModelReleaseStatus | null;
   to_status: ModelReleaseStatus;
@@ -311,6 +445,8 @@ export interface Run {
   pipeline: PipelineRef;
   asset_id?: string | null;
   source_id?: string | null;
+  parameters: Record<string, unknown>;
+  priority: number;
   status: RunStatus;
   revision: number;
   progress: number;
@@ -318,6 +454,8 @@ export interface Run {
   termination_reason?: string | null;
   created_at: number;
   updated_at: number;
+  started_at?: number | null;
+  completed_at?: number | null;
 }
 
 export interface RunPage {
@@ -332,11 +470,17 @@ export interface ResultEnvelope {
   run_id: string;
   domain: Domain;
   pipeline: PipelineRef;
+  asset_id: string | null;
+  source_id: string | null;
   units: Record<string, unknown>[];
   domain_payload: Record<string, unknown>;
+  relations: Record<string, unknown>[];
+  artifacts: Record<string, unknown>[];
   models: Record<string, unknown>[];
   timings: Record<string, number>;
+  media_metadata: MediaTechnicalMetadata;
   warnings: string[];
+  provenance: Record<string, unknown>;
   created_at: number;
 }
 
@@ -348,6 +492,18 @@ export interface ResultPage {
 }
 
 export interface ParseImageResponse {
+  asset: MediaAsset;
+  run: Run;
+  result: ResultEnvelope | null;
+}
+
+export interface ParseVideoResponse {
+  asset: MediaAsset;
+  run: Run;
+  result: ResultEnvelope | null;
+}
+
+export interface ParseDocumentResponse {
   asset: MediaAsset;
   run: Run;
   result: ResultEnvelope | null;

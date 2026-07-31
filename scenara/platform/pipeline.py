@@ -4,12 +4,16 @@ import asyncio
 import hashlib
 import json
 import re
+import threading
+import time
 from collections import defaultdict, deque
-from dataclasses import dataclass
+from contextlib import suppress
+from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from scenara.platform.model_runtime import RuntimeModelBinding
 from scenara.platform.models import PipelineStatus
 
 
@@ -19,6 +23,66 @@ class PipelineError(RuntimeError):
 
 class DomainUnavailable(PipelineError):
     pass
+
+
+class ExecutionInterrupted(PipelineError):
+    """Control-plane interruption that must not be wrapped as an operator failure."""
+
+
+@dataclass(slots=True)
+class ExecutionControl:
+    """Thread-safe pause and cancellation signal for long-running operators."""
+
+    _condition: threading.Condition = field(default_factory=threading.Condition, repr=False)
+    _paused: bool = field(default=False, init=False, repr=False)
+    _cancelled: bool = field(default=False, init=False, repr=False)
+    _pause_started_at: float | None = field(default=None, init=False, repr=False)
+    _paused_seconds: float = field(default=0.0, init=False, repr=False)
+
+    def pause(self) -> None:
+        with self._condition:
+            if not self._paused:
+                self._pause_started_at = time.monotonic()
+            self._paused = True
+
+    def resume(self) -> None:
+        with self._condition:
+            self._finish_pause()
+            self._paused = False
+            self._condition.notify_all()
+
+    def cancel(self) -> None:
+        with self._condition:
+            self._finish_pause()
+            self._cancelled = True
+            self._paused = False
+            self._condition.notify_all()
+
+    def wait_until_runnable(self, delay_seconds: float = 0.0) -> bool:
+        """Block while paused and return False once cancellation is requested."""
+
+        with self._condition:
+            if delay_seconds > 0 and not self._paused and not self._cancelled:
+                self._condition.wait(timeout=delay_seconds)
+            while self._paused and not self._cancelled:
+                self._condition.wait(timeout=0.1)
+            return not self._cancelled
+
+    @property
+    def cancelled(self) -> bool:
+        with self._condition:
+            return self._cancelled
+
+    @property
+    def paused_seconds(self) -> float:
+        with self._condition:
+            active = time.monotonic() - self._pause_started_at if self._pause_started_at is not None else 0.0
+            return self._paused_seconds + active
+
+    def _finish_pause(self) -> None:
+        if self._pause_started_at is not None:
+            self._paused_seconds += time.monotonic() - self._pause_started_at
+            self._pause_started_at = None
 
 
 class OperatorDefinition(BaseModel):
@@ -50,6 +114,8 @@ class ExecutionContext:
     filename: str | None
     content_type: str
     production: bool = False
+    model_bindings: dict[str, RuntimeModelBinding] = field(default_factory=dict)
+    control: ExecutionControl = field(default_factory=ExecutionControl)
 
 
 class Operator(Protocol):
@@ -184,15 +250,21 @@ class PipelineRegistry:
             result: dict[str, Any] | None = None
             for attempt in range(attempts):
                 try:
-                    result = await asyncio.wait_for(
-                        operator.execute(context, inputs, parameters),
-                        timeout=definition.timeout_seconds,
+                    result = await self._execute_operator(
+                        operator,
+                        context,
+                        inputs,
+                        parameters,
+                        checkpoint,
+                        timeout_seconds=definition.timeout_seconds,
                     )
                     break
                 except TimeoutError as exc:
                     if attempt + 1 == attempts:
                         raise PipelineError(f"operator timed out: {node.operator_id}") from exc
                 except DomainUnavailable:
+                    raise
+                except ExecutionInterrupted:
                     raise
                 except Exception as exc:
                     if attempt + 1 == attempts:
@@ -208,6 +280,63 @@ class PipelineRegistry:
         if pipeline.output not in outputs:
             raise PipelineError(f"pipeline output was not produced: {pipeline.output}")
         return outputs[pipeline.output]
+
+    @staticmethod
+    async def _execute_operator(
+        operator: Operator,
+        context: ExecutionContext,
+        inputs: dict[str, Any],
+        parameters: dict[str, Any],
+        checkpoint: Any,
+        *,
+        timeout_seconds: float,
+    ) -> dict[str, Any]:
+        task = asyncio.create_task(operator.execute(context, inputs, parameters))
+        running_seconds = 0.0
+        running_since = time.monotonic()
+        paused_since = context.control.paused_seconds
+
+        async def stop_operator() -> None:
+            context.control.cancel()
+            done, _ = await asyncio.wait({task}, timeout=1.0)
+            if task not in done:
+                task.cancel()
+            with suppress(BaseException):
+                await task
+
+        try:
+            while True:
+                remaining_seconds = timeout_seconds - running_seconds
+                if remaining_seconds <= 0:
+                    await stop_operator()
+                    raise TimeoutError
+                done, _ = await asyncio.wait({task}, timeout=min(0.1, remaining_seconds))
+                now = time.monotonic()
+                paused_now = context.control.paused_seconds
+                running_seconds += max(0.0, now - running_since - (paused_now - paused_since))
+                running_since = now
+                paused_since = paused_now
+                if task in done:
+                    return task.result()
+                if running_seconds >= timeout_seconds:
+                    await stop_operator()
+                    raise TimeoutError
+                try:
+                    await checkpoint()
+                except BaseException:
+                    await stop_operator()
+                    raise
+                checkpoint_finished = time.monotonic()
+                paused_after_checkpoint = context.control.paused_seconds
+                running_seconds += max(
+                    0.0,
+                    checkpoint_finished - running_since - (paused_after_checkpoint - paused_since),
+                )
+                running_since = checkpoint_finished
+                paused_since = paused_after_checkpoint
+        except asyncio.CancelledError:
+            await stop_operator()
+            raise
 
     def _validate(self, pipeline: PipelineDefinition) -> list[str]:
         if not re.fullmatch(r"[a-z][a-z0-9_.-]{1,127}", pipeline.pipeline_id):

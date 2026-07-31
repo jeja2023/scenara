@@ -17,18 +17,26 @@ from .models import (
     HardSampleManifest,
     IamSummary,
     MediaAsset,
+    MediaSource,
+    MediaSourceProbe,
     Membership,
     ModelDeploymentEvent,
     ModelPackage,
     ModelRelease,
     Organization,
+    ParseDocumentResponse,
+    ParseImageResponse,
+    ParseVideoResponse,
+    PortraitIntelligenceStatus,
     ProductCatalogItem,
     ProductEntitlement,
     Project,
+    RepositoryContractCatalog,
     RepositoryTopology,
     ResultEnvelope,
     Role,
     Run,
+    SampleStrategy,
     ServiceAccount,
     UserAccount,
     WebhookDelivery,
@@ -60,7 +68,7 @@ class ScenaraClient:
         headers = {
             "X-Tenant-Id": tenant_id,
             "X-Project-Id": project_id,
-            "User-Agent": "scenara-sdk-python/0.3.0.dev0",
+            "User-Agent": "scenara-sdk-python/0.3.0.dev2",
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -158,20 +166,177 @@ class ScenaraClient:
             time.sleep(poll_interval)
         raise TimeoutError(f"run did not complete within {timeout} seconds: {run_id}")
 
-    def parse_image(self, path: str | Path, *, domain: Domain = "portrait") -> dict[str, Any]:
+    def parse_image(
+        self,
+        path: str | Path,
+        *,
+        domain: Domain = "portrait",
+        pipeline_id: str | None = None,
+        pipeline_version: str | None = None,
+        idempotency_key: str | None = None,
+    ) -> ParseImageResponse:
         source = Path(path)
         content_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
+        data: dict[str, object] = {"domain": domain}
+        if pipeline_id is not None:
+            data["pipeline_id"] = pipeline_id
+        if pipeline_version is not None:
+            data["pipeline_version"] = pipeline_version
         with source.open("rb") as handle:
             return cast(
-                dict[str, Any],
+                ParseImageResponse,
                 self._request(
                     "POST",
                     "/api/v1/parse/image",
                     files={"file": (source.name, handle, content_type)},
-                    data={"domain": domain},
-                    headers={"Idempotency-Key": f"sdk_{uuid.uuid4().hex}"},
+                    data=data,
+                    headers={"Idempotency-Key": idempotency_key or f"sdk_{uuid.uuid4().hex}"},
                 ),
             )
+
+    def parse_video(
+        self,
+        path: str | Path,
+        *,
+        domain: Domain = "portrait",
+        pipeline_id: str | None = None,
+        pipeline_version: str | None = None,
+        sample_interval_ms: int = 1_000,
+        max_units: int = 64,
+        sample_strategy: SampleStrategy = "interval",
+        sample_start_ms: int = 0,
+        sample_end_ms: int | None = None,
+        scene_change_threshold: float = 0.35,
+        frame_max_edge: int | None = None,
+        page_scale: float = 1.5,
+        wait_ms: int = 0,
+        idempotency_key: str | None = None,
+    ) -> ParseVideoResponse:
+        source = Path(path)
+        content_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
+        data: dict[str, object] = {
+            "domain": domain,
+            "sample_interval_ms": sample_interval_ms,
+            "max_units": max_units,
+            "sample_strategy": sample_strategy,
+            "sample_start_ms": sample_start_ms,
+            "scene_change_threshold": scene_change_threshold,
+            "page_scale": page_scale,
+            "wait_ms": wait_ms,
+        }
+        if pipeline_id is not None:
+            data["pipeline_id"] = pipeline_id
+        if pipeline_version is not None:
+            data["pipeline_version"] = pipeline_version
+        if sample_end_ms is not None:
+            data["sample_end_ms"] = sample_end_ms
+        if frame_max_edge is not None:
+            data["frame_max_edge"] = frame_max_edge
+        with source.open("rb") as handle:
+            return cast(
+                ParseVideoResponse,
+                self._request(
+                    "POST",
+                    "/api/v1/parse/video",
+                    files={"file": (source.name, handle, content_type)},
+                    data=data,
+                    headers={"Idempotency-Key": idempotency_key or f"sdk_{uuid.uuid4().hex}"},
+                ),
+            )
+
+    def parse_document(
+        self,
+        path: str | Path,
+        *,
+        domain: Domain = "ocr",
+        pipeline_id: str | None = None,
+        pipeline_version: str | None = None,
+        max_units: int = 64,
+        page_scale: float = 1.5,
+        wait_ms: int = 0,
+        idempotency_key: str | None = None,
+    ) -> ParseDocumentResponse:
+        source = Path(path)
+        content_type = mimetypes.guess_type(source.name)[0] or "application/pdf"
+        data: dict[str, object] = {
+            "domain": domain,
+            "max_units": max_units,
+            "page_scale": page_scale,
+            "wait_ms": wait_ms,
+        }
+        if pipeline_id is not None:
+            data["pipeline_id"] = pipeline_id
+        if pipeline_version is not None:
+            data["pipeline_version"] = pipeline_version
+        with source.open("rb") as handle:
+            return cast(
+                ParseDocumentResponse,
+                self._request(
+                    "POST",
+                    "/api/v1/parse/document",
+                    files={"file": (source.name, handle, content_type)},
+                    data=data,
+                    headers={"Idempotency-Key": idempotency_key or f"sdk_{uuid.uuid4().hex}"},
+                ),
+            )
+
+    def parse_stream(
+        self,
+        source_id: str,
+        *,
+        domain: Domain = "portrait",
+        pipeline_id: str | None = None,
+        pipeline_version: str | None = None,
+        sample_interval_ms: int = 1_000,
+        max_units: int = 64,
+        sample_strategy: SampleStrategy = "interval",
+        sample_start_ms: int = 0,
+        sample_end_ms: int | None = None,
+        scene_change_threshold: float = 0.35,
+        frame_max_edge: int | None = None,
+        max_reconnect_attempts: int = 3,
+        connect_timeout_ms: int = 10_000,
+        read_timeout_ms: int = 10_000,
+        priority: int = 0,
+        wait_ms: int = 0,
+        idempotency_key: str | None = None,
+    ) -> Run:
+        selected_pipeline = pipeline_id or (
+            "portrait.person-detection" if domain == "portrait" else "ocr.document"
+        )
+        parameters: dict[str, object] = {
+            "sample_interval_ms": sample_interval_ms,
+            "max_units": max_units,
+            "sample_strategy": sample_strategy,
+            "sample_start_ms": sample_start_ms,
+            "scene_change_threshold": scene_change_threshold,
+            "max_reconnect_attempts": max_reconnect_attempts,
+            "connect_timeout_ms": connect_timeout_ms,
+            "read_timeout_ms": read_timeout_ms,
+        }
+        if sample_end_ms is not None:
+            parameters["sample_end_ms"] = sample_end_ms
+        if frame_max_edge is not None:
+            parameters["frame_max_edge"] = frame_max_edge
+        pipeline: dict[str, object] = {"pipeline_id": selected_pipeline}
+        if pipeline_version is not None:
+            pipeline["version"] = pipeline_version
+        return cast(
+            Run,
+            self._request(
+                "POST",
+                "/api/v1/parse/stream",
+                json={
+                    "source_id": source_id,
+                    "domain": domain,
+                    "pipeline": pipeline,
+                    "parameters": parameters,
+                    "priority": priority,
+                    "wait_ms": wait_ms,
+                },
+                headers={"Idempotency-Key": idempotency_key or f"sdk_{uuid.uuid4().hex}"},
+            ),
+        )
 
     def list_assets(self, *, offset: int = 0, limit: int = 50) -> dict[str, Any]:
         return cast(
@@ -194,15 +359,37 @@ class ScenaraClient:
         name: str,
         url: str,
         metadata: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+    ) -> MediaSource:
         return cast(
-            dict[str, Any],
+            MediaSource,
             self._request(
                 "POST",
                 "/api/v1/media/sources",
                 json={"name": name, "url": url, "metadata": metadata or {}},
             ),
         )
+
+    def list_sources(self, *, offset: int = 0, limit: int = 50) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self._request("GET", "/api/v1/media/sources", params={"offset": offset, "limit": limit}),
+        )
+
+    def get_source(self, source_id: str) -> MediaSource:
+        return cast(MediaSource, self._request("GET", f"/api/v1/media/sources/{source_id}"))
+
+    def probe_source(self, source_id: str, *, timeout_ms: int = 10_000) -> MediaSourceProbe:
+        return cast(
+            MediaSourceProbe,
+            self._request(
+                "POST",
+                f"/api/v1/media/sources/{source_id}/probe",
+                params={"timeout_ms": timeout_ms},
+            ),
+        )
+
+    def delete_source(self, source_id: str) -> None:
+        self._request("DELETE", f"/api/v1/media/sources/{source_id}")
 
     def pause_run(self, run_id: str) -> Run:
         return cast(Run, self._request("POST", f"/api/v1/runs/{run_id}/pause"))
@@ -222,8 +409,19 @@ class ScenaraClient:
     def get_repository_topology(self) -> RepositoryTopology:
         return cast(RepositoryTopology, self._request("GET", "/api/v1/platform/repositories"))
 
+    def get_repository_contracts(self) -> RepositoryContractCatalog:
+        return cast(RepositoryContractCatalog, self._request("GET", "/api/v1/platform/contracts"))
+
     def get_access_foundation(self) -> AccessFoundationStatus:
         return cast(AccessFoundationStatus, self._request("GET", "/api/v1/platform/access-foundation"))
+
+    def get_portrait_intelligence(self) -> PortraitIntelligenceStatus:
+        """Return the Portrait Intelligence Foundation Platform contract.
+
+        Reports the six strategic capability modules, three core assets,
+        and per-capability readiness state for the portrait domain.
+        """
+        return cast(PortraitIntelligenceStatus, self._request("GET", "/api/v1/platform/portrait-intelligence"))
 
     def get_iam_summary(self) -> IamSummary:
         return cast(IamSummary, self._request("GET", "/api/v1/platform/iam/summary"))
@@ -544,6 +742,12 @@ class ScenaraClient:
 
     def create_model_release(self, release: dict[str, Any]) -> ModelRelease:
         return cast(ModelRelease, self._request("POST", "/api/v1/model-releases", json=release))
+
+    def admit_model_package(self, package: ModelPackage) -> ModelPackage:
+        return cast(
+            ModelPackage,
+            self._request("POST", "/api/v1/model-packages/admissions", json=package),
+        )
 
     def list_model_releases(self) -> list[ModelRelease]:
         return cast(list[ModelRelease], self._request("GET", "/api/v1/model-releases"))

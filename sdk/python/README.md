@@ -1,3 +1,30 @@
 # Scenara 景枢 Python SDK
 
-Scenara 景枢 v1 API 的官方同步 Python 客户端，提供媒体上传、运行生命周期、结果读取、图片解析以及产品目录、仓库拓扑与统一访问底座查询能力。仓库拓扑使用 `ScenaraClient.get_repository_topology()` 读取。
+Scenara 景枢 v1 API 的官方同步 Python 客户端，提供图片、PDF、视频文件、实时视频流解析，媒体源注册与探测，运行生命周期、结果读取，以及产品目录、仓库拓扑、跨仓库契约与统一访问底座查询能力。仓库拓扑使用 `ScenaraClient.get_repository_topology()` 读取，正式契约目录使用 `get_repository_contracts()` 读取，模型包通过 `admit_model_package()` 准入。
+
+```python
+with ScenaraClient("https://scenara.example", token="...") as client:
+    image = client.parse_image(
+        "frame.jpg",
+        pipeline_id="portrait.person-detection",
+        idempotency_key="camera-42-frame-1001",
+    )
+    video = client.parse_video(
+        "clip.mp4",
+        sample_strategy="scene_change",
+        sample_start_ms=5_000,
+        sample_end_ms=30_000,
+        scene_change_threshold=0.25,
+        frame_max_edge=1_280,
+    )
+    document = client.parse_document("report.pdf", max_units=20, page_scale=2.0)
+    stream = client.parse_stream(
+        "source-id",
+        max_units=64,
+        max_reconnect_attempts=5,
+        connect_timeout_ms=3_000,
+        read_timeout_ms=2_000,
+    )
+```
+
+省略 `pipeline_version` 时由服务端选择唯一的 active 版本；需要固定复现某次运行时应显式传入版本。

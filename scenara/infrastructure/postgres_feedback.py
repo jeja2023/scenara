@@ -136,13 +136,14 @@ class PostgresFeedbackRepository:
             async with self._pool.connection() as connection, connection.transaction():
                 await connection.execute(
                     """INSERT INTO scenara_model_releases
-                       (tenant_id, project_id, model_id, version, status, created_at, updated_at, document)
-                       VALUES (%s, %s, %s, %s, %s, to_timestamp(%s), to_timestamp(%s), %s)""",
+                       (tenant_id, project_id, model_id, version, capability, status, created_at, updated_at, document)
+                       VALUES (%s, %s, %s, %s, %s, %s, to_timestamp(%s), to_timestamp(%s), %s)""",
                     (
                         release.tenant_id,
                         release.project_id,
                         release.model_id,
                         release.version,
+                        release.capability,
                         release.status.value,
                         release.created_at,
                         release.updated_at,
@@ -191,13 +192,21 @@ class PostgresFeedbackRepository:
 
         async with self._pool.connection() as connection, connection.transaction():
             cursor = await connection.execute(
-                """SELECT version, document FROM scenara_model_releases
-                   WHERE tenant_id = %s AND project_id = %s AND model_id = %s FOR UPDATE""",
-                (tenant_id, project_id, model_id),
+                """SELECT model_id, version, document FROM scenara_model_releases
+                   WHERE tenant_id = %s AND project_id = %s
+                     AND capability = (
+                         SELECT capability FROM scenara_model_releases
+                         WHERE tenant_id = %s AND project_id = %s AND model_id = %s AND version = %s
+                     )
+                   FOR UPDATE""",
+                (tenant_id, project_id, tenant_id, project_id, model_id, version),
             )
             rows = await cursor.fetchall()
-            releases = {str(row[0]): ModelRelease.model_validate(row[1]) for row in rows}
-            current = releases.get(version)
+            releases = {
+                (str(row[0]), str(row[1])): ModelRelease.model_validate(row[2])
+                for row in rows
+            }
+            current = releases.get((model_id, version))
             if current is None:
                 raise FeedbackNotFound("model release not found")
             validate_release_transition(current.status, target, rollback=rollback)
@@ -208,7 +217,8 @@ class PostgresFeedbackRepository:
                     (
                         item
                         for item in releases.values()
-                        if item.version != version and item.status == ModelReleaseStatus.ACTIVE
+                        if (item.model_id, item.version) != (model_id, version)
+                        and item.status == ModelReleaseStatus.ACTIVE
                     ),
                     None,
                 )

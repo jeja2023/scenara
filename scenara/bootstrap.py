@@ -161,6 +161,7 @@ def build_runtime(
         policy=policy,
         allow_private_targets=settings.allow_private_webhook_targets,
     )
+    feedback = FeedbackService(feedback_repository, state, state, objects, policy, audit)
     runs = RunService(
         state=state,
         objects=objects,
@@ -179,8 +180,8 @@ def build_runtime(
         structured_result_retention_days=settings.structured_result_retention_days,
         production=settings.production,
         allow_private_media_sources=settings.allow_private_media_sources,
+        active_model_resolver=feedback,
     )
-    feedback = FeedbackService(feedback_repository, state, state, objects, policy, audit)
     access = AccessService(access_repository, audit, policy)
     return Runtime(
         settings=settings,

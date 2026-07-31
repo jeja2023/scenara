@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import httpx
 import pytest
@@ -40,6 +41,18 @@ def test_python_sdk_context_lifecycle_and_domain_methods() -> None:
                     }
                 ),
             )
+        if request.url.path.endswith("/platform/contracts"):
+            return httpx.Response(
+                200,
+                content=envelope(
+                    {
+                        "schema_version": "1.0",
+                        "release_version": "1.0.0",
+                        "package_name": "@scenara/repository-contracts",
+                        "contracts": [],
+                    }
+                ),
+            )
         if request.url.path.endswith("/platform/access-foundation"):
             return httpx.Response(
                 200,
@@ -52,6 +65,49 @@ def test_python_sdk_context_lifecycle_and_domain_methods() -> None:
                         "principal_id": "api-token",
                         "policy_provider": "development-open",
                         "capabilities": [],
+                    }
+                ),
+            )
+        if request.url.path.endswith("/platform/portrait-intelligence"):
+            return httpx.Response(
+                200,
+                content=envelope(
+                    {
+                        "schema_version": "1.0",
+                        "positioning": "portrait_intelligence_foundation_platform",
+                        "modules": [
+                            {
+                                "module_id": "algorithms",
+                                "name": "Portrait Algorithms",
+                                "maturity": "partial",
+                                "summary": "Complete portrait AI capability matrix.",
+                                "owner_repository_id": "scenara-model",
+                                "current_scope": ["person_detection — ready"],
+                                "not_in_scope_yet": ["face_detection"],
+                                "next_gate": "Submit ONNX artifacts.",
+                            }
+                        ],
+                        "assets": [
+                            {
+                                "asset_id": "intelligence_engine",
+                                "name": "Portrait Intelligence Engine",
+                                "maturity": "seed",
+                                "summary": "Fuses retrieval and clustering.",
+                                "depends_on_modules": ["algorithms"],
+                                "next_gate": "Ship multi-modal fusion search.",
+                            }
+                        ],
+                        "capabilities": [
+                            {
+                                "capability_id": "person_detection",
+                                "readiness": "ready",
+                                "production_ready": True,
+                                "current_model": "yolov8n.onnx",
+                                "target_model": None,
+                                "embedding_dimension": None,
+                                "target_embedding_dimension": None,
+                            }
+                        ],
                     }
                 ),
             )
@@ -83,7 +139,12 @@ def test_python_sdk_context_lifecycle_and_domain_methods() -> None:
         assert client.get_asset_preview("asset-1") == b"jpeg-preview"
         assert client.list_products()[0]["product_id"] == "parse"
         assert client.get_repository_topology()["current_repository_id"] == "scenara"
+        assert client.get_repository_contracts()["release_version"] == "1.0.0"
         assert client.get_access_foundation()["auth_mode"] == "single_bearer_token"
+        portrait_intelligence = client.get_portrait_intelligence()
+        assert portrait_intelligence["positioning"] == "portrait_intelligence_foundation_platform"
+        assert portrait_intelligence["modules"][0]["module_id"] == "algorithms"
+        assert portrait_intelligence["capabilities"][0]["readiness"] == "ready"
         assert client.list_models() == []
         assert (
             client.create_webhook_subscription(
@@ -225,6 +286,8 @@ def test_python_sdk_feedback_and_model_release_methods() -> None:
             return httpx.Response(201, content=envelope({"manifest_id": "hsm-1", "sha256": "a" * 64}))
         if path.endswith("/model-deployment-events"):
             return httpx.Response(200, content=envelope([]))
+        if path.endswith("/model-packages/admissions"):
+            return httpx.Response(201, content=envelope(json.loads(request.content)))
         if path.endswith("/model-releases") and request.method == "GET":
             return httpx.Response(200, content=envelope([]))
         if "/model-releases/" in path:
@@ -242,6 +305,23 @@ def test_python_sdk_feedback_and_model_release_methods() -> None:
         return httpx.Response(201, content=envelope({"feedback_id": "fbk-1", "status": "pending"}))
 
     with ScenaraClient("https://scenara.example", transport=httpx.MockTransport(handler)) as client:
+        package = {
+            "schema_version": "1.0",
+            "model_id": "scenara.portrait.detector",
+            "version": "1.0.0",
+            "capability": "person_detection",
+            "adapter": "yolo",
+            "runtime_model_id": "scenara.portrait/detector_v1",
+            "sha256": "a" * 64,
+            "source_uri": f"oci://registry.example/detector@sha256:{'a' * 64}",
+            "license_id": "LicenseRef-Proprietary-Approved",
+            "model_card": f"https://artifacts.example/card.json#sha256={'b' * 64}",
+            "evaluation_evidence": [f"https://artifacts.example/eval.json#sha256={'c' * 64}"],
+            "vram_mb": 4096,
+            "regression_samples": ["portrait-v1"],
+            "production_ready": True,
+        }
+        assert client.admit_model_package(package)["runtime_model_id"] == "scenara.portrait/detector_v1"
         assert client.create_feedback({"kind": "false_negative"})["feedback_id"] == "fbk-1"
         assert client.list_feedback() == []
         assert client.review_feedback("fbk-1", status="approved")["status"] == "approved"
@@ -271,3 +351,175 @@ def test_python_sdk_feedback_and_model_release_methods() -> None:
 
     assert any(request.url.path.endswith("/review") for request in requests)
     assert any(request.url.path.endswith("/rollback") for request in requests)
+
+
+def test_python_sdk_media_file_and_stream_shortcuts(tmp_path: Path) -> None:
+    requests: list[httpx.Request] = []
+    media_file = tmp_path / "sample.mp4"
+    media_file.write_bytes(b"\x00\x00\x00\x18ftypisom-sdk-test")
+    image_file = tmp_path / "sample.png"
+    image_file.write_bytes(b"\x89PNG\r\n\x1a\n")
+    document_file = tmp_path / "sample.pdf"
+    document_file.write_bytes(b"%PDF-1.7\n%%EOF")
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.method == "DELETE":
+            return httpx.Response(204)
+        if request.url.path.endswith("/probe"):
+            return httpx.Response(
+                200,
+                content=envelope(
+                    {
+                        "source_id": "src-1",
+                        "reachable": True,
+                        "latency_ms": 12,
+                        "metadata": {"width": 1920, "height": 1080},
+                        "checked_at": 1.0,
+                    }
+                ),
+            )
+        if request.url.path.endswith("/parse/stream"):
+            return httpx.Response(202, content=envelope({"run_id": "run-stream", "status": "queued"}))
+        if request.url.path.endswith("/parse/image"):
+            return httpx.Response(
+                200,
+                content=envelope(
+                    {
+                        "asset": {"asset_id": "asset-image", "metadata": {"format": "png"}},
+                        "run": {"run_id": "run-image", "status": "completed"},
+                        "result": None,
+                    }
+                ),
+            )
+        if request.url.path.endswith("/parse/video"):
+            return httpx.Response(
+                202,
+                content=envelope(
+                    {
+                        "asset": {"asset_id": "asset-video", "metadata": {"container": "mp4"}},
+                        "run": {"run_id": "run-video", "status": "queued"},
+                        "result": None,
+                    }
+                ),
+            )
+        if request.url.path.endswith("/parse/document"):
+            return httpx.Response(
+                202,
+                content=envelope(
+                    {
+                        "asset": {"asset_id": "asset-document", "metadata": {"container": "pdf"}},
+                        "run": {"run_id": "run-document", "status": "queued"},
+                        "result": None,
+                    }
+                ),
+            )
+        if request.url.path.endswith("/media/sources") and request.method == "POST":
+            return httpx.Response(
+                201,
+                content=envelope(
+                    {
+                        "source_id": "src-1",
+                        "kind": "stream",
+                        "name": "camera-a",
+                        "masked_url": "rtsp://1.1.1.1/live",
+                        "metadata": {},
+                        "created_at": 1.0,
+                    }
+                ),
+            )
+        if request.url.path.endswith("/media/sources/src-1"):
+            return httpx.Response(200, content=envelope({"source_id": "src-1", "kind": "stream"}))
+        return httpx.Response(200, content=envelope({"items": [], "offset": 0, "limit": 50, "total": 0}))
+
+    with ScenaraClient("https://scenara.example", transport=httpx.MockTransport(handler)) as client:
+        source = client.create_source(name="camera-a", url="rtsp://1.1.1.1/live")
+        assert "secret_ref" not in source
+        assert client.list_sources()["total"] == 0
+        assert client.get_source("src-1")["source_id"] == "src-1"
+        assert client.probe_source("src-1", timeout_ms=2_000)["metadata"]["width"] == 1920
+        assert client.parse_image(
+            image_file,
+            domain="ocr",
+            pipeline_id="ocr.document",
+            pipeline_version="1.2.3",
+            idempotency_key="image-idempotency",
+        )["asset"]["asset_id"] == "asset-image"
+        assert client.parse_video(
+            media_file,
+            domain="ocr",
+            sample_interval_ms=400,
+            max_units=3,
+            sample_strategy="scene_change",
+            sample_start_ms=500,
+            sample_end_ms=2_500,
+            scene_change_threshold=0.2,
+            frame_max_edge=1_280,
+            page_scale=2.0,
+            wait_ms=2_000,
+            idempotency_key="video-idempotency",
+        )["asset"]["asset_id"] == "asset-video"
+        assert client.parse_document(
+            document_file,
+            max_units=5,
+            page_scale=2.5,
+            idempotency_key="document-idempotency",
+        )["asset"]["asset_id"] == "asset-document"
+        assert client.parse_stream(
+            "src-1",
+            domain="ocr",
+            sample_interval_ms=500,
+            max_units=4,
+            sample_strategy="keyframe",
+            sample_start_ms=250,
+            sample_end_ms=5_000,
+            scene_change_threshold=0.4,
+            frame_max_edge=720,
+            max_reconnect_attempts=5,
+            connect_timeout_ms=3_000,
+            read_timeout_ms=2_000,
+            idempotency_key="stream-idempotency",
+        )["run_id"] == "run-stream"
+        client.delete_source("src-1")
+
+    video_request = next(item for item in requests if item.url.path.endswith("/parse/video"))
+    assert video_request.headers["Idempotency-Key"] == "video-idempotency"
+    assert b'name="sample_interval_ms"' in video_request.content
+    assert b"400" in video_request.content
+    for field in (
+        b'sample_strategy',
+        b'sample_start_ms',
+        b'sample_end_ms',
+        b'scene_change_threshold',
+        b'frame_max_edge',
+        b'page_scale',
+    ):
+        assert b'name="' + field + b'"' in video_request.content
+    assert b'name="pipeline_version"' not in video_request.content
+    image_request = next(item for item in requests if item.url.path.endswith("/parse/image"))
+    assert image_request.headers["Idempotency-Key"] == "image-idempotency"
+    assert b'name="pipeline_id"' in image_request.content
+    assert b"ocr.document" in image_request.content
+    assert b'name="pipeline_version"' in image_request.content
+    assert b"1.2.3" in image_request.content
+    document_request = next(item for item in requests if item.url.path.endswith("/parse/document"))
+    assert document_request.headers["Idempotency-Key"] == "document-idempotency"
+    assert b'name="page_scale"' in document_request.content
+    assert b"2.5" in document_request.content
+    stream_request = next(item for item in requests if item.url.path.endswith("/parse/stream"))
+    assert stream_request.headers["Idempotency-Key"] == "stream-idempotency"
+    assert json.loads(stream_request.content)["parameters"] == {
+        "sample_interval_ms": 500,
+        "max_units": 4,
+        "sample_strategy": "keyframe",
+        "sample_start_ms": 250,
+        "sample_end_ms": 5_000,
+        "scene_change_threshold": 0.4,
+        "frame_max_edge": 720,
+        "max_reconnect_attempts": 5,
+        "connect_timeout_ms": 3_000,
+        "read_timeout_ms": 2_000,
+    }
+    assert json.loads(stream_request.content)["pipeline"] == {"pipeline_id": "ocr.document"}
+    probe_request = next(item for item in requests if item.url.path.endswith("/probe"))
+    assert probe_request.url.params["timeout_ms"] == "2000"

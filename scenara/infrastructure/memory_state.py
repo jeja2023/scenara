@@ -309,28 +309,66 @@ class MemoryStateStore:
                 raise StateConflict("run does not exist")
             stored = event.model_copy(update={"event_id": len(rows) + 1}, deep=True)
             rows.append(stored)
-            now = stored.created_at
-            for endpoint in self._webhook_subscriptions.values():
-                if (
-                    endpoint.tenant_id == tenant_id
-                    and endpoint.project_id == project_id
-                    and endpoint.enabled
-                    and stored.event_type in endpoint.event_types
-                ):
-                    delivery = WebhookDeliveryRecord(
-                        delivery_id=f"whd_{uuid4().hex}",
-                        tenant_id=tenant_id,
-                        project_id=project_id,
-                        endpoint_id=endpoint.endpoint_id,
-                        event_id=f"{stored.run_id}:{stored.event_id}",
-                        event_type=stored.event_type,
-                        payload=stored.model_dump(mode="json"),
-                        next_attempt_at=now,
-                        created_at=now,
-                        updated_at=now,
-                    )
-                    self._webhook_deliveries[self._key(tenant_id, project_id, delivery.delivery_id)] = delivery
+            self._enqueue_webhook_event(
+                tenant_id,
+                project_id,
+                event_id=f"{stored.run_id}:{stored.event_id}",
+                event_type=stored.event_type,
+                payload=stored.model_dump(mode="json"),
+                created_at=stored.created_at,
+            )
             return stored.model_copy(deep=True)
+
+    async def enqueue_webhook_event(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        event_id: str,
+        event_type: str,
+        payload: dict[str, object],
+        created_at: float,
+    ) -> None:
+        async with self._lock:
+            self._enqueue_webhook_event(
+                tenant_id,
+                project_id,
+                event_id=event_id,
+                event_type=event_type,
+                payload=payload,
+                created_at=created_at,
+            )
+
+    def _enqueue_webhook_event(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        event_id: str,
+        event_type: str,
+        payload: dict[str, object],
+        created_at: float,
+    ) -> None:
+        for endpoint in self._webhook_subscriptions.values():
+            if (
+                endpoint.tenant_id == tenant_id
+                and endpoint.project_id == project_id
+                and endpoint.enabled
+                and event_type in endpoint.event_types
+            ):
+                delivery = WebhookDeliveryRecord(
+                    delivery_id=f"whd_{uuid4().hex}",
+                    tenant_id=tenant_id,
+                    project_id=project_id,
+                    endpoint_id=endpoint.endpoint_id,
+                    event_id=event_id,
+                    event_type=event_type,
+                    payload=payload,
+                    next_attempt_at=created_at,
+                    created_at=created_at,
+                    updated_at=created_at,
+                )
+                self._webhook_deliveries[self._key(tenant_id, project_id, delivery.delivery_id)] = delivery
 
     async def events_after(
         self,

@@ -12,7 +12,7 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from scenara.platform.audit import AuditLogger
-from scenara.platform.model_runtime import ModelCatalog, ModelPackageManifest
+from scenara.platform.model_runtime import ModelCatalog, ModelPackageManifest, RuntimeModelBinding
 from scenara.platform.models import PrincipalContext, ResultEnvelope, RunStatus
 from scenara.platform.objects import ObjectStore, validate_object_key
 from scenara.platform.policy import PolicyProvider, require_allowed
@@ -213,6 +213,8 @@ class ModelRelease(FeedbackModel):
     project_id: str
     model_id: str
     version: str
+    capability: str
+    runtime_model_id: str
     package_sha256: str
     evidence_refs: tuple[str, ...] = ()
     status: ModelReleaseStatus = ModelReleaseStatus.CANDIDATE
@@ -230,6 +232,9 @@ class ModelDeploymentEvent(FeedbackModel):
     project_id: str
     model_id: str
     version: str
+    capability: str
+    runtime_model_id: str
+    package_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     action: str
     from_status: ModelReleaseStatus | None
     to_status: ModelReleaseStatus
@@ -409,7 +414,12 @@ class MemoryFeedbackRepository:
         previous: ModelRelease | None = None
         if target == ModelReleaseStatus.ACTIVE:
             for other_key, other in self._releases.items():
-                if other_key[:3] == key[:3] and other.status == ModelReleaseStatus.ACTIVE and other_key != key:
+                if (
+                    other_key[:2] == key[:2]
+                    and other.capability == current.capability
+                    and other.status == ModelReleaseStatus.ACTIVE
+                    and other_key != key
+                ):
                     previous = other.model_copy(
                         update={"status": ModelReleaseStatus.RETIRED, "retired_at": now, "updated_at": now}
                     )
@@ -473,6 +483,28 @@ class FeedbackService:
         self._objects = objects
         self._policy = policy
         self._audit = audit
+
+    async def admit_package(
+        self,
+        context: PrincipalContext,
+        package: ModelPackageManifest,
+    ) -> ModelPackageManifest:
+        await require_allowed(self._policy, context, "model-package.admit", "model_package")
+        if package.runtime_model_id.startswith("legacy/"):
+            raise FeedbackConflict("legacy runtime bindings are reserved for migrated packages")
+        await self._audit.record(
+            context,
+            action="model-package.admit",
+            resource_type="model-package",
+            resource_id=f"{package.model_id}@{package.version}",
+            evidence={
+                "capability": package.capability,
+                "runtime_model_id": package.runtime_model_id,
+                "sha256": package.sha256,
+            },
+        )
+        await self._catalog.register_model_package(package)
+        return package
 
     async def create(self, context: PrincipalContext, body: CreateFeedbackRequest) -> FeedbackRecord:
         await require_allowed(self._policy, context, "feedback.create", "feedback")
@@ -604,11 +636,14 @@ class FeedbackService:
     ) -> ModelRelease:
         await require_allowed(self._policy, context, "model-release.create", "model-release")
         package = await self._package(body.model_id, body.version, body.package_sha256)
-        del package
+        if package.runtime_model_id.startswith("legacy/"):
+            raise FeedbackConflict("migrated model packages must be replaced before release")
         now = time.time()
         release = ModelRelease(
             tenant_id=context.tenant_id,
             project_id=context.project_id,
+            capability=package.capability,
+            runtime_model_id=package.runtime_model_id,
             created_by=context.principal_id,
             created_at=now,
             updated_at=now,
@@ -646,6 +681,8 @@ class FeedbackService:
             ModelReleaseStatus.ACTIVE,
         }:
             package = await self._package(model_id, version, current.package_sha256)
+            if package.runtime_model_id.startswith("legacy/"):
+                raise FeedbackConflict("migrated model packages must be replaced before release")
             await self._validate_qualification_evidence(context, current, package)
         if body.status == ModelReleaseStatus.ACTIVE:
             assert package is not None
@@ -665,13 +702,16 @@ class FeedbackService:
             version,
             body.status,
         )
-        await self._repository.append_deployment_event(
+        await self._record_deployment_event(
             ModelDeploymentEvent(
                 event_id=f"mde_{uuid4().hex}",
                 tenant_id=context.tenant_id,
                 project_id=context.project_id,
                 model_id=model_id,
                 version=version,
+                capability=updated.capability,
+                runtime_model_id=updated.runtime_model_id,
+                package_sha256=updated.package_sha256,
                 action="transition",
                 from_status=current.status,
                 to_status=updated.status,
@@ -682,13 +722,16 @@ class FeedbackService:
             )
         )
         if retired is not None:
-            await self._repository.append_deployment_event(
+            await self._record_deployment_event(
                 ModelDeploymentEvent(
                     event_id=f"mde_{uuid4().hex}",
                     tenant_id=context.tenant_id,
                     project_id=context.project_id,
                     model_id=retired.model_id,
                     version=retired.version,
+                    capability=retired.capability,
+                    runtime_model_id=retired.runtime_model_id,
+                    package_sha256=retired.package_sha256,
                     action="superseded",
                     from_status=ModelReleaseStatus.ACTIVE,
                     to_status=ModelReleaseStatus.RETIRED,
@@ -714,6 +757,8 @@ class FeedbackService:
             raise FeedbackNotFound("rollback target not found")
         validate_release_transition(target.status, ModelReleaseStatus.ACTIVE, rollback=True)
         package = await self._package(model_id, target.version, target.package_sha256)
+        if package.runtime_model_id.startswith("legacy/"):
+            raise FeedbackConflict("migrated model packages cannot be rollback targets")
         if not package.production_ready:
             raise FeedbackConflict("rollback target package is not production-ready")
         await self._validate_qualification_evidence(context, target, package)
@@ -732,13 +777,16 @@ class FeedbackService:
             ModelReleaseStatus.ACTIVE,
             rollback=True,
         )
-        await self._repository.append_deployment_event(
+        await self._record_deployment_event(
             ModelDeploymentEvent(
                 event_id=f"mde_{uuid4().hex}",
                 tenant_id=context.tenant_id,
                 project_id=context.project_id,
                 model_id=model_id,
                 version=target.version,
+                capability=updated.capability,
+                runtime_model_id=updated.runtime_model_id,
+                package_sha256=updated.package_sha256,
                 action="rollback",
                 from_status=target.status,
                 to_status=ModelReleaseStatus.ACTIVE,
@@ -749,13 +797,16 @@ class FeedbackService:
             )
         )
         if retired is not None:
-            await self._repository.append_deployment_event(
+            await self._record_deployment_event(
                 ModelDeploymentEvent(
                     event_id=f"mde_{uuid4().hex}",
                     tenant_id=context.tenant_id,
                     project_id=context.project_id,
                     model_id=model_id,
                     version=retired.version,
+                    capability=retired.capability,
+                    runtime_model_id=retired.runtime_model_id,
+                    package_sha256=retired.package_sha256,
                     action="rollback-retire",
                     from_status=ModelReleaseStatus.ACTIVE,
                     to_status=ModelReleaseStatus.RETIRED,
@@ -772,6 +823,48 @@ class FeedbackService:
     ) -> list[ModelDeploymentEvent]:
         await require_allowed(self._policy, context, "model-release.read", "model-deployment-event")
         return await self._repository.list_deployment_events(context.tenant_id, context.project_id, limit)
+
+    async def active_runtime_bindings(
+        self,
+        tenant_id: str,
+        project_id: str,
+    ) -> dict[str, RuntimeModelBinding]:
+        packages = {
+            (package.model_id, package.version, package.sha256): package
+            for package in await self._catalog.list_model_packages()
+        }
+        bindings: dict[str, RuntimeModelBinding] = {}
+        for release in await self._repository.list_releases(tenant_id, project_id):
+            if release.status != ModelReleaseStatus.ACTIVE:
+                continue
+            package = packages.get((release.model_id, release.version, release.package_sha256))
+            if package is None:
+                raise FeedbackConflict("active model release package is unavailable")
+            if package.runtime_model_id.startswith("legacy/"):
+                continue
+            if release.capability in bindings:
+                raise FeedbackConflict("multiple active model releases target the same capability")
+            bindings[release.capability] = RuntimeModelBinding(
+                capability=release.capability,
+                model_id=release.model_id,
+                version=release.version,
+                runtime_model_id=release.runtime_model_id,
+                adapter=package.adapter,
+                sha256=package.sha256,
+                package_sha256=release.package_sha256,
+            )
+        return bindings
+
+    async def _record_deployment_event(self, event: ModelDeploymentEvent) -> None:
+        await self._repository.append_deployment_event(event)
+        await self._state.enqueue_webhook_event(
+            event.tenant_id,
+            event.project_id,
+            event_id=event.event_id,
+            event_type="model.deployment.changed",
+            payload=event.model_dump(mode="json"),
+            created_at=event.created_at,
+        )
 
     async def _package(self, model_id: str, version: str, sha256: str) -> ModelPackageManifest:
         for package in await self._catalog.list_model_packages():

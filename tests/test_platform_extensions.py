@@ -14,7 +14,14 @@ from PIL import Image
 from scenara.infrastructure.object_store import LocalObjectStore
 from scenara.platform.audit import AuditLogger, AuditUnavailable
 from scenara.platform.media_batch import MediaInput, decode_media
-from scenara.platform.model_runtime import AdapterHealth, ModelMetadata, ModelPackageManifest, ModelRegistry
+from scenara.platform.model_runtime import (
+    AdapterHealth,
+    ModelMetadata,
+    ModelPackageManifest,
+    ModelRegistry,
+    RuntimeModelBinding,
+    runtime_binding_scope,
+)
 from scenara.platform.models import MediaKind, PipelineStatus, PrincipalContext
 from scenara.platform.network import UnsafeNetworkTarget, validate_external_url
 from scenara.platform.pipeline import PipelineDefinition, PipelineError, PipelineNode, PipelineRegistry
@@ -169,7 +176,18 @@ class _Adapter:
 
     def metadata(self) -> ModelMetadata:
         assert self.package is not None
-        return ModelMetadata(**self.package.model_dump(exclude={"model_card", "regression_samples"}))
+        return ModelMetadata(
+            model_id=self.package.model_id,
+            version=self.package.version,
+            capability=self.package.capability,
+            adapter=self.package.adapter,
+            runtime_model_id=self.package.runtime_model_id,
+            sha256=self.package.sha256,
+            source_uri=self.package.source_uri,
+            license_id=self.package.license_id,
+            vram_mb=self.package.vram_mb,
+            production_ready=self.package.production_ready,
+        )
 
     async def close(self) -> None:
         return None
@@ -186,10 +204,12 @@ async def test_production_model_registry_rejects_unapproved(tmp_path: Path) -> N
         version="1.0.0",
         capability="test",
         adapter="test",
+        runtime_model_id="test/model",
         sha256=hashlib.sha256(b"model").hexdigest(),
-        source_uri="internal://approved",
+        source_uri=f"internal://approved#sha256={hashlib.sha256(b'model').hexdigest()}",
         license_id="Proprietary",
-        model_card="model-card.yml",
+        model_card=f"internal://model-card.yml#sha256={'b' * 64}",
+        evaluation_evidence=(f"internal://evaluation.json#sha256={'c' * 64}",),
         vram_mb=1024,
         regression_samples=("sample-1",),
         production_ready=False,
@@ -211,10 +231,12 @@ async def test_model_registry_persists_verified_package_in_catalog(tmp_path: Pat
         version="1.0.0",
         capability="test-approved",
         adapter="test",
+        runtime_model_id="test/approved-model",
         sha256=hashlib.sha256(b"approved-model").hexdigest(),
-        source_uri="internal://approved-model",
+        source_uri=f"internal://approved-model#sha256={hashlib.sha256(b'approved-model').hexdigest()}",
         license_id="Proprietary",
-        model_card="model-card.yml",
+        model_card=f"internal://model-card.yml#sha256={'b' * 64}",
+        evaluation_evidence=(f"internal://evaluation.json#sha256={'c' * 64}",),
         vram_mb=1024,
         regression_samples=("sample-1",),
         production_ready=True,
@@ -223,3 +245,38 @@ async def test_model_registry_persists_verified_package_in_catalog(tmp_path: Pat
     registry = ModelRegistry(production=True, catalog=catalog)
     await registry.install(package, artifact, _Adapter())
     assert await catalog.list_model_packages() == [package]
+
+
+@pytest.mark.asyncio
+async def test_active_release_binding_selects_exact_legacy_runtime(monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.portrait_model_runtime_capability as runtime_capability
+
+    binding = RuntimeModelBinding(
+        capability="person_detection",
+        model_id="scenara.portrait.detector",
+        version="2.0.0",
+        runtime_model_id="scenara.portrait/detector_v2",
+        adapter="yolo",
+        sha256="a" * 64,
+        package_sha256="a" * 64,
+    )
+    monkeypatch.setattr(runtime_capability, "capability_status", lambda _: {"adapter": "development"})
+    monkeypatch.setattr(
+        runtime_capability,
+        "resolve_model_reference",
+        lambda *args: ("scenara.portrait", "detector_v2", "scenara.portrait/detector_v2", None),
+    )
+    monkeypatch.setattr(runtime_capability, "model_config", lambda _: {"version": "2.0.0"})
+    monkeypatch.setattr(runtime_capability, "get_model_path", lambda *args: Path("model.onnx"))
+
+    async def loaded(*args):
+        del args
+        return {"model_hash": "a" * 64}, False, 0.01
+
+    monkeypatch.setattr(runtime_capability, "get_or_load_model", loaded)
+    with runtime_binding_scope({"person_detection": binding}):
+        selected = await runtime_capability.get_capability_runtime("person_detection", {"yolo"})
+    assert selected is not None
+    assert selected.model_id == "scenara.portrait.detector"
+    assert selected.version == "2.0.0"
+    assert selected.cache_key == "scenara.portrait/detector_v2"

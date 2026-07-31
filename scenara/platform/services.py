@@ -6,12 +6,13 @@ import json
 import time
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
 from scenara.platform.audit import AuditLogger
-from scenara.platform.media_batch import MediaInput, create_media_preview
+from scenara.platform.media_batch import MediaInput, inspect_media
+from scenara.platform.model_runtime import RuntimeModelBinding, runtime_binding_scope
 from scenara.platform.models import (
     TERMINAL_RUN_STATUSES,
     CreateMediaSourceRequest,
@@ -19,8 +20,11 @@ from scenara.platform.models import (
     MediaAsset,
     MediaKind,
     MediaSource,
+    MediaSourceProbe,
+    MediaTechnicalMetadata,
     MediaUnitResult,
     ObjectRetentionRecord,
+    PipelineRef,
     PipelineStatus,
     PrincipalContext,
     ResultEnvelope,
@@ -34,6 +38,8 @@ from scenara.platform.objects import ObjectStore
 from scenara.platform.pipeline import (
     DomainUnavailable,
     ExecutionContext,
+    ExecutionControl,
+    ExecutionInterrupted,
     PipelineDefinition,
     PipelineError,
     PipelineRegistry,
@@ -52,8 +58,16 @@ class InvalidTransition(RuntimeError):
     pass
 
 
-class ExecutionStopped(RuntimeError):
+class ExecutionStopped(ExecutionInterrupted):
     pass
+
+
+class ActiveModelResolver(Protocol):
+    async def active_runtime_bindings(
+        self,
+        tenant_id: str,
+        project_id: str,
+    ) -> dict[str, RuntimeModelBinding]: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +97,7 @@ class RunService:
         structured_result_retention_days: int,
         production: bool,
         allow_private_media_sources: bool = False,
+        active_model_resolver: ActiveModelResolver | None = None,
     ) -> None:
         self.state = state
         self.objects = objects
@@ -101,6 +116,7 @@ class RunService:
         self.structured_result_retention_days = structured_result_retention_days
         self.production = production
         self.allow_private_media_sources = allow_private_media_sources
+        self.active_model_resolver = active_model_resolver
         self.queue.set_handler(self.execute_run)
 
     async def create_asset(
@@ -120,17 +136,24 @@ class RunService:
             raise ValueError(f"media exceeds {self.max_media_bytes} bytes")
         if kind == MediaKind.IMAGE and len(data) > self.max_image_bytes:
             raise ValueError(f"image exceeds {self.max_image_bytes} bytes")
+        if kind == MediaKind.STREAM:
+            raise ValueError("stream inputs must be registered as media sources")
+        media_input = MediaInput(
+            kind=kind,
+            content_type=content_type,
+            data=data,
+            filename=filename,
+        )
+        try:
+            raw_metadata, preview_data = await asyncio.to_thread(inspect_media, media_input)
+            metadata = MediaTechnicalMetadata.model_validate(raw_metadata)
+        except PipelineError as exc:
+            raise ValueError(f"invalid {kind.value} media: {exc}") from exc
         asset_id = f"ast_{uuid4().hex}"
         object_key = f"tenants/{context.tenant_id}/projects/{context.project_id}/assets/{asset_id}/original"
         preview_key = f"tenants/{context.tenant_id}/projects/{context.project_id}/assets/{asset_id}/preview.jpg"
         now = time.time()
         retention_days = 1 if temporary else self.raw_media_retention_days
-        preview_data: bytes | None = None
-        with suppress(PipelineError):
-            preview_data = await asyncio.to_thread(
-                create_media_preview,
-                MediaInput(kind=kind, content_type=content_type, data=data),
-            )
         asset = MediaAsset(
             asset_id=asset_id,
             tenant_id=context.tenant_id,
@@ -141,21 +164,21 @@ class RunService:
             size_bytes=len(data),
             sha256=hashlib.sha256(data).hexdigest(),
             object_key=object_key,
-            preview_object_key=preview_key if preview_data is not None else None,
-            preview_content_type="image/jpeg" if preview_data is not None else None,
-            preview_sha256=hashlib.sha256(preview_data).hexdigest() if preview_data is not None else None,
+            preview_object_key=preview_key,
+            preview_content_type="image/jpeg",
+            preview_sha256=hashlib.sha256(preview_data).hexdigest(),
+            metadata=metadata,
             temporary=temporary,
             created_at=now,
             expires_at=now + retention_days * 86_400,
         )
         await self.objects.put(object_key, data, asset.content_type)
-        if preview_data is not None:
-            try:
-                await self.objects.put(preview_key, preview_data, "image/jpeg")
-            except Exception:
-                with suppress(Exception):
-                    await self.objects.delete(object_key)
-                raise
+        try:
+            await self.objects.put(preview_key, preview_data, "image/jpeg")
+        except Exception:
+            with suppress(Exception):
+                await self.objects.delete(object_key)
+            raise
         stored: MediaAsset | None = None
         tracked_keys: list[str] = []
         try:
@@ -173,20 +196,19 @@ class RunService:
                 )
             )
             tracked_keys.append(object_key)
-            if preview_data is not None:
-                await self.state.track_object(
-                    ObjectRetentionRecord(
-                        tenant_id=context.tenant_id,
-                        project_id=context.project_id,
-                        object_key=preview_key,
-                        category="preview",
-                        owner_type="media_asset",
-                        owner_id=asset_id,
-                        created_at=now,
-                        expires_at=now + self.preview_retention_days * 86_400,
-                    )
+            await self.state.track_object(
+                ObjectRetentionRecord(
+                    tenant_id=context.tenant_id,
+                    project_id=context.project_id,
+                    object_key=preview_key,
+                    category="preview",
+                    owner_type="media_asset",
+                    owner_id=asset_id,
+                    created_at=now,
+                    expires_at=now + self.preview_retention_days * 86_400,
                 )
-                tracked_keys.append(preview_key)
+            )
+            tracked_keys.append(preview_key)
             await self.policy.consume(context, "media_bytes", len(data), {"asset_id": asset_id})
             await self.audit.record(
                 context,
@@ -205,9 +227,8 @@ class RunService:
                     await self.state.delete_asset(context.tenant_id, context.project_id, asset_id)
             with suppress(Exception):
                 await self.objects.delete(object_key)
-            if preview_data is not None:
-                with suppress(Exception):
-                    await self.objects.delete(preview_key)
+            with suppress(Exception):
+                await self.objects.delete(preview_key)
             raise
 
     async def sync_pipeline_catalog(self) -> list[PipelineDefinition]:
@@ -232,6 +253,19 @@ class RunService:
         if active_only and persisted.status != PipelineStatus.ACTIVE:
             raise PipelineError(f"pipeline is not active: {pipeline_id}@{version}")
         return persisted
+
+    async def resolve_pipeline_ref(self, pipeline_id: str, version: str | None = None) -> PipelineRef:
+        if version is None:
+            active = [
+                pipeline
+                for pipeline in await self.sync_pipeline_catalog()
+                if pipeline.pipeline_id == pipeline_id and pipeline.status == PipelineStatus.ACTIVE
+            ]
+            if len(active) != 1:
+                raise PipelineError(f"pipeline must have exactly one active version: {pipeline_id}")
+            version = active[0].version
+        await self.pipeline_definition(pipeline_id, version)
+        return PipelineRef(pipeline_id=pipeline_id, version=version)
 
     async def transition_pipeline(
         self,
@@ -343,6 +377,74 @@ class RunService:
             with suppress(Exception):
                 await self.secrets.delete(source.secret_ref)
             raise
+
+    async def get_source(self, context: PrincipalContext, source_id: str) -> MediaSource:
+        await require_allowed(self.policy, context, "read", "media_source", {"source_id": source_id})
+        source = await self.state.get_source(context.tenant_id, context.project_id, source_id)
+        if source is None:
+            raise ResourceNotFound("media source not found")
+        return source
+
+    async def delete_source(self, context: PrincipalContext, source_id: str) -> None:
+        await require_allowed(self.policy, context, "delete", "media_source", {"source_id": source_id})
+        source = await self.state.get_source(context.tenant_id, context.project_id, source_id)
+        if source is None:
+            raise ResourceNotFound("media source not found")
+        runs = await self.state.list_runs(context.tenant_id, context.project_id)
+        if any(item.source_id == source_id and item.status not in TERMINAL_RUN_STATUSES for item in runs):
+            raise StateConflict("media source has a non-terminal run")
+        await self.audit.record(
+            context,
+            action="media.source.delete",
+            resource_type="media_source",
+            resource_id=source_id,
+            evidence={"masked_url": source.masked_url},
+        )
+        await self.state.delete_source(context.tenant_id, context.project_id, source_id)
+        await self.secrets.delete(source.secret_ref)
+
+    async def probe_source(
+        self,
+        context: PrincipalContext,
+        source_id: str,
+        *,
+        timeout_ms: int = 10_000,
+    ) -> MediaSourceProbe:
+        source = await self.get_source(context, source_id)
+        await require_allowed(self.policy, context, "execute", "media_source", {"source_id": source_id})
+        source_url = await self.secrets.get(source.secret_ref)
+        await validate_external_url(
+            source_url,
+            allowed_schemes=frozenset({"rtsp", "rtmp", "http", "https"}),
+            allow_private=self.allow_private_media_sources,
+            allow_credentials=True,
+        )
+        started = time.perf_counter()
+        try:
+            raw_metadata, _preview = await asyncio.wait_for(
+                asyncio.to_thread(
+                    inspect_media,
+                    MediaInput(kind=MediaKind.STREAM, content_type="application/octet-stream", source_url=source_url),
+                ),
+                timeout=timeout_ms / 1000 + 1,
+            )
+        except TimeoutError as exc:
+            raise ValueError("media source probe timed out") from exc
+        probe = MediaSourceProbe(
+            source_id=source_id,
+            reachable=True,
+            latency_ms=max(0, round((time.perf_counter() - started) * 1000)),
+            metadata=MediaTechnicalMetadata.model_validate(raw_metadata),
+            checked_at=time.time(),
+        )
+        await self.audit.record(
+            context,
+            action="media.source.probe",
+            resource_type="media_source",
+            resource_id=source_id,
+            evidence={"reachable": True, "latency_ms": probe.latency_ms},
+        )
+        return probe
 
     async def create_run(
         self,
@@ -578,6 +680,11 @@ class RunService:
                 run.pipeline.version,
                 active_only=False,
             )
+            model_bindings = (
+                await self.active_model_resolver.active_runtime_bindings(run.tenant_id, run.project_id)
+                if self.active_model_resolver is not None
+                else {}
+            )
             context = ExecutionContext(
                 run_id=run.run_id,
                 tenant_id=run.tenant_id,
@@ -589,33 +696,36 @@ class RunService:
                 filename=filename,
                 content_type=content_type,
                 production=self.production,
+                model_bindings=model_bindings,
             )
 
             checkpoint_run: RunRecord = run
 
             async def checkpoint() -> None:
-                await self._checkpoint(checkpoint_run)
+                await self._checkpoint(checkpoint_run, context.control)
 
             parameters = {
                 "max_units": self.max_media_units,
                 "sample_interval_ms": self.media_sample_interval_ms,
                 **run.parameters,
             }
-            result = await self.pipelines.execute(
-                pipeline,
-                context,
-                {
-                    "$media.bytes": data or b"",
-                    "$media.input": MediaInput(
-                        kind=media_kind,
-                        content_type=content_type,
-                        data=data,
-                        source_url=source_url,
-                    ),
-                },
-                parameters,
-                checkpoint,
-            )
+            with runtime_binding_scope(model_bindings):
+                result = await self.pipelines.execute(
+                    pipeline,
+                    context,
+                    {
+                        "$media.bytes": data or b"",
+                        "$media.input": MediaInput(
+                            kind=media_kind,
+                            content_type=content_type,
+                            data=data,
+                            source_url=source_url,
+                            filename=filename,
+                        ),
+                    },
+                    parameters,
+                    checkpoint,
+                )
             if not isinstance(result, ResultEnvelope):
                 raise PipelineError("pipeline did not return a ResultEnvelope")
             await self._store_result(run, result)
@@ -781,26 +891,34 @@ class RunService:
             raise InvalidTransition(f"run cannot start from {run.status.value}")
         raise StateConflict("run could not acquire execution state")
 
-    async def _checkpoint(self, run: RunRecord) -> None:
+    async def _checkpoint(self, run: RunRecord, control: ExecutionControl | None = None) -> None:
         while True:
             latest = await self.state.get_run(run.tenant_id, run.project_id, run.run_id)
             if latest is None:
+                if control is not None:
+                    control.cancel()
                 raise ExecutionStopped
             if latest.status == RunStatus.CANCELLING:
-                cancelled = await self._set_status(
+                if control is not None:
+                    control.cancel()
+                await self._set_status(
                     latest,
                     RunStatus.CANCELLED,
                     completed_at=time.time(),
                     termination_reason="cancelled_by_user",
                 )
-                await self._event(cancelled, "run.cancelled")
                 raise ExecutionStopped
             if latest.status == RunStatus.PAUSING:
+                if control is not None:
+                    control.pause()
                 latest = await self._set_status(latest, RunStatus.PAUSED)
-                await self._event(latest, "run.paused")
             if latest.status == RunStatus.PAUSED:
+                if control is not None:
+                    control.pause()
                 await asyncio.sleep(0.1)
                 continue
+            if control is not None:
+                control.resume()
             return
 
     async def _set_status(self, run: RunRecord, status: RunStatus, **changes: Any) -> RunRecord:

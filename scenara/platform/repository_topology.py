@@ -116,6 +116,8 @@ def build_repository_topology() -> RepositoryTopology:
                 consumer_repository_id="scenara",
                 transport=RepositoryContractTransport.IMMUTABLE_MANIFEST,
                 payload_type="ModelPackageManifest",
+                release_version="1.0.0",
+                schema_path="contracts/repository/v1.0.0/model-package-admission.schema.json",
                 invariants=[
                     "sha256_digest_required",
                     "model_card_required",
@@ -130,6 +132,8 @@ def build_repository_topology() -> RepositoryTopology:
                 consumer_repository_id="scenara-data",
                 transport=RepositoryContractTransport.IMMUTABLE_MANIFEST,
                 payload_type="HardSampleManifest",
+                release_version="1.0.0",
+                schema_path="contracts/repository/v1.0.0/hard-sample-handoff.schema.json",
                 invariants=[
                     "approved_feedback_only",
                     "authorized_export_required",
@@ -143,6 +147,8 @@ def build_repository_topology() -> RepositoryTopology:
                 consumer_repository_id="scenara-model",
                 transport=RepositoryContractTransport.VERSIONED_API,
                 payload_type="DatasetVersionReference",
+                release_version="1.0.0",
+                schema_path="contracts/repository/v1.0.0/dataset-version-input.schema.json",
                 invariants=[
                     "immutable_dataset_version_required",
                     "lineage_required",
@@ -155,6 +161,8 @@ def build_repository_topology() -> RepositoryTopology:
                 consumer_repository_id="scenara-model",
                 transport=RepositoryContractTransport.EVENT,
                 payload_type="ModelDeploymentEvent",
+                release_version="1.0.0",
+                schema_path="contracts/repository/v1.0.0/deployment-feedback.schema.json",
                 invariants=[
                     "versioned_schema_required",
                     "tenant_project_scope_required",

@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import hashlib
+import re
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+IMMUTABLE_REFERENCE = re.compile(r"(?:@sha256:|#sha256=)([0-9a-f]{64})$")
 
 
 class AdapterHealth(StrEnum):
@@ -18,17 +24,45 @@ class AdapterHealth(StrEnum):
 class ModelPackageManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    schema_version: Literal["1.0"] = "1.0"
     model_id: str = Field(pattern=r"^[a-z][a-z0-9_.-]{1,127}$")
     version: str = Field(pattern=r"^\d+\.\d+\.\d+(?:-[a-z0-9.-]+)?$")
-    capability: str = Field(min_length=2, max_length=128)
+    capability: str = Field(pattern=r"^[a-z][a-z0-9_.-]{1,127}$")
     adapter: str = Field(min_length=2, max_length=64)
+    runtime_model_id: str = Field(pattern=r"^[^/\\\s]+/[^/\\\s]+$", max_length=384)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     source_uri: str = Field(min_length=1, max_length=2048)
     license_id: str = Field(min_length=1, max_length=128)
-    model_card: str = Field(min_length=1, max_length=1024)
+    model_card: str = Field(min_length=1, max_length=2048)
+    evaluation_evidence: tuple[str, ...] = Field(min_length=1, max_length=100)
     vram_mb: int = Field(ge=0, le=196_608)
     regression_samples: tuple[str, ...] = Field(min_length=1)
     production_ready: bool = False
+
+    @field_validator("source_uri", "model_card")
+    @classmethod
+    def immutable_reference(cls, value: str) -> str:
+        normalized = value.strip()
+        if not IMMUTABLE_REFERENCE.search(normalized):
+            raise ValueError("model package references must end with an immutable SHA-256 digest")
+        return normalized
+
+    @field_validator("evaluation_evidence")
+    @classmethod
+    def immutable_evidence(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        normalized = tuple(item.strip() for item in value)
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("model evaluation evidence references must be unique")
+        if any(not item or len(item) > 2048 or not IMMUTABLE_REFERENCE.search(item) for item in normalized):
+            raise ValueError("model evaluation evidence must use immutable SHA-256 references")
+        return normalized
+
+    @model_validator(mode="after")
+    def artifact_digest_matches(self) -> ModelPackageManifest:
+        match = IMMUTABLE_REFERENCE.search(self.source_uri)
+        if match is None or match.group(1) != self.sha256:
+            raise ValueError("model artifact reference digest must match sha256")
+        return self
 
 
 class ModelMetadata(BaseModel):
@@ -38,11 +72,44 @@ class ModelMetadata(BaseModel):
     version: str
     capability: str
     adapter: str
+    runtime_model_id: str
     sha256: str
     source_uri: str
     license_id: str
     vram_mb: int
     production_ready: bool
+
+
+class RuntimeModelBinding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    capability: str
+    model_id: str
+    version: str
+    runtime_model_id: str
+    adapter: str
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    package_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+_ACTIVE_RUNTIME_BINDINGS: ContextVar[dict[str, RuntimeModelBinding] | None] = ContextVar(
+    "scenara_active_runtime_bindings",
+    default=None,
+)
+
+
+def current_runtime_binding(capability: str) -> RuntimeModelBinding | None:
+    bindings = _ACTIVE_RUNTIME_BINDINGS.get()
+    return bindings.get(capability) if bindings is not None else None
+
+
+@contextmanager
+def runtime_binding_scope(bindings: dict[str, RuntimeModelBinding]) -> Iterator[None]:
+    reset_handle = _ACTIVE_RUNTIME_BINDINGS.set(dict(bindings))
+    try:
+        yield
+    finally:
+        _ACTIVE_RUNTIME_BINDINGS.reset(reset_handle)
 
 
 class ModelAdapter(Protocol):
@@ -139,4 +206,7 @@ __all__ = [
     "ModelPackageManifest",
     "ModelRegistry",
     "ModelRegistryError",
+    "RuntimeModelBinding",
+    "current_runtime_binding",
+    "runtime_binding_scope",
 ]

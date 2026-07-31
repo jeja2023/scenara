@@ -1,0 +1,15 @@
+{
+  "authorization_id": "grant_training_2026_07",
+  "authorized_consumer_repository_ids": [
+    "scenara-model"
+  ],
+  "created_at": 1785369600.0,
+  "dataset_id": "portrait.training",
+  "lineage_refs": [
+    "https://data.example/lineage/source.json#sha256=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  ],
+  "manifest_sha256": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "manifest_uri": "https://data.example/manifests/2.1.0.json#sha256=dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+  "schema_version": "1.0",
+  "version": "2.1.0"
+}

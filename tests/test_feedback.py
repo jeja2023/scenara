@@ -4,16 +4,22 @@ import hashlib
 import json
 import time
 from datetime import UTC, datetime, timedelta
+from io import BytesIO
+from types import SimpleNamespace
 
 import httpx
 import pytest
+from PIL import Image
 
 from scenara.bootstrap import build_runtime
-from scenara.platform.model_runtime import ModelPackageManifest
+from scenara.platform.model_runtime import ModelPackageManifest, current_runtime_binding
 from scenara.platform.models import (
+    CreateRunRequest,
+    MediaKind,
     ModelProvenance,
     PipelineRef,
     PortraitDomainPayload,
+    PrincipalContext,
     ResultEnvelope,
     ResultReference,
     RunRecord,
@@ -29,12 +35,14 @@ async def feedback_client(development_settings):
         ModelPackageManifest(
             model_id="scenara.portrait.release",
             version="1.0.0",
-            capability="portrait-analysis",
+            capability="person_detection",
             adapter="release-test",
+            runtime_model_id="scenara.portrait/release_1_0_0",
             sha256="a" * 64,
-            source_uri="internal://models/portrait/1.0.0",
+            source_uri=f"internal://models/portrait/1.0.0#sha256={'a' * 64}",
             license_id="Proprietary",
-            model_card="models/portrait-1.0.0.yml",
+            model_card=f"internal://models/portrait-1.0.0.yml#sha256={'c' * 64}",
+            evaluation_evidence=(f"internal://evaluation/1.0.0.json#sha256={'d' * 64}",),
             vram_mb=1024,
             regression_samples=("portrait-regression-v1",),
             production_ready=True,
@@ -92,12 +100,14 @@ async def feedback_client(development_settings):
         ModelPackageManifest(
             model_id="scenara.portrait.release",
             version="1.1.0",
-            capability="portrait-analysis",
+            capability="person_detection",
             adapter="release-test",
+            runtime_model_id="scenara.portrait/release_1_1_0",
             sha256="b" * 64,
-            source_uri="internal://models/portrait/1.1.0",
+            source_uri=f"internal://models/portrait/1.1.0#sha256={'b' * 64}",
             license_id="Proprietary",
-            model_card="models/portrait-1.1.0.yml",
+            model_card=f"internal://models/portrait-1.1.0.yml#sha256={'c' * 64}",
+            evaluation_evidence=(f"internal://evaluation/1.1.0.json#sha256={'d' * 64}",),
             vram_mb=1024,
             regression_samples=("portrait-regression-v2",),
             production_ready=True,
@@ -118,6 +128,51 @@ def feedback_body(*, authorized: bool = True) -> dict[str, object]:
         "authorized_for_training": authorized,
         "deidentified": authorized,
     }
+
+
+def model_package_body() -> dict[str, object]:
+    digest = "e" * 64
+    return {
+        "schema_version": "1.0",
+        "model_id": "scenara.portrait.admitted",
+        "version": "2.0.0",
+        "capability": "person_detection",
+        "adapter": "yolo",
+        "runtime_model_id": "scenara.portrait/admitted_v2",
+        "sha256": digest,
+        "source_uri": f"oci://registry.example/scenara/admitted@sha256:{digest}",
+        "license_id": "LicenseRef-Proprietary-Approved",
+        "model_card": f"https://artifacts.example/model-card.json#sha256={'f' * 64}",
+        "evaluation_evidence": [
+            f"https://artifacts.example/evaluation.json#sha256={'1' * 64}",
+        ],
+        "vram_mb": 4096,
+        "regression_samples": ["portrait-regression-v2"],
+        "production_ready": True,
+    }
+
+
+@pytest.mark.asyncio
+async def test_model_package_admission_requires_immutable_formal_manifest(feedback_client) -> None:
+    api, _ = feedback_client
+    package = model_package_body()
+    admitted = await api.post("/api/v1/model-packages/admissions", json=package)
+    assert admitted.status_code == 201, admitted.text
+    assert admitted.json()["data"]["runtime_model_id"] == "scenara.portrait/admitted_v2"
+    assert any(item["model_id"] == package["model_id"] for item in (await api.get("/api/v1/models")).json()["data"])
+
+    mutable = {**package, "version": "2.0.1", "source_uri": "https://artifacts.example/model.onnx"}
+    rejected = await api.post("/api/v1/model-packages/admissions", json=mutable)
+    assert rejected.status_code == 400
+
+    conflict = dict(package)
+    conflict["runtime_model_id"] = "scenara.portrait/changed"
+    rejected_conflict = await api.post("/api/v1/model-packages/admissions", json=conflict)
+    assert rejected_conflict.status_code == 409
+
+    reserved = {**package, "model_id": "scenara.portrait.legacy", "runtime_model_id": "legacy/model"}
+    rejected_reserved = await api.post("/api/v1/model-packages/admissions", json=reserved)
+    assert rejected_reserved.status_code == 409
 
 
 @pytest.mark.asyncio
@@ -249,6 +304,8 @@ async def test_model_release_lifecycle_activation_and_rollback(feedback_client) 
     releases = (await api.get("/api/v1/model-releases")).json()["data"]
     statuses = {item["version"]: item["status"] for item in releases}
     assert statuses == {"1.0.0": "retired", "1.1.0": "active"}
+    active = await runtime.feedback.active_runtime_bindings("default", "default")
+    assert active["person_detection"].runtime_model_id == "scenara.portrait/release_1_1_0"
 
     rolled_back = await api.post(
         "/api/v1/model-releases/scenara.portrait.release/rollback",
@@ -260,9 +317,117 @@ async def test_model_release_lifecycle_activation_and_rollback(feedback_client) 
     releases = (await api.get("/api/v1/model-releases")).json()["data"]
     statuses = {item["version"]: item["status"] for item in releases}
     assert statuses == {"1.0.0": "active", "1.1.0": "retired"}
+    active = await runtime.feedback.active_runtime_bindings("default", "default")
+    assert active["person_detection"].runtime_model_id == "scenara.portrait/release_1_0_0"
     events = (await api.get("/api/v1/model-deployment-events")).json()["data"]
     assert events[0]["action"] in {"rollback", "rollback-retire"}
     assert any(event["action"] == "rollback" for event in events)
+
+
+@pytest.mark.asyncio
+async def test_run_freezes_active_release_and_passes_it_to_runtime(feedback_client, monkeypatch) -> None:
+    api, runtime = feedback_client
+    await create_release(api, runtime, "1.0.0", "a" * 64)
+    observed: list[str] = []
+
+    async def execute(pipeline, execution_context, initial_inputs, run_parameters, checkpoint):
+        del pipeline, initial_inputs, run_parameters
+        await checkpoint()
+        binding = current_runtime_binding("person_detection")
+        assert binding is not None
+        assert execution_context.model_bindings["person_detection"] == binding
+        observed.append(binding.runtime_model_id)
+        return ResultEnvelope(
+            run_id=execution_context.run_id,
+            domain="portrait",
+            pipeline=PipelineRef(
+                pipeline_id=execution_context.pipeline_id,
+                version=execution_context.pipeline_version,
+            ),
+            asset_id=execution_context.asset_id,
+            domain_payload=PortraitDomainPayload(),
+            models=[
+                ModelProvenance(
+                    capability=binding.capability,
+                    model_id=binding.model_id,
+                    version=binding.version,
+                    sha256=binding.sha256,
+                    production_ready=True,
+                )
+            ],
+            created_at=time.time(),
+        )
+
+    monkeypatch.setattr(runtime.pipelines, "execute", execute)
+    image = BytesIO()
+    Image.new("RGB", (8, 8), (20, 30, 40)).save(image, format="PNG")
+    context = PrincipalContext(tenant_id="default", project_id="default", principal_id="runtime-test")
+    asset = await runtime.runs.create_asset(
+        context,
+        data=image.getvalue(),
+        filename="runtime-binding.png",
+        content_type="image/png",
+        kind=MediaKind.IMAGE,
+    )
+    outcome = await runtime.runs.create_run(
+        context,
+        CreateRunRequest(
+            domain="portrait",
+            pipeline=PipelineRef(pipeline_id="portrait.person-detection", version="0.1.0"),
+            asset_id=asset.asset_id,
+            wait_ms=2_000,
+        ),
+        idempotency_key="active-model-binding",
+    )
+    assert outcome.run.status == RunStatus.COMPLETED
+    assert observed == ["scenara.portrait/release_1_0_0"]
+    result = await runtime.runs.result(context, outcome.run.run_id)
+    assert result.models[0].model_id == "scenara.portrait.release"
+    assert result.models[0].version == "1.0.0"
+
+
+@pytest.mark.asyncio
+async def test_deployment_feedback_is_enqueued_and_delivered_to_training_subscriber(
+    feedback_client,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    api, runtime = feedback_client
+
+    async def allow_target(url: str, **kwargs: object) -> str:
+        del kwargs
+        return url
+
+    monkeypatch.setattr("scenara.platform.webhook_service.validate_external_url", allow_target)
+    subscription = await api.post(
+        "/api/v1/webhooks/subscriptions",
+        json={
+            "name": "model training deployment feedback",
+            "url": "https://model.example.test/scenara-events",
+            "secret": "deployment-feedback-secret",
+            "event_types": ["model.deployment.changed"],
+        },
+    )
+    assert subscription.status_code == 201, subscription.text
+    await create_release(api, runtime, "1.0.0", "a" * 64)
+
+    pending = (await api.get("/api/v1/webhooks/deliveries")).json()["data"]
+    assert pending
+    assert all(item["event_type"] == "model.deployment.changed" for item in pending)
+    assert any(item["payload"]["to_status"] == "active" for item in pending)
+    assert all(item["payload"]["runtime_model_id"] == "scenara.portrait/release_1_0_0" for item in pending)
+
+    delivered_payloads: list[dict[str, object]] = []
+
+    class Sender:
+        async def deliver(self, target, event_id, event_type, payload, *, max_attempts=5):
+            del target, event_id, event_type, max_attempts
+            delivered_payloads.append(payload)
+            return SimpleNamespace(status_code=202)
+
+    runtime.webhooks._sender = Sender()
+    delivered, failed = await runtime.webhooks.deliver_due()
+    assert (delivered, failed) == (len(pending), 0)
+    assert any(payload["to_status"] == "active" for payload in delivered_payloads)
 
 
 @pytest.mark.asyncio

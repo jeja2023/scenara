@@ -52,11 +52,120 @@ export class ScenaraClient {
     resumeRun(runId) {
         return this.transport("POST", "/api/v1/runs/" + encodeURIComponent(runId) + "/resume");
     }
+    listAssets(offset = 0, limit = 50) {
+        return this.transport("GET", "/api/v1/media/assets?offset=" + String(offset) + "&limit=" + String(limit));
+    }
+    uploadAsset(input) {
+        const form = new FormData();
+        form.append("file", input.file, input.filename);
+        form.append("kind", input.kind ?? "image");
+        return this.transport("POST", "/api/v1/media/assets", { body: form });
+    }
+    parseImage(input) {
+        const form = new FormData();
+        form.append("file", input.file, input.filename);
+        form.append("domain", input.domain ?? "portrait");
+        if (input.pipelineId)
+            form.append("pipeline_id", input.pipelineId);
+        if (input.pipelineVersion)
+            form.append("pipeline_version", input.pipelineVersion);
+        return this.transport("POST", "/api/v1/parse/image", {
+            body: form,
+            idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
+        });
+    }
+    parseVideo(input) {
+        const form = new FormData();
+        form.append("file", input.file, input.filename);
+        form.append("domain", input.domain ?? "portrait");
+        if (input.pipelineId)
+            form.append("pipeline_id", input.pipelineId);
+        if (input.pipelineVersion)
+            form.append("pipeline_version", input.pipelineVersion);
+        form.append("sample_interval_ms", String(input.sampleIntervalMs ?? 1000));
+        form.append("max_units", String(input.maxUnits ?? 64));
+        form.append("sample_strategy", input.sampleStrategy ?? "interval");
+        form.append("sample_start_ms", String(input.sampleStartMs ?? 0));
+        if (input.sampleEndMs !== undefined)
+            form.append("sample_end_ms", String(input.sampleEndMs));
+        form.append("scene_change_threshold", String(input.sceneChangeThreshold ?? 0.35));
+        if (input.frameMaxEdge !== undefined)
+            form.append("frame_max_edge", String(input.frameMaxEdge));
+        form.append("page_scale", String(input.pageScale ?? 1.5));
+        form.append("wait_ms", String(input.waitMs ?? 0));
+        return this.transport("POST", "/api/v1/parse/video", {
+            body: form,
+            idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
+        });
+    }
+    parseDocument(input) {
+        const form = new FormData();
+        form.append("file", input.file, input.filename);
+        form.append("domain", input.domain ?? "ocr");
+        if (input.pipelineId)
+            form.append("pipeline_id", input.pipelineId);
+        if (input.pipelineVersion)
+            form.append("pipeline_version", input.pipelineVersion);
+        form.append("max_units", String(input.maxUnits ?? 64));
+        form.append("page_scale", String(input.pageScale ?? 1.5));
+        form.append("wait_ms", String(input.waitMs ?? 0));
+        return this.transport("POST", "/api/v1/parse/document", {
+            body: form,
+            idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
+        });
+    }
+    parseStream(input) {
+        const domain = input.domain ?? "portrait";
+        const pipelineId = input.pipelineId ?? (domain === "portrait" ? "portrait.person-detection" : "ocr.document");
+        const pipeline = {
+            pipeline_id: pipelineId,
+            ...(input.pipelineVersion === undefined ? {} : { version: input.pipelineVersion }),
+        };
+        return this.transport("POST", "/api/v1/parse/stream", {
+            idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
+            body: {
+                source_id: input.sourceId,
+                domain,
+                pipeline,
+                parameters: {
+                    sample_interval_ms: input.sampleIntervalMs ?? 1000,
+                    max_units: input.maxUnits ?? 64,
+                    sample_strategy: input.sampleStrategy ?? "interval",
+                    sample_start_ms: input.sampleStartMs ?? 0,
+                    ...(input.sampleEndMs === undefined ? {} : { sample_end_ms: input.sampleEndMs }),
+                    scene_change_threshold: input.sceneChangeThreshold ?? 0.35,
+                    ...(input.frameMaxEdge === undefined ? {} : { frame_max_edge: input.frameMaxEdge }),
+                    max_reconnect_attempts: input.maxReconnectAttempts ?? 3,
+                    connect_timeout_ms: input.connectTimeoutMs ?? 10000,
+                    read_timeout_ms: input.readTimeoutMs ?? 10000,
+                },
+                priority: input.priority ?? 0,
+                wait_ms: input.waitMs ?? 0,
+            },
+        });
+    }
     deleteAsset(assetId) {
         return this.transport("DELETE", "/api/v1/media/assets/" + encodeURIComponent(assetId));
     }
     getAssetPreview(assetId) {
         return this.transport("GET", "/api/v1/media/assets/" + encodeURIComponent(assetId) + "/preview");
+    }
+    listSources(offset = 0, limit = 50) {
+        return this.transport("GET", "/api/v1/media/sources?offset=" + String(offset) + "&limit=" + String(limit));
+    }
+    createSource(input) {
+        return this.transport("POST", "/api/v1/media/sources", {
+            body: { name: input.name, url: input.url, metadata: input.metadata ?? {} },
+        });
+    }
+    getSource(sourceId) {
+        return this.transport("GET", "/api/v1/media/sources/" + encodeURIComponent(sourceId));
+    }
+    probeSource(sourceId, timeoutMs = 10000) {
+        return this.transport("POST", "/api/v1/media/sources/" + encodeURIComponent(sourceId) + "/probe?timeout_ms=" + String(timeoutMs));
+    }
+    deleteSource(sourceId) {
+        return this.transport("DELETE", "/api/v1/media/sources/" + encodeURIComponent(sourceId));
     }
     listPipelines() {
         return this.transport("GET", "/api/v1/pipelines");
@@ -70,8 +179,19 @@ export class ScenaraClient {
     getRepositoryTopology() {
         return this.transport("GET", "/api/v1/platform/repositories");
     }
+    getRepositoryContracts() {
+        return this.transport("GET", "/api/v1/platform/contracts");
+    }
     getAccessFoundation() {
         return this.transport("GET", "/api/v1/platform/access-foundation");
+    }
+    /**
+     * Returns the Portrait Intelligence Foundation Platform contract: the six
+     * strategic capability modules, three core assets, and per-capability
+     * readiness state for the portrait domain.
+     */
+    getPortraitIntelligence() {
+        return this.transport("GET", "/api/v1/platform/portrait-intelligence");
     }
     getIamSummary() {
         return this.transport("GET", "/api/v1/platform/iam/summary");
@@ -232,6 +352,9 @@ export class ScenaraClient {
     }
     createModelRelease(release) {
         return this.transport("POST", "/api/v1/model-releases", { body: release });
+    }
+    admitModelPackage(modelPackage) {
+        return this.transport("POST", "/api/v1/model-packages/admissions", { body: modelPackage });
     }
     listModelReleases() {
         return this.transport("GET", "/api/v1/model-releases");

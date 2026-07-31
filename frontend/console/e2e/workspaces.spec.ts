@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const allowedInterfaceTerms = new Set([
-  "AI", "API", "GPU", "HTTP", "HTTPS", "JSON", "KB", "MiB", "OCR", "OpenAPI", "PostgreSQL", "Python", "Redis", "S3", "SDK", "SHA", "TypeScript",
+  "AI", "API", "B", "GPU", "HTTP", "HTTPS", "JSON", "KB", "MiB", "OCR", "OpenAPI", "PDF", "PostgreSQL", "Python", "Redis", "S3", "SDK", "SHA", "TypeScript",
   "Scenara", "Agent", "Console", "Data", "Edge", "Flow", "Index", "Model", "Parse", "Search",
 ]);
 
@@ -44,7 +44,7 @@ test.beforeEach(async ({ page }) => {
       data = { items: [], offset: 0, limit: 100, total: 0 };
     } else if (path === "/api/v1/system/status") {
       data = {
-        version: "0.3.0.dev0",
+        version: "0.3.0.dev2",
         profile: "development",
         state_backend: "memory",
         object_backend: "local",
@@ -166,6 +166,60 @@ test.beforeEach(async ({ page }) => {
           },
         ],
       };
+    } else if (path === "/api/v1/platform/portrait-intelligence") {
+      const modules = [
+        ["data_governance", "planned", "scenara-data"],
+        ["annotation", "planned", "scenara-data"],
+        ["training", "external", "scenara-model"],
+        ["algorithms", "partial", "scenara-model"],
+        ["vector_retrieval", "partial", "scenara"],
+        ["mlops", "seed", "scenara"],
+      ] as const;
+      const assets = [
+        ["data_lake", "planned", ["data_governance", "annotation"]],
+        ["foundation_model", "planned", ["algorithms", "training", "data_governance"]],
+        ["intelligence_engine", "seed", ["algorithms", "vector_retrieval", "mlops"]],
+      ] as const;
+      const capabilities = [
+        ["person_detection", "ready", true],
+        ["body_embedding", "ready", true],
+        ["face_detection", "fallback", false],
+        ["face_embedding", "fallback", false],
+        ["pose", "placeholder", false],
+        ["gait", "fallback", false],
+        ["appearance", "fallback", false],
+      ] as const;
+      data = {
+        schema_version: "1.0",
+        positioning: "portrait_intelligence_foundation_platform",
+        modules: modules.map(([moduleId, maturity, owner]) => ({
+          module_id: moduleId,
+          name: `English backend name must not reach the interface (${moduleId})`,
+          maturity,
+          summary: "English backend summary must not reach the interface.",
+          owner_repository_id: owner,
+          current_scope: [],
+          not_in_scope_yet: [],
+          next_gate: "English backend gate must not reach the interface.",
+        })),
+        assets: assets.map(([assetId, maturity, deps]) => ({
+          asset_id: assetId,
+          name: `English backend name must not reach the interface (${assetId})`,
+          maturity,
+          summary: "English backend summary must not reach the interface.",
+          depends_on_modules: [...deps],
+          next_gate: "English backend gate must not reach the interface.",
+        })),
+        capabilities: capabilities.map(([capabilityId, readiness, productionReady]) => ({
+          capability_id: capabilityId,
+          readiness,
+          production_ready: productionReady,
+          current_model: null,
+          target_model: null,
+          embedding_dimension: null,
+          target_embedding_dimension: null,
+        })),
+      };
     } else if (path === "/api/v1/platform/service-accounts" && route.request().method() === "GET") {
       data = [{
         tenant_id: "default",
@@ -238,6 +292,157 @@ test("mobile navigation opens and reaches another workspace", async ({ page }) =
   await page.getByRole("link", { name: "媒体" }).click();
   await expect(page.getByRole("heading", { level: 1, name: "媒体" })).toBeVisible();
   expect(pageErrors).toEqual([]);
+});
+
+test("parse workbench exposes complete media-mode controls", async ({ page }) => {
+  await page.goto("ocr");
+  await page.getByRole("tab", { name: "视频文件" }).click();
+  await expect(page.getByLabel("采样策略")).toBeVisible();
+  await page.getByRole("button", { name: "展开高级参数" }).click();
+  await expect(page.getByLabel("起始时间（毫秒）")).toBeVisible();
+  await expect(page.getByLabel("结束时间（毫秒）")).toBeVisible();
+  await expect(page.getByLabel("帧最大边长（像素）")).toBeVisible();
+
+  await page.getByRole("tab", { name: "PDF 文档" }).click();
+  await expect(page.getByLabel("最大页数")).toBeVisible();
+  await expect(page.getByLabel("渲染倍率")).toBeVisible();
+
+  await page.getByRole("tab", { name: "实时流" }).click();
+  await page.getByRole("button", { name: "展开高级参数" }).click();
+  await expect(page.getByLabel("最大分析时长（毫秒）")).toBeVisible();
+  await expect(page.getByLabel("最大重连次数")).toBeVisible();
+  await expect(page.getByLabel("连接超时（毫秒）")).toBeVisible();
+  await expect(page.getByLabel("读取超时（毫秒）")).toBeVisible();
+  await expectChineseInterface(page);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+});
+
+test("parse workbench completes every media flow and cancellation", async ({ page }, testInfo) => {
+  await page.unroute("**/api/**");
+  let videoParses = 0;
+  let cancelRequested = false;
+  const run = (runId: string, status: string) => ({
+    run_id: runId,
+    domain: "ocr",
+    pipeline: { pipeline_id: "ocr.document", version: "2.1.0" },
+    parameters: {},
+    priority: 0,
+    status,
+    revision: 1,
+    progress: status === "completed" ? 1 : 0.4,
+    created_at: 1,
+    updated_at: 1,
+  });
+  const result = (runId: string, unitType: "frame" | "page" = "frame") => ({
+    schema_version: "1.0",
+    run_id: runId,
+    domain: "ocr",
+    pipeline: { pipeline_id: "ocr.document", version: "2.1.0" },
+    asset_id: unitType === "page" ? "asset-document" : "asset-media",
+    source_id: runId === "run-stream" ? "source-1" : null,
+    units: [{
+      unit_id: unitType === "page" ? "page_1" : "frame_0",
+      unit_type: unitType,
+      index: 0,
+      pts_ms: unitType === "frame" ? 0 : null,
+      page_number: unitType === "page" ? 1 : null,
+      width: 640,
+      height: 360,
+      objects: [],
+    }],
+    domain_payload: { domain: "ocr", text: `OCR ${runId}`, blocks: [] },
+    relations: [],
+    artifacts: [],
+    models: [],
+    timings: {},
+    media_metadata: { sampled_units: 1, timestamp_source: runId === "run-stream" ? "monotonic_clock" : "position_msec" },
+    warnings: [],
+    provenance: {},
+    created_at: 1,
+  });
+  const envelope = (data: unknown) => JSON.stringify({ schema_version: "1.0", request_id: "parse-e2e", data });
+
+  await page.route("**/api/**", async (route) => {
+    const request = route.request();
+    const path = new URL(request.url()).pathname;
+    if (path === "/api/v1/media/sources" && request.method() === "GET") {
+      await route.fulfill({ contentType: "application/json", body: envelope({ items: [{ source_id: "source-1", name: "东门", masked_url: "rtsp://camera.example/live", metadata: {}, created_at: 1 }], offset: 0, limit: 200, total: 1 }) });
+      return;
+    }
+    if (path === "/api/v1/parse/image") {
+      await route.fulfill({ contentType: "application/json", body: envelope({ asset: { asset_id: "asset-image", metadata: {} }, run: run("run-image", "completed"), result: result("run-image") }) });
+      return;
+    }
+    if (path === "/api/v1/parse/video") {
+      videoParses += 1;
+      const runId = videoParses === 1 ? "run-video" : "run-video-cancel";
+      await route.fulfill({ status: 202, contentType: "application/json", body: envelope({ asset: { asset_id: "asset-video", metadata: {} }, run: run(runId, videoParses === 1 ? "queued" : "running"), result: null }) });
+      return;
+    }
+    if (path === "/api/v1/parse/document") {
+      await route.fulfill({ status: 202, contentType: "application/json", body: envelope({ asset: { asset_id: "asset-document", metadata: {} }, run: run("run-document", "completed"), result: null }) });
+      return;
+    }
+    if (path === "/api/v1/parse/stream") {
+      await route.fulfill({ status: 202, contentType: "application/json", body: envelope(run("run-stream", "completed")) });
+      return;
+    }
+    if (path.endsWith("/events")) {
+      const runId = path.split("/").at(-2)!;
+      const body = runId === "run-video-cancel" ? "" : `data: ${JSON.stringify({ status: "completed", payload: { progress: 1 } })}\n\n`;
+      await route.fulfill({ status: 200, contentType: "text/event-stream", body });
+      return;
+    }
+    if (path.endsWith("/cancel") && request.method() === "POST") {
+      cancelRequested = true;
+      await route.fulfill({ contentType: "application/json", body: envelope(run("run-video-cancel", "cancelling")) });
+      return;
+    }
+    if (path.endsWith("/result")) {
+      const runId = path.split("/").at(-2)!;
+      const unitType = runId === "run-document" ? "page" : "frame";
+      await route.fulfill({ contentType: "application/json", body: envelope({ result: result(runId, unitType), unit_offset: 0, unit_limit: 1000, unit_total: 1 }) });
+      return;
+    }
+    if (/\/api\/v1\/runs\/[^/]+$/.test(path)) {
+      const runId = path.split("/").at(-1)!;
+      const status = runId === "run-video-cancel" ? (cancelRequested ? "cancelled" : "running") : "completed";
+      await route.fulfill({ contentType: "application/json", body: envelope(run(runId, status)) });
+      return;
+    }
+    await route.fulfill({ contentType: "application/json", body: envelope([]) });
+  });
+
+  await page.goto("ocr");
+  const fileInput = page.locator('input[type="file"]');
+  await fileInput.setInputFiles({ name: "frame.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZbZsAAAAASUVORK5CYII=", "base64") });
+  await page.getByRole("button", { name: "开始解析" }).click();
+  await expect(page.getByLabel("OCR 文本结果")).toHaveValue("OCR run-image");
+
+  await page.getByRole("tab", { name: "视频文件" }).click();
+  await fileInput.setInputFiles({ name: "clip.mp4", mimeType: "video/mp4", buffer: Buffer.from("video") });
+  await page.getByRole("button", { name: "开始解析" }).click();
+  await expect(page.getByLabel("OCR 文本结果")).toHaveValue("OCR run-video");
+
+  await page.getByRole("tab", { name: "PDF 文档" }).click();
+  await fileInput.setInputFiles({ name: "report.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.7\n%%EOF") });
+  await page.getByRole("button", { name: "开始解析" }).click();
+  await expect(page.getByLabel("OCR 文本结果")).toHaveValue("OCR run-document");
+
+  await page.getByRole("tab", { name: "实时流" }).click();
+  await page.getByLabel("已登记视频流").selectOption("source-1");
+  await page.getByRole("button", { name: "开始解析" }).click();
+  await expect(page.getByLabel("OCR 文本结果")).toHaveValue("OCR run-stream");
+  const screenshot = await page.screenshot({ path: testInfo.outputPath("parse-workbench.png"), fullPage: true });
+  expect(screenshot.byteLength).toBeGreaterThan(5_000);
+
+  await page.getByRole("tab", { name: "视频文件" }).click();
+  await fileInput.setInputFiles({ name: "cancel.mp4", mimeType: "video/mp4", buffer: Buffer.from("video") });
+  await page.getByRole("button", { name: "开始解析" }).click();
+  await page.getByRole("button", { name: "取消运行" }).click();
+  await expect(page.getByText("已取消", { exact: true })).toBeVisible();
+  expect(cancelRequested).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
 });
 
 test("access management tabs and one-time credential render", async ({ page }) => {

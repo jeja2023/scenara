@@ -23,6 +23,7 @@ from scenara.platform.webhooks import WebhookDeliveryError, WebhookDeliveryServi
 SUPPORTED_WEBHOOK_EVENTS = frozenset(
     {
         "result.available",
+        "model.deployment.changed",
         "run.cancelled",
         "run.cancelling",
         "run.completed",
