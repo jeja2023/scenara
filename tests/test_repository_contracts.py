@@ -93,3 +93,19 @@ def test_semantic_validator_checks_cross_field_and_canonical_digests() -> None:
     hard_sample["items"][0]["correction"]["label"] = "changed"
     with pytest.raises(SystemExit, match="checksum does not match"):
         validate_contract_document("hard-sample-handoff", hard_sample)
+
+
+def test_typescript_openapi_digest_allow_marker_is_preserved_in_generated_artifacts() -> None:
+    generated_files = (
+        Path("sdk/typescript/src/generated.ts"),
+        Path("sdk/typescript/dist/generated.js"),
+        Path("sdk/typescript/dist/generated.d.ts"),
+    )
+    for path in generated_files:
+        digest_lines = [
+            line
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if "OPENAPI_SHA256" in line
+        ]
+        assert len(digest_lines) == 1, path
+        assert "gitleaks:allow - public contract digest" in digest_lines[0], path

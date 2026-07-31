@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "e129b304130390bb7158ce7d38c7c45ba233479250b2557b5885263b16dfda82";
+export declare const OPENAPI_SHA256 = "e129b304130390bb7158ce7d38c7c45ba233479250b2557b5885263b16dfda82" /** gitleaks:allow - public contract digest */;
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
