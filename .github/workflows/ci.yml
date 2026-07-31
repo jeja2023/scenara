@@ -86,9 +86,40 @@ jobs:
         env:
           SCENARA_OCR_ENGINE_FACTORY: compose_interpolation_only:create_engine
         run: |
-          docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml up -d --wait postgres redis minio
-          docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml run --rm migrate
-          docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml run --rm minio-init
+          compose=(docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml)
+          for attempt in 1 2 3; do
+            if "${compose[@]}" up -d --wait postgres redis minio; then
+              break
+            fi
+            "${compose[@]}" ps || true
+            "${compose[@]}" logs --no-color --tail=100 postgres redis minio || true
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
+      - name: Apply integration database migrations
+        env:
+          SCENARA_OCR_ENGINE_FACTORY: compose_interpolation_only:create_engine
+        run: |
+          compose=(docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml)
+          for attempt in 1 2 3; do
+            if "${compose[@]}" run --rm migrate; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
+      - name: Initialize integration object store
+        env:
+          SCENARA_OCR_ENGINE_FACTORY: compose_interpolation_only:create_engine
+        run: |
+          compose=(docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml)
+          for attempt in 1 2 3; do
+            if "${compose[@]}" run --rm minio-init; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep $((attempt * 5))
+          done
       - run: python -m pytest -q -m integration tests/integration --junitxml=integration-services.junit.xml
       - name: Capture service logs
         if: always()

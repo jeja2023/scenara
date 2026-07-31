@@ -134,6 +134,22 @@ def test_default_runtime_model_references_use_cache_key_contract() -> None:
     assert capabilities_document["capabilities"]["body_embedding"]["model_id"] == "person_reid_default"
 
 
+def test_integration_service_bootstrap_is_split_and_retried() -> None:
+    document = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    steps = document["jobs"]["integration-services"]["steps"]
+    named_steps = {step.get("name"): step for step in steps if step.get("name")}
+    expected_commands = {
+        "Start PostgreSQL, Redis, and MinIO": "up -d --wait postgres redis minio",
+        "Apply integration database migrations": "run --rm migrate",
+        "Initialize integration object store": "run --rm minio-init",
+    }
+    for name, command in expected_commands.items():
+        script = named_steps[name]["run"]
+        assert "for attempt in 1 2 3" in script
+        assert command in script
+        assert 'if [ "$attempt" -eq 3 ]; then exit 1; fi' in script
+
+
 def test_offline_builder_emits_release_identity_and_model_manifest() -> None:
     offline_build = OFFLINE_BUILD_SCRIPT.read_text(encoding="utf-8")
     for field in (
