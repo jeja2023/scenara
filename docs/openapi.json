@@ -1814,13 +1814,8 @@
       "Body_parse_document_api_v1_parse_document_post": {
         "properties": {
           "domain": {
-            "default": "ocr",
-            "enum": [
-              "portrait",
-              "ocr"
-            ],
-            "title": "Domain",
-            "type": "string"
+            "$ref": "#/components/schemas/DomainId",
+            "default": "ocr"
           },
           "file": {
             "contentMediaType": "application/octet-stream",
@@ -1880,13 +1875,8 @@
       "Body_parse_image_api_v1_parse_image_post": {
         "properties": {
           "domain": {
-            "default": "portrait",
-            "enum": [
-              "portrait",
-              "ocr"
-            ],
-            "title": "Domain",
-            "type": "string"
+            "$ref": "#/components/schemas/DomainId",
+            "default": "portrait"
           },
           "file": {
             "contentMediaType": "application/octet-stream",
@@ -1925,13 +1915,8 @@
       "Body_parse_video_api_v1_parse_video_post": {
         "properties": {
           "domain": {
-            "default": "portrait",
-            "enum": [
-              "portrait",
-              "ocr"
-            ],
-            "title": "Domain",
-            "type": "string"
+            "$ref": "#/components/schemas/DomainId",
+            "default": "portrait"
           },
           "file": {
             "contentMediaType": "application/octet-stream",
@@ -3179,6 +3164,25 @@
         "title": "FeedbackStatus",
         "type": "string"
       },
+      "GenericDomainPayload": {
+        "additionalProperties": true,
+        "description": "Fallback payload for a registered domain without a platform model.",
+        "properties": {
+          "domain": {
+            "$ref": "#/components/schemas/DomainId"
+          },
+          "schema_version": {
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain"
+        ],
+        "title": "GenericDomainPayload",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -4066,6 +4070,17 @@
       "MediaUnitResult": {
         "additionalProperties": false,
         "properties": {
+          "frame_artifact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frame Artifact Id"
+          },
           "height": {
             "exclusiveMinimum": 0.0,
             "title": "Height",
@@ -6048,6 +6063,7 @@
       },
       "ResultArtifact": {
         "additionalProperties": false,
+        "description": "Derived binary produced while executing a run (feature crops, unit frames).",
         "properties": {
           "artifact_id": {
             "title": "Artifact Id",
@@ -6111,19 +6127,15 @@
             "$ref": "#/components/schemas/DomainId"
           },
           "domain_payload": {
-            "discriminator": {
-              "mapping": {
-                "ocr": "#/components/schemas/OcrDomainPayload",
-                "portrait": "#/components/schemas/PortraitDomainPayload"
-              },
-              "propertyName": "domain"
-            },
-            "oneOf": [
+            "anyOf": [
               {
                 "$ref": "#/components/schemas/PortraitDomainPayload"
               },
               {
                 "$ref": "#/components/schemas/OcrDomainPayload"
+              },
+              {
+                "$ref": "#/components/schemas/GenericDomainPayload"
               }
             ],
             "title": "Domain Payload"
@@ -6942,6 +6954,17 @@
               }
             ]
           },
+          "crop_artifact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crop Artifact Id"
+          },
           "feature_refs": {
             "items": {
               "type": "string"
@@ -7160,9 +7183,9 @@
     }
   },
   "info": {
-    "description": "Scenara 景枢企业视觉 AI 中枢平台",
+    "description": "Scenara 景枢视觉 AI 中枢平台",
     "title": "Scenara API",
-    "version": "0.3.0.dev3"
+    "version": "0.3.0.dev5"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -14698,11 +14721,7 @@
             "schema": {
               "anyOf": [
                 {
-                  "enum": [
-                    "portrait",
-                    "ocr"
-                  ],
-                  "type": "string"
+                  "$ref": "#/components/schemas/DomainId"
                 },
                 {
                   "type": "null"
@@ -15044,6 +15063,120 @@
         "summary": "Get Run",
         "tags": [
           "Runs"
+        ]
+      }
+    },
+    "/api/v1/runs/{run_id}/artifacts/{artifact_id}": {
+      "get": {
+        "description": "Return one derived image declared by the run result.\n\nFeature crops (``crop_artifact_id`` on an object) and unit frames\n(``frame_artifact_id`` on a media unit) are served from here.",
+        "operationId": "get_result_artifact_api_v1_runs__run_id__artifacts__artifact_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Result Artifact",
+        "tags": [
+          "Results"
         ]
       }
     },

@@ -5,8 +5,16 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until signed, reproducible evidence is committed.
 
-Current development version: `0.3.0-dev.3` (`0.3.0.dev3` for Python packages).
+Current development version: `0.3.0-dev.5` (`0.3.0.dev5` for Python packages).
 This version is an engineering qualification snapshot, not a `1.0.0` production release.
+
+The `0.3.0-dev.5` engineering baseline additionally fixes the migration and
+capacity evidence boundary: `app/` contains 43 reachable Python modules (about
+6,882 lines), list pagination/count/existence checks execute in the state
+backend, published contract bytes are LF-stable, and CI measures coverage over
+`scenara`, `app`, and the Python SDK together. Video and live-stream person
+detection now consumes progressive decoded batches, persists monotonic Run
+progress, and exposes replaceable partial Result snapshots before completion.
 
 | Stage | Deliverable | Status | Evidence required |
 |---|---|---|---|
@@ -47,15 +55,16 @@ The `1.0` version must not be published while any box above is unchecked.
 
 ## Current local verification
 
-The following checks were executed on 2026-07-31 and are supporting implementation evidence only:
+The following checks were executed on 2026-08-03 and are supporting implementation evidence only:
 
 | Check | Result |
 |---|---|
-| `python -m pytest -q --cov=scenara --cov=sdk/python/scenara_sdk --cov-fail-under=75` | 124 passed, 6 integration tests skipped by default; 80.42% coverage |
+| `python -m pytest -q --cov=scenara --cov=app --cov=sdk/python/scenara_sdk --cov-fail-under=60` | 153 passed, 8 integration tests skipped by default; 63.05% coverage across 11,647 statements |
 | Real GOP keyframe cross-check | PyAV and Scenara both selected frames `0, 12, 24, 36, 48, 60, 72, 84, 96, 108`; normal decode no longer uses the FFmpeg raw-only keyframe flag |
-| `SCENARA_RUN_INTEGRATION=1 python -m pytest -q -m integration tests/integration` | 6 passed against Docker PostgreSQL/pgvector, Redis and MinIO, including pause/resume/cancel, IAM persistence and API key lifecycle |
+| Real-time video and stream browser qualification | HEVC file Run `run_915a658dcd69469a81877c21ee2f22ab` exposed 8/16/24-unit partial results before completing 32 units with 21 objects; HTTP MPEG-TS Run `run_2e3c39dd7f6b4c4aa65f27b3820a277c` exposed units 1-8 individually and completed with 7 objects; after an API container force-recreate, persisted Source `src_1cd455c67c7548cdad6aa9f35f1ed63a` successfully previewed and Run `run_9816db5634ec4b13a057e36566901224` exposed 4/8 units before completing with 9 objects; crop JPEGs, 1920x1080 full frames, highlights, and Results-page replay loaded successfully |
+| `SCENARA_RUN_INTEGRATION=1 python -m pytest -q -m integration tests/integration` | 8 tests collected for PostgreSQL/pgvector, Redis and MinIO; the dev.4 pagination and artifact additions require the CI real-service job or a local Compose qualification run |
 | `scripts/local_backup_restore_drill.ps1` | passed; PostgreSQL and MinIO markers restored and verified |
-| `npm run check` | passed; console lint, 13 console tests, typecheck, build and TypeScript SDK runtime/contract check |
+| `pnpm run check` | passed; Prettier, warning-free console lint, 17 console tests, typecheck, build and TypeScript SDK runtime/contract check |
 | `pnpm run console:e2e` | 34 passed across desktop Chrome and Pixel 7 viewports; all 12 routes plus complete image/video/PDF/stream controls and cancellation tracking checked for page errors and horizontal overflow |
 | Ruff (including `app/` correctness rules), Mypy, OpenAPI/SDK drift, published repository-contract drift/compatibility, repository gate, implementation release gate | all passed |
 | `python -m pip_audit -r requirements/dev.txt` and `pnpm audit --audit-level high` | no known vulnerabilities in the committed dependency definitions |

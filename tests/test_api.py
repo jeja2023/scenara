@@ -180,6 +180,32 @@ async def test_tenant_scope_hides_assets(client) -> None:
 
 
 @pytest.mark.asyncio
+async def test_run_event_stream_disables_proxy_buffering(client) -> None:
+    api, _ = client
+    asset_id = await upload_image(api)
+    created = await api.post(
+        "/api/v1/runs",
+        json={
+            "domain": "ocr",
+            "pipeline": {"pipeline_id": "ocr.document", "version": "0.1.0"},
+            "asset_id": asset_id,
+            "wait_ms": 2000,
+        },
+        headers={"Idempotency-Key": "sse-headers"},
+    )
+    assert created.status_code == 202, created.text
+    run_id = created.json()["data"]["run_id"]
+
+    events = await api.get(f"/api/v1/runs/{run_id}/events")
+
+    assert events.status_code == 200
+    assert events.headers["content-type"].startswith("text/event-stream")
+    assert events.headers["cache-control"] == "no-cache, no-transform"
+    assert events.headers["x-accel-buffering"] == "no"
+    assert "event: run.queued" in events.text
+
+
+@pytest.mark.asyncio
 async def test_console_bundle_is_served_with_spa_fallback(
     development_settings,
     monkeypatch: pytest.MonkeyPatch,
@@ -208,6 +234,8 @@ async def test_console_bundle_is_served_with_spa_fallback(
         assert console.status_code == 200
         assert "Scenara 景枢" in console.text
         assert "frame-ancestors 'none'" in console.headers["content-security-policy"]
+        assert "img-src 'self' data: blob:" in console.headers["content-security-policy"]
+        assert "media-src 'self' blob:" in console.headers["content-security-policy"]
         assert (await api.get("/console/favicon.svg")).status_code == 200
 
 
@@ -216,13 +244,23 @@ def test_openapi_exposes_domain_union(development_settings) -> None:
     components = schema["components"]["schemas"]
     result_schema = components["ResultEnvelope"]
     domain_payload = result_schema["properties"]["domain_payload"]
-    assert domain_payload["discriminator"]["propertyName"] == "domain"
-    assert len(domain_payload["oneOf"]) == 2
+    assert len(domain_payload["anyOf"]) == 3
 
 
 @pytest.mark.asyncio
 async def test_pipeline_and_model_catalog_endpoints_use_state_store(client) -> None:
     api, runtime = client
+    domains = await api.get("/api/v1/domains")
+    assert domains.status_code == 200
+    domain_by_id = {item["domain_id"]: item for item in domains.json()["data"]}
+    assert domain_by_id["ocr"]["console_route"] == "/parse?domain=ocr"
+    assert domain_by_id["portrait"]["default_pipeline_id"] == "portrait.person-detection"
+    assert set(domain_by_id["ocr"]["supported_media_kinds"]) == {
+        "image",
+        "video",
+        "document",
+        "stream",
+    }
     pipelines = await api.get("/api/v1/pipelines")
     assert pipelines.status_code == 200
     assert {item["pipeline_id"] for item in pipelines.json()["data"]} == {
@@ -231,6 +269,8 @@ async def test_pipeline_and_model_catalog_endpoints_use_state_store(client) -> N
         "portrait.person-detection",
     }
     assert len(await runtime.state.list_pipeline_definitions()) == 3
+    ocr_pipeline = next(item for item in pipelines.json()["data"] if item["pipeline_id"] == "ocr.document")
+    assert ocr_pipeline["parameter_schema"]["layout_required"]["control"] == "boolean"
     models = await api.get("/api/v1/models")
     assert models.status_code == 200
     assert models.json()["data"] == []
@@ -312,9 +352,7 @@ async def test_platform_repository_topology_exposes_ownership_and_integration_bo
     assert contracts["model-package-admission"]["payload_type"] == "ModelPackageManifest"
     assert contracts["model-package-admission"]["release_version"] == "1.0.0"
     assert contracts["model-package-admission"]["compatibility"] == "backward"
-    assert contracts["model-package-admission"]["schema_path"].endswith(
-        "/model-package-admission.schema.json"
-    )
+    assert contracts["model-package-admission"]["schema_path"].endswith("/model-package-admission.schema.json")
     assert contracts["hard-sample-handoff"]["payload_type"] == "HardSampleManifest"
     assert set(topology["boundary_rules"]) == {
         "immutable_artifact_references",
@@ -470,7 +508,12 @@ async def test_iam_lifecycle_issues_scoped_service_credentials(development_setti
         assert user.status_code == 201, user.text
         role = await api.post(
             "/api/v1/platform/roles",
-            json={"role_id": "role-admin", "display_name": "Project Admin", "scopes": ["iam:*"], "product_ids": ["console"]},
+            json={
+                "role_id": "role-admin",
+                "display_name": "Project Admin",
+                "scopes": ["iam:*"],
+                "product_ids": ["console"],
+            },
             headers=root_headers,
         )
         assert role.status_code == 201, role.text
@@ -591,9 +634,7 @@ async def test_iam_lifecycle_issues_scoped_service_credentials(development_setti
         assert product_denied.status_code == 403
         assert product_denied.json()["error"]["message"] == "product denied: parse"
 
-        revoked = await api.post(
-            f"/api/v1/platform/api-keys/{key_id}/revoke", headers=root_headers
-        )
+        revoked = await api.post(f"/api/v1/platform/api-keys/{key_id}/revoke", headers=root_headers)
         assert revoked.status_code == 200, revoked.text
         assert revoked.json()["data"]["revoked_at"] is not None
         assert (await api.get("/api/v1/platform/iam/summary", headers=key_headers)).status_code == 401
@@ -669,9 +710,7 @@ async def test_iam_rejects_dangling_projects_principals_and_roles(client) -> Non
 
 
 @pytest.mark.asyncio
-async def test_webhook_subscription_outbox_delivery_and_secret_cleanup(
-    client, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_webhook_subscription_outbox_delivery_and_secret_cleanup(client, monkeypatch: pytest.MonkeyPatch) -> None:
     api, runtime = client
 
     async def allow_target(url: str, **kwargs: object) -> str:
@@ -691,9 +730,7 @@ async def test_webhook_subscription_outbox_delivery_and_secret_cleanup(
     assert created.status_code == 201, created.text
     endpoint = created.json()["data"]
     assert "secret" not in created.text
-    stored_endpoint = await runtime.state.get_webhook_subscription(
-        "default", "default", endpoint["endpoint_id"]
-    )
+    stored_endpoint = await runtime.state.get_webhook_subscription("default", "default", endpoint["endpoint_id"])
     assert stored_endpoint is not None
 
     asset_id = await upload_image(api)

@@ -1,6 +1,6 @@
 {
   "name": "scenara",
-  "version": "0.3.0-dev.3",
+  "version": "0.3.0-dev.5",
   "private": true,
   "type": "commonjs",
   "description": "Scenara enterprise vision parsing platform",
@@ -13,7 +13,8 @@
     "console:e2e": "npm run test:e2e -w @scenara/console",
     "console:typecheck": "npm run typecheck -w @scenara/console",
     "console:build": "npm run build -w @scenara/console",
-    "console:check": "npm run console:lint && npm run console:test && npm run console:typecheck && npm run console:build",
+    "console:format:check": "npm run format:check -w @scenara/console",
+    "console:check": "npm run console:format:check && npm run console:lint && npm run console:test && npm run console:typecheck && npm run console:build",
     "sdk:check": "npm run check -w scenara-sdk"
   },
   "engines": {"node": ">=22.22.2 <23"}

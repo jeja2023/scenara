@@ -5,9 +5,9 @@ import hmac
 import re
 import time
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, Response, UploadFile, status
@@ -18,6 +18,7 @@ from starlette.staticfiles import StaticFiles
 
 from scenara import __version__
 from scenara.bootstrap import Runtime, build_runtime
+from scenara.domains.portrait.capabilities import portrait_capability_snapshot
 from scenara.domains.portrait.service import (
     CreateIdentityRequest,
     EnrollIdentityRequest,
@@ -81,6 +82,7 @@ from scenara.platform.models import (
     CreateServiceAccountRequest,
     CreateUserRequest,
     CreateWebhookSubscriptionRequest,
+    DomainId,
     IamSummary,
     MediaAsset,
     MediaAssetPage,
@@ -118,7 +120,7 @@ from scenara.platform.models import (
 from scenara.platform.observability import RequestMetrics
 from scenara.platform.pipeline import PipelineError
 from scenara.platform.policy import PolicyDenied, PolicyUnavailable, require_allowed
-from scenara.platform.portrait_intelligence import CapabilitySnapshot, build_portrait_intelligence
+from scenara.platform.portrait_intelligence import build_portrait_intelligence
 from scenara.platform.product_catalog import build_product_catalog
 from scenara.platform.repository_contracts import (
     CONTRACT_ROOT,
@@ -136,8 +138,9 @@ CONSOLE_DIST = Path(__file__).resolve().parents[1] / "frontend" / "console" / "d
 CONSOLE_SECURITY_HEADERS = {
     "Cache-Control": "no-store",
     "Content-Security-Policy": (
-        "default-src 'self'; connect-src 'self' http: https:; img-src 'self' data:; "
-        "style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
+        "default-src 'self'; connect-src 'self' http: https:; img-src 'self' data: blob:; "
+        "media-src 'self' blob:; style-src 'self'; script-src 'self'; object-src 'none'; "
+        "base-uri 'none'; frame-ancestors 'none'"
     ),
     "X-Content-Type-Options": "nosniff",
 }
@@ -223,7 +226,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     app = FastAPI(
         title="Scenara API",
         version=__version__,
-        description="Scenara 景枢企业视觉 AI 中枢平台",
+        description="Scenara 景枢视觉 AI 中枢平台",
         docs_url="/docs" if not runtime.settings.production else None,
         redoc_url=None,
         lifespan=lifespan,
@@ -392,11 +395,23 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[MediaAssetPage]:
         await require_allowed(runtime.policy, context, "list", "media_asset")
-        rows = await runtime.state.list_assets(context.tenant_id, context.project_id)
-        rows = [item for item in rows if item.deleted_at is None]
+        rows, total = await asyncio.gather(
+            runtime.state.list_assets(
+                context.tenant_id,
+                context.project_id,
+                include_deleted=False,
+                offset=offset,
+                limit=limit,
+            ),
+            runtime.state.count_assets(
+                context.tenant_id,
+                context.project_id,
+                include_deleted=False,
+            ),
+        )
         return _envelope(
             request,
-            MediaAssetPage(items=rows[offset : offset + limit], offset=offset, limit=limit, total=len(rows)),
+            MediaAssetPage(items=rows, offset=offset, limit=limit, total=total),
         )  # type: ignore[return-value]
 
     @app.get("/api/v1/media/assets/{asset_id}", tags=["Media"])
@@ -444,14 +459,22 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[MediaSourcePage]:
         await require_allowed(runtime.policy, context, "list", "media_source")
-        rows = await runtime.state.list_sources(context.tenant_id, context.project_id)
+        rows, total = await asyncio.gather(
+            runtime.state.list_sources(
+                context.tenant_id,
+                context.project_id,
+                offset=offset,
+                limit=limit,
+            ),
+            runtime.state.count_sources(context.tenant_id, context.project_id),
+        )
         return _envelope(
             request,
             MediaSourcePage(
-                items=[_media_source_view(item) for item in rows[offset : offset + limit]],
+                items=[_media_source_view(item) for item in rows],
                 offset=offset,
                 limit=limit,
-                total=len(rows),
+                total=total,
             ),
         )  # type: ignore[return-value]
 
@@ -509,7 +532,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     async def list_runs(
         request: Request,
         run_status: Annotated[RunStatus | None, Query(alias="status")] = None,
-        domain: Literal["portrait", "ocr"] | None = None,
+        domain: DomainId | None = None,
         offset: Annotated[int, Query(ge=0)] = 0,
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         context: PrincipalContext = Depends(principal_context),
@@ -570,6 +593,24 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             ResultPage(result=page, unit_offset=unit_offset, unit_limit=unit_limit, unit_total=total),
         )  # type: ignore[return-value]
 
+    @app.get("/api/v1/runs/{run_id}/artifacts/{artifact_id}", tags=["Results"])
+    async def get_result_artifact(
+        run_id: str,
+        artifact_id: str,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> Response:
+        """Return one derived image declared by the run result.
+
+        Feature crops (``crop_artifact_id`` on an object) and unit frames
+        (``frame_artifact_id`` on a media unit) are served from here.
+        """
+        data, content_type, sha256 = await runtime.runs.result_artifact(context, run_id, artifact_id)
+        return Response(
+            content=data,
+            media_type=content_type,
+            headers={"ETag": f'"sha256:{sha256}"', "Cache-Control": "private, max-age=300"},
+        )
+
     @app.get("/api/v1/runs/{run_id}/events", tags=["Runs"])
     async def run_events(
         run_id: str,
@@ -600,13 +641,17 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
                     heartbeat_at = now + 15
                 await asyncio.sleep(0.25)
 
-        return StreamingResponse(stream(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
+        return StreamingResponse(
+            stream(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache, no-transform", "X-Accel-Buffering": "no"},
+        )
 
     @app.post("/api/v1/parse/image", tags=["Parsing"])
     async def parse_image(
         request: Request,
         file: Annotated[UploadFile, File()],
-        domain: Annotated[Literal["portrait", "ocr"], Form()] = "portrait",
+        domain: Annotated[DomainId, Form()] = "portrait",
         pipeline_id: Annotated[str | None, Form()] = None,
         pipeline_version: Annotated[str | None, Form()] = None,
         idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
@@ -621,7 +666,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             kind=MediaKind.IMAGE,
             temporary=True,
         )
-        selected_pipeline = pipeline_id or ("portrait.person-detection" if domain == "portrait" else "ocr.document")
+        selected_pipeline = pipeline_id or runtime.plugins.default_pipeline_id(domain)
         selected_pipeline_ref = await runtime.runs.resolve_pipeline_ref(selected_pipeline, pipeline_version)
         create = CreateRunRequest(
             domain=domain,
@@ -643,7 +688,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     async def parse_video(
         request: Request,
         file: Annotated[UploadFile, File()],
-        domain: Annotated[Literal["portrait", "ocr"], Form()] = "portrait",
+        domain: Annotated[DomainId, Form()] = "portrait",
         pipeline_id: Annotated[str | None, Form()] = None,
         pipeline_version: Annotated[str | None, Form()] = None,
         sample_interval_ms: Annotated[int, Form(ge=1, le=3_600_000)] = 1000,
@@ -667,7 +712,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             kind=MediaKind.VIDEO,
             temporary=True,
         )
-        selected_pipeline = pipeline_id or ("portrait.person-detection" if domain == "portrait" else "ocr.document")
+        selected_pipeline = pipeline_id or runtime.plugins.default_pipeline_id(domain)
         selected_pipeline_ref = await runtime.runs.resolve_pipeline_ref(selected_pipeline, pipeline_version)
         params: dict[str, object] = {
             "sample_interval_ms": sample_interval_ms,
@@ -705,7 +750,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     async def parse_document(
         request: Request,
         file: Annotated[UploadFile, File()],
-        domain: Annotated[Literal["portrait", "ocr"], Form()] = "ocr",
+        domain: Annotated[DomainId, Form()] = "ocr",
         pipeline_id: Annotated[str | None, Form()] = None,
         pipeline_version: Annotated[str | None, Form()] = None,
         max_units: Annotated[int, Form(ge=1, le=1000)] = 64,
@@ -723,7 +768,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             kind=MediaKind.DOCUMENT,
             temporary=True,
         )
-        selected_pipeline = pipeline_id or ("portrait.person-detection" if domain == "portrait" else "ocr.document")
+        selected_pipeline = pipeline_id or runtime.plugins.default_pipeline_id(domain)
         selected_pipeline_ref = await runtime.runs.resolve_pipeline_ref(selected_pipeline, pipeline_version)
         outcome = await runtime.runs.create_run(
             context,
@@ -1092,6 +1137,11 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
                 "schema_version": manifest.schema_version,
                 "console_route": manifest.console_route,
                 "capabilities": list(manifest.capabilities),
+                "description": manifest.description,
+                "supported_media_kinds": list(manifest.supported_media_kinds),
+                "default_pipeline_id": manifest.default_pipeline_id
+                or runtime.plugins.default_pipeline_id(manifest.domain_id),
+                "navigation_order": manifest.navigation_order,
             }
             for manifest in runtime.plugins.manifests()
         ]
@@ -1102,8 +1152,13 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request, context: PrincipalContext = Depends(principal_context)
     ) -> ApiEnvelope[list[ProductCatalogItem]]:
         del context
-        installed_domains = [manifest.domain_id for manifest in runtime.plugins.manifests()]
-        return _envelope(request, build_product_catalog(installed_domains))  # type: ignore[return-value]
+        manifests = runtime.plugins.manifests()
+        installed_domains = [manifest.domain_id for manifest in manifests]
+        domain_scopes = {manifest.domain_id: manifest.product_scope for manifest in manifests}
+        return _envelope(
+            request,
+            build_product_catalog(installed_domains, domain_scopes=domain_scopes),
+        )  # type: ignore[return-value]
 
     @app.get("/api/v1/platform/repositories", tags=["Platform"])
     async def platform_repository_topology(
@@ -1161,25 +1216,10 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         """
         del context
         installed_domains = [manifest.domain_id for manifest in runtime.plugins.manifests()]
-        snapshot: dict[str, CapabilitySnapshot] = {}
+        snapshot = {}
         if "portrait" in installed_domains:
-            try:
-                from app.portrait_model_capabilities import capability_status as _cap_status
-                from app.portrait_model_capabilities import production_model_ready as _prod_ready
-                from scenara.platform.portrait_intelligence import PORTRAIT_CAPABILITY_IDS
-
-                for cap_id in PORTRAIT_CAPABILITY_IDS:
-                    cap = _cap_status(cap_id)
-                    snapshot[cap_id] = CapabilitySnapshot(
-                        readiness=cap.get("status", "not_configured"),
-                        production_ready=bool(_prod_ready(cap_id)),
-                        current_model=cap.get("model_id") or None,
-                        target_model=cap.get("production_model") or None,
-                        embedding_dimension=cap.get("embedding_dim") or None,
-                        target_embedding_dimension=cap.get("production_embedding_dim") or None,
-                    )
-            except Exception:  # pragma: no cover — app layer may not be installed
-                pass
+            with suppress(Exception):  # optional migrated runtime
+                snapshot = portrait_capability_snapshot()
         return _envelope(  # type: ignore[return-value]
             request,
             build_portrait_intelligence(snapshot, installed_domains=installed_domains),

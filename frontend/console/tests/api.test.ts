@@ -3,7 +3,14 @@ import { join } from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, api, apiStream, saveConnection, streamJsonEvents, userFacingError } from "../src/api";
+import {
+  ApiError,
+  api,
+  apiStream,
+  saveConnection,
+  streamJsonEvents,
+  userFacingError,
+} from "../src/api";
 import {
   labelAccessCapability,
   labelCapability,
@@ -38,13 +45,19 @@ describe("console API contract", () => {
   it("adds project context and unwraps the API envelope", async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(
-        JSON.stringify({ schema_version: "1.0", request_id: "req-1", data: { status: "ok" } }),
+        JSON.stringify({
+          schema_version: "1.0",
+          request_id: "req-1",
+          data: { status: "ok" },
+        }),
         { status: 200, headers: { "Content-Type": "application/json" } },
       ),
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(api<{ status: string }>("/healthz")).resolves.toEqual({ status: "ok" });
+    await expect(api<{ status: string }>("/healthz")).resolves.toEqual({
+      status: "ok",
+    });
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("https://scenara.example/healthz");
     const headers = new Headers(init.headers);
@@ -69,12 +82,19 @@ describe("console API contract", () => {
 
     const error = await api("/api/v1/runs").catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ApiError);
-    expect(error).toMatchObject({ status: 403, code: "POLICY_DENIED", requestId: "req-denied" });
+    expect(error).toMatchObject({
+      status: 403,
+      code: "POLICY_DENIED",
+      requestId: "req-denied",
+    });
     expect((error as ApiError).message).toBe("当前身份无权执行此操作");
   });
 
   it("turns network failures into a Chinese message", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockRejectedValue(new TypeError("Failed to fetch")),
+    );
     await expect(api("/healthz")).rejects.toMatchObject({
       code: "NETWORK_ERROR",
       message: "无法连接到服务，请检查接口地址和网络",
@@ -82,7 +102,9 @@ describe("console API contract", () => {
   });
 
   it("uses the configured connection for event streams", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response("data: {}\n\n", { status: 200 }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response("data: {}\n\n", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const controller = new AbortController();
     await apiStream("/api/v1/runs/run-1/events", controller.signal);
@@ -98,10 +120,11 @@ describe("console API contract", () => {
 
   it("parses CRLF and multi-line event data", async () => {
     const response = new Response(
-      "id: 1\r\nevent: run.running\r\ndata: {\"status\":\r\ndata: \"running\"}\r\n\r\n: heartbeat\r\n\r\ndata: {\"status\":\"completed\"}\r\n\r\n",
+      'id: 1\r\nevent: run.running\r\ndata: {"status":\r\ndata: "running"}\r\n\r\n: heartbeat\r\n\r\ndata: {"status":"completed"}\r\n\r\n',
     );
     const events: Array<{ status: string }> = [];
-    for await (const event of streamJsonEvents<{ status: string }>(response)) events.push(event);
+    for await (const event of streamJsonEvents<{ status: string }>(response))
+      events.push(event);
     expect(events).toEqual([{ status: "running" }, { status: "completed" }]);
   });
 
@@ -109,7 +132,13 @@ describe("console API contract", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ request_id: "req-stream", error: { code: "POLICY_DENIED" } }), { status: 403 }),
+        new Response(
+          JSON.stringify({
+            request_id: "req-stream",
+            error: { code: "POLICY_DENIED" },
+          }),
+          { status: 403 },
+        ),
       ),
     );
     await expect(apiStream("/api/v1/runs/run-1/events")).rejects.toMatchObject({
@@ -123,6 +152,7 @@ describe("console API contract", () => {
 describe("console information architecture", () => {
   it("localizes API identifiers and unknown values", () => {
     expect(labelDomain("portrait")).toBe("人像");
+    expect(labelDomain("vehicle.inspection")).toBe("Vehicle Inspection");
     expect(labelCapability("face_detection")).toBe("人脸检测");
     expect(labelPipeline("ocr.document")).toBe("OCR 文档识别");
     expect(labelRunStatus("future-status")).toBe("未知状态");
@@ -131,9 +161,13 @@ describe("console information architecture", () => {
     expect(labelProductGate("edge")).toContain("服务端部署");
     expect(labelAccessCapability("api_authentication").name).toBe("接口认证");
     expect(labelEntitlementSource("manual")).toBe("手动配置");
-    expect(labelWarning("gait_requires_at_least_8_frames")).toBe("步态分析至少需要 8 帧画面");
-    expect(labelVersion("0.3.0.dev3")).toBe("0.3.0 开发版 3");
-    expect(userFacingError(new TypeError("Failed to fetch"))).toBe("操作失败，请稍后重试");
+    expect(labelWarning("gait_requires_at_least_8_frames")).toBe(
+      "步态分析至少需要 8 帧画面",
+    );
+    expect(labelVersion("0.3.0.dev5")).toBe("0.3.0 开发版 5");
+    expect(userFacingError(new TypeError("Failed to fetch"))).toBe(
+      "操作失败，请稍后重试",
+    );
     // Portrait Intelligence Foundation Platform labels
     expect(labelPortraitModule("data_governance")).toBe("数据治理");
     expect(labelPortraitModule("annotation")).toBe("标注平台");
@@ -158,16 +192,19 @@ describe("console information architecture", () => {
     expect(labelPortraitCapability("pose")).toBe("姿态估计");
   });
 
-  it("includes every 0.7 workspace", () => {
-    const names = new Set(routes.map((route) => String(route.name ?? "fallback")));
+  it("keeps one unified parsing workspace in the console navigation", () => {
+    const names = new Set(
+      routes.map((route) => String(route.name ?? "fallback")),
+    );
     expect(names).toEqual(
       new Set([
         "overview",
+        "parse",
+        "parse-domain",
+        "parse-media",
         "media",
         "runs",
-        "results",
-        "portrait",
-        "ocr",
+        "capabilities",
         "pipelines",
         "models",
         "access",
@@ -180,10 +217,15 @@ describe("console information architecture", () => {
   });
 
   it("keeps general-purpose interface labels in Chinese", () => {
-    const collectVueFiles = (directory: string): string[] => readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-      const child = join(directory, entry.name);
-      return entry.isDirectory() ? collectVueFiles(child) : entry.name.endsWith(".vue") ? [child] : [];
-    });
+    const collectVueFiles = (directory: string): string[] =>
+      readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+        const child = join(directory, entry.name);
+        return entry.isDirectory()
+          ? collectVueFiles(child)
+          : entry.name.endsWith(".vue")
+            ? [child]
+            : [];
+      });
     const source = collectVueFiles(join(process.cwd(), "src"))
       .map((file) => readFileSync(file, "utf8"))
       .join("\n");
@@ -213,7 +255,8 @@ describe("console information architecture", () => {
       "暂无 API Key",
       "接口 v1",
     ];
-    expect(untranslatedLabels.filter((label) => source.includes(label))).toEqual([]);
+    expect(
+      untranslatedLabels.filter((label) => source.includes(label)),
+    ).toEqual([]);
   });
 });
-

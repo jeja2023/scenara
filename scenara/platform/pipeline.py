@@ -7,12 +7,14 @@ import re
 import threading
 import time
 from collections import defaultdict, deque
+from collections.abc import Awaitable, Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from scenara.platform.artifacts import ArtifactSink
 from scenara.platform.model_runtime import RuntimeModelBinding
 from scenara.platform.models import PipelineStatus
 
@@ -115,7 +117,18 @@ class ExecutionContext:
     content_type: str
     production: bool = False
     model_bindings: dict[str, RuntimeModelBinding] = field(default_factory=dict)
+    artifacts: ArtifactSink | None = None
     control: ExecutionControl = field(default_factory=ExecutionControl)
+    progress_reporter: Callable[[float, dict[str, Any]], Awaitable[None]] | None = None
+    partial_result_publisher: Callable[[Any], Awaitable[None]] | None = None
+
+    async def report_progress(self, progress: float, **payload: Any) -> None:
+        if self.progress_reporter is not None:
+            await self.progress_reporter(max(0.0, min(0.99, progress)), payload)
+
+    async def publish_partial_result(self, result: Any) -> None:
+        if self.partial_result_publisher is not None:
+            await self.partial_result_publisher(result)
 
 
 class Operator(Protocol):
@@ -138,6 +151,21 @@ class PipelineNode(BaseModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
 
 
+class PipelineParameterDefinition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    control: Literal["boolean", "integer", "number", "select", "text"]
+    default: Any = None
+    minimum: float | None = None
+    maximum: float | None = None
+    step: float | None = None
+    options: list[str] = Field(default_factory=list)
+    placeholder: str | None = None
+    advanced: bool = False
+    media_kinds: set[str] = Field(default_factory=set)
+
+
 class PipelineDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -148,6 +176,7 @@ class PipelineDefinition(BaseModel):
     nodes: list[PipelineNode]
     output: str
     allowed_parameters: set[str] = Field(default_factory=set)
+    parameter_schema: dict[str, PipelineParameterDefinition] = Field(default_factory=dict)
     pausable: bool = False
 
     @property

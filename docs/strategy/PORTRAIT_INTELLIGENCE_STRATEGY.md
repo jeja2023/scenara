@@ -1,6 +1,6 @@
 # Scenara 人像智能基础平台长期战略
 
-适用版本：`0.3.0-dev.3`。本文是景枢人像 AI 方向的长期技术战略，定义平台演进目标、六大核心模块、三项核心资产以及各阶段的门禁与现状差距。本文是战略意图文件，不是已发布能力清单。能力成熟度以 `model-capabilities.yml` 和 [实现矩阵](../release/IMPLEMENTATION_MATRIX.md) 为准。
+适用版本：`0.3.0-dev.5`。本文是景枢人像 AI 方向的长期技术战略，定义平台演进目标、六大核心模块、三项核心资产以及各阶段的门禁与现状差距。本文是战略意图文件，不是已发布能力清单。能力成熟度以 `model-capabilities.yml` 和 [实现矩阵](../release/IMPLEMENTATION_MATRIX.md) 为准。
 
 ---
 
@@ -127,7 +127,7 @@
 **工具选型**：
 
 - pgvector — 千万级以下规模的默认后端，随 PostgreSQL 一体部署
-- Qdrant — 中大规模场景（推荐 `PORTRAIT_VECTOR_BACKEND=qdrant`），已有旧迁移层实现（[app/portrait_vector_store.py](../../app/portrait_vector_store.py)）
+- Qdrant — 中大规模场景的候选后端，尚未实现 `FeatureStore` 适配器
 - Milvus — 超大规模或多模态混合检索场景
 
 **平台侧已有**：
@@ -139,7 +139,7 @@
 **演进路径**：
 
 1. 当前：pgvector 覆盖 1.0 单节点场景
-2. 中期：将 `app/` 中的 Qdrant 旧实现迁移到 `scenara/infrastructure/` 实现 `FeatureStore` 协议
+2. 中期：在 `scenara/infrastructure/` 新增 Qdrant `FeatureStore` 适配器
 3. 长期：按规模选型，`FeatureStore` 抽象层保证上层代码零修改切换后端
 
 **聚类与关联能力**（规划中）：跨摄像头 Re-ID 聚类、时间线关联、身份图谱，依赖 Portrait Intelligence Engine 层，不在 `FeatureStore` 层实现。
@@ -161,7 +161,7 @@
 - 模型发布状态机（`candidate → validated → approved → active → retired`）
 - `ModelDeploymentEvent` 审计与 Webhook 投递
 - 按租户/项目的模型激活/回滚与 Run 绑定冻结
-- 生产门禁脚本（`app/production_gates.py`）
+- 生产配置失败关闭门禁（`scenara/settings.py`）
 
 **缺失项**：
 
@@ -224,7 +224,7 @@
 
 ## 现状差距评估
 
-本节记录截至 `0.3.0-dev.3` 的实际差距，随版本迭代更新。
+本节记录截至 `0.3.0-dev.5` 的实际差距，随版本迭代更新。
 
 ```text
 数据治理       ░░░░░░░░░░  ~5%   契约 Schema 已有，工具链空白
@@ -263,9 +263,9 @@ Intelligence Engine █░░░  ~10%
 
 ### 阶段 1.0 → 1.1：MLOps 与向量检索强化
 
-**目标**：生产推理服务能力提升，Qdrant 后端迁移至新平台架构。
+**目标**：生产推理服务能力提升，并在新平台架构中实现 Qdrant 后端。
 
-- 将 `app/portrait_vector_store.py` 中的 Qdrant 实现迁移为 `FeatureStore` Protocol 实现（[scenara/infrastructure/](../../scenara/infrastructure/)）
+- 在 [scenara/infrastructure/](../../scenara/infrastructure/) 中实现 Qdrant `FeatureStore` 适配器
 - 接入 Triton Inference Server，替换 ONNXRuntime 直接推理
 - 接入 MLflow，`scenara-model` 实验与 `ModelPackageManifest` 版本绑定
 - 多模态融合检索：face + body embedding 联合评分

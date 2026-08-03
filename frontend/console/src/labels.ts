@@ -1,6 +1,6 @@
 import type { Domain, RunStatus } from "./types";
 
-const domainLabels: Record<Domain, string> = {
+const domainLabels: Record<string, string> = {
   portrait: "人像",
   ocr: "OCR 文档",
 };
@@ -236,15 +236,20 @@ const repositoryLabels: Record<string, string> = {
 };
 
 const repositorySummaryLabels: Record<string, string> = {
-  scenara: "本仓库统一承载视觉解析、共享控制面、开放接口、开发工具包及平台运行底座。",
-  "scenara-model": "现有独立仓库专注模型训练、实验、算力调度、评估与不可变模型制品。",
-  "scenara-data": "达到拆分门禁后，独立承载数据集、标注、质量、血缘、授权与导出。",
+  scenara:
+    "本仓库统一承载视觉解析、共享控制面、开放接口、开发工具包及平台运行底座。",
+  "scenara-model":
+    "现有独立仓库专注模型训练、实验、算力调度、评估与不可变模型制品。",
+  "scenara-data":
+    "达到拆分门禁后，独立承载数据集、标注、质量、血缘、授权与导出。",
 };
 
 const repositoryGateLabels: Record<string, string> = {
   scenara: "保持共享平台契约稳定，仅拆分具备独立负责人和版本化契约的专业负载。",
-  "scenara-model": "向平台发布带摘要、模型卡、许可信息和评估证据的不可变模型制品清单。",
-  "scenara-data": "数据集、版本、血缘、授权和导出形成稳定归属与契约后再创建独立仓库。",
+  "scenara-model":
+    "向平台发布带摘要、模型卡、许可信息和评估证据的不可变模型制品清单。",
+  "scenara-data":
+    "数据集、版本、血缘、授权和导出形成稳定归属与契约后再创建独立仓库。",
 };
 
 const repositoryLifecycleLabels: Record<string, string> = {
@@ -291,7 +296,10 @@ const repositoryContractLabels: Record<string, string> = {
   "deployment-feedback": "部署反馈事件",
 };
 
-const accessCapabilityLabels: Record<string, { name: string; summary: string; nextGate: string }> = {
+const accessCapabilityLabels: Record<
+  string,
+  { name: string; summary: string; nextGate: string }
+> = {
   tenant_project_context: {
     name: "租户与项目上下文",
     summary: "每个请求和身份资源都受租户与项目标识约束。",
@@ -390,13 +398,15 @@ const portraitModuleSummaryLabels: Record<string, string> = {
   data_governance: "建立版本不可变、血缘完整的人像训练与评估数据资产。",
   annotation: "支持图片、视频和流截帧的标注与质量复核，打通难例闭环。",
   training: "统一训练框架覆盖检测、识别、姿态、行人重识别与属性任务。",
-  algorithms: "构建完整人像能力矩阵：人员检测、人脸检测与识别、姿态、步态与外观属性。",
+  algorithms:
+    "构建完整人像能力矩阵：人员检测、人脸检测与识别、姿态、步态与外观属性。",
   vector_retrieval: "支撑海量人像库的高速近似检索、跨摄像头关联与聚类。",
   mlops: "覆盖实验、准入、部署、监控与反馈的模型全生命周期治理。",
 };
 
 const portraitModuleGateLabels: Record<string, string> = {
-  data_governance: "数据集、版本、血缘、授权与导出形成稳定归属后再创建独立数据仓库。",
+  data_governance:
+    "数据集、版本、血缘、授权与导出形成稳定归属后再创建独立数据仓库。",
   annotation: "先完成数据治理底座，标注工具集成属于独立数据仓库的职责范围。",
   training: "由训练仓库发布带摘要、模型卡和评估证据的不可变模型制品清单。",
   algorithms: "通过模型准入接口提交全部能力的正式制品，附摘要与模型卡。",
@@ -412,13 +422,17 @@ const portraitAssetLabels: Record<string, string> = {
 
 const portraitAssetSummaryLabels: Record<string, string> = {
   data_lake: "统一管理原始媒体、标注结果、特征向量、质量标签与版本血缘。",
-  foundation_model: "持续训练覆盖检测、识别、属性、姿态、重识别与步态的多任务模型，替代割裂的小模型。",
-  intelligence_engine: "融合检索、聚类、知识图谱、事件分析与持续学习，形成可持续演进的平台能力。",
+  foundation_model:
+    "持续训练覆盖检测、识别、属性、姿态、重识别与步态的多任务模型，替代割裂的小模型。",
+  intelligence_engine:
+    "融合检索、聚类、知识图谱、事件分析与持续学习，形成可持续演进的平台能力。",
 };
 
 const portraitAssetGateLabels: Record<string, string> = {
-  data_lake: "先建成数据治理与标注能力，数据湖从稳定的数据集版本与血缘归属中沉淀。",
-  foundation_model: "先让各独立任务模型全部达到就绪，再在后续版本收敛为共享骨干网络。",
+  data_lake:
+    "先建成数据治理与标注能力，数据湖从稳定的数据集版本与血缘归属中沉淀。",
+  foundation_model:
+    "先让各独立任务模型全部达到就绪，再在后续版本收敛为共享骨干网络。",
   intelligence_engine: "先完成向量后端迁移并交付人脸与人体多模态融合检索。",
 };
 
@@ -468,8 +482,19 @@ export function labelPortraitCapability(value: string): string {
   return portraitCapabilityLabels[value] ?? "未命名能力";
 }
 
+function humanizeIdentifier(value: string): string {
+  const words = value
+    .replace(/[_.-]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  return words.length
+    ? words.map((word) => word[0]?.toUpperCase() + word.slice(1)).join(" ")
+    : "未命名";
+}
+
 export function labelDomain(value: Domain | string): string {
-  return domainLabels[value as Domain] ?? "其他领域";
+  return domainLabels[value] ?? humanizeIdentifier(value);
 }
 
 export function labelCapability(value: string): string {
@@ -477,7 +502,7 @@ export function labelCapability(value: string): string {
 }
 
 export function labelPipeline(value: string): string {
-  return pipelineLabels[value] ?? "自定义流水线";
+  return pipelineLabels[value] ?? humanizeIdentifier(value);
 }
 
 export function labelOperator(value: string): string {
@@ -596,12 +621,18 @@ export function labelRepositoryContract(value: string): string {
   return repositoryContractLabels[value] ?? "版本化集成契约";
 }
 
-export function labelAccessCapability(value: string): { name: string; summary: string; nextGate: string } {
-  return accessCapabilityLabels[value] ?? {
-    name: "未命名访问能力",
-    summary: "该能力尚未提供中文说明。",
-    nextGate: "等待平台负责人补充下一阶段门禁。",
-  };
+export function labelAccessCapability(value: string): {
+  name: string;
+  summary: string;
+  nextGate: string;
+} {
+  return (
+    accessCapabilityLabels[value] ?? {
+      name: "未命名访问能力",
+      summary: "该能力尚未提供中文说明。",
+      nextGate: "等待平台负责人补充下一阶段门禁。",
+    }
+  );
 }
 
 export function labelPolicyProvider(value: string): string {
@@ -611,8 +642,15 @@ export function labelPolicyProvider(value: string): string {
 }
 
 export function labelEntitlementSource(value: string): string {
-  return ({ manual: "手动配置", enterprise_license: "企业许可证", system: "系统配置" } as Record<string, string>)[value]
-    ?? "其他来源";
+  return (
+    (
+      {
+        manual: "手动配置",
+        enterprise_license: "企业许可证",
+        system: "系统配置",
+      } as Record<string, string>
+    )[value] ?? "其他来源"
+  );
 }
 
 export function labelScope(value: string): string {
@@ -635,7 +673,14 @@ export function labelTerminationReason(value?: string | null): string {
 }
 
 export function labelWarning(value: string): string {
-  if (value === "gait_requires_at_least_8_frames") return "步态分析至少需要 8 帧画面";
+  if (value === "gait_requires_at_least_8_frames")
+    return "步态分析至少需要 8 帧画面";
+  if (value === "artifact_quota_reached") {
+    return "特征图片数量已达到本次运行的上限，部分对象没有生成裁剪图；如需完整覆盖，请提高特征图片配额或缩小分析范围。";
+  }
+  if (value === "artifact_storage_unavailable") {
+    return "特征图片写入对象存储失败，解析结果不受影响，但部分裁剪图无法查看。";
+  }
   if (value === "media_termination:max_units_reached") {
     return "已达到最大分析单元上限，本次任务已正常完成；如需继续处理，请提高“最大分析单元”或缩小采样间隔。";
   }
@@ -648,7 +693,9 @@ export function labelWarning(value: string): string {
   if (value.startsWith("media_termination:")) {
     return `媒体处理提前结束：${labelTerminationReason(value.slice("media_termination:".length))}`;
   }
-  return /[\u3400-\u9fff]/u.test(value) ? value : "运行产生技术告警，请查看原始结果";
+  return /[\u3400-\u9fff]/u.test(value)
+    ? value
+    : "运行产生技术告警，请查看原始结果";
 }
 
 export function labelSystemReason(value: string): string {
@@ -657,5 +704,7 @@ export function labelSystemReason(value: string): string {
 
 export function labelVersion(value: string): string {
   const development = value.match(/^(\d+\.\d+\.\d+)(?:\.dev|-dev\.)(\d+)$/u);
-  return development ? `${development[1]} 开发版${development[2] === "0" ? "" : ` ${development[2]}`}` : value;
+  return development
+    ? `${development[1]} 开发版${development[2] === "0" ? "" : ` ${development[2]}`}`
+    : value;
 }

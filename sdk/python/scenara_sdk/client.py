@@ -68,7 +68,7 @@ class ScenaraClient:
         headers = {
             "X-Tenant-Id": tenant_id,
             "X-Project-Id": project_id,
-            "User-Agent": "scenara-sdk-python/0.3.0.dev3",
+            "User-Agent": "scenara-sdk-python/0.3.0.dev5",
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -150,6 +150,17 @@ class ScenaraClient:
     def get_result(self, run_id: str) -> ResultEnvelope:
         page = cast(dict[str, Any], self._request("GET", f"/api/v1/runs/{run_id}/result"))
         return cast(ResultEnvelope, page["result"])
+
+    def get_result_artifact(self, run_id: str, artifact_id: str) -> bytes:
+        """Download one derived image declared by a run result.
+
+        Feature crops are referenced by ``crop_artifact_id`` on a detected object
+        and full unit images by ``frame_artifact_id`` on a media unit.
+        """
+        response = self._client.get(f"/api/v1/runs/{run_id}/artifacts/{artifact_id}")
+        if response.is_error:
+            self._raise_response_error(response)
+        return response.content
 
     def wait_result(self, run_id: str, *, timeout: float = 300.0, poll_interval: float = 0.5) -> ResultEnvelope:
         deadline = time.monotonic() + timeout

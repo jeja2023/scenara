@@ -1,6 +1,6 @@
 [project]
 name = "scenara"
-version = "0.3.0.dev3"
+version = "0.3.0.dev5"
 requires-python = ">=3.12"
 description = "Scenara enterprise vision parsing platform"
 license = { file = "LICENSE" }
@@ -22,8 +22,8 @@ strict = true
 [tool.ruff]
 target-version = "py312"
 line-length = 120
-extend-exclude = [".venv", "typings", "models", "runtime-state", "app"]
+extend-exclude = [".venv", "typings", "models", "runtime-state"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
-ignore = ["E501", "B008", "RUF001", "RUF002", "RUF003"]
+ignore = ["B008", "RUF001", "RUF002", "RUF003"]

@@ -16,8 +16,12 @@ class PortraitPlugin:
         domain_id="portrait",
         display_name="人像",
         schema_version="1.0",
-        console_route="/portrait",
+        console_route="/parse?domain=portrait",
         capabilities=tuple(sorted(PORTRAIT_CAPABILITIES)),
+        product_scope=("portrait analysis", "detected object feature crops"),
+        description="Detect people and analyze portrait-related visual features.",
+        default_pipeline_id="portrait.person-detection",
+        navigation_order=10,
     )
 
     def __init__(self, backend: PortraitAnalysisBackend | None = None) -> None:
@@ -65,6 +69,34 @@ class PortraitPlugin:
                     "scene_change_threshold",
                     "frame_max_edge",
                     "page_scale",
+                },
+                parameter_schema={
+                    "confidence": {
+                        "label": "最低置信度",
+                        "control": "number",
+                        "default": 0.5,
+                        "minimum": 0,
+                        "maximum": 1,
+                        "step": 0.05,
+                    },
+                    "iou": {
+                        "label": "重叠阈值",
+                        "control": "number",
+                        "default": 0.45,
+                        "minimum": 0,
+                        "maximum": 1,
+                        "step": 0.05,
+                        "advanced": True,
+                    },
+                    "max_detections": {
+                        "label": "最大目标数",
+                        "control": "integer",
+                        "default": 300,
+                        "minimum": 1,
+                        "maximum": 10000,
+                        "step": 1,
+                        "advanced": True,
+                    },
                 },
                 pausable=True,
             ),

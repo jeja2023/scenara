@@ -1,6 +1,6 @@
 # Scenara（景枢）企业级视觉 AI 平台优化升级方案
 
-**版本：V2.6（0.3.0-dev.3 媒体预览与 GPU 验证版）**
+**版本：V2.7（0.3.0-dev.5 工程质量与容量基线版）**
 
 **基线日期：2026-07-31**
 
@@ -10,7 +10,7 @@
 
 ## 1. 执行结论
 
-1. **品牌决策已确定**：英文品牌保持 **Scenara**，中文品牌由“景析”正式变更为 **景枢**，完整名称统一为 **Scenara 景枢**，产品类别为“企业视觉 AI 中枢平台”。“景枢”表达统一接入、解析、调度、输出和治理的视觉能力中枢；不再保留两套中文品牌，也不恢复 Portrait Hub 或 Vision Hub。
+1. **品牌决策已确定**：英文品牌保持 **Scenara**，中文品牌由“景析”正式变更为 **景枢**，完整名称统一为 **Scenara 景枢**，产品类别为“视觉 AI 中枢平台”。“景枢”表达统一接入、解析、调度、输出和治理的视觉能力中枢；不再保留两套中文品牌，也不恢复 Portrait Hub 或 Vision Hub。
 2. **建立统一产品矩阵，但不复制平台**：Parse、Model、Data、Edge、Flow、Search 与 Agent 是可独立演进的产品模块；Console、API、SDK 是共享入口，Index 是共享底座。当前继续使用同一平台内核、IAM、授权、审计和部署栈，不因命名拆分重复系统。
 3. **先完成 1.0 资格验证，再扩功能**：仓库中 0.4-1.0 的主体代码已经存在，主要缺口不是继续堆功能，而是真实 PostgreSQL/Redis/MinIO、合法模型、目标 GPU、离线安装和备份恢复证据。
 4. **Portrait 是首个正式领域，OCR/Document 是验证领域**：二者用于证明平台内核可复用。Vehicle、Industrial、Behavior 等新领域只有在现有领域通过质量和商业验证后才立项。
@@ -24,7 +24,7 @@
 | 维度 | 当前事实 | 结论 |
 |---|---|---|
 | 品牌现状 | `README.md`、品牌规范、控制台、OpenAPI、SDK 文档和品牌资产已统一为“景枢” | 品牌迁移已完成；仓库门禁阻止旧品牌重新进入当前产品表面 |
-| 产品阶段 | 当前版本为 `0.3.0-dev.3`，仓库明确声明尚未发布 1.0（`README.md`） | 所有生产级宣传均受发布门禁约束 |
+| 产品阶段 | 当前版本为 `0.3.0-dev.5`，仓库明确声明尚未发布 1.0（`README.md`） | 所有生产级宣传均受发布门禁约束 |
 | 产品与访问底座 | 11 项产品目录、Organization、Project、User、Role、Membership、Service Account、API Key 与 Product Entitlement 已成为公共契约 | 产品继续共享 IAM、授权、审计和部署栈；身份联邦与商业生命周期仍受门禁约束 |
 | 架构边界 | `platform` 定义契约，`domains` 实现领域，`infrastructure` 实现端口，`enterprise` 通过 Policy Hook 接入（`docs/adr/0001-platform-domain-boundaries.md:14-29`） | 继续采用模块化单体，不拆微服务平台 |
 | 正式领域 | Portrait 为正式领域；OCR/Document 为验证领域（`README.md:7-8`） | 2026 年不同时扩张多个新领域 |
@@ -50,12 +50,13 @@
 | 0.8 产品矩阵与共享访问底座 | 工程完成，联邦身份和商业生命周期待建设 | 持续通过租户隔离、密钥生命周期、scope 收窄、产品授权、PostgreSQL、Console 与 SDK 契约测试 |
 | 1.0 私有化交付 | 已实现，待目标环境资格验证 | GPU 容量、离线安装、备份恢复和安全评估报告 |
 
-### 2.3 2026-07-30 质量快照
+### 2.3 2026-08-01 质量快照
 
-- `python -m pytest -q --cov=scenara --cov=sdk/python/scenara_sdk --cov-fail-under=75`：**87 passed，6 skipped，78.29% coverage**。跳过项为需要真实外部服务的集成测试，不能计作 1.0 已通过；启用 Docker 服务后 6 项集成测试全部通过。
+- `python -m pytest -q --cov=scenara --cov=app --cov=sdk/python/scenara_sdk --cov-fail-under=60`：**150 passed，8 skipped，62.84% coverage**。该结果覆盖平台、实际保留的迁移推理层和 Python SDK；跳过项需要真实 PostgreSQL、Redis 或 S3 兼容服务，不能计作 1.0 已通过。
 - `python scripts/release_gate.py --implementation-only`：通过，说明所需实现文件与生成契约当前齐全。
 - `python scripts/repository_gate.py`：通过，说明仓库来源、敏感信息、模型资产和公共命名门禁当前通过。
-- `npm run check`：通过；`pnpm run console:e2e` 在桌面 Chrome 与 Pixel 7 两个视口完成 28 项浏览器验收，无页面异常或横向溢出。
+- `npm run check`：通过；`pnpm run console:e2e` 在桌面 Chrome 与 Pixel 7 两个视口完成 34 项浏览器验收，无页面异常或横向溢出。
+- 调试 Docker 使用 PostgreSQL 持久状态恢复原故障长视频 Run：1920×1080、662.6 秒、663 个采样帧在 512 MiB 解码帧预算与 16 帧 YOLO 批次下完成，容器峰值约 2.61 GiB，重启与 OOM 均为 0；修复前同一 Run 会顶满 15.45 GiB 并被 OOM/137 终止。
 
 以上结果是当前工作区快照，不替代 CI、目标环境报告或正式签署证据。
 
@@ -63,7 +64,7 @@
 
 ### 3.1 统一定位
 
-> **Scenara 景枢是面向企业私有化部署的企业视觉 AI 中枢平台，以版本化 Media、Run、Pipeline、Model 和 Result 契约，将图片、视频、PDF 与实时流转化为可治理、可追溯的结构化视觉结果。**
+> **Scenara 景枢是面向企业私有化部署的视觉 AI 中枢平台，以版本化 Media、Run、Pipeline、Model 和 Result 契约，将图片、视频、PDF 与实时流转化为可治理、可追溯的结构化视觉结果。**
 
 中文品牌更名不改变英文品牌、代码命名空间和公共技术标识。仓库名、Python/TypeScript 包名、Docker 镜像、API 路径、数据库表前缀和 `SCENARA_*` 环境变量继续使用 `Scenara/scenara`，避免引入与产品价值无关的兼容性成本。
 
@@ -126,7 +127,7 @@ flowchart TB
 ### 4.1 不可破坏的架构约束
 
 1. `scenara.platform` 不导入具体 Domain；新增 Domain 只能实现平台契约并通过注册表安装。
-2. 新平台能力进入 `scenara/`；`app/` 只作为 Portrait Hub 迁移适配层，不再承载新的通用职责。
+2. 新平台能力进入 `scenara/`；`app/` 只保留 Portrait 推理运行时适配。当前基线为 43 个 Python 文件、约 6,882 行，AST 与部署入口可达性门禁禁止无引用模块重新进入。
 3. PostgreSQL 保存业务事实和对象引用；Redis 故障或重建不能导致业务事实丢失。
 4. S3/MinIO 对象发布后不可变，数据库中的结果引用必须携带 SHA-256；删除媒体或生物特征时同时删除记录与对象。
 5. Pipeline 使用不可变语义版本，生命周期保持 `draft -> validated -> approved -> active -> retired`。
@@ -339,7 +340,7 @@ flowchart TB
 | 同时建设 Parse/Model/Data/Edge 四套产品 | 团队被 UI、权限、部署和运维重复工作拖垮 | 1.0 保持一个平台，只有触发条件满足后再拆产品包 |
 | 模型权重或数据权利不清 | 无法交付或产生合规风险 | 模型包、数据集和评估报告必须带权利证明与 SHA-256 |
 | 训练平台直接耦合生产数据库 | 数据泄露、schema 绑定和不可控变更 | 只交换版本化 Manifest、对象引用与签名事件 |
-| `app/` 迁移层继续增长 | 平台边界重新被 Portrait 语义污染 | 架构测试禁止新增通用职责，迁移完成后按能力逐步收缩 |
+| `app/` 迁移层继续增长 | 平台边界重新被 Portrait 语义污染 | 当前从 157 个文件收缩到 43 个；架构门禁扫描 Python 与部署入口，任何不可达模块直接失败 |
 | 单 GPU 同时承载批处理与实时流 | 资源竞争导致实时延迟不可控 | 保持独立队列 lane，资格测试测容量拐点并设置并发/背压上限 |
 | 生物特征与原始媒体留存不当 | 隐私和合同风险 | 项目级更短留存、权限隔离、审计、加密和可验证删除 |
 | 过早宣传 Foundation Model 或全量行为理解 | 路线失焦且缺少数据证据 | 仅在数据、场景、预算和评估体系成熟后单独立项 |

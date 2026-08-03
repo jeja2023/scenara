@@ -1,11 +1,42 @@
 import { expect, test } from "@playwright/test";
 
 const allowedInterfaceTerms = new Set([
-  "AI", "API", "B", "GPU", "HTTP", "HTTPS", "JSON", "KB", "MiB", "OCR", "OpenAPI", "PDF", "PostgreSQL", "Python", "Redis", "S3", "SDK", "SHA", "TypeScript",
-  "Scenara", "Agent", "Console", "Data", "Edge", "Flow", "Index", "Model", "Parse", "Search",
+  "AI",
+  "API",
+  "B",
+  "GPU",
+  "HTTP",
+  "HTTPS",
+  "JSON",
+  "KB",
+  "MiB",
+  "OCR",
+  "OpenAPI",
+  "PDF",
+  "PostgreSQL",
+  "Python",
+  "Redis",
+  "S3",
+  "SDK",
+  "SHA",
+  "TypeScript",
+  "Scenara",
+  "Agent",
+  "Console",
+  "Data",
+  "Edge",
+  "Flow",
+  "Index",
+  "Model",
+  "Parse",
+  "portrait",
+  "ocr",
+  "Search",
 ]);
 
-async function expectChineseInterface(page: import("@playwright/test").Page): Promise<void> {
+async function expectChineseInterface(
+  page: import("@playwright/test").Page,
+): Promise<void> {
   const text = await page.locator("body").innerText();
   const terms = [...new Set(text.match(/[A-Za-z][A-Za-z-]*/g) ?? [])];
   expect(terms.filter((term) => !allowedInterfaceTerms.has(term))).toEqual([]);
@@ -13,11 +44,10 @@ async function expectChineseInterface(page: import("@playwright/test").Page): Pr
 
 const workspaces = [
   ["", "总览", "总览"],
+  ["parse", "解析工作区", "解析"],
   ["media", "媒体", "媒体"],
   ["runs", "运行", "运行"],
-  ["results", "结果", "结果"],
-  ["portrait", "人像解析", "人像解析"],
-  ["ocr", "OCR 文档解析", "OCR 文档"],
+  ["capabilities", "领域与能力", "领域与能力"],
   ["pipelines", "流水线", "流水线"],
   ["models", "模型", "模型"],
   ["feedback", "反馈与发布", "反馈与发布"],
@@ -33,18 +63,44 @@ test.beforeEach(async ({ page }) => {
       await route.fulfill({
         status: 404,
         contentType: "application/json",
-        body: JSON.stringify({ request_id: "e2e", error: { code: "NOT_INSTALLED", message: "not installed" } }),
+        body: JSON.stringify({
+          request_id: "e2e",
+          error: { code: "NOT_INSTALLED", message: "not installed" },
+        }),
       });
       return;
     }
     let data: unknown = [];
     if (path === "/api/v1/media/assets" || path === "/api/v1/media/sources") {
       data = { items: [], offset: 0, limit: 50, total: 0 };
+    } else if (path === "/api/v1/domains") {
+      data = [
+        {
+          domain_id: "portrait",
+          display_name: "人像",
+          schema_version: "1.0",
+          console_route: "/parse?domain=portrait",
+          capabilities: ["person_detection"],
+          supported_media_kinds: ["image", "video", "document", "stream"],
+          default_pipeline_id: "portrait.person-detection",
+          navigation_order: 10,
+        },
+        {
+          domain_id: "ocr",
+          display_name: "OCR 文档",
+          schema_version: "1.0",
+          console_route: "/parse?domain=ocr",
+          capabilities: ["text_recognition"],
+          supported_media_kinds: ["image", "video", "document", "stream"],
+          default_pipeline_id: "ocr.document",
+          navigation_order: 20,
+        },
+      ];
     } else if (path === "/api/v1/runs") {
       data = { items: [], offset: 0, limit: 100, total: 0 };
     } else if (path === "/api/v1/system/status") {
       data = {
-        version: "0.3.0.dev3",
+        version: "0.3.0.dev5",
         profile: "development",
         state_backend: "memory",
         object_backend: "local",
@@ -54,11 +110,16 @@ test.beforeEach(async ({ page }) => {
       };
     } else if (path === "/api/v1/platform/products") {
       const products = [
-        ["parse", "product_module", "available"], ["model", "product_module", "seed"],
-        ["data", "product_module", "seed"], ["console", "control_plane", "available"],
-        ["api", "developer_surface", "available"], ["sdk", "developer_surface", "available"],
-        ["index", "foundation", "seed"], ["search", "product_module", "planned"],
-        ["flow", "product_module", "planned"], ["edge", "product_module", "gated"],
+        ["parse", "product_module", "available"],
+        ["model", "product_module", "seed"],
+        ["data", "product_module", "seed"],
+        ["console", "control_plane", "available"],
+        ["api", "developer_surface", "available"],
+        ["sdk", "developer_surface", "available"],
+        ["index", "foundation", "seed"],
+        ["search", "product_module", "planned"],
+        ["flow", "product_module", "planned"],
+        ["edge", "product_module", "gated"],
         ["agent", "product_module", "gated"],
       ] as const;
       data = products.map(([productId, layer, maturity]) => ({
@@ -86,8 +147,16 @@ test.beforeEach(async ({ page }) => {
             current_repository: true,
             primary_product_ids: ["parse", "console", "api", "sdk"],
             integration_product_ids: ["model", "data"],
-            responsibilities: ["platform_runtime", "shared_console", "shared_open_api", "shared_sdks"],
-            excluded_responsibilities: ["model_training_jobs", "dataset_catalog_and_versioning"],
+            responsibilities: [
+              "platform_runtime",
+              "shared_console",
+              "shared_open_api",
+              "shared_sdks",
+            ],
+            excluded_responsibilities: [
+              "model_training_jobs",
+              "dataset_catalog_and_versioning",
+            ],
             next_gate: "English backend gate must not reach the interface.",
           },
           {
@@ -98,8 +167,15 @@ test.beforeEach(async ({ page }) => {
             current_repository: false,
             primary_product_ids: ["model"],
             integration_product_ids: ["data", "console", "api", "sdk"],
-            responsibilities: ["model_training_jobs", "experiment_tracking", "training_compute_scheduling"],
-            excluded_responsibilities: ["model_admission_release_and_deployment", "shared_console"],
+            responsibilities: [
+              "model_training_jobs",
+              "experiment_tracking",
+              "training_compute_scheduling",
+            ],
+            excluded_responsibilities: [
+              "model_admission_release_and_deployment",
+              "shared_console",
+            ],
             next_gate: "English backend gate must not reach the interface.",
           },
           {
@@ -110,8 +186,15 @@ test.beforeEach(async ({ page }) => {
             current_repository: false,
             primary_product_ids: ["data"],
             integration_product_ids: ["model", "console", "api", "sdk"],
-            responsibilities: ["dataset_catalog_and_versioning", "data_labeling_and_review", "dataset_quality_and_lineage"],
-            excluded_responsibilities: ["model_training_jobs", "operational_media_run_and_result_storage"],
+            responsibilities: [
+              "dataset_catalog_and_versioning",
+              "data_labeling_and_review",
+              "dataset_quality_and_lineage",
+            ],
+            excluded_responsibilities: [
+              "model_training_jobs",
+              "operational_media_run_and_result_storage",
+            ],
             next_gate: "English backend gate must not reach the interface.",
           },
         ],
@@ -159,10 +242,12 @@ test.beforeEach(async ({ page }) => {
             capability_id: "tenant_project_context",
             name: "Tenant and project context",
             status: "available",
-            summary: "Every request is scoped by tenant and project identifiers.",
+            summary:
+              "Every request is scoped by tenant and project identifiers.",
             current_scope: [],
             not_in_scope_yet: [],
-            next_gate: "Add first-class organization and project administration resources.",
+            next_gate:
+              "Add first-class organization and project administration resources.",
           },
         ],
       };
@@ -177,8 +262,16 @@ test.beforeEach(async ({ page }) => {
       ] as const;
       const assets = [
         ["data_lake", "planned", ["data_governance", "annotation"]],
-        ["foundation_model", "planned", ["algorithms", "training", "data_governance"]],
-        ["intelligence_engine", "seed", ["algorithms", "vector_retrieval", "mlops"]],
+        [
+          "foundation_model",
+          "planned",
+          ["algorithms", "training", "data_governance"],
+        ],
+        [
+          "intelligence_engine",
+          "seed",
+          ["algorithms", "vector_retrieval", "mlops"],
+        ],
       ] as const;
       const capabilities = [
         ["person_detection", "ready", true],
@@ -210,28 +303,35 @@ test.beforeEach(async ({ page }) => {
           depends_on_modules: [...deps],
           next_gate: "English backend gate must not reach the interface.",
         })),
-        capabilities: capabilities.map(([capabilityId, readiness, productionReady]) => ({
-          capability_id: capabilityId,
-          readiness,
-          production_ready: productionReady,
-          current_model: null,
-          target_model: null,
-          embedding_dimension: null,
-          target_embedding_dimension: null,
-        })),
+        capabilities: capabilities.map(
+          ([capabilityId, readiness, productionReady]) => ({
+            capability_id: capabilityId,
+            readiness,
+            production_ready: productionReady,
+            current_model: null,
+            target_model: null,
+            embedding_dimension: null,
+            target_embedding_dimension: null,
+          }),
+        ),
       };
-    } else if (path === "/api/v1/platform/service-accounts" && route.request().method() === "GET") {
-      data = [{
-        tenant_id: "default",
-        project_id: "default",
-        service_account_id: "automation-console",
-        display_name: "控制台自动化",
-        scopes: ["iam:*"],
-        product_ids: ["console"],
-        disabled: false,
-        created_at: 1,
-        updated_at: 1,
-      }];
+    } else if (
+      path === "/api/v1/platform/service-accounts" &&
+      route.request().method() === "GET"
+    ) {
+      data = [
+        {
+          tenant_id: "default",
+          project_id: "default",
+          service_account_id: "automation-console",
+          display_name: "控制台自动化",
+          scopes: ["iam:*"],
+          product_ids: ["console"],
+          disabled: false,
+          created_at: 1,
+          updated_at: 1,
+        },
+      ];
     } else if (path.endsWith("/service-accounts/automation-console/api-keys")) {
       data = {
         record: {
@@ -256,11 +356,15 @@ test.beforeEach(async ({ page }) => {
 });
 
 for (const [path, heading, title] of workspaces) {
-  test(`${title} workspace renders without viewport overflow`, async ({ page }) => {
+  test(`${title} workspace renders without viewport overflow`, async ({
+    page,
+  }) => {
     const pageErrors: string[] = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
     await page.goto(path);
-    await expect(page.getByRole("heading", { level: 1, name: heading })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: heading }),
+    ).toBeVisible();
     await expect(page).toHaveTitle(`${title} · Scenara 景枢`);
     await page.waitForTimeout(100);
     const overflowsViewport = await page.evaluate(
@@ -272,29 +376,39 @@ for (const [path, heading, title] of workspaces) {
   });
 }
 
-test("overview exposes repository ownership without leaking backend copy", async ({ page }) => {
+test("overview exposes repository ownership without leaking backend copy", async ({
+  page,
+}) => {
   await page.goto("");
   await expect(page.getByRole("heading", { name: "仓库拓扑" })).toBeVisible();
   await expect(page.getByText("Scenara 平台集成仓库")).toBeVisible();
   await expect(page.getByText("Scenara Model 专业仓库")).toBeVisible();
   await expect(page.getByText("Scenara Data 专业仓库")).toBeVisible();
   await expect(page.getByText("禁止跨仓库共享数据库")).toBeVisible();
-  await expect(page.getByText("English backend gate must not reach the interface.")).toHaveCount(0);
+  await expect(
+    page.getByText("English backend gate must not reach the interface."),
+  ).toHaveCount(0);
   await expectChineseInterface(page);
 });
 
-test("mobile navigation opens and reaches another workspace", async ({ page }) => {
+test("mobile navigation opens and reaches another workspace", async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("");
   await page.getByRole("button", { name: "打开导航" }).click();
   await page.getByRole("link", { name: "媒体" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "媒体" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "媒体" }),
+  ).toBeVisible();
   expect(pageErrors).toEqual([]);
 });
 
-test("parse workbench exposes complete media-mode controls", async ({ page }) => {
+test("parse workbench exposes complete media-mode controls", async ({
+  page,
+}) => {
   await page.goto("ocr");
   await page.getByRole("tab", { name: "视频文件" }).click();
   await expect(page.getByLabel("采样策略")).toBeVisible();
@@ -314,12 +428,36 @@ test("parse workbench exposes complete media-mode controls", async ({ page }) =>
   await expect(page.getByLabel("连接超时（毫秒）")).toBeVisible();
   await expect(page.getByLabel("读取超时（毫秒）")).toBeVisible();
   await expectChineseInterface(page);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth + 1,
+    ),
+  ).toBe(false);
 });
 
-test("parse workbench completes every media flow and cancellation", async ({ page }, testInfo) => {
+test("parse domain-media routes keep a scoped workspace", async ({ page }) => {
+  await page.goto("parse/portrait/video");
+
+  const mobileMenu = page.locator(".mobile-menu");
+  if (await mobileMenu.isVisible()) await mobileMenu.click();
+
+  await expect(page).toHaveURL(/\/parse\/portrait\/video$/);
+  const context = page.locator(".parse-context-bar");
+  await expect(context).toContainText("人像");
+  await expect(context).toContainText("视频");
+
+  const portraitMenu = page
+    .locator(".parse-domain-group")
+    .filter({ hasText: "人像" });
+  await portraitMenu.getByRole("link", { name: "图片", exact: true }).click();
+  await expect(page).toHaveURL(/\/parse\/portrait\/image$/);
+});
+
+test("parse workbench completes every media flow and cancellation", async ({
+  page,
+}, testInfo) => {
   await page.unroute("**/api/**");
-  let videoParses = 0;
+  let runCount = 0;
   let cancelRequested = false;
   const run = (runId: string, status: string) => ({
     run_id: runId,
@@ -340,92 +478,242 @@ test("parse workbench completes every media flow and cancellation", async ({ pag
     pipeline: { pipeline_id: "ocr.document", version: "2.1.0" },
     asset_id: unitType === "page" ? "asset-document" : "asset-media",
     source_id: runId === "run-stream" ? "source-1" : null,
-    units: [{
-      unit_id: unitType === "page" ? "page_1" : "frame_0",
-      unit_type: unitType,
-      index: 0,
-      pts_ms: unitType === "frame" ? 0 : null,
-      page_number: unitType === "page" ? 1 : null,
-      width: 640,
-      height: 360,
-      objects: [],
-    }],
+    units: [
+      {
+        unit_id: unitType === "page" ? "page_1" : "frame_0",
+        unit_type: unitType,
+        index: 0,
+        pts_ms: unitType === "frame" ? 0 : null,
+        page_number: unitType === "page" ? 1 : null,
+        width: 640,
+        height: 360,
+        objects: [],
+      },
+    ],
     domain_payload: { domain: "ocr", text: `OCR ${runId}`, blocks: [] },
     relations: [],
     artifacts: [],
     models: [],
     timings: {},
-    media_metadata: { sampled_units: 1, timestamp_source: runId === "run-stream" ? "monotonic_clock" : "position_msec" },
+    media_metadata: {
+      sampled_units: 1,
+      timestamp_source:
+        runId === "run-stream" ? "monotonic_clock" : "position_msec",
+    },
     warnings: [],
     provenance: {},
     created_at: 1,
   });
-  const envelope = (data: unknown) => JSON.stringify({ schema_version: "1.0", request_id: "parse-e2e", data });
+  const envelope = (data: unknown) =>
+    JSON.stringify({ schema_version: "1.0", request_id: "parse-e2e", data });
 
   await page.route("**/api/**", async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
     if (path === "/api/v1/media/sources" && request.method() === "GET") {
-      await route.fulfill({ contentType: "application/json", body: envelope({ items: [{ source_id: "source-1", name: "东门", masked_url: "rtsp://camera.example/live", metadata: {}, created_at: 1 }], offset: 0, limit: 200, total: 1 }) });
+      await route.fulfill({
+        contentType: "application/json",
+        body: envelope({
+          items: [
+            {
+              source_id: "source-1",
+              name: "东门",
+              masked_url: "rtsp://camera.example/live",
+              metadata: {},
+              created_at: 1,
+            },
+          ],
+          offset: 0,
+          limit: 200,
+          total: 1,
+        }),
+      });
       return;
     }
-    if (path === "/api/v1/parse/image") {
-      await route.fulfill({ contentType: "application/json", body: envelope({ asset: { asset_id: "asset-image", metadata: {} }, run: run("run-image", "completed"), result: result("run-image") }) });
+    if (path === "/api/v1/media/assets" && request.method() === "GET") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: envelope({ items: [], offset: 0, limit: 200, total: 0 }),
+      });
       return;
     }
-    if (path === "/api/v1/parse/video") {
-      videoParses += 1;
-      const runId = videoParses === 1 ? "run-video" : "run-video-cancel";
-      await route.fulfill({ status: 202, contentType: "application/json", body: envelope({ asset: { asset_id: "asset-video", metadata: {} }, run: run(runId, videoParses === 1 ? "queued" : "running"), result: null }) });
+    if (path === "/api/v1/pipelines" && request.method() === "GET") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: envelope([
+          {
+            pipeline_id: "portrait.person-detection",
+            version: "0.1.0",
+            domain: "portrait",
+            status: "active",
+            pausable: true,
+            nodes: [],
+          },
+          {
+            pipeline_id: "ocr.document",
+            version: "2.1.0",
+            domain: "ocr",
+            status: "active",
+            pausable: true,
+            nodes: [],
+          },
+        ]),
+      });
       return;
     }
-    if (path === "/api/v1/parse/document") {
-      await route.fulfill({ status: 202, contentType: "application/json", body: envelope({ asset: { asset_id: "asset-document", metadata: {} }, run: run("run-document", "completed"), result: null }) });
+    if (path === "/api/v1/domains" && request.method() === "GET") {
+      await route.fulfill({
+        contentType: "application/json",
+        body: envelope([
+          {
+            domain_id: "portrait",
+            display_name: "人像",
+            schema_version: "1.0",
+            console_route: "/parse?domain=portrait",
+            capabilities: ["person_detection"],
+            supported_media_kinds: ["image", "video", "document", "stream"],
+            default_pipeline_id: "portrait.person-detection",
+            navigation_order: 10,
+          },
+          {
+            domain_id: "ocr",
+            display_name: "OCR 文档",
+            schema_version: "1.0",
+            console_route: "/parse?domain=ocr",
+            capabilities: ["text_recognition"],
+            supported_media_kinds: ["image", "video", "document", "stream"],
+            default_pipeline_id: "ocr.document",
+            navigation_order: 20,
+          },
+        ]),
+      });
       return;
     }
-    if (path === "/api/v1/parse/stream") {
-      await route.fulfill({ status: 202, contentType: "application/json", body: envelope(run("run-stream", "completed")) });
+    if (path === "/api/v1/media/assets" && request.method() === "POST") {
+      await route.fulfill({
+        status: 201,
+        contentType: "application/json",
+        body: envelope({
+          asset_id: "asset-upload",
+          kind: "image",
+          filename: "uploaded",
+          content_type: "application/octet-stream",
+          size_bytes: 1,
+          sha256: "a".repeat(64),
+          metadata: {},
+          temporary: false,
+          created_at: 1,
+        }),
+      });
+      return;
+    }
+    if (path === "/api/v1/runs" && request.method() === "POST") {
+      runCount += 1;
+      const runId = [
+        "run-image",
+        "run-video",
+        "run-document",
+        "run-stream",
+        "run-video-cancel",
+      ][runCount - 1]!;
+      const status =
+        runId === "run-video"
+          ? "queued"
+          : runId === "run-video-cancel"
+            ? "running"
+            : "completed";
+      await route.fulfill({
+        status: 202,
+        contentType: "application/json",
+        body: envelope(run(runId, status)),
+      });
       return;
     }
     if (path.endsWith("/events")) {
       const runId = path.split("/").at(-2)!;
-      const body = runId === "run-video-cancel" ? "" : `data: ${JSON.stringify({ status: "completed", payload: { progress: 1 } })}\n\n`;
-      await route.fulfill({ status: 200, contentType: "text/event-stream", body });
+      const body =
+        runId === "run-video-cancel"
+          ? ""
+          : `data: ${JSON.stringify({ status: "completed", payload: { progress: 1 } })}\n\n`;
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body,
+      });
       return;
     }
     if (path.endsWith("/cancel") && request.method() === "POST") {
       cancelRequested = true;
-      await route.fulfill({ contentType: "application/json", body: envelope(run("run-video-cancel", "cancelling")) });
+      await route.fulfill({
+        contentType: "application/json",
+        body: envelope(run("run-video-cancel", "cancelling")),
+      });
       return;
     }
     if (path.endsWith("/result")) {
       const runId = path.split("/").at(-2)!;
       const unitType = runId === "run-document" ? "page" : "frame";
-      await route.fulfill({ contentType: "application/json", body: envelope({ result: result(runId, unitType), unit_offset: 0, unit_limit: 1000, unit_total: 1 }) });
+      await route.fulfill({
+        contentType: "application/json",
+        body: envelope({
+          result: result(runId, unitType),
+          unit_offset: 0,
+          unit_limit: 1000,
+          unit_total: 1,
+        }),
+      });
       return;
     }
     if (/\/api\/v1\/runs\/[^/]+$/.test(path)) {
       const runId = path.split("/").at(-1)!;
-      const status = runId === "run-video-cancel" ? (cancelRequested ? "cancelled" : "running") : "completed";
-      await route.fulfill({ contentType: "application/json", body: envelope(run(runId, status)) });
+      const status =
+        runId === "run-video-cancel"
+          ? cancelRequested
+            ? "cancelled"
+            : "running"
+          : "completed";
+      await route.fulfill({
+        contentType: "application/json",
+        body: envelope(run(runId, status)),
+      });
       return;
     }
-    await route.fulfill({ contentType: "application/json", body: envelope([]) });
+    await route.fulfill({
+      contentType: "application/json",
+      body: envelope([]),
+    });
   });
 
   await page.goto("ocr");
   const fileInput = page.locator('input[type="file"]');
-  await fileInput.setInputFiles({ name: "frame.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZbZsAAAAASUVORK5CYII=", "base64") });
+  await fileInput.setInputFiles({
+    name: "frame.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9ZbZsAAAAASUVORK5CYII=",
+      "base64",
+    ),
+  });
   await page.getByRole("button", { name: "开始解析" }).click();
   await expect(page.getByLabel("OCR 文本结果")).toHaveValue("OCR run-image");
 
   await page.getByRole("tab", { name: "视频文件" }).click();
-  await fileInput.setInputFiles({ name: "clip.mp4", mimeType: "video/mp4", buffer: Buffer.from("video") });
+  await page.getByRole("button", { name: "当前上传" }).click();
+  await fileInput.setInputFiles({
+    name: "clip.mp4",
+    mimeType: "video/mp4",
+    buffer: Buffer.from("video"),
+  });
   await page.getByRole("button", { name: "开始解析" }).click();
   await expect(page.getByLabel("OCR 文本结果")).toHaveValue("OCR run-video");
 
   await page.getByRole("tab", { name: "PDF 文档" }).click();
-  await fileInput.setInputFiles({ name: "report.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.7\n%%EOF") });
+  await page.getByRole("button", { name: "当前上传" }).click();
+  await fileInput.setInputFiles({
+    name: "report.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("%PDF-1.7\n%%EOF"),
+  });
   await page.getByRole("button", { name: "开始解析" }).click();
   await expect(page.getByLabel("OCR 文本结果")).toHaveValue("OCR run-document");
 
@@ -433,27 +721,45 @@ test("parse workbench completes every media flow and cancellation", async ({ pag
   await page.getByLabel("已登记视频流").selectOption("source-1");
   await page.getByRole("button", { name: "开始解析" }).click();
   await expect(page.getByLabel("OCR 文本结果")).toHaveValue("OCR run-stream");
-  const screenshot = await page.screenshot({ path: testInfo.outputPath("parse-workbench.png"), fullPage: true });
+  const screenshot = await page.screenshot({
+    path: testInfo.outputPath("parse-workbench.png"),
+    fullPage: true,
+  });
   expect(screenshot.byteLength).toBeGreaterThan(5_000);
 
   await page.getByRole("tab", { name: "视频文件" }).click();
-  await fileInput.setInputFiles({ name: "cancel.mp4", mimeType: "video/mp4", buffer: Buffer.from("video") });
+  await page.getByRole("button", { name: "当前上传" }).click();
+  await fileInput.setInputFiles({
+    name: "cancel.mp4",
+    mimeType: "video/mp4",
+    buffer: Buffer.from("video"),
+  });
   await page.getByRole("button", { name: "开始解析" }).click();
   await page.getByRole("button", { name: "取消运行" }).click();
   await expect(page.getByText("已取消", { exact: true })).toBeVisible();
   expect(cancelRequested).toBe(true);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth + 1,
+    ),
+  ).toBe(false);
 });
 
-test("access management tabs and one-time credential render", async ({ page }) => {
+test("access management tabs and one-time credential render", async ({
+  page,
+}) => {
   await page.goto("access");
   await page.getByRole("tab", { name: "服务凭据" }).click();
-  await expect(page.getByRole("heading", { name: "创建服务账号" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "创建服务账号" }),
+  ).toBeVisible();
   await page.getByLabel("密钥名称").fill("控制台持续集成");
   await page.getByRole("button", { name: "签发密钥" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator("input[readonly]")).toHaveValue("example-scenara-credential-value");
+  await expect(dialog.locator("input[readonly]")).toHaveValue(
+    "example-scenara-credential-value",
+  );
   await dialog.getByRole("button", { name: "完成" }).click();
 
   for (const [tab, heading] of [
@@ -467,5 +773,9 @@ test("access management tabs and one-time credential render", async ({ page }) =
     await expectChineseInterface(page);
   }
   await expectChineseInterface(page);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)).toBe(false);
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth + 1,
+    ),
+  ).toBe(false);
 });
