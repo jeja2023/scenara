@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import time
 from contextlib import suppress
 from dataclasses import dataclass
@@ -10,6 +11,7 @@ from typing import Any, Protocol
 from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
+from scenara.platform.artifacts import RunArtifactSink
 from scenara.platform.audit import AuditLogger
 from scenara.platform.media_batch import MediaInput, inspect_media
 from scenara.platform.model_runtime import RuntimeModelBinding, runtime_binding_scope
@@ -29,6 +31,7 @@ from scenara.platform.models import (
     PrincipalContext,
     ResultEnvelope,
     ResultReference,
+    ResultSummary,
     RunEvent,
     RunRecord,
     RunStatus,
@@ -48,6 +51,8 @@ from scenara.platform.policy import PolicyProvider, require_allowed
 from scenara.platform.queue import RunQueue
 from scenara.platform.secrets import SecretStore
 from scenara.platform.store import StateConflict, StateStore
+
+logger = logging.getLogger(__name__)
 
 
 class ResourceNotFound(RuntimeError):
@@ -98,6 +103,11 @@ class RunService:
         production: bool,
         allow_private_media_sources: bool = False,
         active_model_resolver: ActiveModelResolver | None = None,
+        run_artifacts_enabled: bool = True,
+        run_artifact_max_crops: int = 200,
+        run_artifact_max_frames: int = 64,
+        run_artifact_crop_max_edge: int = 256,
+        run_artifact_frame_max_edge: int = 1920,
     ) -> None:
         self.state = state
         self.objects = objects
@@ -117,6 +127,11 @@ class RunService:
         self.production = production
         self.allow_private_media_sources = allow_private_media_sources
         self.active_model_resolver = active_model_resolver
+        self.run_artifacts_enabled = run_artifacts_enabled
+        self.run_artifact_max_crops = run_artifact_max_crops
+        self.run_artifact_max_frames = run_artifact_max_frames
+        self.run_artifact_crop_max_edge = run_artifact_crop_max_edge
+        self.run_artifact_frame_max_edge = run_artifact_frame_max_edge
         self.queue.set_handler(self.execute_run)
 
     async def create_asset(
@@ -310,8 +325,11 @@ class RunService:
         asset = await self.state.get_asset(context.tenant_id, context.project_id, asset_id)
         if asset is None:
             raise ResourceNotFound("media asset not found")
-        runs = await self.state.list_runs(context.tenant_id, context.project_id)
-        if any(item.asset_id == asset_id and item.status not in TERMINAL_RUN_STATUSES for item in runs):
+        if await self.state.has_non_terminal_run(
+            context.tenant_id,
+            context.project_id,
+            asset_id=asset_id,
+        ):
             raise StateConflict("media asset has a non-terminal run")
         await self.audit.record(
             context,
@@ -390,8 +408,11 @@ class RunService:
         source = await self.state.get_source(context.tenant_id, context.project_id, source_id)
         if source is None:
             raise ResourceNotFound("media source not found")
-        runs = await self.state.list_runs(context.tenant_id, context.project_id)
-        if any(item.source_id == source_id and item.status not in TERMINAL_RUN_STATUSES for item in runs):
+        if await self.state.has_non_terminal_run(
+            context.tenant_id,
+            context.project_id,
+            source_id=source_id,
+        ):
             raise StateConflict("media source has a non-terminal run")
         await self.audit.record(
             context,
@@ -588,15 +609,89 @@ class RunService:
         limit: int = 50,
     ) -> tuple[list[RunRecord], int]:
         await require_allowed(self.policy, context, "list", "run")
-        rows = await self.state.list_runs(context.tenant_id, context.project_id)
-        if status is not None:
-            rows = [item for item in rows if item.status == status]
-        if domain is not None:
-            rows = [item for item in rows if item.domain == domain]
-        return rows[offset : offset + limit], len(rows)
+        rows, total = await asyncio.gather(
+            self.state.list_runs(
+                context.tenant_id,
+                context.project_id,
+                status=status,
+                domain=domain,
+                offset=offset,
+                limit=limit,
+            ),
+            self.state.count_runs(
+                context.tenant_id,
+                context.project_id,
+                status=status,
+                domain=domain,
+            ),
+        )
+        return rows, total
 
-    async def result(self, context: PrincipalContext, run_id: str) -> ResultEnvelope:
-        await require_allowed(self.policy, context, "read", "run", {"run_id": run_id})
+    async def list_results(
+        self,
+        context: PrincipalContext,
+        *,
+        domain: str | None = None,
+        media_kind: MediaKind | None = None,
+        query: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> tuple[list[ResultSummary], int]:
+        await require_allowed(self.policy, context, "list", "run")
+        references, total = await asyncio.gather(
+            self.state.list_result_references(
+                context.tenant_id,
+                context.project_id,
+                domain=domain,
+                media_kind=media_kind.value if media_kind else None,
+                query=query,
+                offset=offset,
+                limit=limit,
+            ),
+            self.state.count_result_references(
+                context.tenant_id,
+                context.project_id,
+                domain=domain,
+                media_kind=media_kind.value if media_kind else None,
+                query=query,
+            ),
+        )
+        items: list[ResultSummary] = []
+        for reference in references:
+            run = await self.state.get_run(context.tenant_id, context.project_id, reference.run_id)
+            if run is None:
+                continue
+            items.append(
+                ResultSummary(
+                    result_id=reference.run_id,
+                    run_id=reference.run_id,
+                    domain=reference.domain,
+                    pipeline=run.pipeline,
+                    status=run.status,
+                    asset_id=reference.asset_id or run.asset_id,
+                    source_id=reference.source_id or run.source_id,
+                    media_kind=reference.media_kind,
+                    resource_name=reference.resource_name,
+                    unit_count=reference.unit_count,
+                    object_count=reference.object_count,
+                    person_count=reference.person_count,
+                    face_count=reference.face_count,
+                    ocr_block_count=reference.ocr_block_count,
+                    text_length=reference.text_length,
+                    warning_count=reference.warning_count,
+                    index_status=reference.index_status,
+                    created_at=reference.created_at,
+                )
+            )
+        return items, total
+
+    async def _result_index(
+        self,
+        context: PrincipalContext,
+        run_id: str,
+    ) -> tuple[ResultEnvelope, ResultReference]:
+        """Load the result index document without materialising sharded units."""
+
         await self._get_run(context, run_id)
         reference = await self.state.get_result_reference(context.tenant_id, context.project_id, run_id)
         if reference is None:
@@ -604,7 +699,11 @@ class RunService:
         document = await self.objects.get(reference.object_key)
         if hashlib.sha256(document).hexdigest() != reference.sha256:
             raise PipelineError("stored result checksum does not match its database reference")
-        result = ResultEnvelope.model_validate_json(document)
+        return ResultEnvelope.model_validate_json(document), reference
+
+    async def result(self, context: PrincipalContext, run_id: str) -> ResultEnvelope:
+        await require_allowed(self.policy, context, "read", "run", {"run_id": run_id})
+        result, reference = await self._result_index(context, run_id)
         if reference.shard_keys:
             if len(reference.shard_keys) != len(reference.shard_sha256):
                 raise PipelineError("stored result shard manifest is invalid")
@@ -625,6 +724,31 @@ class RunService:
                 raise PipelineError("stored result shard count does not match its reference")
             result = result.model_copy(update={"units": units}, deep=True)
         return result
+
+    async def result_artifact(
+        self,
+        context: PrincipalContext,
+        run_id: str,
+        artifact_id: str,
+    ) -> tuple[bytes, str, str]:
+        """Return the bytes, content type, and checksum of one declared run artifact.
+
+        Only artifacts listed in the stored result are readable, so an unknown or
+        forged identifier can never reach the object store.
+        """
+
+        await require_allowed(self.policy, context, "read", "run", {"run_id": run_id})
+        result, _ = await self._result_index(context, run_id)
+        artifact = next((item for item in result.artifacts if item.artifact_id == artifact_id), None)
+        if artifact is None:
+            raise ResourceNotFound("run artifact not found")
+        try:
+            data = await self.objects.get(artifact.object_key)
+        except Exception as exc:
+            raise ResourceNotFound("run artifact is no longer stored") from exc
+        if hashlib.sha256(data).hexdigest() != artifact.sha256:
+            raise PipelineError("stored run artifact checksum does not match its result reference")
+        return data, artifact.content_type, artifact.sha256
 
     async def transition(self, context: PrincipalContext, run_id: str, action: str) -> RunRecord:
         await require_allowed(self.policy, context, action, "run", {"run_id": run_id})
@@ -669,12 +793,27 @@ class RunService:
                 continue
         raise StateConflict("run transition could not be applied")
 
+    def _artifact_sink(self, run: RunRecord) -> RunArtifactSink | None:
+        if not self.run_artifacts_enabled:
+            return None
+        return RunArtifactSink(
+            self.objects,
+            tenant_id=run.tenant_id,
+            project_id=run.project_id,
+            run_id=run.run_id,
+            max_crops=self.run_artifact_max_crops,
+            max_frames=self.run_artifact_max_frames,
+            crop_max_edge=self.run_artifact_crop_max_edge,
+            frame_max_edge=self.run_artifact_frame_max_edge,
+        )
+
     async def execute_run(self, tenant_id: str, project_id: str, run_id: str) -> None:
         run = await self.state.get_run(tenant_id, project_id, run_id)
         if run is None:
             raise ResourceNotFound("queued run does not exist")
         if run.status in TERMINAL_RUN_STATUSES:
             return
+        sink = self._artifact_sink(run)
         try:
             run = await self._begin_execution(run)
             if run.status == RunStatus.CANCELLED:
@@ -713,6 +852,65 @@ class RunService:
                 if self.active_model_resolver is not None
                 else {}
             )
+            checkpoint_run: RunRecord = run
+            execution_run = run
+
+            async def report_progress(progress: float, payload: dict[str, Any]) -> None:
+                nonlocal checkpoint_run
+                for _ in range(4):
+                    latest = await self.state.get_run(
+                        execution_run.tenant_id,
+                        execution_run.project_id,
+                        execution_run.run_id,
+                    )
+                    if latest is None:
+                        raise ResourceNotFound("run disappeared while reporting progress")
+                    if latest.status in TERMINAL_RUN_STATUSES:
+                        return
+                    next_progress = max(latest.progress, min(0.99, progress))
+                    if next_progress <= latest.progress:
+                        return
+                    updated = latest.model_copy(update={"progress": next_progress, "updated_at": time.time()})
+                    try:
+                        saved = await self.state.save_run(updated, expected_revision=latest.revision)
+                    except StateConflict:
+                        continue
+                    checkpoint_run = saved
+                    await self._event(
+                        saved,
+                        "run.progress",
+                        {"progress": saved.progress, **payload},
+                    )
+                    return
+                raise StateConflict("run progress could not be saved")
+
+            async def publish_partial_result(partial: Any) -> None:
+                if not isinstance(partial, ResultEnvelope):
+                    raise PipelineError("partial pipeline result is not a ResultEnvelope")
+                if sink is not None and (sink.artifacts or sink.warnings):
+                    partial = partial.model_copy(
+                        update={
+                            "artifacts": [*partial.artifacts, *sink.artifacts],
+                            "warnings": [*partial.warnings, *sink.warnings],
+                        },
+                        deep=True,
+                    )
+                try:
+                    await self._store_result(execution_run, partial, sink, partial=True)
+                    latest = await self.state.get_run(
+                        execution_run.tenant_id,
+                        execution_run.project_id,
+                        execution_run.run_id,
+                    )
+                    if latest is not None and latest.status not in TERMINAL_RUN_STATUSES:
+                        await self._event(
+                            latest,
+                            "result.partial",
+                            {"unit_count": len(partial.units), "progress": latest.progress},
+                        )
+                except Exception:
+                    logger.exception("could not publish partial result for run %s", execution_run.run_id)
+
             context = ExecutionContext(
                 run_id=run.run_id,
                 tenant_id=run.tenant_id,
@@ -725,9 +923,10 @@ class RunService:
                 content_type=content_type,
                 production=self.production,
                 model_bindings=model_bindings,
+                artifacts=sink,
+                progress_reporter=report_progress,
+                partial_result_publisher=publish_partial_result,
             )
-
-            checkpoint_run: RunRecord = run
 
             async def checkpoint() -> None:
                 await self._checkpoint(checkpoint_run, context.control)
@@ -756,7 +955,15 @@ class RunService:
                 )
             if not isinstance(result, ResultEnvelope):
                 raise PipelineError("pipeline did not return a ResultEnvelope")
-            await self._store_result(run, result)
+            if sink is not None and (sink.artifacts or sink.warnings):
+                result = result.model_copy(
+                    update={
+                        "artifacts": [*result.artifacts, *sink.artifacts],
+                        "warnings": [*result.warnings, *sink.warnings],
+                    },
+                    deep=True,
+                )
+            await self._store_result(run, result, sink)
             latest = await self.state.get_run(run.tenant_id, run.project_id, run.run_id)
             if latest is None:
                 raise ResourceNotFound("run disappeared during execution")
@@ -789,6 +996,9 @@ class RunService:
             )
             await self._event(run, "result.available", {"result_schema_version": result.schema_version})
         except ExecutionStopped:
+            await self._discard_partial_result(run)
+            if sink is not None:
+                await sink.discard()
             latest = await self.state.get_run(run.tenant_id, run.project_id, run.run_id)
             if latest and latest.status != RunStatus.CANCELLED:
                 cancelled = await self._set_status(
@@ -809,6 +1019,9 @@ class RunService:
                     evidence={"status": cancelled.status.value},
                 )
         except Exception as exc:
+            await self._discard_partial_result(run)
+            if sink is not None:
+                await sink.discard()
             latest = await self.state.get_run(run.tenant_id, run.project_id, run.run_id)
             if latest and latest.status not in TERMINAL_RUN_STATUSES:
                 code = "DOMAIN_UNAVAILABLE" if isinstance(exc, DomainUnavailable) else "PIPELINE_EXECUTION_FAILED"
@@ -833,11 +1046,20 @@ class RunService:
                     evidence={"code": code, "message": str(exc)[:500]},
                 )
 
-    async def _store_result(self, run: RunRecord, result: ResultEnvelope) -> ResultReference:
-        base_key = f"tenants/{run.tenant_id}/projects/{run.project_id}/runs/{run.run_id}"
+    async def _store_result(
+        self,
+        run: RunRecord,
+        result: ResultEnvelope,
+        sink: RunArtifactSink | None = None,
+        *,
+        partial: bool = False,
+    ) -> ResultReference:
+        run_base_key = f"tenants/{run.tenant_id}/projects/{run.project_id}/runs/{run.run_id}"
+        base_key = f"{run_base_key}/partial/snapshot-{len(result.units):06d}" if partial else run_base_key
         shard_keys: list[str] = []
         shard_sha256: list[str] = []
         written_keys: list[str] = []
+        previous = await self.state.get_result_reference(run.tenant_id, run.project_id, run.run_id)
         try:
             if len(result.units) > self.result_shard_units:
                 for offset in range(0, len(result.units), self.result_shard_units):
@@ -860,6 +1082,16 @@ class RunService:
             result_key = f"{base_key}/result.json"
             await self.objects.put(result_key, result_document, "application/json")
             written_keys.append(result_key)
+            asset = (
+                await self.state.get_asset(run.tenant_id, run.project_id, run.asset_id)
+                if run.asset_id
+                else None
+            )
+            source = (
+                await self.state.get_source(run.tenant_id, run.project_id, run.source_id)
+                if run.source_id
+                else None
+            )
             reference = ResultReference(
                 run_id=run.run_id,
                 object_key=result_key,
@@ -869,8 +1101,19 @@ class RunService:
                 shard_sha256=shard_sha256,
                 domain=result.domain,
                 created_at=result.created_at,
+                asset_id=run.asset_id,
+                source_id=run.source_id,
+                media_kind=asset.kind if asset is not None else (MediaKind.STREAM if source else None),
+                resource_name=asset.filename if asset is not None else source.name if source is not None else None,
+                object_count=sum(len(unit.objects) for unit in result.units),
+                person_count=len(getattr(result.domain_payload, "persons", [])),
+                face_count=len(getattr(result.domain_payload, "faces", [])),
+                ocr_block_count=len(getattr(result.domain_payload, "blocks", [])),
+                text_length=len(getattr(result.domain_payload, "text", "") or ""),
+                warning_count=len(result.warnings),
+                index_status="partial" if partial else "ready",
             )
-            expires_at = result.created_at + self.structured_result_retention_days * 86_400
+            expires_at = run.created_at + self.structured_result_retention_days * 86_400
             for object_key in written_keys:
                 await self.state.track_object(
                     ObjectRetentionRecord(
@@ -880,11 +1123,26 @@ class RunService:
                         category="structured_result",
                         owner_type="run_result",
                         owner_id=run.run_id,
-                        created_at=result.created_at,
+                        created_at=run.created_at,
                         expires_at=expires_at,
                     )
                 )
+            if sink is not None and not partial:
+                # Feature crops and unit frames are derived previews: they follow the
+                # preview retention window, not the longer structured-result window.
+                for record in sink.retention_records(
+                    created_at=run.created_at,
+                    expires_at=run.created_at + self.preview_retention_days * 86_400,
+                ):
+                    await self.state.track_object(record)
             await self.state.save_result_reference(run.tenant_id, run.project_id, reference)
+            if previous is not None and previous.object_key != reference.object_key:
+                previous_keys = [previous.object_key, *previous.shard_keys]
+                for object_key in previous_keys:
+                    with suppress(Exception):
+                        await self.objects.delete(object_key)
+                with suppress(Exception):
+                    await self.state.mark_objects_deleted(previous_keys, time.time())
             return reference
         except Exception:
             for object_key in written_keys:
@@ -893,6 +1151,21 @@ class RunService:
             with suppress(Exception):
                 await self.state.mark_objects_deleted(written_keys, time.time())
             raise
+
+    async def _discard_partial_result(self, run: RunRecord) -> None:
+        try:
+            reference = await self.state.get_result_reference(run.tenant_id, run.project_id, run.run_id)
+        except Exception:
+            logger.exception("could not inspect partial result for run %s", run.run_id)
+            return
+        if reference is None or "/partial/" not in reference.object_key:
+            return
+        object_keys = [reference.object_key, *reference.shard_keys]
+        for object_key in object_keys:
+            with suppress(Exception):
+                await self.objects.delete(object_key)
+        with suppress(Exception):
+            await self.state.mark_objects_deleted(object_keys, time.time())
 
     async def _begin_execution(self, run: RunRecord) -> RunRecord:
         for _ in range(4):

@@ -203,7 +203,9 @@ class PostgresAccessRepository:
         return ApiKeyRecord.model_validate(row) if row else None
 
     async def list_api_keys(self, tenant_id: str, project_id: str) -> list[ApiKeyRecord]:
-        rows = await self._list_documents("scenara_api_keys", "tenant_id = %s AND project_id = %s", (tenant_id, project_id))
+        rows = await self._list_documents(
+            "scenara_api_keys", "tenant_id = %s AND project_id = %s", (tenant_id, project_id)
+        )
         return [ApiKeyRecord.model_validate(row) for row in rows]
 
     async def record_api_key_used(self, tenant_id: str, project_id: str, key_id: str, used_at: float) -> None:

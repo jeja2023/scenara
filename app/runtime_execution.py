@@ -7,6 +7,7 @@ import numpy as np
 import numpy.typing as npt
 from fastapi import HTTPException, status
 
+from app.exception_utils import exception_log_summary
 from app.inference_scheduler import InferenceScheduler
 from app.metrics import observe
 from app.observability import (
@@ -17,7 +18,6 @@ from app.observability import (
     trace_span,
     wall_time,
 )
-from app.portrait_response import exception_log_summary
 from app.runtime_sessions import primary_execution_provider, run_session
 from app.runtime_state import decrement_gpu_queue_waiters, gpu_semaphore_for_device, increment_gpu_queue_waiters
 from app.schemas import ModelBundle
@@ -53,9 +53,7 @@ def should_run_shadow(active_model_id: str, percentage: int) -> bool:
     if percentage >= 100:
         return True
     traffic_key = current_request_id() or current_scheduling_scope() or str(wall_time())
-    bucket = int.from_bytes(
-        hashlib.sha256(f"{active_model_id}:{traffic_key}".encode()).digest()[:4], "big"
-    ) % 100
+    bucket = int.from_bytes(hashlib.sha256(f"{active_model_id}:{traffic_key}".encode()).digest()[:4], "big") % 100
     return bucket < percentage
 
 
@@ -174,7 +172,11 @@ async def _run_model_bundle_direct(bundle: ModelBundle, input_array: Array) -> t
     model_semaphore = bundle.get("semaphore")
     gpu_device_id = bundle.get("gpu_device_id")
     execution_provider = bundle_execution_provider(bundle)
-    gpu_semaphore = gpu_semaphore_for_device(gpu_device_id) if execution_provider in {"CUDAExecutionProvider", "TensorrtExecutionProvider"} else None
+    gpu_semaphore = (
+        gpu_semaphore_for_device(gpu_device_id)
+        if execution_provider in {"CUDAExecutionProvider", "TensorrtExecutionProvider"}
+        else None
+    )
     queue_timeout = float(bundle.get("queue_timeout_seconds", 0) or 0)
     queue_start = now()
     model_acquired = False
@@ -318,6 +320,8 @@ def stack_outputs(output_groups: list[list[Array]]) -> list[Array]:
     for output_index in range(output_count):
         stacked.append(np.concatenate([group[output_index] for group in output_groups], axis=0))
     return stacked
+
+
 async def run_yolo_frames(
     bundle: ModelBundle,
     input_array: Array,

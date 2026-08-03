@@ -5,16 +5,14 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until signed, reproducible evidence is committed.
 
-Current development version: `0.3.0-dev.5` (`0.3.0.dev5` for Python packages).
+Current development version: `0.3.0-dev.6` (`0.3.0.dev6` for Python packages).
 This version is an engineering qualification snapshot, not a `1.0.0` production release.
 
-The `0.3.0-dev.5` engineering baseline additionally fixes the migration and
-capacity evidence boundary: `app/` contains 43 reachable Python modules (about
-6,882 lines), list pagination/count/existence checks execute in the state
-backend, published contract bytes are LF-stable, and CI measures coverage over
-`scenara`, `app`, and the Python SDK together. Video and live-stream person
-detection now consumes progressive decoded batches, persists monotonic Run
-progress, and exposes replaceable partial Result snapshots before completion.
+The `0.3.0-dev.6` engineering baseline adds domain-scoped Parse workspaces, a
+first-class cross-domain Results center, Data Assets terminology, and a
+tenant/project-scoped result-summary query path backed by PostgreSQL indexes.
+It retains the `0.3.0-dev.5` migration, capacity, coverage, progressive media
+decoding, monotonic Run progress, and replaceable partial Result guarantees.
 
 | Stage | Deliverable | Status | Evidence required |
 |---|---|---|---|

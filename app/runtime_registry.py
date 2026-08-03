@@ -8,11 +8,11 @@ from typing import Any, TypedDict, cast
 import numpy as np
 from fastapi import HTTPException, status
 
+from app.exception_utils import exception_log_summary
 from app.metrics import observe
 from app.model_config import config_section, config_value, model_config
 from app.model_package import model_hash, validate_model_hash
 from app.observability import logger, now, wall_time
-from app.portrait_response import exception_log_summary
 from app.runtime_sessions import create_session, input_dtype, io_meta, primary_execution_provider
 from app.runtime_state import MODEL_LOAD_LOCKS, MODEL_LOAD_RETRY_AFTER, MODEL_REGISTRY, REGISTRY_LOCK, gpu_device_ids
 from app.schemas import ModelBundle
@@ -103,8 +103,12 @@ def model_runtime_fingerprint(cache_key_value: str, digest: str) -> str:
 
 def model_runtime_limits(cache_key_value: str) -> tuple[int, float]:
     config = model_config(cache_key_value)
-    raw_concurrency = config_value(config, "runtime", "max_concurrency", config.get("max_concurrency", MODEL_CONCURRENCY_LIMIT))
-    raw_timeout = config_value(config, "runtime", "queue_timeout_seconds", config.get("queue_timeout_seconds", MODEL_QUEUE_TIMEOUT_SECONDS))
+    raw_concurrency = config_value(
+        config, "runtime", "max_concurrency", config.get("max_concurrency", MODEL_CONCURRENCY_LIMIT)
+    )
+    raw_timeout = config_value(
+        config, "runtime", "queue_timeout_seconds", config.get("queue_timeout_seconds", MODEL_QUEUE_TIMEOUT_SECONDS)
+    )
     try:
         max_concurrency = max(1, int(raw_concurrency))
     except (TypeError, ValueError):
@@ -146,14 +150,9 @@ def model_dynamic_batch_config(cache_key_value: str) -> DynamicBatchConfig:
             max_wait_ms,
             nonnegative_float("async_max_wait_ms", DYNAMIC_BATCH_ASYNC_MAX_WAIT_MS),
         ),
-        "dynamic_batch_max_queue_size": positive_int(
-            "max_queue_size", DYNAMIC_BATCH_MAX_QUEUE_SIZE
-        ),
+        "dynamic_batch_max_queue_size": positive_int("max_queue_size", DYNAMIC_BATCH_MAX_QUEUE_SIZE),
         "contract_version": str(
-            batching.get("contract_version")
-            or config.get("contract_version")
-            or config.get("version")
-            or "1"
+            batching.get("contract_version") or config.get("contract_version") or config.get("version") or "1"
         ),
     }
 
@@ -189,6 +188,8 @@ async def get_model_load_lock(cache_key_value: str) -> asyncio.Lock:
             lock = asyncio.Lock()
             MODEL_LOAD_LOCKS[cache_key_value] = lock
         return lock
+
+
 async def evict_lru_if_needed(except_key: str | None = None) -> None:
     if MAX_LOADED_MODELS <= 0:
         return
@@ -199,9 +200,7 @@ async def evict_lru_if_needed(except_key: str | None = None) -> None:
             # ——在运行中途释放会话是未定义行为。如果每个可淘汰的模型都在忙碌，
             # 则停止淘汰并允许注册表短暂超出容量限制，而不是去损坏一个活跃的会话。
             evictable = [
-                key
-                for key, bundle in MODEL_REGISTRY.items()
-                if key != except_key and not bundle.get("in_use", 0)
+                key for key, bundle in MODEL_REGISTRY.items() if key != except_key and not bundle.get("in_use", 0)
             ]
             if not evictable:
                 return
@@ -218,6 +217,7 @@ async def unload_model_by_key(cache_key_value: str) -> bool:
         removed = MODEL_REGISTRY.pop(cache_key_value, None)
         MODEL_LOAD_LOCKS.pop(cache_key_value, None)
     if removed is not None:
+
         async def release_when_drained() -> None:
             while int(removed.get("in_use", 0) or 0) > 0:
                 await asyncio.sleep(0.01)

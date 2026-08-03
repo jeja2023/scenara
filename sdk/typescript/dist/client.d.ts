@@ -77,6 +77,12 @@ export declare class ScenaraClient {
     createRun(input: CreateRunInput): Promise<Run>;
     cancelRun(runId: string): Promise<Run>;
     getResult(runId: string): Promise<ResultEnvelope>;
+    /**
+     * Download one derived image declared by a run result: a feature crop
+     * (`crop_artifact_id` on a detected object) or a full unit image
+     * (`frame_artifact_id` on a media unit).
+     */
+    getResultArtifact(runId: string, artifactId: string): Promise<Uint8Array>;
     pauseRun(runId: string): Promise<Run>;
     resumeRun(runId: string): Promise<Run>;
     listAssets(offset?: number, limit?: number): Promise<MediaAssetPage>;

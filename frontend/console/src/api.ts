@@ -1,13 +1,29 @@
 import type { ApiErrorBody, Envelope } from "./types";
 
-export interface ConnectionSettings { apiBase: string; token: string; tenantId: string; projectId: string }
+export interface ConnectionSettings {
+  apiBase: string;
+  token: string;
+  tenantId: string;
+  projectId: string;
+}
 
 const STORAGE_KEY = "scenara.console.connection.v1";
-const defaults: ConnectionSettings = { apiBase: "", token: "", tenantId: "default", projectId: "default" };
+const defaults: ConnectionSettings = {
+  apiBase: "",
+  token: "",
+  tenantId: "default",
+  projectId: "default",
+};
 
 export function loadConnection(): ConnectionSettings {
-  try { return { ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") } as ConnectionSettings; }
-  catch { return { ...defaults }; }
+  try {
+    return {
+      ...defaults,
+      ...JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}"),
+    } as ConnectionSettings;
+  } catch {
+    return { ...defaults };
+  }
 }
 
 export function saveConnection(value: ConnectionSettings): void {
@@ -15,7 +31,12 @@ export function saveConnection(value: ConnectionSettings): void {
 }
 
 export class ApiError extends Error {
-  constructor(readonly status: number, readonly code: string, message: string, readonly requestId?: string) {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+    readonly requestId?: string,
+  ) {
     super(message);
   }
 }
@@ -46,7 +67,10 @@ function localizedHttpError(status: number, code: string): string {
   return "请求失败，请检查输入后重试";
 }
 
-export function userFacingError(caught: unknown, fallback = "操作失败，请稍后重试"): string {
+export function userFacingError(
+  caught: unknown,
+  fallback = "操作失败，请稍后重试",
+): string {
   return caught instanceof ApiError ? caught.message : fallback;
 }
 
@@ -56,8 +80,14 @@ function requestHeaders(init: RequestInit): Headers {
   if (!headers.has("Accept")) headers.set("Accept", "application/json");
   headers.set("X-Tenant-Id", connection.tenantId);
   headers.set("X-Project-Id", connection.projectId);
-  if (connection.token) headers.set("Authorization", `Bearer ${connection.token}`);
-  if (init.body && !(init.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (connection.token)
+    headers.set("Authorization", `Bearer ${connection.token}`);
+  if (
+    init.body &&
+    !(init.body instanceof FormData) &&
+    !headers.has("Content-Type")
+  )
+    headers.set("Content-Type", "application/json");
   return headers;
 }
 
@@ -65,26 +95,45 @@ async function request(path: string, init: RequestInit): Promise<Response> {
   const connection = loadConnection();
   let response: Response;
   try {
-    response = await fetch(`${connection.apiBase}${path}`, { ...init, headers: requestHeaders(init), cache: "no-store" });
+    response = await fetch(`${connection.apiBase}${path}`, {
+      ...init,
+      headers: requestHeaders(init),
+      cache: "no-store",
+    });
   } catch {
-    throw new ApiError(0, "NETWORK_ERROR", localizedHttpError(0, "NETWORK_ERROR"));
+    throw new ApiError(
+      0,
+      "NETWORK_ERROR",
+      localizedHttpError(0, "NETWORK_ERROR"),
+    );
   }
   return response;
 }
 
 async function responseError(response: Response): Promise<ApiError> {
-  const body = await response.json().catch(() => ({})) as ApiErrorBody;
+  const body = (await response.json().catch(() => ({}))) as ApiErrorBody;
   const code = body.error?.code ?? "HTTP_ERROR";
-  return new ApiError(response.status, code, localizedHttpError(response.status, code), body.request_id);
+  return new ApiError(
+    response.status,
+    code,
+    localizedHttpError(response.status, code),
+    body.request_id,
+  );
 }
 
 export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await request(path, init);
-  const body = await response.json().catch(() => ({})) as Envelope<T> | ApiErrorBody;
+  const body = (await response.json().catch(() => ({}))) as
+    Envelope<T> | ApiErrorBody;
   if (!response.ok) {
     const error = (body as ApiErrorBody).error;
     const code = error?.code ?? "HTTP_ERROR";
-    throw new ApiError(response.status, code, localizedHttpError(response.status, code), (body as ApiErrorBody).request_id);
+    throw new ApiError(
+      response.status,
+      code,
+      localizedHttpError(response.status, code),
+      (body as ApiErrorBody).request_id,
+    );
   }
   return (body as Envelope<T>).data;
 }
@@ -97,8 +146,37 @@ export async function apiBlob(path: string): Promise<Blob> {
   return await response.blob();
 }
 
-export async function apiStream(path: string, signal?: AbortSignal): Promise<Response> {
-  const response = await request(path, { headers: { Accept: "text/event-stream" }, signal });
+/**
+ * 把二进制响应转成可直接渲染的 Data URL。
+ * 控制台的内容安全策略允许同源、data: 和 blob: 图片地址；二进制响应仍转成
+ * Data URL，以便历史产物和跨页面预览保持一致。
+ */
+export function blobToDataUrl(value: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") resolve(reader.result);
+      else reject(new Error("binary response did not produce a data URL"));
+    };
+    reader.onerror = () =>
+      reject(reader.error ?? new Error("binary response could not be read"));
+    reader.readAsDataURL(value);
+  });
+}
+
+/** 拉取一张图片接口响应并转为 Data URL。 */
+export async function apiImageDataUrl(path: string): Promise<string> {
+  return blobToDataUrl(await apiBlob(path));
+}
+
+export async function apiStream(
+  path: string,
+  signal?: AbortSignal,
+): Promise<Response> {
+  const response = await request(path, {
+    headers: { Accept: "text/event-stream" },
+    signal,
+  });
   if (!response.ok) throw await responseError(response);
   return response;
 }
@@ -110,11 +188,16 @@ function parseEventData<T>(block: string): T | undefined {
     .map((line) => line.slice(5).replace(/^ /, ""))
     .join("\n");
   if (!data) return undefined;
-  try { return JSON.parse(data) as T; }
-  catch { return undefined; }
+  try {
+    return JSON.parse(data) as T;
+  } catch {
+    return undefined;
+  }
 }
 
-export async function* streamJsonEvents<T>(response: Response): AsyncGenerator<T> {
+export async function* streamJsonEvents<T>(
+  response: Response,
+): AsyncGenerator<T> {
   if (!response.body) return;
   const reader = response.body.getReader();
   const decoder = new TextDecoder();

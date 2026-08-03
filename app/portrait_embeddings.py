@@ -6,7 +6,7 @@ import numpy.typing as npt
 from PIL import Image
 
 from app.media.quality import assess_image_quality, clamp01
-from app.portrait_compare import l2_normalize_vector
+from app.vector_math import l2_normalize_vector
 
 Array = npt.NDArray[Any]
 
@@ -33,6 +33,7 @@ def image_fingerprint_embedding(image: Image.Image) -> list[float]:
 def best_quality_index(items: list[dict[str, Any]]) -> int:
     if not items:
         return -1
+
     def quality_score(index: int) -> float:
         quality = items[index].get("quality")
         return float(quality.get("score", 0.0)) if isinstance(quality, dict) else 0.0
@@ -57,7 +58,7 @@ def face_detection_image(image: Image.Image) -> tuple[Array, float]:
         scale = FACE_DETECT_MAX_SIDE / float(max_side)
         resized = cv2.resize(
             rgb,
-            (max(1, int(round(image.width * scale))), max(1, int(round(image.height * scale)))),
+            (max(1, round(image.width * scale)), max(1, round(image.height * scale))),
             interpolation=cv2.INTER_AREA,
         )
         return resized, 1.0 / scale
@@ -194,7 +195,7 @@ def dominant_color(image: Image.Image) -> dict[str, Any]:
     name = min(color_names, key=lambda key: float(np.linalg.norm(mean - color_names[key])))
     return {
         "name": name,
-        "rgb": [int(round(value)) for value in mean.tolist()],
+        "rgb": [round(value) for value in mean.tolist()],
     }
 
 

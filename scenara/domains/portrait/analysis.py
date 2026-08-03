@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from PIL import Image
 
+from scenara.platform.artifacts import store_object_crop, store_unit_frame
 from scenara.platform.media_batch import DecodedMedia
 from scenara.platform.model_runtime import current_runtime_binding
 from scenara.platform.models import (
@@ -209,9 +210,7 @@ class LegacyPortraitAnalysisBackend:
                         if binding is not None
                         else str(status.get("model_id") or f"scenara.development.{capability}")
                     ),
-                    version=(
-                        binding.version if binding is not None else str(status.get("version") or "unversioned")
-                    ),
+                    version=(binding.version if binding is not None else str(status.get("version") or "unversioned")),
                     sha256=binding.sha256 if binding is not None else None,
                     production_ready=capability in production_ready,
                 )
@@ -302,6 +301,7 @@ class PortraitFullAnalysisOperator:
         decoded = inputs["batch"]
         if not isinstance(decoded, DecodedMedia):
             raise TypeError("portrait analysis requires a decoded media batch")
+        decoded = await decoded.materialize()
         requested_raw = parameters.get("capabilities", sorted(PORTRAIT_CAPABILITIES))
         if not isinstance(requested_raw, list) or not all(isinstance(item, str) for item in requested_raw):
             raise ValueError("portrait capabilities must be a list of strings")
@@ -326,24 +326,28 @@ class PortraitFullAnalysisOperator:
             objects: list[VisionObject] = []
             unit_persons: list[VisionObject] = []
             for item in analysis.get("persons", []):
+                person_box = _box(item.get("box"))
                 person = VisionObject(
                     object_id=f"person_{uuid4().hex}",
                     object_type="person",
                     score=float(item["score"]) if item.get("score") is not None else None,
-                    bbox=_box(item.get("box")),
+                    bbox=person_box,
                     track_id=str(item["track_id"]) if item.get("track_id") else None,
                     attributes=_safe_attributes(item),
+                    crop_artifact_id=await store_object_crop(context.artifacts, unit.image, bbox=person_box),
                 )
                 persons.append(person)
                 unit_persons.append(person)
                 objects.append(person)
             for item in analysis.get("faces", []):
+                face_box = _box(item.get("box"))
                 face = VisionObject(
                     object_id=f"face_{uuid4().hex}",
                     object_type="face",
                     score=float(item["score"]) if item.get("score") is not None else None,
-                    bbox=_box(item.get("box")),
+                    bbox=face_box,
                     attributes=_safe_attributes(item),
+                    crop_artifact_id=await store_object_crop(context.artifacts, unit.image, bbox=face_box),
                 )
                 faces.append(face)
                 objects.append(face)
@@ -363,6 +367,7 @@ class PortraitFullAnalysisOperator:
                     score=float(item["score"]) if item.get("score") is not None else None,
                     polygon=points,
                     attributes=_safe_attributes(item),
+                    crop_artifact_id=await store_object_crop(context.artifacts, unit.image, polygon=points),
                 )
                 objects.append(silhouette)
                 if unit_persons:
@@ -383,6 +388,11 @@ class PortraitFullAnalysisOperator:
                     width=unit.width,
                     height=unit.height,
                     objects=objects,
+                    frame_artifact_id=(
+                        await store_unit_frame(context.artifacts, unit.image)
+                        if any(item.crop_artifact_id for item in objects)
+                        else None
+                    ),
                 )
             )
 

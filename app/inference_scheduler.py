@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 from collections import defaultdict, deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
@@ -143,9 +144,7 @@ class InferenceScheduler:
 
     def _batch_ready(self, seed: ScheduledInference) -> bool:
         total = sum(
-            item.size
-            for item in self._queue
-            if item.priority == seed.priority and item.group_key == seed.group_key
+            item.size for item in self._queue if item.priority == seed.priority and item.group_key == seed.group_key
         )
         return total >= self.max_batch_size
 
@@ -166,10 +165,8 @@ class InferenceScheduler:
                 wait_seconds = self._wait_seconds(seed)
                 if wait_seconds > 0 and not self._batch_ready(seed):
                     self._wake.clear()
-                    try:
+                    with contextlib.suppress(TimeoutError):
                         await asyncio.wait_for(self._wake.wait(), timeout=wait_seconds)
-                    except TimeoutError:
-                        pass
                     continue
                 batch = self._take_fair_batch(seed)
                 await self._dispatch(batch)
@@ -180,9 +177,7 @@ class InferenceScheduler:
 
     def _take_fair_batch(self, seed: ScheduledInference) -> list[ScheduledInference]:
         candidates = [
-            item
-            for item in self._queue
-            if item.priority == seed.priority and item.group_key == seed.group_key
+            item for item in self._queue if item.priority == seed.priority and item.group_key == seed.group_key
         ]
         by_scope: dict[str, deque[ScheduledInference]] = defaultdict(deque)
         for item in candidates:
@@ -254,26 +249,20 @@ class InferenceScheduler:
             if item.future.cancelled() or item.future.done():
                 continue
             scheduler_wait = max(0.0, now() - item.enqueued_at - inference_seconds)
-            item.future.set_result(
-                (item_outputs, scheduler_wait + model_queue_seconds, inference_seconds)
-            )
+            item.future.set_result((item_outputs, scheduler_wait + model_queue_seconds, inference_seconds))
 
     async def _execute_one(self, item: ScheduledInference) -> None:
         if item.future.cancelled() or item.future.done():
             return
         try:
-            outputs, model_queue_seconds, inference_seconds = await self.executor(
-                self.bundle, item.input_array
-            )
+            outputs, model_queue_seconds, inference_seconds = await self.executor(self.bundle, item.input_array)
         except Exception as exc:
             if not item.future.done():
                 item.future.set_exception(exc)
             return
         if not item.future.done():
             scheduler_wait = max(0.0, now() - item.enqueued_at - inference_seconds)
-            item.future.set_result(
-                (outputs, scheduler_wait + model_queue_seconds, inference_seconds)
-            )
+            item.future.set_result((outputs, scheduler_wait + model_queue_seconds, inference_seconds))
 
     @staticmethod
     def _split_outputs(outputs: list[Array], sizes: list[int]) -> list[list[Array]]:

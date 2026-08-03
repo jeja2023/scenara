@@ -245,7 +245,9 @@ async def test_source_credentials_are_not_returned(kernel_client) -> None:
 
 
 @pytest.mark.asyncio
-async def test_source_probe_returns_sanitized_technical_metadata(kernel_client, monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_source_probe_returns_sanitized_technical_metadata(
+    kernel_client, monkeypatch: pytest.MonkeyPatch
+) -> None:
     api, _runtime = kernel_client
     created = await api.post(
         "/api/v1/media/sources",

@@ -60,13 +60,15 @@ def nms(boxes: Array, scores: Array, iou_threshold: float) -> list[int]:
         order = rest[iou <= iou_threshold]
 
     return keep
+
+
 def crop_person(image: Image.Image, box: list[float], min_size: int = 2) -> Image.Image | None:
     width, height = image.size
     x1, y1, x2, y2 = box
-    left = max(0, min(width, int(round(x1))))
-    top = max(0, min(height, int(round(y1))))
-    right = max(0, min(width, int(round(x2))))
-    bottom = max(0, min(height, int(round(y2))))
+    left = max(0, min(width, round(x1)))
+    top = max(0, min(height, round(y1)))
+    right = max(0, min(width, round(x2)))
+    bottom = max(0, min(height, round(y2)))
     if right - left < min_size or bottom - top < min_size:
         return None
     return image.crop((left, top, right, bottom))
@@ -97,10 +99,10 @@ def person_crop_quality(image: Image.Image, box: list[float], min_size: int = 2)
             "clipped_box": [round(value, 3) for value in clipped],
         }
     crop_box: tuple[int, int, int, int] = (
-        int(round(clipped[0])),
-        int(round(clipped[1])),
-        int(round(clipped[2])),
-        int(round(clipped[3])),
+        round(clipped[0]),
+        round(clipped[1]),
+        round(clipped[2]),
+        round(clipped[3]),
     )
     crop = image.crop(crop_box)
     quality = assess_image_quality(crop)

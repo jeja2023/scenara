@@ -34,9 +34,7 @@ async def get_capability_runtime(capability_name: str, adapters: Iterable[str]) 
     capability = capability_status(capability_name)
     binding = current_runtime_binding(capability_name)
     adapter = (
-        binding.adapter.strip().lower()
-        if binding is not None
-        else str(capability.get("adapter") or "").strip().lower()
+        binding.adapter.strip().lower() if binding is not None else str(capability.get("adapter") or "").strip().lower()
     )
     if adapter not in {item.lower() for item in adapters}:
         return None
@@ -78,19 +76,32 @@ def runtime_input_size(runtime: CapabilityRuntime, default: tuple[int, int]) -> 
             pass
     if runtime.adapter == "opengait":
         shape = runtime.bundle["session"].get_inputs()[0].shape
-        if len(shape) >= 5 and isinstance(shape[-2], int) and isinstance(shape[-1], int):
-            if shape[-2] > 0 and shape[-1] > 0:
-                return int(shape[-2]), int(shape[-1])
+        if (
+            len(shape) >= 5
+            and isinstance(shape[-2], int)
+            and isinstance(shape[-1], int)
+            and shape[-2] > 0
+            and shape[-1] > 0
+        ):
+            return int(shape[-2]), int(shape[-1])
     return configured_input_size(runtime.cache_key, runtime.bundle["session"], default)
 
 
 def runtime_input_value(runtime: CapabilityRuntime, key: str, default: Any = None) -> Any:
     capability_input = runtime.capability.get("input")
-    capability_default = capability_input.get(key) if isinstance(capability_input, dict) and key in capability_input else runtime.capability.get(key, default)
+    capability_default = (
+        capability_input.get(key)
+        if isinstance(capability_input, dict) and key in capability_input
+        else runtime.capability.get(key, default)
+    )
     return config_value(runtime.config, "input", key, capability_default)
 
 
 def runtime_output_value(runtime: CapabilityRuntime, key: str, default: Any = None) -> Any:
     capability_output = runtime.capability.get("output")
-    capability_default = capability_output.get(key) if isinstance(capability_output, dict) and key in capability_output else runtime.capability.get(key, default)
+    capability_default = (
+        capability_output.get(key)
+        if isinstance(capability_output, dict) and key in capability_output
+        else runtime.capability.get(key, default)
+    )
     return config_value(runtime.config, "output", key, capability_default)

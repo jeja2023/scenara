@@ -100,7 +100,9 @@ def decode_rtmpose_outputs(
                 ],
                 dtype=np.float32,
             )
-            scores = np.asarray([clamp01(float((x_score[index] + y_score[index]) / 2.0)) for index in range(count)], dtype=np.float32)
+            scores = np.asarray(
+                [clamp01(float((x_score[index] + y_score[index]) / 2.0)) for index in range(count)], dtype=np.float32
+            )
             return coords, scores
     return np.empty((0, 2), dtype=np.float32), np.empty((0,), dtype=np.float32)
 

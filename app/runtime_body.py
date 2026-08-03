@@ -4,6 +4,7 @@ from typing import Any
 
 from PIL import Image
 
+from app.exception_utils import exception_log_summary
 from app.geometry import crop_person, person_crop_quality
 from app.inference_detection import infer_person_frames
 from app.inference_reid import infer_reid_images
@@ -11,7 +12,6 @@ from app.observability import logger, wall_time
 from app.portrait_embeddings import FALLBACK_EMBEDDING_MODEL_ID, FALLBACK_EMBEDDING_VERSION
 from app.portrait_embeddings import body_record as fallback_body_record
 from app.portrait_model_runtime_capability import get_capability_runtime, runtime_output_value
-from app.portrait_response import exception_log_summary
 from app.settings import RUNTIME_CAPABILITY_RETRY_COOLDOWN_SECONDS
 
 # 这些变量持有的是 "retry-after"（稍后重试）的时间戳，而不是一个永久的标志：
@@ -30,7 +30,9 @@ def _runtime_cooldown_deadline() -> float:
     return wall_time() + RUNTIME_CAPABILITY_RETRY_COOLDOWN_SECONDS
 
 
-def best_person_detection(image: Image.Image, persons: list[dict[str, Any]]) -> tuple[Image.Image, dict[str, Any]] | None:
+def best_person_detection(
+    image: Image.Image, persons: list[dict[str, Any]]
+) -> tuple[Image.Image, dict[str, Any]] | None:
     candidates: list[tuple[float, Image.Image, dict[str, Any], dict[str, Any]]] = []
     for person in persons:
         box = person.get("box")

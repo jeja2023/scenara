@@ -407,7 +407,11 @@ def hungarian_assignment_pairs(
             for candidate_column in range(1, size + 1):
                 if used[candidate_column]:
                     continue
-                current = cost[current_row - 1][candidate_column - 1] - potentials_u[current_row] - potentials_v[candidate_column]
+                current = (
+                    cost[current_row - 1][candidate_column - 1]
+                    - potentials_u[current_row]
+                    - potentials_v[candidate_column]
+                )
                 if current < min_values[candidate_column]:
                     min_values[candidate_column] = current
                     predecessor[candidate_column] = column
@@ -485,7 +489,11 @@ def associate_person_tracks(
             person["track_match"] = details
             matched_persons.add(person_index)
 
-        remaining_tracks = [track for track in unmatched_tracks if track.track_id not in {person.get("track_id") for person in persons if isinstance(person, dict)}]
+        remaining_tracks = [
+            track
+            for track in unmatched_tracks
+            if track.track_id not in {person.get("track_id") for person in persons if isinstance(person, dict)}
+        ]
         low_matches = global_match(
             remaining_tracks,
             [(index, person) for index, person in low if index not in matched_persons],

@@ -10,6 +10,7 @@ from app.schemas import LetterboxMeta
 
 Array = npt.NDArray[Any]
 
+
 def yolo_detections(
     raw_outputs: list[Array],
     meta: LetterboxMeta,

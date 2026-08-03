@@ -67,7 +67,7 @@ const mediaKindLabels: Record<string, string> = {
   image: "图片",
   video: "视频",
   document: "文档",
-  stream: "流",
+  stream: "视频流",
 };
 
 const unitTypeLabels: Record<string, string> = {
@@ -518,7 +518,7 @@ export function labelRunStatus(value: RunStatus | string): string {
 }
 
 export function labelMediaKind(value: string): string {
-  return mediaKindLabels[value] ?? "其他媒体";
+  return mediaKindLabels[value] ?? "其他类型";
 }
 
 export function labelUnitType(value: string): string {

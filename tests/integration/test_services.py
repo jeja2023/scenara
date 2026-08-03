@@ -330,12 +330,80 @@ async def test_postgres_idempotency_locking_events_and_pgvector(postgres: Postgr
     finally:
         async with postgres.pool.connection() as connection, connection.transaction():
             await connection.execute("DELETE FROM scenara_object_retention WHERE tenant_id = %s", (tenant_id,))
-            await connection.execute("DELETE FROM scenara_features WHERE feature_id IN (%s, %s)", (f"feature_{suffix}", f"other_feature_{suffix}"))
-            await connection.execute("DELETE FROM scenara_feature_spaces WHERE feature_space_id = %s", (f"space_{suffix}",))
-            await connection.execute("DELETE FROM scenara_pipeline_versions WHERE pipeline_id = %s", (f"integration.pipeline-{suffix}",))
-            await connection.execute("DELETE FROM scenara_model_packages WHERE model_id = %s", (f"integration.model-{suffix}",))
+            await connection.execute(
+                "DELETE FROM scenara_features WHERE feature_id IN (%s, %s)",
+                (f"feature_{suffix}", f"other_feature_{suffix}"),
+            )
+            await connection.execute(
+                "DELETE FROM scenara_feature_spaces WHERE feature_space_id = %s", (f"space_{suffix}",)
+            )
+            await connection.execute(
+                "DELETE FROM scenara_pipeline_versions WHERE pipeline_id = %s", (f"integration.pipeline-{suffix}",)
+            )
+            await connection.execute(
+                "DELETE FROM scenara_model_packages WHERE model_id = %s", (f"integration.model-{suffix}",)
+            )
         await postgres.delete_run(tenant_id, "qualification", run.run_id)
         await postgres.delete_asset(tenant_id, "qualification", asset.asset_id)
+
+
+async def test_postgres_run_filters_pagination_and_active_reference_lookup(postgres: PostgresStateStore) -> None:
+    suffix = uuid4().hex
+    tenant_id = f"pagination_{suffix}"
+    runs = (
+        _run(f"{suffix}_old", tenant_id=tenant_id).model_copy(
+            update={"created_at": 1.0, "updated_at": 1.0},
+        ),
+        _run(f"{suffix}_done", tenant_id=tenant_id).model_copy(
+            update={
+                "domain": "portrait",
+                "status": RunStatus.COMPLETED,
+                "created_at": 2.0,
+                "updated_at": 2.0,
+            },
+        ),
+        _run(f"{suffix}_new", tenant_id=tenant_id).model_copy(
+            update={"created_at": 3.0, "updated_at": 3.0},
+        ),
+    )
+    try:
+        for index, run in enumerate(runs):
+            await postgres.create_run_idempotent(
+                run,
+                idempotency_key=f"page_{suffix}_{index}",
+                request_hash=str(index),
+            )
+
+        page = await postgres.list_runs(
+            tenant_id,
+            "qualification",
+            domain="ocr",
+            offset=1,
+            limit=1,
+        )
+
+        assert [item.run_id for item in page] == [runs[0].run_id]
+        assert await postgres.count_runs(tenant_id, "qualification", domain="ocr") == 2
+        assert await postgres.count_runs(tenant_id, "qualification", status=RunStatus.COMPLETED) == 1
+        assert (
+            await postgres.has_non_terminal_run(
+                tenant_id,
+                "qualification",
+                asset_id=runs[0].asset_id,
+            )
+            is True
+        )
+        assert (
+            await postgres.has_non_terminal_run(
+                tenant_id,
+                "qualification",
+                asset_id=runs[1].asset_id,
+            )
+            is False
+        )
+    finally:
+        for run in runs:
+            await postgres.delete_run(tenant_id, "qualification", run.run_id)
         await postgres.delete_webhook_subscription(tenant_id, "qualification", f"whk_{suffix}")
 
 

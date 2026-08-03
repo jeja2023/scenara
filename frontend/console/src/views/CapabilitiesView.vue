@@ -46,7 +46,7 @@ onMounted(refresh);
     <div class="page-header">
       <div>
         <h1>领域与能力</h1>
-        <p>查看已安装领域、支持的媒体类型和可用解析流水线。</p>
+        <p>查看已安装领域、支持的数据类型和可用解析流水线。</p>
       </div>
       <button class="button secondary" :disabled="loading" @click="refresh">
         <RefreshCw :size="16" :class="{ spin: loading }" />刷新

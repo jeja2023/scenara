@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
 
-from app.portrait_compare import l2_normalize_vector
 from app.portrait_tracking_metrics import (
     aggregate_track_template,
     association_quality_summary,
@@ -15,6 +15,7 @@ from app.portrait_tracking_metrics import (
     person_quality_score,
     tracklet_quality_score,
 )
+from app.vector_math import l2_normalize_vector
 
 
 def first_frame_index(track: TrackState) -> int:
@@ -77,11 +78,13 @@ class TrackState:
             else:
                 previous = np.asarray(self.smoothed_embedding, dtype=np.float32)
                 current = np.asarray(embedding, dtype=np.float32)
-                self.smoothed_embedding = [round(float(value), 8) for value in l2_normalize_vector(previous * 0.85 + current * 0.15)]
+                self.smoothed_embedding = [
+                    round(float(value), 8) for value in l2_normalize_vector(previous * 0.85 + current * 0.15)
+                ]
 
     def public_dict(self, *, include_template_embedding: bool = False) -> dict[str, Any]:
         ordered = sorted(self.frame_indexes)
-        gaps = [right - left - 1 for left, right in zip(ordered, ordered[1:], strict=False) if right - left > 1]
+        gaps = [right - left - 1 for left, right in itertools.pairwise(ordered) if right - left > 1]
         stability = track_stability_score(self.observations)
         average_confidence = self.confidence_sum / max(1, self.hits)
         average_quality = self.quality_sum / max(1, self.hits)
@@ -132,27 +135,20 @@ def predict_track_box(track: TrackState, frame_index: int) -> list[float]:
     current = observations[-1]
     frame_gap = max(1, int(current["frame_index"]) - int(previous["frame_index"]))
     predict_gap = max(1, frame_index - int(current["frame_index"]))
-    velocity = [
-        (float(current["box"][index]) - float(previous["box"][index])) / frame_gap
-        for index in range(4)
-    ]
-    return [
-        round(float(current["box"][index]) + velocity[index] * predict_gap, 4)
-        for index in range(4)
-    ]
+    velocity = [(float(current["box"][index]) - float(previous["box"][index])) / frame_gap for index in range(4)]
+    return [round(float(current["box"][index]) + velocity[index] * predict_gap, 4) for index in range(4)]
 
 
 def track_stability_score(observations: list[dict[str, Any]]) -> float:
     if len(observations) < 2:
         return 1.0
-    ious = [
-        box_iou(left.get("box", []), right.get("box", []))
-        for left, right in zip(observations, observations[1:], strict=False)
-    ]
+    ious = [box_iou(left.get("box", []), right.get("box", [])) for left, right in itertools.pairwise(observations)]
     return round(float(sum(ious) / len(ious)), 6) if ious else 1.0
 
 
-def find_person_by_track(frames_by_index: dict[int, dict[str, Any]], frame_index: int, track_id: str) -> dict[str, Any] | None:
+def find_person_by_track(
+    frames_by_index: dict[int, dict[str, Any]], frame_index: int, track_id: str
+) -> dict[str, Any] | None:
     frame = frames_by_index.get(frame_index)
     if not frame:
         return None
@@ -169,10 +165,16 @@ def postprocess_tracklets(frames: list[dict[str, Any]], tracks: list[TrackState]
         for index, observation in enumerate(observations):
             boxes = [observation["box"]]
             weights = [0.50]
-            if index > 0 and observation["frame_index"] - observations[index - 1]["frame_index"] <= max_interpolation_gap + 1:
+            if (
+                index > 0
+                and observation["frame_index"] - observations[index - 1]["frame_index"] <= max_interpolation_gap + 1
+            ):
                 boxes.append(observations[index - 1]["box"])
                 weights.append(0.25)
-            if index + 1 < len(observations) and observations[index + 1]["frame_index"] - observation["frame_index"] <= max_interpolation_gap + 1:
+            if (
+                index + 1 < len(observations)
+                and observations[index + 1]["frame_index"] - observation["frame_index"] <= max_interpolation_gap + 1
+            ):
                 boxes.append(observations[index + 1]["box"])
                 weights.append(0.25)
             person = find_person_by_track(frames_by_index, int(observation["frame_index"]), track.track_id)
@@ -183,7 +185,7 @@ def postprocess_tracklets(frames: list[dict[str, Any]], tracks: list[TrackState]
                     "support": len(boxes),
                 }
 
-        for left, right in zip(observations, observations[1:], strict=False):
+        for left, right in itertools.pairwise(observations):
             gap = int(right["frame_index"]) - int(left["frame_index"]) - 1
             if gap <= 0 or gap > max_interpolation_gap:
                 continue

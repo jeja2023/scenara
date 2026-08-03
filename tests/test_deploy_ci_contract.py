@@ -7,7 +7,9 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = ROOT / "deploy" / "compose.yml"
+DEBUG_COMPOSE = ROOT / "deploy" / "compose.debug.yml"
 WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
+GITATTRIBUTES = ROOT / ".gitattributes"
 BACKUP_SCRIPT = ROOT / "deploy" / "scripts" / "backup.sh"
 RESTORE_SCRIPT = ROOT / "deploy" / "scripts" / "restore.sh"
 MIGRATE_SCRIPT = ROOT / "deploy" / "scripts" / "migrate.sh"
@@ -90,6 +92,25 @@ def test_compose_runs_all_versioned_migrations_and_checks_readiness() -> None:
     assert "http://localhost:8000/readyz" in compose
 
 
+def test_debug_compose_persists_run_state_and_applies_migrations() -> None:
+    document = yaml.safe_load(DEBUG_COMPOSE.read_text(encoding="utf-8"))
+    services = document["services"]
+    api = services["api"]
+    assert api["environment"]["SCENARA_STATE_BACKEND"] == "postgres"
+    assert api["depends_on"]["migrate"]["condition"] == "service_completed_successfully"
+    assert services["migrate"]["depends_on"]["postgres"]["condition"] == "service_healthy"
+    assert services["migrate"]["command"] == ["sh", "/deploy-scripts/migrate.sh"]
+    assert "debug-postgres" in document["volumes"]
+    assert "SCENARA_DEBUG_SECRET_ENCRYPTION_KEY" in api["environment"]
+    assert api["command"] == ["sh", "deploy/scripts/debug-entrypoint.sh"]
+    assert "debug-state" in document["volumes"]
+
+
+def test_linux_deploy_scripts_are_forced_to_lf() -> None:
+    assert "deploy/scripts/**/*.sh text eol=lf" in GITATTRIBUTES.read_text(encoding="utf-8")
+    assert b"\r\n" not in MIGRATE_SCRIPT.read_bytes()
+
+
 def test_production_data_service_images_are_digest_pinned() -> None:
     document = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
     services = document["services"]
@@ -167,6 +188,11 @@ def test_offline_builder_emits_release_identity_and_model_manifest() -> None:
 
 def test_ci_checks_legacy_adapter_code_and_enforces_coverage() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
-    assert "ruff check --select E4,E7,E9,F app" in workflow
+    package = (ROOT / "package.json").read_text(encoding="utf-8")
+    console_package = (ROOT / "frontend" / "console" / "package.json").read_text(encoding="utf-8")
+    assert "ruff check scenara app tests sdk/python scripts" in workflow
     assert "mypy scenara app sdk/python/scenara_sdk" in workflow
-    assert "--cov-fail-under=75" in workflow
+    assert "--cov=app" in workflow
+    assert "--cov-fail-under=60" in workflow
+    assert '"console:format:check"' in package
+    assert '"format:check"' in console_package

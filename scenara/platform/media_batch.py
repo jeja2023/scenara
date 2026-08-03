@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import math
 import os
+import queue
 import tempfile
 import time
-from dataclasses import dataclass
+from collections.abc import AsyncIterator, Callable
+from dataclasses import dataclass, field
 from io import BytesIO
 from typing import Any, Literal
 
@@ -17,6 +20,8 @@ from scenara.platform.pipeline import ExecutionContext, ExecutionControl, Operat
 
 MAX_PIXELS = 80_000_000
 SCENE_CHANGE_HISTOGRAM_BINS = 32
+DECODED_BATCH_MEMORY_BUDGET_BYTES = 512 * 1024 * 1024
+RGB_BYTES_PER_PIXEL = 3
 
 
 @dataclass(slots=True)
@@ -76,12 +81,113 @@ class DecodedMediaUnit:
         return self.image.height
 
 
+_PROGRESSIVE_MEDIA_END = object()
+
+
+class ProgressiveMediaStream:
+    def __init__(
+        self,
+        producer: Callable[[Callable[[DecodedMediaUnit, int], None]], DecodedMedia],
+        control: ExecutionControl,
+        *,
+        queue_size: int = 32,
+    ) -> None:
+        self._control = control
+        self._queue: queue.Queue[tuple[DecodedMediaUnit, int] | object] = queue.Queue(maxsize=queue_size)
+        self._task = asyncio.create_task(asyncio.to_thread(self._produce, producer))
+
+    def _produce(
+        self,
+        producer: Callable[[Callable[[DecodedMediaUnit, int], None]], DecodedMedia],
+    ) -> DecodedMedia:
+        try:
+            return producer(self._emit)
+        finally:
+            while True:
+                try:
+                    self._queue.put(_PROGRESSIVE_MEDIA_END, timeout=0.1)
+                    break
+                except queue.Full:
+                    if self._control.cancelled:
+                        with contextlib.suppress(queue.Empty):
+                            self._queue.get_nowait()
+
+    def _emit(self, unit: DecodedMediaUnit, expected_units: int) -> None:
+        while True:
+            try:
+                self._queue.put((unit, expected_units), timeout=0.1)
+                return
+            except queue.Full:
+                if self._control.cancelled:
+                    raise PipelineError("media decoding cancelled") from None
+
+    async def batches(self, batch_size: int) -> AsyncIterator[tuple[list[DecodedMediaUnit], int]]:
+        batch: list[DecodedMediaUnit] = []
+        expected_units = 1
+        while True:
+            item = await asyncio.to_thread(self._queue.get)
+            if item is _PROGRESSIVE_MEDIA_END:
+                if batch:
+                    yield batch, expected_units
+                return
+            if not isinstance(item, tuple):
+                raise PipelineError("progressive media queue returned an invalid item")
+            unit, expected_units = item
+            batch.append(unit)
+            if len(batch) >= batch_size:
+                yield batch, expected_units
+                batch = []
+
+    async def result(self) -> DecodedMedia:
+        return await self._task
+
+    async def close(self) -> None:
+        if self._task.done():
+            with contextlib.suppress(BaseException):
+                await self._task
+            return
+        self._control.cancel()
+        with contextlib.suppress(BaseException):
+            await self._task
+
+
 @dataclass(slots=True)
 class DecodedMedia:
     kind: MediaKind
     units: list[DecodedMediaUnit]
     metadata: MediaTechnicalMetadata
     termination_reason: str | None = None
+    stream: ProgressiveMediaStream | None = field(default=None, repr=False)
+
+    async def iter_batches(self, batch_size: int) -> AsyncIterator[tuple[list[DecodedMediaUnit], int]]:
+        if batch_size < 1:
+            raise ValueError("batch_size must be positive")
+        if self.stream is None:
+            expected_units = max(1, len(self.units))
+            for offset in range(0, len(self.units), batch_size):
+                yield self.units[offset : offset + batch_size], expected_units
+            return
+        stream = self.stream
+        async for batch, expected_units in stream.batches(batch_size):
+            yield batch, expected_units
+        final = await stream.result()
+        self.metadata = final.metadata
+        self.termination_reason = final.termination_reason
+        self.stream = None
+
+    async def materialize(self) -> DecodedMedia:
+        if self.stream is None:
+            return self
+        units: list[DecodedMediaUnit] = []
+        async for batch, _ in self.iter_batches(32):
+            units.extend(batch)
+        self.units = units
+        return self
+
+    async def close(self) -> None:
+        if self.stream is not None:
+            await self.stream.close()
+            self.stream = None
 
 
 def _safe_image(data: bytes) -> tuple[Image.Image, str]:
@@ -89,7 +195,10 @@ def _safe_image(data: bytes) -> tuple[Image.Image, str]:
         with Image.open(BytesIO(data)) as opened:
             opened.verify()
         with Image.open(BytesIO(data)) as opened:
-            image = ImageOps.exif_transpose(opened).convert("RGB")
+            transposed = ImageOps.exif_transpose(opened)
+            if transposed is None:
+                raise ValueError("image orientation could not be normalized")
+            image = transposed.convert("RGB")
             image_format = str(opened.format or "unknown").lower()
     except (Image.DecompressionBombError, UnidentifiedImageError, OSError, ValueError) as exc:
         raise PipelineError("media is not a valid supported image") from exc
@@ -215,6 +324,48 @@ def _capture_metadata(capture: Any) -> dict[str, Any]:
     }
 
 
+def _estimated_sample_count(
+    plan: SamplePlan,
+    *,
+    frame_count: int,
+    duration_ms: int,
+    fps: float,
+    is_stream: bool,
+) -> int:
+    if is_stream or plan.strategy in {SampleStrategy.KEYFRAME, SampleStrategy.SCENE_CHANGE}:
+        return plan.max_units
+    if plan.strategy == SampleStrategy.UNIFORM and frame_count > 0:
+        window_start = min(frame_count - 1, max(0, round(plan.start_ms / 1000 * fps)))
+        window_end = frame_count if plan.end_ms is None else min(frame_count, round(plan.end_ms / 1000 * fps))
+        return min(plan.max_units, max(1, window_end - window_start))
+    if duration_ms > 0:
+        window_end_ms = duration_ms if plan.end_ms is None else min(duration_ms, plan.end_ms)
+        window_ms = max(0, window_end_ms - plan.start_ms)
+        return min(plan.max_units, max(1, window_ms // plan.sample_interval_ms + 1))
+    return plan.max_units
+
+
+def _effective_frame_max_edge(
+    plan: SamplePlan,
+    *,
+    width: int,
+    height: int,
+    estimated_units: int,
+) -> int | None:
+    if width <= 0 or height <= 0:
+        return plan.frame_max_edge
+    natural_edge = max(width, height)
+    requested_edge = min(natural_edge, plan.frame_max_edge or natural_edge)
+    pixels_per_unit = max(
+        64 * 64,
+        DECODED_BATCH_MEMORY_BUDGET_BYTES // (RGB_BYTES_PER_PIXEL * max(1, estimated_units)),
+    )
+    aspect_ratio = max(width, height) / min(width, height)
+    budget_edge = max(64, math.floor(math.sqrt(pixels_per_unit * aspect_ratio)))
+    effective_edge = min(requested_edge, budget_edge)
+    return effective_edge if effective_edge < natural_edge or plan.frame_max_edge is not None else None
+
+
 def _decode_video(
     media: MediaInput,
     *,
@@ -223,6 +374,8 @@ def _decode_video(
     connect_timeout_ms: int = 10_000,
     read_timeout_ms: int = 10_000,
     control: ExecutionControl | None = None,
+    unit_callback: Callable[[DecodedMediaUnit, int], None] | None = None,
+    retain_units: bool = True,
 ) -> DecodedMedia:
     plan.validate()
     _check_control(control)
@@ -274,6 +427,19 @@ def _decode_video(
         fps = float(metadata.get("fps") or 25.0)
         frame_count = int(metadata.get("frame_count") or 0)
         duration_ms = int(metadata.get("duration_ms") or 0)
+        estimated_units = _estimated_sample_count(
+            plan,
+            frame_count=frame_count,
+            duration_ms=duration_ms,
+            fps=fps,
+            is_stream=is_stream,
+        )
+        effective_frame_max_edge = _effective_frame_max_edge(
+            plan,
+            width=int(metadata.get("width") or 0),
+            height=int(metadata.get("height") or 0),
+            estimated_units=estimated_units,
+        )
         step = max(1, round(plan.sample_interval_ms / 1000 * fps))
         uniform_step = step
         if plan.strategy == SampleStrategy.UNIFORM and not is_stream and frame_count > 0:
@@ -295,10 +461,13 @@ def _decode_video(
         previous_signature: Any | None = None
         last_stream_pts_ms: int | None = None
         last_output_pts_ms = -1
-        timestamp_source: Literal["decoder_pts", "position_msec", "monotonic_clock"] = "monotonic_clock" if is_stream else "position_msec"
+        timestamp_source: Literal["decoder_pts", "position_msec", "monotonic_clock"] = (
+            "monotonic_clock" if is_stream else "position_msec"
+        )
         next_interval_ms = plan.start_ms
         termination_reason = "source_ended"
-        while len(units) < plan.max_units:
+        sampled_units = 0
+        while sampled_units < plan.max_units:
             _check_control(control)
             ok, frame = capture.read()
             _check_control(control)
@@ -326,9 +495,13 @@ def _decode_video(
             if is_stream:
                 frame_duration_ms = max(1, round(1000 / fps))
                 wall_clock_ms = int((time.monotonic() - started) * 1000)
-                position_ms = wall_clock_ms if last_stream_pts_ms is None else max(
-                    wall_clock_ms,
-                    last_stream_pts_ms + frame_duration_ms,
+                position_ms = (
+                    wall_clock_ms
+                    if last_stream_pts_ms is None
+                    else max(
+                        wall_clock_ms,
+                        last_stream_pts_ms + frame_duration_ms,
+                    )
                 )
                 last_stream_pts_ms = position_ms
                 elapsed_ms = position_ms
@@ -375,24 +548,30 @@ def _decode_video(
             height, width = frame.shape[:2]
             if width <= 0 or height <= 0 or width * height > MAX_PIXELS:
                 raise PipelineError("video frame dimensions exceed the safety limit")
-            image = _downscale(Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)), plan.frame_max_edge)
+            image = _downscale(
+                Image.fromarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)),
+                effective_frame_max_edge,
+            )
             output_pts_ms = max(position_ms, last_output_pts_ms + 1)
             last_output_pts_ms = output_pts_ms
-            units.append(
-                DecodedMediaUnit(
-                    unit_id=f"frame_{frame_number}",
-                    unit_type="frame",
-                    index=len(units),
-                    pts_ms=output_pts_ms,
-                    image=image,
-                )
+            unit = DecodedMediaUnit(
+                unit_id=f"frame_{frame_number}",
+                unit_type="frame",
+                index=sampled_units,
+                pts_ms=output_pts_ms,
+                image=image,
             )
-        if not units:
+            sampled_units += 1
+            if retain_units:
+                units.append(unit)
+            if unit_callback is not None:
+                unit_callback(unit, estimated_units)
+        if sampled_units == 0:
             raise PipelineError("video or stream did not yield a decodable frame")
-        reason = "max_units_reached" if len(units) == plan.max_units else termination_reason
+        reason = "max_units_reached" if sampled_units == plan.max_units else termination_reason
         metadata.update(
             {
-                "sampled_units": len(units),
+                "sampled_units": sampled_units,
                 "frames_read": frame_index,
                 "sample_interval_ms": plan.sample_interval_ms,
                 "sample_strategy": plan.strategy.value,
@@ -404,14 +583,14 @@ def _decode_video(
                 "timestamp_source": timestamp_source,
             }
         )
-        if plan.frame_max_edge is not None:
-            metadata["frame_max_edge"] = plan.frame_max_edge
+        if effective_frame_max_edge is not None:
+            metadata["frame_max_edge"] = effective_frame_max_edge
         if plan.strategy == SampleStrategy.KEYFRAME:
             metadata["keyframe_count"] = keyframe_count
         if plan.strategy == SampleStrategy.SCENE_CHANGE:
             metadata["scene_change_count"] = scene_change_count
-        if duration_ms <= 0 and not is_stream and units and units[-1].pts_ms:
-            metadata["duration_ms"] = units[-1].pts_ms
+        if duration_ms <= 0 and not is_stream and last_output_pts_ms >= 0:
+            metadata["duration_ms"] = last_output_pts_ms
         return DecodedMedia(
             kind=media.kind,
             units=units,
@@ -498,6 +677,8 @@ def decode_media(
     frame_max_edge: int | None = None,
     page_scale: float = 1.5,
     control: ExecutionControl | None = None,
+    unit_callback: Callable[[DecodedMediaUnit, int], None] | None = None,
+    retain_units: bool = True,
 ) -> DecodedMedia:
     _check_control(control)
     if not 1 <= max_units <= 10_000:
@@ -541,6 +722,8 @@ def decode_media(
         connect_timeout_ms=connect_timeout_ms,
         read_timeout_ms=read_timeout_ms,
         control=control,
+        unit_callback=unit_callback,
+        retain_units=retain_units,
     )
 
 
@@ -569,7 +752,7 @@ def create_media_preview(media: MediaInput, *, max_edge: int = 640) -> bytes:
 class DecodeMediaOperator:
     definition = OperatorDefinition(
         operator_id="platform.media.decode",
-        version="1.1.0",
+        version="1.2.0",
         input_types={"media": "media/input"},
         output_types={"batch": "media/batch"},
         timeout_seconds=3600,
@@ -606,22 +789,45 @@ class DecodeMediaOperator:
             raise PipelineError("max_reconnect_attempts is outside the supported range")
         if not 100 <= connect_timeout_ms <= 120_000 or not 100 <= read_timeout_ms <= 120_000:
             raise PipelineError("media timeout is outside the supported range")
-        decoded = await asyncio.to_thread(
-            decode_media,
-            media,
-            max_units=max_units,
-            sample_interval_ms=sample_interval_ms,
-            max_reconnect_attempts=max_reconnect_attempts,
-            connect_timeout_ms=connect_timeout_ms,
-            read_timeout_ms=read_timeout_ms,
-            sample_strategy=sample_strategy,
-            sample_start_ms=sample_start_ms,
-            sample_end_ms=sample_end_ms,
-            scene_change_threshold=scene_change_threshold,
-            frame_max_edge=frame_max_edge,
-            page_scale=page_scale,
-            control=context.control,
-        )
+        decode_arguments: dict[str, Any] = {
+            "max_units": max_units,
+            "sample_interval_ms": sample_interval_ms,
+            "max_reconnect_attempts": max_reconnect_attempts,
+            "connect_timeout_ms": connect_timeout_ms,
+            "read_timeout_ms": read_timeout_ms,
+            "sample_strategy": sample_strategy,
+            "sample_start_ms": sample_start_ms,
+            "sample_end_ms": sample_end_ms,
+            "scene_change_threshold": scene_change_threshold,
+            "frame_max_edge": frame_max_edge,
+            "page_scale": page_scale,
+            "control": context.control,
+        }
+        if media.kind in {MediaKind.VIDEO, MediaKind.STREAM}:
+            stream = ProgressiveMediaStream(
+                lambda callback: decode_media(
+                    media,
+                    **decode_arguments,
+                    unit_callback=callback,
+                    retain_units=False,
+                ),
+                context.control,
+            )
+            return {
+                "batch": DecodedMedia(
+                    kind=media.kind,
+                    units=[],
+                    metadata=MediaTechnicalMetadata(
+                        sampled_units=0,
+                        sample_interval_ms=sample_interval_ms,
+                        sample_strategy=SampleStrategy(sample_strategy),
+                        sample_start_ms=sample_start_ms,
+                        sample_end_ms=sample_end_ms,
+                    ),
+                    stream=stream,
+                )
+            }
+        decoded = await asyncio.to_thread(decode_media, media, **decode_arguments)
         return {"batch": decoded}
 
 
@@ -630,6 +836,7 @@ __all__ = [
     "DecodedMedia",
     "DecodedMediaUnit",
     "MediaInput",
+    "ProgressiveMediaStream",
     "SamplePlan",
     "SampleStrategy",
     "create_media_preview",

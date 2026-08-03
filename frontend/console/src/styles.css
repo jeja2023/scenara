@@ -11,8 +11,14 @@
   --green: #27764c;
   --amber: #a96b12;
   --line: #d9dfdc;
+  --line-strong: #b7c2bd;
   --muted: #64716d;
+  --text-muted: #64716d;
   --surface: #ffffff;
+  --surface-soft: #f6f8f7;
+  --accent-soft: #e4f1f1;
+  --accent-strong: #087682;
+  --warning: #a96b12;
   --sidebar: #111a18;
   letter-spacing: 0;
 }
@@ -154,8 +160,41 @@ textarea:focus-visible {
   color: #fff;
   box-shadow: inset 3px 0 0 var(--teal);
 }
+.sidebar nav button.parse-nav-root {
+  width: 100%;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #b9c5c1;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.sidebar nav button.parse-nav-root:hover {
+  background: #202c29;
+  color: #fff;
+}
+.sidebar nav button.parse-nav-root.router-link-active {
+  background: #263a36;
+  color: #fff;
+  box-shadow: inset 3px 0 0 var(--teal);
+}
 .parse-nav-root {
   margin-bottom: 0 !important;
+}
+.parse-nav-chevron {
+  margin-left: auto;
+  transition: transform 160ms ease;
+}
+.parse-nav-chevron.expanded {
+  transform: rotate(180deg);
 }
 .parse-subnav {
   max-height: 360px;
@@ -167,8 +206,7 @@ textarea:focus-visible {
 .parse-domain-group {
   margin-bottom: 5px;
 }
-.parse-domain-link,
-.parse-media-link {
+.parse-domain-link {
   height: auto !important;
   min-height: 27px;
   margin: 1px 0 !important;
@@ -177,23 +215,12 @@ textarea:focus-visible {
   font-size: 12px !important;
 }
 .parse-domain-link {
-  justify-content: space-between;
   color: #e6efec !important;
   font-weight: 650;
 }
-.parse-domain-link small {
-  color: #778b85;
-  font-size: 9px;
-  font-weight: 400;
-}
-.parse-domain-link.active,
-.parse-media-link.active {
+.parse-domain-link.active {
   background: #20352f;
   color: #fff !important;
-}
-.parse-media-link {
-  padding-left: 19px !important;
-  color: #9fafaa !important;
 }
 .parse-subnav-empty {
   display: block;

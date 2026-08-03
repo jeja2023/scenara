@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import asyncio
+import time
 from types import SimpleNamespace
 
 import pytest
 
 import scenara.scheduler as scheduler_module
 import scenara.worker as worker_module
+from scenara.bootstrap import build_runtime
+from scenara.platform.models import PipelineRef, RunRecord, RunStatus
 
 
 class FakeQueue:
@@ -92,3 +96,35 @@ async def test_runtime_processes_close_after_failure(monkeypatch: pytest.MonkeyP
     with pytest.raises(RuntimeError, match="queue failed"):
         await worker_module.run_worker("worker-a", "batch")
     assert calls == ["open", "close"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("status", [RunStatus.QUEUED, RunStatus.RUNNING])
+async def test_inline_runtime_recovers_non_terminal_runs(development_settings, status: RunStatus) -> None:
+    runtime = build_runtime(development_settings)
+    now = time.time()
+    run = RunRecord(
+        run_id=f"run_recover_{status.value}",
+        tenant_id="default",
+        project_id="default",
+        domain="portrait",
+        pipeline=PipelineRef(pipeline_id="portrait.person-detection", version="0.1.0"),
+        asset_id="missing-after-restart",
+        status=status,
+        created_at=now,
+        updated_at=now,
+    )
+    await runtime.state.create_run_idempotent(run, idempotency_key=run.run_id, request_hash=run.run_id)
+
+    await runtime.open()
+    try:
+        for _ in range(100):
+            recovered = await runtime.state.get_run("default", "default", run.run_id)
+            assert recovered is not None
+            if recovered.status == RunStatus.FAILED:
+                break
+            await asyncio.sleep(0.01)
+        assert recovered.status == RunStatus.FAILED
+        assert recovered.error_code == "PIPELINE_EXECUTION_FAILED"
+    finally:
+        await runtime.close()

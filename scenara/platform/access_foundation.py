@@ -22,9 +22,7 @@ def build_access_foundation(
 ) -> AccessFoundationStatus:
     auth_mode: AuthMode = "single_bearer_token" if settings.auth_required else "development_open"
     if settings.auth_required:
-        principal_source: PrincipalSource = (
-            "service_account_api_key" if context.scopes else "api_token"
-        )
+        principal_source: PrincipalSource = "service_account_api_key" if context.scopes else "api_token"
     elif context.principal_id == "anonymous":
         principal_source = "anonymous"
     else:
@@ -69,7 +67,10 @@ def build_access_foundation(
                 capability_id="product_entitlements",
                 name="Product entitlements",
                 status=AccessCapabilityStatus.AVAILABLE,
-                summary="Project product assignments and service credential product limits are enforced at the shared policy boundary.",
+                summary=(
+                    "Project product assignments and service credential product limits are enforced "
+                    "at the shared policy boundary."
+                ),
                 current_scope=[
                     "enterprise entitlements",
                     "project product activation and suspension",

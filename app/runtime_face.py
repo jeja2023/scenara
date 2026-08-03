@@ -304,13 +304,17 @@ async def apply_arcface_embeddings(image: Image.Image, faces: list[dict[str, Any
     if runtime is None or not faces:
         return False
     input_height, input_width = runtime_input_size(runtime, (112, 112))
-    normalize = str(runtime_input_value(runtime, "normalize", runtime.capability.get("preprocess", "rgb_minus_127p5_div_128")))
+    normalize = str(
+        runtime_input_value(runtime, "normalize", runtime.capability.get("preprocess", "rgb_minus_127p5_div_128"))
+    )
     color = str(runtime_input_value(runtime, "color", "rgb"))
     inputs: list[Array] = []
     for face in faces:
         crop = face.get("crop")
         if not isinstance(crop, Image.Image):
-            crop = face_crop_from_box(image, [float(value) for value in face.get("box", [0, 0, image.width, image.height])[:4]])
+            crop = face_crop_from_box(
+                image, [float(value) for value in face.get("box", [0, 0, image.width, image.height])[:4]]
+            )
             face["crop"] = crop
         aligned = arcface_aligned_crop(
             image,

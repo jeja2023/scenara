@@ -30,4 +30,5 @@ rollout-audit*.jsonl
 shared-models/
 models/
 node_modules/
+frontend/console/dist/
 frontend/console-next/dist/

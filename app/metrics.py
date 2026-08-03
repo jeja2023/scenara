@@ -67,6 +67,7 @@ class Histogram(TypedDict):
     count: int
     sum: float
 
+
 HISTOGRAM_BUCKETS: dict[str, tuple[float, ...]] = {
     "inference_seconds": (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0),
     "queue_seconds": (0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0),
@@ -210,14 +211,18 @@ def append_histogram(lines: list[str], metric: str, help_text: str) -> None:
     for bucket, count in zip(histogram["buckets"], histogram["counts"], strict=False):
         lines.append(f'{prometheus_name}_bucket{{le="{bucket:g}"}} {count}')
     lines.append(f'{prometheus_name}_bucket{{le="+Inf"}} {histogram["count"]}')
-    lines.append(f'{prometheus_name}_count {histogram["count"]}')
-    lines.append(f'{prometheus_name}_sum {histogram["sum"]}')
+    lines.append(f"{prometheus_name}_count {histogram['count']}")
+    lines.append(f"{prometheus_name}_sum {histogram['sum']}")
 
 
 def prometheus_metrics() -> str:
     now = time.monotonic()
     with METRICS_LOCK:
-        if PROMETHEUS_METRICS_CACHE_SECONDS > 0 and PROMETHEUS_CACHE.get("text") and now < float(PROMETHEUS_CACHE["expires_at"]):
+        if (
+            PROMETHEUS_METRICS_CACHE_SECONDS > 0
+            and PROMETHEUS_CACHE.get("text")
+            and now < float(PROMETHEUS_CACHE["expires_at"])
+        ):
             return str(PROMETHEUS_CACHE["text"])
         text = build_prometheus_metrics()
         PROMETHEUS_CACHE["text"] = text
@@ -229,21 +234,19 @@ def build_prometheus_metrics() -> str:
     from app import runtime_state
     from app.inference_scheduler import dynamic_batch_queue_depth
     from app.model_config import MODEL_CONFIGS
-    from app.portrait_stream_worker import STREAM_WORKER_SESSIONS
 
     loaded_models = len(runtime_state.MODEL_REGISTRY)
-    active_stream_sessions = sum(1 for item in STREAM_WORKER_SESSIONS.values() if item.get("status") == "running")
-    stream_backpressure_drops = sum(int(item.get("backpressure_drops", 0)) for item in STREAM_WORKER_SESSIONS.values())
-    stream_reconnects_total = sum(int(item.get("restart_count", 0)) for item in STREAM_WORKER_SESSIONS.values())
-    stream_frames_processed = sum(int(item.get("frames_processed", 0)) for item in STREAM_WORKER_SESSIONS.values())
-    stream_frames_sampled = sum(int(item.get("frames_sampled", 0)) for item in STREAM_WORKER_SESSIONS.values())
+    active_stream_sessions = 0
+    stream_backpressure_drops = 0
+    stream_reconnects_total = 0
+    stream_frames_processed = 0
+    stream_frames_sampled = 0
     queue_depth = max(0, int(runtime_state.GPU_QUEUE_WAITERS)) + sum(
         max(0, int(depth)) for depth in runtime_state.GPU_DEVICE_QUEUE_WAITERS.values()
     )
     batch_queue_depth = dynamic_batch_queue_depth()
     device_queue_depths = {
-        device_id: max(0, int(depth))
-        for device_id, depth in runtime_state.GPU_DEVICE_QUEUE_WAITERS.items()
+        device_id: max(0, int(depth)) for device_id, depth in runtime_state.GPU_DEVICE_QUEUE_WAITERS.items()
     }
     lines = [
         "# HELP gpu_worker_requests_total 应用中间件接收到的 HTTP 请求总数。",
@@ -261,7 +264,10 @@ def build_prometheus_metrics() -> str:
         "# HELP gpu_worker_model_load_errors_total 失败的模型加载总数。",
         "# TYPE gpu_worker_model_load_errors_total counter",
         f"gpu_worker_model_load_errors_total {METRICS.get('model_load_errors_total', 0)}",
-        "# HELP gpu_worker_model_load_cooldown_rejections_total Requests fast-failed while a model load is cooling down after failure.",
+        (
+            "# HELP gpu_worker_model_load_cooldown_rejections_total Requests fast-failed "
+            "while a model load is cooling down after failure."
+        ),
         "# TYPE gpu_worker_model_load_cooldown_rejections_total counter",
         f"gpu_worker_model_load_cooldown_rejections_total {METRICS.get('model_load_cooldown_rejections_total', 0)}",
         "# HELP gpu_worker_cache_hits_total 模型缓存命中总数。",
@@ -397,7 +403,9 @@ def build_prometheus_metrics() -> str:
 
     for status_code, count in sorted(REQUEST_STATUS_COUNTS.items()):
         status_class = f"{status_code[0]}xx" if status_code else "unknown"
-        lines.append(f'gpu_worker_requests_total{{status="{metric_label(status_code)}",status_class="{status_class}"}} {count}')
+        lines.append(
+            f'gpu_worker_requests_total{{status="{metric_label(status_code)}",status_class="{status_class}"}} {count}'
+        )
 
     for device_id, depth in sorted(device_queue_depths.items()):
         lines.append(f'gpu_worker_gpu_device_queue_depth{{device="{device_id}"}} {depth}')

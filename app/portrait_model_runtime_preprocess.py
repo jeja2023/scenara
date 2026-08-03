@@ -52,13 +52,13 @@ def letterbox_tensor(
 ) -> tuple[Array, LetterboxMeta]:
     original_width, original_height = image.size
     scale = min(input_width / max(1, original_width), input_height / max(1, original_height))
-    resized_width = max(1, int(round(original_width * scale)))
-    resized_height = max(1, int(round(original_height * scale)))
+    resized_width = max(1, round(original_width * scale))
+    resized_height = max(1, round(original_height * scale))
     pad_left = (input_width - resized_width) / 2
     pad_top = (input_height - resized_height) / 2
     resized = image.convert("RGB").resize((resized_width, resized_height), Image.Resampling.BILINEAR)
     canvas = Image.new("RGB", (input_width, input_height), (114, 114, 114))
-    canvas.paste(resized, (int(round(pad_left - 0.1)), int(round(pad_top - 0.1))))
+    canvas.paste(resized, (round(pad_left - 0.1), round(pad_top - 0.1)))
     meta: LetterboxMeta = {
         "original_width": original_width,
         "original_height": original_height,

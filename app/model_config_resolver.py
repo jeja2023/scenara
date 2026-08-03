@@ -12,10 +12,7 @@ def rollout_candidates(alias_config: dict[str, Any]) -> list[dict[str, Any]]:
     if isinstance(rollout, dict):
         rollout = rollout.get("targets") or rollout.get("candidates")
     if not isinstance(rollout, list) and isinstance(alias_config.get("traffic_split"), dict):
-        rollout = [
-            {"target": target, "weight": weight}
-            for target, weight in alias_config["traffic_split"].items()
-        ]
+        rollout = [{"target": target, "weight": weight} for target, weight in alias_config["traffic_split"].items()]
     if not isinstance(rollout, list):
         return []
 
@@ -68,13 +65,23 @@ def weighted_rollout_target(
 
 def alias_resolution(alias_name: str, alias_config: Any, traffic_key: str | None = None) -> dict[str, Any]:
     if isinstance(alias_config, str):
-        return {"alias": alias_name, "target": validate_model_target(alias_config), "strategy": "static", "traffic_key": traffic_key}
+        return {
+            "alias": alias_name,
+            "target": validate_model_target(alias_config),
+            "strategy": "static",
+            "traffic_key": traffic_key,
+        }
     if not isinstance(alias_config, dict):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="别名配置无效")
 
     target = alias_config.get("target")
     if isinstance(target, str) and target.strip():
-        return {"alias": alias_name, "target": validate_model_target(target), "strategy": "static", "traffic_key": traffic_key}
+        return {
+            "alias": alias_name,
+            "target": validate_model_target(target),
+            "strategy": "static",
+            "traffic_key": traffic_key,
+        }
 
     project_name = alias_config.get("project_name")
     model_name = alias_config.get("model_name")

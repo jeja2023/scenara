@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 import time
+from collections.abc import Callable
 from datetime import datetime
 from enum import StrEnum
 from typing import Any, Literal, Protocol, TypedDict
@@ -165,7 +166,7 @@ EVIDENCE_SIGNER_PLACEHOLDER = re.compile(r"(?i)(?:<[^>]+>|\b(?:example|replace|t
 
 class ModelQualificationEvidence(FeedbackModel):
     schema_version: Literal["1.0"] = "1.0"
-    evidence_type: Literal["model_rights", "portrait_evaluation", "ocr_evaluation", "regression"]
+    evidence_type: str = Field(pattern=r"^(?:model_rights|regression|[a-z][a-z0-9_.-]{1,63}_evaluation)$")
     status: Literal["passed"]
     model_id: str = Field(min_length=1, max_length=128)
     model_version: str = Field(pattern=r"^\d+\.\d+\.\d+(?:-[a-z0-9.-]+)?$")
@@ -185,7 +186,7 @@ class ModelQualificationEvidence(FeedbackModel):
             raise ValueError("qualification evidence signer cannot be a placeholder")
         if self.evidence_type == "model_rights" and self.details.get("rights_cleared") is not True:
             raise ValueError("model rights evidence must confirm cleared rights")
-        if self.evidence_type in {"portrait_evaluation", "ocr_evaluation"} and not (
+        if self.evidence_type.endswith("_evaluation") and not (
             self.details.get("thresholds_approved_before_run") is True
             and self.details.get("within_tolerance") is True
             and isinstance(self.details.get("independent_runs"), int)
@@ -476,6 +477,7 @@ class FeedbackService:
         objects: ObjectStore,
         policy: PolicyProvider,
         audit: AuditLogger,
+        evaluation_evidence_type: Callable[[ModelPackageManifest], str | None],
     ) -> None:
         self._repository = repository
         self._catalog = catalog
@@ -483,6 +485,7 @@ class FeedbackService:
         self._objects = objects
         self._policy = policy
         self._audit = audit
+        self._evaluation_evidence_type = evaluation_evidence_type
 
     async def admit_package(
         self,
@@ -906,12 +909,8 @@ class FeedbackService:
             if evidence.evidence_type in evidence_types:
                 raise FeedbackConflict("model qualification evidence types must be unique")
             evidence_types.add(evidence.evidence_type)
-        capability = package.capability.lower()
-        if "portrait" in capability or ".portrait." in package.model_id:
-            evaluation_type = "portrait_evaluation"
-        elif "ocr" in capability or ".ocr." in package.model_id:
-            evaluation_type = "ocr_evaluation"
-        else:
+        evaluation_type = self._evaluation_evidence_type(package)
+        if evaluation_type is None:
             raise FeedbackConflict("model capability has no qualification evidence policy")
         required = {"model_rights", evaluation_type, "regression"}
         missing = sorted(required - evidence_types)

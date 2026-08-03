@@ -191,7 +191,9 @@ def embedding_dimension_for_modality(modality: str) -> int:
 
 def production_model_ready(name: str) -> bool:
     capability = capability_status(name)
-    return capability.get("status") in {"ready", "production"} and capability.get("model_id") != capability.get("fallback_model_id")
+    return capability.get("status") in {"ready", "production"} and capability.get("model_id") != capability.get(
+        "fallback_model_id"
+    )
 
 
 def non_production_capability_names(capabilities: dict[str, Any] | None = None) -> list[str]:
@@ -201,7 +203,9 @@ def non_production_capability_names(capabilities: dict[str, Any] | None = None) 
         if not isinstance(capability, dict):
             names.append(str(name))
             continue
-        if capability.get("status") not in {"ready", "production"} or capability.get("model_id") == capability.get("fallback_model_id"):
+        if capability.get("status") not in {"ready", "production"} or capability.get("model_id") == capability.get(
+            "fallback_model_id"
+        ):
             names.append(str(name))
     return sorted(names)
 
@@ -211,10 +215,7 @@ def validate_required_production_capabilities(capabilities: dict[str, Any] | Non
         return
     missing = non_production_capability_names(capabilities)
     if missing:
-        raise RuntimeError(
-            "production model capabilities are required but not ready: "
-            + ", ".join(missing)
-        )
+        raise RuntimeError("production model capabilities are required but not ready: " + ", ".join(missing))
 
 
 validate_required_production_capabilities(MODEL_CAPABILITIES)

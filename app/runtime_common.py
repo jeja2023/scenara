@@ -5,8 +5,8 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from app.portrait_compare import l2_normalize_vector
 from app.portrait_model_runtime_preprocess import batch_slice
+from app.vector_math import l2_normalize_vector
 
 Array = npt.NDArray[Any]
 

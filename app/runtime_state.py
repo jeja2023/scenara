@@ -13,8 +13,7 @@ REGISTRY_LOCK = asyncio.Lock()
 MODEL_LOAD_RETRY_AFTER: dict[str, float] = {}
 GPU_SEMAPHORE = asyncio.Semaphore(max(1, GPU_QUEUE_LIMIT))
 GPU_DEVICE_SEMAPHORES = {
-    int(device_id): asyncio.Semaphore(max(1, GPU_QUEUE_LIMIT_PER_DEVICE))
-    for device_id in GPU_DEVICE_IDS
+    int(device_id): asyncio.Semaphore(max(1, GPU_QUEUE_LIMIT_PER_DEVICE)) for device_id in GPU_DEVICE_IDS
 }
 GPU_QUEUE_WAITERS = 0
 GPU_DEVICE_QUEUE_WAITERS = {int(device_id): 0 for device_id in GPU_DEVICE_SEMAPHORES}

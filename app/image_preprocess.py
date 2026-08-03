@@ -12,14 +12,14 @@ Array = npt.NDArray[Any]
 def letterbox_image(image: Image.Image, input_height: int, input_width: int) -> tuple[Array, LetterboxMeta]:
     original_width, original_height = image.size
     scale = min(input_width / original_width, input_height / original_height)
-    resized_width = max(1, int(round(original_width * scale)))
-    resized_height = max(1, int(round(original_height * scale)))
+    resized_width = max(1, round(original_width * scale))
+    resized_height = max(1, round(original_height * scale))
     pad_left = (input_width - resized_width) / 2
     pad_top = (input_height - resized_height) / 2
 
     resized = image.resize((resized_width, resized_height), Image.Resampling.BILINEAR)
     canvas = Image.new("RGB", (input_width, input_height), (114, 114, 114))
-    canvas.paste(resized, (int(round(pad_left - 0.1)), int(round(pad_top - 0.1))))
+    canvas.paste(resized, (round(pad_left - 0.1), round(pad_top - 0.1)))
 
     array = np.asarray(canvas, dtype=np.float32) / 255.0
     tensor = np.transpose(array, (2, 0, 1))

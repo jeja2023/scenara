@@ -270,6 +270,8 @@ class VisionObject(ExtensibleModel):
     track_id: str | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
     feature_refs: list[str] = Field(default_factory=list)
+    crop_artifact_id: str | None = None
+    """Identifier of the cropped feature image in ``ResultEnvelope.artifacts``."""
 
 
 class PortraitDomainPayload(ExtensibleModel):
@@ -298,7 +300,16 @@ class OcrDomainPayload(ExtensibleModel):
     language: str | None = None
 
 
-DomainPayload = Annotated[PortraitDomainPayload | OcrDomainPayload, Field(discriminator="domain")]
+class GenericDomainPayload(ExtensibleModel):
+    """Fallback payload for a registered domain without a platform model."""
+
+    domain: DomainId
+    schema_version: str = "1.0"
+
+
+# Keep first-party payloads strongly typed while allowing plugins to introduce
+# their own payload shape without changing the platform model union.
+DomainPayload = PortraitDomainPayload | OcrDomainPayload | GenericDomainPayload
 
 
 class MediaUnitResult(StrictModel):
@@ -310,6 +321,8 @@ class MediaUnitResult(StrictModel):
     width: int = Field(gt=0)
     height: int = Field(gt=0)
     objects: list[VisionObject] = Field(default_factory=list)
+    frame_artifact_id: str | None = None
+    """Identifier of the full unit image in ``ResultEnvelope.artifacts``."""
 
 
 class ModelProvenance(StrictModel):
@@ -328,6 +341,8 @@ class ResultRelation(StrictModel):
 
 
 class ResultArtifact(StrictModel):
+    """Derived binary produced while executing a run (feature crops, unit frames)."""
+
     artifact_id: str
     artifact_type: str
     object_key: str
@@ -359,6 +374,12 @@ class ResultEnvelope(StrictModel):
     provenance: ProvenanceEvidence = Field(default_factory=ProvenanceEvidence)
     created_at: float
 
+    @model_validator(mode="after")
+    def validate_domain_payload(self) -> ResultEnvelope:
+        if self.domain != self.domain_payload.domain:
+            raise ValueError("domain must match domain_payload.domain")
+        return self
+
 
 class ResultReference(StrictModel):
     run_id: str
@@ -370,6 +391,47 @@ class ResultReference(StrictModel):
     shard_sha256: list[str] = Field(default_factory=list)
     domain: DomainId
     created_at: float
+    asset_id: str | None = None
+    source_id: str | None = None
+    media_kind: MediaKind | None = None
+    resource_name: str | None = None
+    object_count: int = Field(default=0, ge=0)
+    person_count: int = Field(default=0, ge=0)
+    face_count: int = Field(default=0, ge=0)
+    ocr_block_count: int = Field(default=0, ge=0)
+    text_length: int = Field(default=0, ge=0)
+    warning_count: int = Field(default=0, ge=0)
+    index_status: Literal["ready", "partial"] = "ready"
+
+
+class ResultSummary(StrictModel):
+    """Searchable result projection used by the global result center."""
+
+    result_id: str
+    run_id: str
+    domain: DomainId
+    pipeline: PipelineRef
+    status: RunStatus
+    asset_id: str | None = None
+    source_id: str | None = None
+    media_kind: MediaKind | None = None
+    resource_name: str | None = None
+    unit_count: int = Field(ge=0)
+    object_count: int = Field(ge=0)
+    person_count: int = Field(ge=0)
+    face_count: int = Field(ge=0)
+    ocr_block_count: int = Field(ge=0)
+    text_length: int = Field(ge=0)
+    warning_count: int = Field(ge=0)
+    index_status: Literal["ready", "partial"] = "ready"
+    created_at: float
+
+
+class ResultSummaryPage(StrictModel):
+    items: list[ResultSummary]
+    offset: int
+    limit: int
+    total: int
 
 
 class ObjectRetentionRecord(StrictModel):
@@ -856,9 +918,7 @@ class PortraitIntelligenceStatus(StrictModel):
     """
 
     schema_version: Literal["1.0"] = "1.0"
-    positioning: Literal["portrait_intelligence_foundation_platform"] = (
-        "portrait_intelligence_foundation_platform"
-    )
+    positioning: Literal["portrait_intelligence_foundation_platform"] = "portrait_intelligence_foundation_platform"
     modules: list[PortraitModuleItem]
     assets: list[PortraitAssetItem]
     capabilities: list[PortraitCapabilityItem]

@@ -154,7 +154,9 @@ def face_model_summary(faces: list[dict[str, Any]], *, include_embeddings: bool)
     return runtime_face.face_model_summary(faces, include_embeddings=include_embeddings)
 
 
-def best_person_detection(image: Image.Image, persons: list[dict[str, Any]]) -> tuple[Image.Image, dict[str, Any]] | None:
+def best_person_detection(
+    image: Image.Image, persons: list[dict[str, Any]]
+) -> tuple[Image.Image, dict[str, Any]] | None:
     return runtime_body.best_person_detection(image, persons)
 
 

@@ -1,0 +1,75 @@
+name: scenara-debug
+
+services:
+  postgres:
+    image: pgvector/pgvector@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
+    environment:
+      POSTGRES_DB: scenara
+      POSTGRES_USER: scenara
+      POSTGRES_PASSWORD: scenara
+    volumes:
+      - debug-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scenara -d scenara"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  migrate:
+    image: pgvector/pgvector@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: scenara
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: scenara
+      PGUSER: scenara
+    volumes:
+      - ../migrations:/migrations:ro
+      - ./scripts:/deploy-scripts:ro
+    command: ["sh", "/deploy-scripts/migrate.sh"]
+    restart: "no"
+
+  api:
+    image: scenara-api:debug
+    build:
+      context: ..
+    environment:
+      SCENARA_PROFILE: development
+      SCENARA_STATE_BACKEND: postgres
+      SCENARA_POSTGRES_DSN: postgresql://scenara:scenara@postgres:5432/scenara
+      SCENARA_OBJECT_BACKEND: local
+      SCENARA_QUEUE_BACKEND: inline
+      SCENARA_DATA_DIR: /var/lib/scenara/runtime-state
+      SCENARA_AUTH_REQUIRED: "false"
+      SCENARA_PRODUCTION_MODELS_REQUIRED: "false"
+      SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES: "true"
+      SCENARA_DEBUG_SECRET_ENCRYPTION_KEY: ${SCENARA_DEBUG_SECRET_ENCRYPTION_KEY:-}
+      SCENARA_RUN_ARTIFACTS_ENABLED: "true"
+      GPU_DEVICE_IDS: "0"
+      CPU_FALLBACK_ENABLED: "false"
+      FORCE_CPU: "false"
+      MODELS_ROOT: /opt/scenara/models
+    volumes:
+      - debug-state:/var/lib/scenara
+      - ../models:/opt/scenara/models:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:${SCENARA_DEBUG_PORT:-8011}:8000"
+    gpus: all
+    command: ["sh", "deploy/scripts/debug-entrypoint.sh"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/readyz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  debug-postgres:
+  debug-state:

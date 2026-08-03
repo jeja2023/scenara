@@ -112,6 +112,16 @@ async def test_ocr_run_is_idempotent_and_returns_typed_result(client) -> None:
     assert payload["text"] == "Scenara 景枢"
     assert payload["blocks"][0]["reading_order"] == 0
 
+    results = await api.get("/api/v1/results", params={"domain": "ocr", "media_kind": "image"})
+    assert results.status_code == 200, results.text
+    result_page = results.json()["data"]
+    assert result_page["total"] == 1
+    summary = result_page["items"][0]
+    assert summary["run_id"] == first_run["run_id"]
+    assert summary["media_kind"] == "image"
+    assert summary["ocr_block_count"] == 1
+    assert summary["text_length"] == len("Scenara 景枢")
+
 
 @pytest.mark.asyncio
 async def test_idempotency_key_rejects_different_request(client) -> None:

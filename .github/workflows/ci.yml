@@ -21,10 +21,9 @@ jobs:
         run: |
           uv pip compile requirements/production.in --python-version 3.12 --python-platform x86_64-manylinux_2_28 --generate-hashes --no-emit-index-url --output-file requirements/production.lock
           git diff --exit-code -- requirements/production.lock
-      - run: python -m ruff check scenara tests sdk/python scripts
-      - run: python -m ruff check --select E4,E7,E9,F app
+      - run: python -m ruff check scenara app tests sdk/python scripts
       - run: python -m mypy scenara app sdk/python/scenara_sdk
-      - run: python -m pytest -q --cov=scenara --cov=sdk/python/scenara_sdk --cov-report=term --cov-fail-under=75
+      - run: python -m pytest -q --cov=scenara --cov=app --cov=sdk/python/scenara_sdk --cov-report=term --cov-fail-under=60
       - run: python scripts/generate_typescript_sdk.py --check
       - run: python scripts/export_openapi.py --check
       - name: Verify and package repository contracts

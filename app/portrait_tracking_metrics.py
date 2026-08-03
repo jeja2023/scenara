@@ -5,7 +5,7 @@ from typing import Any
 import numpy as np
 import numpy.typing as npt
 
-from app.portrait_compare import cosine_similarity, l2_normalize_vector
+from app.vector_math import cosine_similarity, l2_normalize_vector
 
 Array = npt.NDArray[Any]
 
@@ -55,7 +55,9 @@ def person_confidence(person: dict[str, Any]) -> float:
         return 0.0
 
 
-def make_embedding_sample(frame_index: int, person: dict[str, Any], embedding: list[float] | None) -> dict[str, Any] | None:
+def make_embedding_sample(
+    frame_index: int, person: dict[str, Any], embedding: list[float] | None
+) -> dict[str, Any] | None:
     if not embedding:
         return None
     raw_crop_quality = person.get("crop_quality")
@@ -82,11 +84,7 @@ def aggregate_track_template(
     *,
     include_embedding: bool = False,
 ) -> dict[str, Any]:
-    valid = [
-        sample
-        for sample in samples
-        if isinstance(sample.get("embedding"), list) and sample.get("embedding")
-    ]
+    valid = [sample for sample in samples if isinstance(sample.get("embedding"), list) and sample.get("embedding")]
     if not valid:
         return {
             "embedding_dim": 0,
@@ -158,7 +156,7 @@ def aggregate_track_template(
                 factor = 0.08
                 outlier_count += 1
             else:
-                factor = 0.16 + 0.84 * (consensus ** 2)
+                factor = 0.16 + 0.84 * (consensus**2)
             refined_weights.append(base_weight * factor)
 
     if sum(refined_weights) <= 1e-9:
@@ -167,13 +165,22 @@ def aggregate_track_template(
     total_weight = max(1e-9, sum(refined_weights))
     template = sum(vector * weight for vector, weight in zip(vectors, refined_weights, strict=False)) / total_weight
     template = l2_normalize_vector(np.asarray(template, dtype=np.float32))
-    consensus_score = sum(consensus * weight for consensus, weight in zip(consensus_scores, refined_weights, strict=False)) / total_weight
+    consensus_score = (
+        sum(consensus * weight for consensus, weight in zip(consensus_scores, refined_weights, strict=False))
+        / total_weight
+    )
     payload: dict[str, Any] = {
         "embedding_dim": int(template.shape[0]),
         "sample_count": len(vectors),
         "aggregation": "quality_confidence_weighted_mean",
-        "quality": round(sum(quality * weight for quality, weight in zip(qualities, refined_weights, strict=False)) / total_weight, 6),
-        "confidence": round(sum(confidence * weight for confidence, weight in zip(confidences, refined_weights, strict=False)) / total_weight, 6),
+        "quality": round(
+            sum(quality * weight for quality, weight in zip(qualities, refined_weights, strict=False)) / total_weight, 6
+        ),
+        "confidence": round(
+            sum(confidence * weight for confidence, weight in zip(confidences, refined_weights, strict=False))
+            / total_weight,
+            6,
+        ),
         "temporal": {
             "method": "linear_recency_decay",
             "frame_span": [min_frame_index, max_frame_index],
@@ -193,7 +200,9 @@ def aggregate_track_template(
     return payload
 
 
-def tracklet_quality_score(average_confidence: float, average_quality: float, stability: float, gap_count: int) -> float:
+def tracklet_quality_score(
+    average_confidence: float, average_quality: float, stability: float, gap_count: int
+) -> float:
     gap_penalty = min(0.20, max(0, gap_count) * 0.03)
     score = average_quality * 0.45 + average_confidence * 0.35 + stability * 0.20 - gap_penalty
     return round(max(0.0, min(1.0, score)), 6)

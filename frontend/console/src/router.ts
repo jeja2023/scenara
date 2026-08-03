@@ -1,6 +1,7 @@
 import {
   Activity,
   Boxes,
+  FileSearch,
   Images,
   LayoutDashboard,
   MessageSquareText,
@@ -48,10 +49,14 @@ const routes = [
     },
   },
   {
-    path: "/media",
-    name: "media",
+    path: "/assets",
+    name: "assets",
     component: () => import("./views/MediaView.vue"),
-    meta: { title: "媒体", icon: Images, section: "工作台" },
+    meta: { title: "数据资产", icon: Images, section: "数据" },
+  },
+  {
+    path: "/media",
+    redirect: "/assets",
   },
   {
     path: "/runs",
@@ -69,7 +74,9 @@ const routes = [
   },
   {
     path: "/results",
-    redirect: { path: "/runs", query: { status: "completed" } },
+    name: "results",
+    component: () => import("./views/ResultsView.vue"),
+    meta: { title: "解析结果", icon: FileSearch, section: "结果" },
   },
   {
     path: "/capabilities",

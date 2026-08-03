@@ -46,6 +46,14 @@ export class ScenaraClient {
         const page = await this.transport("GET", "/api/v1/runs/" + encodeURIComponent(runId) + "/result");
         return page.result;
     }
+    /**
+     * Download one derived image declared by a run result: a feature crop
+     * (`crop_artifact_id` on a detected object) or a full unit image
+     * (`frame_artifact_id` on a media unit).
+     */
+    getResultArtifact(runId, artifactId) {
+        return this.transport("GET", "/api/v1/runs/" + encodeURIComponent(runId) + "/artifacts/" + encodeURIComponent(artifactId));
+    }
     pauseRun(runId) {
         return this.transport("POST", "/api/v1/runs/" + encodeURIComponent(runId) + "/pause");
     }

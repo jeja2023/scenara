@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { Menu, RefreshCw, Settings, X } from "@lucide/vue";
-import { computed, nextTick, onMounted, reactive, ref } from "vue";
+import { ChevronDown, Menu, RefreshCw, Settings, X } from "@lucide/vue";
+import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 
 import {
@@ -10,9 +10,9 @@ import {
   type ConnectionSettings,
 } from "./api";
 import brandMark from "./assets/scenara-mark.svg";
-import { labelDomain, labelMediaKind } from "./labels";
+import { labelDomain } from "./labels";
 import { routes } from "./router";
-import type { DomainManifest, MediaKind } from "./types";
+import type { DomainManifest } from "./types";
 
 const route = useRoute();
 const mobileOpen = ref(false);
@@ -35,6 +35,7 @@ const navigation = computed(() => {
 const parseRouteActive = computed(
   () => route.path === "/parse" || route.path.startsWith("/parse/"),
 );
+const parseExpanded = ref(false);
 const parseDomains = computed(() =>
   [...domainManifests.value].sort(
     (left, right) =>
@@ -43,27 +44,25 @@ const parseDomains = computed(() =>
   ),
 );
 
-function mediaKindsFor(domain: DomainManifest): MediaKind[] {
-  return domain.supported_media_kinds?.length
-    ? domain.supported_media_kinds
-    : ["image", "video", "document", "stream"];
-}
-
-function firstMediaKindFor(domain: DomainManifest): MediaKind {
-  return mediaKindsFor(domain)[0] ?? "image";
-}
-
 function domainPath(domain: DomainManifest): string {
-  return `/parse/${encodeURIComponent(domain.domain_id)}/${firstMediaKindFor(domain)}`;
-}
-
-function mediaPath(domain: DomainManifest, kind: MediaKind): string {
-  return `/parse/${encodeURIComponent(domain.domain_id)}/${kind}`;
+  return `/parse/${encodeURIComponent(domain.domain_id)}`;
 }
 
 function isDomainActive(domain: DomainManifest): boolean {
   return String(route.params.domain || route.query.domain) === domain.domain_id;
 }
+
+function toggleParseNavigation(): void {
+  parseExpanded.value = !parseExpanded.value;
+}
+
+watch(
+  parseRouteActive,
+  (active) => {
+    parseExpanded.value = active;
+  },
+  { immediate: true },
+);
 
 async function loadDomainNavigation(): Promise<void> {
   try {
@@ -167,16 +166,22 @@ onMounted(() => {
               <span>{{ item.meta?.title }}</span>
             </RouterLink>
             <template v-else>
-              <RouterLink
-                :to="item.path"
+              <button
+                type="button"
                 class="parse-nav-root"
                 :class="{ 'router-link-active': parseRouteActive }"
-                @click="mobileOpen = false"
+                :aria-expanded="parseExpanded"
+                @click="toggleParseNavigation"
               >
                 <component :is="item.meta?.icon" :size="17" />
                 <span>{{ item.meta?.title }}</span>
-              </RouterLink>
-              <div v-if="parseRouteActive" class="parse-subnav">
+                <ChevronDown
+                  :size="15"
+                  class="parse-nav-chevron"
+                  :class="{ expanded: parseExpanded }"
+                />
+              </button>
+              <div v-if="parseExpanded" class="parse-subnav">
                 <div
                   v-for="domain in parseDomains"
                   :key="domain.domain_id"
@@ -191,21 +196,6 @@ onMounted(() => {
                     <span>{{
                       domain.display_name || labelDomain(domain.domain_id)
                     }}</span>
-                    <small>{{ domain.domain_id }}</small>
-                  </RouterLink>
-                  <RouterLink
-                    v-for="kind in mediaKindsFor(domain)"
-                    :key="`${domain.domain_id}-${kind}`"
-                    :to="mediaPath(domain, kind)"
-                    class="parse-media-link"
-                    :class="{
-                      active:
-                        isDomainActive(domain) &&
-                        route.params.mediaKind === kind,
-                    }"
-                    @click="mobileOpen = false"
-                  >
-                    {{ labelMediaKind(kind) }}
                   </RouterLink>
                 </div>
                 <span v-if="!parseDomains.length" class="parse-subnav-empty">

@@ -5,9 +5,9 @@ from typing import Any, cast
 import yaml
 from fastapi import HTTPException
 
+from app.exception_utils import exception_log_summary
 from app.model_refs import validate_model_target, validate_path_name
 from app.observability import logger
-from app.portrait_response import exception_log_summary
 from app.schemas import ModelConfig
 from app.settings import MODEL_CONFIG_PATH, MODEL_CONFIG_READ_FAIL_CLOSED
 
@@ -149,7 +149,9 @@ def model_config_path_fingerprint(path: Path) -> str:
     return hashlib.sha256(str(path).encode("utf-8")).hexdigest()[:16]
 
 
-def empty_model_config_or_raise(message: str, exc: Exception | None = None) -> tuple[dict[str, ModelConfig], dict[str, Any]]:
+def empty_model_config_or_raise(
+    message: str, exc: Exception | None = None
+) -> tuple[dict[str, ModelConfig], dict[str, Any]]:
     if exc is None:
         logger.warning(
             "%s: config_path_hash=%s",

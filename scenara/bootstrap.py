@@ -67,6 +67,9 @@ class Runtime:
         await self.runs.sync_pipeline_catalog()
         await self.objects.open()
         await self.queue.open()
+        if isinstance(self.queue, InlineRunQueue):
+            for run in await self.state.recoverable_runs():
+                await self.queue.enqueue(run)
 
     async def close(self) -> None:
         await self.queue.close()
@@ -161,7 +164,15 @@ def build_runtime(
         policy=policy,
         allow_private_targets=settings.allow_private_webhook_targets,
     )
-    feedback = FeedbackService(feedback_repository, state, state, objects, policy, audit)
+    feedback = FeedbackService(
+        feedback_repository,
+        state,
+        state,
+        objects,
+        policy,
+        audit,
+        plugins.qualification_evidence_type,
+    )
     runs = RunService(
         state=state,
         objects=objects,
@@ -181,6 +192,11 @@ def build_runtime(
         production=settings.production,
         allow_private_media_sources=settings.allow_private_media_sources,
         active_model_resolver=feedback,
+        run_artifacts_enabled=settings.run_artifacts_enabled,
+        run_artifact_max_crops=settings.run_artifact_max_crops,
+        run_artifact_max_frames=settings.run_artifact_max_frames,
+        run_artifact_crop_max_edge=settings.run_artifact_crop_max_edge,
+        run_artifact_frame_max_edge=settings.run_artifact_frame_max_edge,
     )
     access = AccessService(access_repository, audit, policy)
     return Runtime(

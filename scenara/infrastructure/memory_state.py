@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Iterable
 from uuid import uuid4
 
 from scenara.platform.audit import AuditEvent
 from scenara.platform.model_runtime import ModelPackageManifest
 from scenara.platform.models import (
+    TERMINAL_RUN_STATUSES,
     MediaAsset,
     MediaSource,
     ObjectRetentionRecord,
@@ -14,6 +16,7 @@ from scenara.platform.models import (
     ResultReference,
     RunEvent,
     RunRecord,
+    RunStatus,
     WebhookDeliveryRecord,
     WebhookSubscription,
 )
@@ -201,14 +204,35 @@ class MemoryStateStore:
             asset = self._assets.get(self._key(tenant_id, project_id, asset_id))
             return asset.model_copy(deep=True) if asset else None
 
-    async def list_assets(self, tenant_id: str, project_id: str) -> list[MediaAsset]:
+    async def list_assets(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        include_deleted: bool = True,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[MediaAsset]:
         async with self._lock:
             rows = [
                 item.model_copy(deep=True)
                 for (row_tenant, row_project, _), item in self._assets.items()
-                if row_tenant == tenant_id and row_project == project_id
+                if row_tenant == tenant_id
+                and row_project == project_id
+                and (include_deleted or item.deleted_at is None)
             ]
-        return sorted(rows, key=lambda item: (item.created_at, item.asset_id), reverse=True)
+        rows.sort(key=lambda item: (item.created_at, item.asset_id), reverse=True)
+        return rows[offset:] if limit is None else rows[offset : offset + limit]
+
+    async def count_assets(self, tenant_id: str, project_id: str, *, include_deleted: bool = True) -> int:
+        async with self._lock:
+            return sum(
+                1
+                for (row_tenant, row_project, _), item in self._assets.items()
+                if row_tenant == tenant_id
+                and row_project == project_id
+                and (include_deleted or item.deleted_at is None)
+            )
 
     async def create_source(self, source: MediaSource) -> MediaSource:
         async with self._lock:
@@ -223,14 +247,30 @@ class MemoryStateStore:
             source = self._sources.get(self._key(tenant_id, project_id, source_id))
             return source.model_copy(deep=True) if source else None
 
-    async def list_sources(self, tenant_id: str, project_id: str) -> list[MediaSource]:
+    async def list_sources(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[MediaSource]:
         async with self._lock:
             rows = [
                 item.model_copy(deep=True)
                 for (row_tenant, row_project, _), item in self._sources.items()
                 if row_tenant == tenant_id and row_project == project_id
             ]
-        return sorted(rows, key=lambda item: (item.created_at, item.source_id), reverse=True)
+        rows.sort(key=lambda item: (item.created_at, item.source_id), reverse=True)
+        return rows[offset:] if limit is None else rows[offset : offset + limit]
+
+    async def count_sources(self, tenant_id: str, project_id: str) -> int:
+        async with self._lock:
+            return sum(
+                1
+                for row_tenant, row_project, _ in self._sources
+                if row_tenant == tenant_id and row_project == project_id
+            )
 
     async def delete_source(self, tenant_id: str, project_id: str, source_id: str) -> MediaSource | None:
         async with self._lock:
@@ -265,14 +305,74 @@ class MemoryStateStore:
             run = self._runs.get(self._key(tenant_id, project_id, run_id))
             return run.model_copy(deep=True) if run else None
 
-    async def list_runs(self, tenant_id: str, project_id: str) -> list[RunRecord]:
+    async def list_runs(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        status: RunStatus | None = None,
+        domain: str | None = None,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[RunRecord]:
         async with self._lock:
             rows = [
                 item.model_copy(deep=True)
                 for (row_tenant, row_project, _), item in self._runs.items()
                 if row_tenant == tenant_id and row_project == project_id
+                and (status is None or item.status == status)
+                and (domain is None or item.domain == domain)
             ]
-        return sorted(rows, key=lambda item: (item.created_at, item.run_id), reverse=True)
+        rows.sort(key=lambda item: (item.created_at, item.run_id), reverse=True)
+        return rows[offset:] if limit is None else rows[offset : offset + limit]
+
+    async def count_runs(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        status: RunStatus | None = None,
+        domain: str | None = None,
+    ) -> int:
+        async with self._lock:
+            return sum(
+                1
+                for (row_tenant, row_project, _), item in self._runs.items()
+                if row_tenant == tenant_id
+                and row_project == project_id
+                and (status is None or item.status == status)
+                and (domain is None or item.domain == domain)
+            )
+
+    async def recoverable_runs(self) -> list[RunRecord]:
+        async with self._lock:
+            rows = [
+                item.model_copy(deep=True)
+                for item in self._runs.values()
+                if item.status not in TERMINAL_RUN_STATUSES
+            ]
+        rows.sort(key=lambda item: (item.created_at, item.run_id))
+        return rows
+
+    async def has_non_terminal_run(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        asset_id: str | None = None,
+        source_id: str | None = None,
+    ) -> bool:
+        if (asset_id is None) == (source_id is None):
+            raise ValueError("exactly one of asset_id or source_id is required")
+        async with self._lock:
+            return any(
+                row_tenant == tenant_id
+                and row_project == project_id
+                and item.status not in TERMINAL_RUN_STATUSES
+                and (asset_id is None or item.asset_id == asset_id)
+                and (source_id is None or item.source_id == source_id)
+                for (row_tenant, row_project, _), item in self._runs.items()
+            )
 
     async def delete_run(self, tenant_id: str, project_id: str, run_id: str) -> RunRecord | None:
         async with self._lock:
@@ -399,6 +499,48 @@ class MemoryStateStore:
         async with self._lock:
             result = self._results.get(self._key(tenant_id, project_id, run_id))
             return result.model_copy(deep=True) if result else None
+
+    async def list_result_references(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        domain: str | None = None,
+        media_kind: str | None = None,
+        query: str | None = None,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[ResultReference]:
+        async with self._lock:
+            rows = [
+                item
+                for (row_tenant, row_project, _), item in self._results.items()
+                if (row_tenant, row_project) == (tenant_id, project_id)
+                and (domain is None or item.domain == domain)
+                and (media_kind is None or (item.media_kind and item.media_kind.value == media_kind))
+                and (query is None or query.lower() in json.dumps(item.model_dump(mode="json"), ensure_ascii=False).lower())
+            ]
+            rows.sort(key=lambda item: (item.created_at, item.run_id), reverse=True)
+            sliced = rows[offset:] if limit is None else rows[offset : offset + limit]
+            return [item.model_copy(deep=True) for item in sliced]
+
+    async def count_result_references(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        domain: str | None = None,
+        media_kind: str | None = None,
+        query: str | None = None,
+    ) -> int:
+        rows = await self.list_result_references(
+            tenant_id,
+            project_id,
+            domain=domain,
+            media_kind=media_kind,
+            query=query,
+        )
+        return len(rows)
 
     async def append_audit(self, event: AuditEvent) -> None:
         async with self._lock:

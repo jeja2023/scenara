@@ -44,8 +44,9 @@ async function expectChineseInterface(
 
 const workspaces = [
   ["", "总览", "总览"],
-  ["parse", "解析工作区", "解析"],
-  ["media", "媒体", "媒体"],
+  ["parse/portrait", "解析工作区", "解析"],
+  ["assets", "数据资产", "数据资产"],
+  ["results", "解析结果", "解析结果"],
   ["runs", "运行", "运行"],
   ["capabilities", "领域与能力", "领域与能力"],
   ["pipelines", "流水线", "流水线"],
@@ -72,6 +73,8 @@ test.beforeEach(async ({ page }) => {
     }
     let data: unknown = [];
     if (path === "/api/v1/media/assets" || path === "/api/v1/media/sources") {
+      data = { items: [], offset: 0, limit: 50, total: 0 };
+    } else if (path === "/api/v1/results") {
       data = { items: [], offset: 0, limit: 50, total: 0 };
     } else if (path === "/api/v1/domains") {
       data = [
@@ -100,7 +103,7 @@ test.beforeEach(async ({ page }) => {
       data = { items: [], offset: 0, limit: 100, total: 0 };
     } else if (path === "/api/v1/system/status") {
       data = {
-        version: "0.3.0.dev5",
+        version: "0.3.0.dev6",
         profile: "development",
         state_backend: "memory",
         object_backend: "local",
@@ -399,29 +402,50 @@ test("mobile navigation opens and reaches another workspace", async ({
   page.on("pageerror", (error) => pageErrors.push(error.message));
   await page.goto("");
   await page.getByRole("button", { name: "打开导航" }).click();
-  await page.getByRole("link", { name: "媒体" }).click();
+  await page.getByRole("link", { name: "数据资产" }).click();
   await expect(
-    page.getByRole("heading", { level: 1, name: "媒体" }),
+    page.getByRole("heading", { level: 1, name: "数据资产" }),
   ).toBeVisible();
   expect(pageErrors).toEqual([]);
+});
+
+test("解析菜单只负责展开领域入口，不会导航到默认解析页", async ({
+  page,
+}) => {
+  await page.goto("");
+  const mobileMenu = page.locator(".mobile-menu");
+  if (await mobileMenu.isVisible()) await mobileMenu.click();
+  const parseMenu = page.getByRole("button", { name: "解析", exact: true });
+  await expect(parseMenu).toHaveAttribute("aria-expanded", "false");
+  await parseMenu.click();
+  await expect(parseMenu).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator(".parse-subnav")).toBeVisible();
+  await expect(page).toHaveURL(/\/console\/$/);
+  await expect(
+    page.getByRole("heading", { name: "解析工作区" }),
+  ).toHaveCount(0);
+
+  await parseMenu.click();
+  await expect(parseMenu).toHaveAttribute("aria-expanded", "false");
+  await expect(page.locator(".parse-subnav")).toHaveCount(0);
 });
 
 test("parse workbench exposes complete media-mode controls", async ({
   page,
 }) => {
   await page.goto("ocr");
-  await page.getByRole("tab", { name: "视频文件" }).click();
+  await page.getByRole("tab", { name: "视频", exact: true }).click();
   await expect(page.getByLabel("采样策略")).toBeVisible();
   await page.getByRole("button", { name: "展开高级参数" }).click();
   await expect(page.getByLabel("起始时间（毫秒）")).toBeVisible();
   await expect(page.getByLabel("结束时间（毫秒）")).toBeVisible();
   await expect(page.getByLabel("帧最大边长（像素）")).toBeVisible();
 
-  await page.getByRole("tab", { name: "PDF 文档" }).click();
+  await page.getByRole("tab", { name: "文档" }).click();
   await expect(page.getByLabel("最大页数")).toBeVisible();
   await expect(page.getByLabel("渲染倍率")).toBeVisible();
 
-  await page.getByRole("tab", { name: "实时流" }).click();
+  await page.getByRole("tab", { name: "视频流" }).click();
   await page.getByRole("button", { name: "展开高级参数" }).click();
   await expect(page.getByLabel("最大分析时长（毫秒）")).toBeVisible();
   await expect(page.getByLabel("最大重连次数")).toBeVisible();
@@ -435,7 +459,9 @@ test("parse workbench exposes complete media-mode controls", async ({
   ).toBe(false);
 });
 
-test("parse domain-media routes keep a scoped workspace", async ({ page }) => {
+test("parse domain pages keep media tabs inside the workspace", async ({
+  page,
+}) => {
   await page.goto("parse/portrait/video");
 
   const mobileMenu = page.locator(".mobile-menu");
@@ -446,11 +472,13 @@ test("parse domain-media routes keep a scoped workspace", async ({ page }) => {
   await expect(context).toContainText("人像");
   await expect(context).toContainText("视频");
 
-  const portraitMenu = page
-    .locator(".parse-domain-group")
-    .filter({ hasText: "人像" });
-  await portraitMenu.getByRole("link", { name: "图片", exact: true }).click();
-  await expect(page).toHaveURL(/\/parse\/portrait\/image$/);
+  const portraitMenu = page.getByRole("link", { name: "人像", exact: true });
+  await expect(portraitMenu).toBeVisible();
+  await expect(page.locator(".parse-media-link")).toHaveCount(0);
+  await expect(page.locator(".parse-domain-link small")).toHaveCount(0);
+  await portraitMenu.click();
+  await expect(page).toHaveURL(/\/parse\/portrait$/);
+  await expect(page.getByRole("tab", { name: "图片", exact: true })).toBeVisible();
 });
 
 test("parse workbench completes every media flow and cancellation", async ({
@@ -697,7 +725,7 @@ test("parse workbench completes every media flow and cancellation", async ({
   await page.getByRole("button", { name: "开始解析" }).click();
   await expect(page.getByLabel("OCR 文本结果")).toHaveValue("OCR run-image");
 
-  await page.getByRole("tab", { name: "视频文件" }).click();
+  await page.getByRole("tab", { name: "视频", exact: true }).click();
   await page.getByRole("button", { name: "当前上传" }).click();
   await fileInput.setInputFiles({
     name: "clip.mp4",
@@ -707,7 +735,7 @@ test("parse workbench completes every media flow and cancellation", async ({
   await page.getByRole("button", { name: "开始解析" }).click();
   await expect(page.getByLabel("OCR 文本结果")).toHaveValue("OCR run-video");
 
-  await page.getByRole("tab", { name: "PDF 文档" }).click();
+  await page.getByRole("tab", { name: "文档" }).click();
   await page.getByRole("button", { name: "当前上传" }).click();
   await fileInput.setInputFiles({
     name: "report.pdf",
@@ -717,7 +745,7 @@ test("parse workbench completes every media flow and cancellation", async ({
   await page.getByRole("button", { name: "开始解析" }).click();
   await expect(page.getByLabel("OCR 文本结果")).toHaveValue("OCR run-document");
 
-  await page.getByRole("tab", { name: "实时流" }).click();
+  await page.getByRole("tab", { name: "视频流" }).click();
   await page.getByLabel("已登记视频流").selectOption("source-1");
   await page.getByRole("button", { name: "开始解析" }).click();
   await expect(page.getByLabel("OCR 文本结果")).toHaveValue("OCR run-stream");
@@ -727,7 +755,7 @@ test("parse workbench completes every media flow and cancellation", async ({
   });
   expect(screenshot.byteLength).toBeGreaterThan(5_000);
 
-  await page.getByRole("tab", { name: "视频文件" }).click();
+  await page.getByRole("tab", { name: "视频", exact: true }).click();
   await page.getByRole("button", { name: "当前上传" }).click();
   await fileInput.setInputFiles({
     name: "cancel.mp4",

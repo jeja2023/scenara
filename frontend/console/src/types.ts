@@ -220,6 +220,32 @@ export interface ResultPage {
   unit_limit: number;
   unit_total: number;
 }
+export interface ResultSummary {
+  result_id: string;
+  run_id: string;
+  domain: Domain;
+  pipeline: PipelineRef;
+  status: RunStatus;
+  asset_id?: string | null;
+  source_id?: string | null;
+  media_kind?: MediaKind | null;
+  resource_name?: string | null;
+  unit_count: number;
+  object_count: number;
+  person_count: number;
+  face_count: number;
+  ocr_block_count: number;
+  text_length: number;
+  warning_count: number;
+  index_status: "ready" | "partial";
+  created_at: number;
+}
+export interface ResultSummaryPage {
+  items: ResultSummary[];
+  offset: number;
+  limit: number;
+  total: number;
+}
 export interface Pipeline {
   pipeline_id: string;
   version: string;

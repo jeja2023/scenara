@@ -164,7 +164,7 @@ describe("console information architecture", () => {
     expect(labelWarning("gait_requires_at_least_8_frames")).toBe(
       "步态分析至少需要 8 帧画面",
     );
-    expect(labelVersion("0.3.0.dev5")).toBe("0.3.0 开发版 5");
+    expect(labelVersion("0.3.0.dev6")).toBe("0.3.0 开发版 6");
     expect(userFacingError(new TypeError("Failed to fetch"))).toBe(
       "操作失败，请稍后重试",
     );
@@ -202,7 +202,8 @@ describe("console information architecture", () => {
         "parse",
         "parse-domain",
         "parse-media",
-        "media",
+        "assets",
+        "results",
         "runs",
         "capabilities",
         "pipelines",

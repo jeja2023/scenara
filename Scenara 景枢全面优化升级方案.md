@@ -1,8 +1,8 @@
 # Scenara（景枢）企业级视觉 AI 平台优化升级方案
 
-**版本：V2.7（0.3.0-dev.5 工程质量与容量基线版）**
+**版本：V2.8（0.3.0-dev.6 解析体验与结果中心基线版）**
 
-**基线日期：2026-07-31**
+**基线日期：2026-08-03**
 
 **适用范围：当前 `scenara` 仓库、私有化部署产品与人像模型训练平台的协作边界**
 
@@ -24,7 +24,7 @@
 | 维度 | 当前事实 | 结论 |
 |---|---|---|
 | 品牌现状 | `README.md`、品牌规范、控制台、OpenAPI、SDK 文档和品牌资产已统一为“景枢” | 品牌迁移已完成；仓库门禁阻止旧品牌重新进入当前产品表面 |
-| 产品阶段 | 当前版本为 `0.3.0-dev.5`，仓库明确声明尚未发布 1.0（`README.md`） | 所有生产级宣传均受发布门禁约束 |
+| 产品阶段 | 当前版本为 `0.3.0-dev.6`，仓库明确声明尚未发布 1.0（`README.md`） | 所有生产级宣传均受发布门禁约束 |
 | 产品与访问底座 | 11 项产品目录、Organization、Project、User、Role、Membership、Service Account、API Key 与 Product Entitlement 已成为公共契约 | 产品继续共享 IAM、授权、审计和部署栈；身份联邦与商业生命周期仍受门禁约束 |
 | 架构边界 | `platform` 定义契约，`domains` 实现领域，`infrastructure` 实现端口，`enterprise` 通过 Policy Hook 接入（`docs/adr/0001-platform-domain-boundaries.md:14-29`） | 继续采用模块化单体，不拆微服务平台 |
 | 正式领域 | Portrait 为正式领域；OCR/Document 为验证领域（`README.md:7-8`） | 2026 年不同时扩张多个新领域 |
@@ -32,7 +32,7 @@
 | 执行内核 | 已有类型化 Operator、版本化 Pipeline、白名单参数、超时/重试和 DAG 校验（`scenara/platform/pipeline.py`） | 近期补齐资格验证和可观测性，不重写编排引擎 |
 | 数据权威 | PostgreSQL 为事实源；Redis 只保存投递、租约和短期事件；S3 保存媒体和不可变结果（`docs/adr/0001-platform-domain-boundaries.md:27-29`） | 禁止把 Redis 当业务数据库，禁止在多处保存不一致状态 |
 | 运行语义 | 至少一次投递、乐观并发、单调事件 ID、不可变结果对象（`docs/adr/0002-runtime-and-storage.md:12-19`） | 重点验证幂等、重试和恢复，不改为“恰好一次”口号 |
-| 控制台 | 已有总览、媒体、运行、结果、人像、OCR、Pipeline、模型、接入、运维和企业模块路由（`frontend/console/src/router.ts`） | 先打通完整操作闭环，再考虑可视化拖拽编排 |
+| 控制台 | 已有总览、数据资产、运行、解析结果、人像、OCR、Pipeline、模型、接入、运维和企业模块路由（`frontend/console/src/router.ts`） | 解析工作区保持领域内闭环，跨领域结果统一进入结果中心；再考虑检索与可视化编排 |
 | SDK | Python SDK 与 OpenAPI 生成的 TypeScript SDK 已纳入实现门禁 | 后续必须保持 OpenAPI 与 SDK 零漂移 |
 | 部署基线 | Ubuntu x86_64、Docker Compose、单卡不少于 23,000 MiB 的 NVIDIA GPU、PostgreSQL/pgvector、Redis、MinIO（`deploy/README.md`） | Kubernetes、多节点 HA 和外部向量库不进入 1.0 承诺 |
 

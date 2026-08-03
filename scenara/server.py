@@ -105,6 +105,7 @@ from scenara.platform.models import (
     Project,
     RepositoryTopology,
     ResultPage,
+    ResultSummaryPage,
     Role,
     RunPage,
     RunRecord,
@@ -591,6 +592,29 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         return _envelope(
             request,
             ResultPage(result=page, unit_offset=unit_offset, unit_limit=unit_limit, unit_total=total),
+        )  # type: ignore[return-value]
+
+    @app.get("/api/v1/results", tags=["Results"])
+    async def list_results(
+        request: Request,
+        domain: DomainId | None = None,
+        media_kind: MediaKind | None = None,
+        query: Annotated[str | None, Query(max_length=256)] = None,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[ResultSummaryPage]:
+        items, total = await runtime.runs.list_results(
+            context,
+            domain=domain,
+            media_kind=media_kind,
+            query=query.strip() if query else None,
+            offset=offset,
+            limit=limit,
+        )
+        return _envelope(
+            request,
+            ResultSummaryPage(items=items, offset=offset, limit=limit, total=total),
         )  # type: ignore[return-value]
 
     @app.get("/api/v1/runs/{run_id}/artifacts/{artifact_id}", tags=["Results"])

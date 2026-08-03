@@ -894,6 +894,30 @@
         "title": "ApiEnvelope[ResultPage]",
         "type": "object"
       },
+      "ApiEnvelope_ResultSummaryPage_": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ResultSummaryPage"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "data"
+        ],
+        "title": "ApiEnvelope[ResultSummaryPage]",
+        "type": "object"
+      },
       "ApiEnvelope_Role_": {
         "additionalProperties": false,
         "properties": {
@@ -6281,6 +6305,169 @@
         "title": "ResultRelation",
         "type": "object"
       },
+      "ResultSummary": {
+        "additionalProperties": false,
+        "description": "Searchable result projection used by the global result center.",
+        "properties": {
+          "asset_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Id"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "number"
+          },
+          "domain": {
+            "$ref": "#/components/schemas/DomainId"
+          },
+          "face_count": {
+            "minimum": 0.0,
+            "title": "Face Count",
+            "type": "integer"
+          },
+          "index_status": {
+            "default": "ready",
+            "enum": [
+              "ready",
+              "partial"
+            ],
+            "title": "Index Status",
+            "type": "string"
+          },
+          "media_kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MediaKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "object_count": {
+            "minimum": 0.0,
+            "title": "Object Count",
+            "type": "integer"
+          },
+          "ocr_block_count": {
+            "minimum": 0.0,
+            "title": "Ocr Block Count",
+            "type": "integer"
+          },
+          "person_count": {
+            "minimum": 0.0,
+            "title": "Person Count",
+            "type": "integer"
+          },
+          "pipeline": {
+            "$ref": "#/components/schemas/PipelineRef"
+          },
+          "resource_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Name"
+          },
+          "result_id": {
+            "title": "Result Id",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "text_length": {
+            "minimum": 0.0,
+            "title": "Text Length",
+            "type": "integer"
+          },
+          "unit_count": {
+            "minimum": 0.0,
+            "title": "Unit Count",
+            "type": "integer"
+          },
+          "warning_count": {
+            "minimum": 0.0,
+            "title": "Warning Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "result_id",
+          "run_id",
+          "domain",
+          "pipeline",
+          "status",
+          "unit_count",
+          "object_count",
+          "person_count",
+          "face_count",
+          "ocr_block_count",
+          "text_length",
+          "warning_count",
+          "created_at"
+        ],
+        "title": "ResultSummary",
+        "type": "object"
+      },
+      "ResultSummaryPage": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ResultSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "offset": {
+            "title": "Offset",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "offset",
+          "limit",
+          "total"
+        ],
+        "title": "ResultSummaryPage",
+        "type": "object"
+      },
       "ReviewFeedbackRequest": {
         "additionalProperties": false,
         "properties": {
@@ -7185,7 +7372,7 @@
   "info": {
     "description": "Scenara 景枢视觉 AI 中枢平台",
     "title": "Scenara API",
-    "version": "0.3.0.dev5"
+    "version": "0.3.0.dev6"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -14691,6 +14878,175 @@
         "summary": "Search Portrait Identities",
         "tags": [
           "Portrait"
+        ]
+      }
+    },
+    "/api/v1/results": {
+      "get": {
+        "operationId": "list_results_api_v1_results_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "domain",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/DomainId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Domain"
+            }
+          },
+          {
+            "in": "query",
+            "name": "media_kind",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/MediaKind"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Media Kind"
+            }
+          },
+          {
+            "in": "query",
+            "name": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Query"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 200,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_ResultSummaryPage_"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Results",
+        "tags": [
+          "Results"
         ]
       }
     },

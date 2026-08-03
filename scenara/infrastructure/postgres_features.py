@@ -77,7 +77,8 @@ class PostgresFeatureStore:
         async with self._pool.connection() as conn:
             await conn.execute(
                 """INSERT INTO scenara_features
-                (tenant_id, project_id, feature_id, feature_space_id, subject_type, subject_id, embedding, created_at, expires_at)
+                (tenant_id, project_id, feature_id, feature_space_id, subject_type, subject_id,
+                 embedding, created_at, expires_at)
                 VALUES (%s, %s, %s, %s, %s, %s, %s, to_timestamp(%s), to_timestamp(%s))""",
                 (
                     feature.tenant_id,
@@ -141,7 +142,8 @@ class PostgresFeatureStore:
     async def delete_subject(self, tenant_id: str, project_id: str, subject_type: str, subject_id: str) -> int:
         async with self._pool.connection() as conn:
             cursor = await conn.execute(
-                "DELETE FROM scenara_features WHERE tenant_id = %s AND project_id = %s AND subject_type = %s AND subject_id = %s",
+                """DELETE FROM scenara_features
+                   WHERE tenant_id = %s AND project_id = %s AND subject_type = %s AND subject_id = %s""",
                 (tenant_id, project_id, subject_type, subject_id),
             )
         return int(cursor.rowcount)

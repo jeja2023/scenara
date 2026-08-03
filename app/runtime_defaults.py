@@ -92,12 +92,7 @@ def parse_env_file(path: Path) -> dict[str, str]:
 def local_dev_env_overrides(root_dir: Path) -> dict[str, str]:
     runtime_state_dir = root_dir / "runtime-state"
     overrides = dict(LOCAL_DEV_ENV_DEFAULTS)
-    overrides.update(
-        {
-            key: str(root_dir / relative_path)
-            for key, relative_path in LOCAL_DEV_PATH_KEYS.items()
-        }
-    )
+    overrides.update({key: str(root_dir / relative_path) for key, relative_path in LOCAL_DEV_PATH_KEYS.items()})
     overrides.update(
         {
             "RUNTIME_STATE_DIR": str(runtime_state_dir),
@@ -109,9 +104,6 @@ def local_dev_env_overrides(root_dir: Path) -> dict[str, str]:
         }
     )
     overrides.update(
-        {
-            key: str(runtime_state_dir / relative_path)
-            for key, relative_path in LOCAL_DEV_STATE_PATH_KEYS.items()
-        }
+        {key: str(runtime_state_dir / relative_path) for key, relative_path in LOCAL_DEV_STATE_PATH_KEYS.items()}
     )
     return overrides

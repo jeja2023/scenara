@@ -1,18 +1,20 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 
 from scenara.platform.models import ProductCatalogItem, ProductLayer, ProductMaturity
 
 
-def build_product_catalog(installed_domains: Iterable[str]) -> list[ProductCatalogItem]:
+def build_product_catalog(
+    installed_domains: Iterable[str],
+    *,
+    domain_scopes: Mapping[str, Iterable[str]] | None = None,
+) -> list[ProductCatalogItem]:
     domains = frozenset(installed_domains)
-    parse_maturity = ProductMaturity.AVAILABLE if {"portrait", "ocr"} & domains else ProductMaturity.SEED
+    parse_maturity = ProductMaturity.AVAILABLE if domains else ProductMaturity.SEED
     parse_scope = ["media ingestion", "run lifecycle", "versioned pipelines", "typed visual results"]
-    if "portrait" in domains:
-        parse_scope.append("portrait analysis")
-    if "ocr" in domains:
-        parse_scope.append("OCR document parsing")
+    for domain_id in sorted(domains):
+        parse_scope.extend(domain_scopes.get(domain_id, ()) if domain_scopes is not None else ())
 
     return [
         ProductCatalogItem(
@@ -31,6 +33,7 @@ def build_product_catalog(installed_domains: Iterable[str]) -> list[ProductCatal
                 "/api/v1/parse/stream",
                 "/api/v1/runs",
                 "/api/v1/runs/{run_id}/result",
+                "/api/v1/runs/{run_id}/artifacts/{artifact_id}",
             ],
             depends_on=["api", "console", "sdk"],
             next_gate="Complete 1.0 production qualification with approved model artifacts and target-GPU evidence.",
@@ -51,7 +54,10 @@ def build_product_catalog(installed_domains: Iterable[str]) -> list[ProductCatal
                 "/api/v1/model-deployment-events",
             ],
             depends_on=["data", "api", "console"],
-            next_gate="Keep training external until dataset, experiment, and compute ownership are explicitly productized.",
+            next_gate=(
+                "Keep training external until dataset, experiment, and compute ownership are "
+                "explicitly productized."
+            ),
         ),
         ProductCatalogItem(
             product_id="data",
@@ -95,10 +101,17 @@ def build_product_catalog(installed_domains: Iterable[str]) -> list[ProductCatal
             maturity=ProductMaturity.AVAILABLE,
             summary="Python and TypeScript developer clients for the v1 API.",
             current_scope=["Python SDK", "TypeScript SDK", "OpenAPI-derived schema types"],
-            not_in_scope_yet=["multi-product namespaces", "published release automation", "long-term deprecation testing"],
+            not_in_scope_yet=[
+                "multi-product namespaces",
+                "published release automation",
+                "long-term deprecation testing",
+            ],
             api_paths=["/api/v1/platform/products"],
             depends_on=["api"],
-            next_gate="Keep SDK methods aligned with OpenAPI and split namespaces only when products gain independent lifecycles.",
+            next_gate=(
+                "Keep SDK methods aligned with OpenAPI and split namespaces only when products "
+                "gain independent lifecycles."
+            ),
         ),
         ProductCatalogItem(
             product_id="index",
@@ -144,7 +157,13 @@ def build_product_catalog(installed_domains: Iterable[str]) -> list[ProductCatal
             maturity=ProductMaturity.GATED,
             summary="Future edge inference product for offline and near-device deployments.",
             current_scope=[],
-            not_in_scope_yet=["device registry", "fleet management", "signed model delivery", "offline sync", "telemetry"],
+            not_in_scope_yet=[
+                "device registry",
+                "fleet management",
+                "signed model delivery",
+                "offline sync",
+                "telemetry",
+            ],
             depends_on=["parse", "model", "api"],
             next_gate="Do not start until the supported server deployment and release evidence are stable.",
         ),
@@ -155,7 +174,13 @@ def build_product_catalog(installed_domains: Iterable[str]) -> list[ProductCatal
             maturity=ProductMaturity.GATED,
             summary="Future agentic layer that can coordinate parsing, search, workflow, and review actions.",
             current_scope=[],
-            not_in_scope_yet=["tool permission model", "human approval loop", "agent traces", "agent evaluation", "memory policy"],
+            not_in_scope_yet=[
+                "tool permission model",
+                "human approval loop",
+                "agent traces",
+                "agent evaluation",
+                "memory policy",
+            ],
             depends_on=["flow", "search", "api", "console"],
             next_gate="Add after Flow and Search have stable contracts plus auditable action governance.",
         ),

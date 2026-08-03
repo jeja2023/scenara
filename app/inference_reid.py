@@ -5,11 +5,12 @@ import numpy as np
 import numpy.typing as npt
 from PIL import Image
 
+from app.image_preprocess import resize_image_tensor
 from app.model_config import config_value, configured_input_size, model_config
 from app.observability import now
-from app.runtime import run_yolo_frames
+from app.postprocess import normalize_embeddings
+from app.runtime_execution import run_yolo_frames
 from app.schemas import ModelBundle
-from app.vision import normalize_embeddings, resize_image_tensor
 
 Array = npt.NDArray[Any]
 
@@ -23,7 +24,9 @@ async def infer_reid_images(
     config = model_config(key, default_type="reid")
     input_height, input_width = configured_input_size(key, session, default=(256, 128))
     normalize = str(config_value(config, "input", "normalize", "imagenet"))
-    embedding_normalize = str(config_value(config, "output", "embedding_normalize", config.get("embedding_normalize", "l2")))
+    embedding_normalize = str(
+        config_value(config, "output", "embedding_normalize", config.get("embedding_normalize", "l2"))
+    )
 
     preprocess_start = now()
 

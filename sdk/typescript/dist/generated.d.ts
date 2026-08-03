@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "6cca1a57bb6826d57fe8fb9ec8f182a1e55b2a25321e8bb22deaeddd2389c93e" /** gitleaks:allow - public contract digest */;
+export declare const OPENAPI_SHA256 = "eaa6fb8c12733cca0af76dfce006f159a74881092e62b649b1a8c2f9e50aedab" /** gitleaks:allow - public contract digest */;
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
@@ -181,6 +181,11 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_ResultSummaryPage_ = {
+        data: ResultSummaryPage;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_Role_ = {
         data: Role;
         request_id: string;
@@ -356,7 +361,7 @@ export declare namespace OpenApi {
         kind?: MediaKind;
     };
     type Body_parse_document_api_v1_parse_document_post = {
-        domain?: "portrait" | "ocr";
+        domain?: DomainId;
         file: string;
         max_units?: number;
         page_scale?: number;
@@ -365,13 +370,13 @@ export declare namespace OpenApi {
         wait_ms?: number;
     };
     type Body_parse_image_api_v1_parse_image_post = {
-        domain?: "portrait" | "ocr";
+        domain?: DomainId;
         file: string;
         pipeline_id?: (string) | (null);
         pipeline_version?: (string) | (null);
     };
     type Body_parse_video_api_v1_parse_video_post = {
-        domain?: "portrait" | "ocr";
+        domain?: DomainId;
         file: string;
         frame_max_edge?: (number) | (null);
         max_units?: number;
@@ -584,6 +589,11 @@ export declare namespace OpenApi {
         updated_at: number;
     };
     type FeedbackStatus = "pending" | "approved" | "rejected";
+    type GenericDomainPayload = {
+        domain: DomainId;
+        schema_version?: string;
+        [key: string]: unknown;
+    };
     type HTTPValidationError = {
         detail?: Array<ValidationError>;
     };
@@ -721,6 +731,7 @@ export declare namespace OpenApi {
         width?: (number) | (null);
     };
     type MediaUnitResult = {
+        frame_artifact_id?: (string) | (null);
         height: number;
         index: number;
         objects?: Array<VisionObject>;
@@ -1076,7 +1087,7 @@ export declare namespace OpenApi {
         asset_id?: (string) | (null);
         created_at: number;
         domain: DomainId;
-        domain_payload: (PortraitDomainPayload) | (OcrDomainPayload);
+        domain_payload: (PortraitDomainPayload) | (OcrDomainPayload) | (GenericDomainPayload);
         media_metadata?: MediaTechnicalMetadata;
         models?: Array<ModelProvenance>;
         pipeline: PipelineRef;
@@ -1102,6 +1113,32 @@ export declare namespace OpenApi {
         score?: (number) | (null);
         source_object_id: string;
         target_object_id: string;
+    };
+    type ResultSummary = {
+        asset_id?: (string) | (null);
+        created_at: number;
+        domain: DomainId;
+        face_count: number;
+        index_status?: "ready" | "partial";
+        media_kind?: (MediaKind) | (null);
+        object_count: number;
+        ocr_block_count: number;
+        person_count: number;
+        pipeline: PipelineRef;
+        resource_name?: (string) | (null);
+        result_id: string;
+        run_id: string;
+        source_id?: (string) | (null);
+        status: RunStatus;
+        text_length: number;
+        unit_count: number;
+        warning_count: number;
+    };
+    type ResultSummaryPage = {
+        items: Array<ResultSummary>;
+        limit: number;
+        offset: number;
+        total: number;
     };
     type ReviewFeedbackRequest = {
         notes?: string;
@@ -1224,6 +1261,7 @@ export declare namespace OpenApi {
             [key: string]: unknown;
         };
         bbox?: (BoundingBox) | (null);
+        crop_artifact_id?: (string) | (null);
         feature_refs?: Array<string>;
         object_id: string;
         object_type: string;

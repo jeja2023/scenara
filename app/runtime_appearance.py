@@ -48,4 +48,9 @@ async def infer_appearance_record_for_image(image: Image.Image, *, include_embed
     return fallback
 
 
-__all__ = ["get_capability_runtime", "infer_appearance_record_for_image", "run_attribute_reid_appearance", "run_model_bundle"]
+__all__ = [
+    "get_capability_runtime",
+    "infer_appearance_record_for_image",
+    "run_attribute_reid_appearance",
+    "run_model_bundle",
+]

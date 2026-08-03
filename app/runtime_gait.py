@@ -15,7 +15,9 @@ from app.runtime_execution import run_model_bundle
 Array = npt.NDArray[Any]
 
 
-def gait_sequence_tensor(images: list[Image.Image], input_height: int, input_width: int, *, layout: str = "ntchw") -> Array:
+def gait_sequence_tensor(
+    images: list[Image.Image], input_height: int, input_width: int, *, layout: str = "ntchw"
+) -> Array:
     frames: list[Array] = []
     for image in images:
         gray = image.convert("L").resize((input_width, input_height), Image.Resampling.BILINEAR)
@@ -63,4 +65,10 @@ async def infer_gait_embedding_for_images(images: list[Image.Image]) -> tuple[li
     return fallback_gait_embedding(images)
 
 
-__all__ = ["gait_sequence_tensor", "get_capability_runtime", "infer_gait_embedding_for_images", "run_model_bundle", "run_opengait"]
+__all__ = [
+    "gait_sequence_tensor",
+    "get_capability_runtime",
+    "infer_gait_embedding_for_images",
+    "run_model_bundle",
+    "run_opengait",
+]

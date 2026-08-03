@@ -246,7 +246,6 @@ def build_portrait_intelligence(
                 "FeatureStore protocol with cosine / L2 / inner-product metrics",
                 "MemoryFeatureStore (development) and PostgresFeatureStore (production)",
                 "Multi-dimensional feature spaces isolated by domain, modality, model, version",
-                "Qdrant backend available in legacy app/ layer (PORTRAIT_VECTOR_BACKEND=qdrant)",
             ],
             not_in_scope_yet=[
                 "Qdrant infrastructure implementation under scenara/infrastructure/ FeatureStore protocol",
@@ -254,10 +253,7 @@ def build_portrait_intelligence(
                 "Cross-camera Re-ID clustering service",
                 "Portrait identity graph and timeline correlation",
             ],
-            next_gate=(
-                "Migrate the Qdrant implementation from app/portrait_vector_store.py to "
-                "scenara/infrastructure/ as a FeatureStore Protocol implementation."
-            ),
+            next_gate="Implement Qdrant under scenara/infrastructure/ using the FeatureStore protocol.",
         ),
         PortraitModuleItem(
             module_id="mlops",
@@ -272,7 +268,7 @@ def build_portrait_intelligence(
                 "Model release state machine with deployment event audit",
                 "Webhook delivery of deployment state changes to scenara-model",
                 "Per-tenant/project model activation and rollback",
-                "Production gate checks (app/production_gates.py)",
+                "Fail-closed production configuration checks (scenara/settings.py)",
             ],
             not_in_scope_yet=[
                 "Triton Inference Server integration (replaces direct ONNXRuntime inference)",

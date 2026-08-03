@@ -157,6 +157,18 @@ export class ScenaraClient {
     return page.result;
   }
 
+  /**
+   * Download one derived image declared by a run result: a feature crop
+   * (`crop_artifact_id` on a detected object) or a full unit image
+   * (`frame_artifact_id` on a media unit).
+   */
+  getResultArtifact(runId: string, artifactId: string): Promise<Uint8Array> {
+    return this.transport<Uint8Array>(
+      "GET",
+      "/api/v1/runs/" + encodeURIComponent(runId) + "/artifacts/" + encodeURIComponent(artifactId),
+    );
+  }
+
   pauseRun(runId: string): Promise<Run> {
     return this.transport<Run>("POST", "/api/v1/runs/" + encodeURIComponent(runId) + "/pause");
   }

@@ -53,7 +53,9 @@ models/*
 .codex-tmp/
 .omx/
 temp_gov_check_probe.txt
-# Node.js build output
+# Node.js build output. The console bundle is deployment-generated; the
+# TypeScript SDK dist/ directory is intentionally tracked as a publishable
+# package artifact.
 node_modules/
 package-lock.json
 frontend/console-next/dist/

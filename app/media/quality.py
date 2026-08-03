@@ -41,7 +41,9 @@ def assess_image_quality(image: Image.Image) -> dict[str, Any]:
     aspect_score = clamp01(1.0 - max(0.0, abs(aspect_ratio - 0.75) - 0.75) / 2.5)
     noise = clamp01(float(np.median(np.abs(laplacian))) / 30.0) if laplacian is not None else 1.0
     rg = np.abs(rgb[:, :, 0].astype(np.float32) - rgb[:, :, 1].astype(np.float32))
-    yb = np.abs(0.5 * (rgb[:, :, 0].astype(np.float32) + rgb[:, :, 1].astype(np.float32)) - rgb[:, :, 2].astype(np.float32))
+    yb = np.abs(
+        0.5 * (rgb[:, :, 0].astype(np.float32) + rgb[:, :, 1].astype(np.float32)) - rgb[:, :, 2].astype(np.float32)
+    )
     colorfulness = clamp01((float(rg.std()) + float(yb.std())) / 120.0) if rgb.size else 0.0
     exposure_clipping = clamp01((underexposure + overexposure) / 2.0)
     score = clamp01(

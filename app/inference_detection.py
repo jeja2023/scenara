@@ -6,12 +6,13 @@ import numpy as np
 import numpy.typing as npt
 from PIL import Image
 
+from app.image_preprocess import letterbox_image
 from app.model_config import config_value, configured_input_size, model_config
 from app.model_package import labels_from_config, parse_class_filter
 from app.observability import now
-from app.runtime import run_yolo_frames
+from app.postprocess import yolo_detections, yolo_person_detections
+from app.runtime_execution import run_yolo_frames
 from app.schemas import LetterboxMeta, ModelBundle
-from app.vision import letterbox_image, yolo_detections, yolo_person_detections
 
 Array = npt.NDArray[Any]
 
@@ -94,6 +95,8 @@ async def infer_person_frames(
         "timing": timing,
     }
     return frames, runtime_meta
+
+
 async def infer_detection_images(
     bundle: ModelBundle,
     key: str,
@@ -108,9 +111,13 @@ async def infer_detection_images(
     model_path = Path(bundle["path"])
     input_height, input_width = configured_input_size(key, session, default=(640, 640))
     labels = labels_from_config(config, model_path)
-    confidence_value = float(confidence if confidence is not None else config_value(config, "output", "confidence", 0.25))
+    confidence_value = float(
+        confidence if confidence is not None else config_value(config, "output", "confidence", 0.25)
+    )
     iou_value = float(iou if iou is not None else config_value(config, "output", "iou", 0.45))
-    max_detections_value = int(max_detections if max_detections is not None else config_value(config, "output", "max_detections", 100))
+    max_detections_value = int(
+        max_detections if max_detections is not None else config_value(config, "output", "max_detections", 100)
+    )
     class_filter_ids = parse_class_filter(config_value(config, "output", "class_filter"), labels)
 
     preprocess_start = now()

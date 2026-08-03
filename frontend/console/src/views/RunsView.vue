@@ -97,6 +97,10 @@ async function transition(
 }
 
 function openWorkspace(run: Run): void {
+  if (run.status === "completed") {
+    void router.push({ path: "/results", query: { run: run.run_id } });
+    return;
+  }
   void router.push({ path: "/parse", query: { run: run.run_id } });
 }
 

@@ -125,7 +125,9 @@ def log_json(level: int, event: str, **fields: Any) -> None:
     payload.setdefault("request_id", current_request_id())
     payload.setdefault("tenant_id", current_tenant_id())
     payload.setdefault("traceparent", current_traceparent())
-    logger.log(level, json.dumps({key: value for key, value in payload.items() if value is not None}, ensure_ascii=False))
+    logger.log(
+        level, json.dumps({key: value for key, value in payload.items() if value is not None}, ensure_ascii=False)
+    )
 
 
 @contextmanager

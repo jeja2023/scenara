@@ -7,9 +7,9 @@ import yaml
 from fastapi import HTTPException, status
 
 from app.constants import COCO_CLASSES
+from app.exception_utils import exception_log_summary
 from app.model_config import config_section, config_value, configured_sha256, model_config, model_task
 from app.observability import logger
-from app.portrait_response import exception_log_summary
 from app.settings import MODELS_ROOT
 
 
@@ -263,4 +263,3 @@ def validate_model_hash(cache_key_value: str, digest: str) -> None:
                 "actual_sha256": digest,
             },
         )
-

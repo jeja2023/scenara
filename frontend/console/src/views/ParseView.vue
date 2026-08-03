@@ -342,6 +342,7 @@ const hasResult = computed(() => !!result.value);
 const currentDomainLabel = computed(
   () => selectedDomainManifest.value?.display_name || labelDomain(domain.value),
 );
+const isDomainScoped = computed(() => Boolean(route.params?.domain));
 const currentMediaLabel = computed(() => labelMediaKind(mode.value));
 const scopedHistoryRuns = computed(() =>
   historyRuns.value.filter((item) => {
@@ -1359,26 +1360,25 @@ onBeforeUnmount(() => {
         <span class="control-label">当前解析工作区</span>
         <strong>{{ currentDomainLabel }} / {{ currentMediaLabel }}</strong>
       </div>
-      <nav class="parse-context-nav" aria-label="当前领域媒体类型">
-        <RouterLink
-          v-for="kind in supportedMediaKinds"
-          :key="kind"
-          :to="workspacePath(domain, kind)"
-          :class="{ active: mode === kind }"
-        >
-          {{ labelMediaKind(kind) }}
-        </RouterLink>
+      <nav class="parse-context-nav" aria-label="解析工作区操作">
         <RouterLink
           class="parse-history-link"
           :to="{ path: '/runs', query: { domain } }"
         >
           查看全部运行
         </RouterLink>
+        <RouterLink v-if="hasResult" to="/results" class="parse-results-link">
+          查看解析结果
+        </RouterLink>
       </nav>
     </div>
 
     <div class="workbench-config">
-      <div>
+      <div v-if="isDomainScoped" class="parse-domain-context">
+        <span class="control-label">当前能力</span>
+        <strong>{{ currentDomainLabel }}</strong>
+      </div>
+      <div v-else>
         <span class="control-label">解析能力</span>
         <div
           v-if="availableDomains.length <= 4"
@@ -1442,7 +1442,7 @@ onBeforeUnmount(() => {
       </label>
     </div>
 
-    <div class="segmented media-modes" role="tablist" aria-label="媒体类型">
+    <div class="segmented media-modes" role="tablist" aria-label="数据类型">
       <button
         v-if="supportedMediaKinds.includes('image')"
         :class="{ active: mode === 'image' }"
@@ -1459,7 +1459,7 @@ onBeforeUnmount(() => {
         :aria-selected="mode === 'video'"
         @click="selectMode('video')"
       >
-        <Video :size="16" />视频文件
+        <Video :size="16" />视频
       </button>
       <button
         v-if="supportedMediaKinds.includes('document')"
@@ -1468,7 +1468,7 @@ onBeforeUnmount(() => {
         :aria-selected="mode === 'document'"
         @click="selectMode('document')"
       >
-        <FileText :size="16" />PDF 文档
+        <FileText :size="16" />文档
       </button>
       <button
         v-if="supportedMediaKinds.includes('stream')"
@@ -1477,7 +1477,7 @@ onBeforeUnmount(() => {
         :aria-selected="mode === 'stream'"
         @click="selectMode('stream')"
       >
-        <Radio :size="16" />实时流
+        <Radio :size="16" />视频流
       </button>
     </div>
 
@@ -1579,11 +1579,11 @@ onBeforeUnmount(() => {
         <div class="input-controls">
           <template v-if="mode !== 'stream'">
             <div class="input-origin">
-              <span class="control-label">媒体来源</span>
+              <span class="control-label">数据来源</span>
               <div
                 class="segmented origin-modes"
                 role="group"
-                aria-label="媒体来源"
+                aria-label="数据来源"
               >
                 <button
                   :class="{ active: inputOrigin === 'upload' }"
@@ -1597,7 +1597,7 @@ onBeforeUnmount(() => {
                   :aria-pressed="inputOrigin === 'library'"
                   @click="selectOrigin('library')"
                 >
-                  <Library :size="15" />媒体库
+                  <Library :size="15" />资产库
                 </button>
               </div>
             </div>
@@ -1626,7 +1626,7 @@ onBeforeUnmount(() => {
 
             <div v-else class="library-picker-row">
               <label>
-                <span>媒体库资产</span>
+                <span>文件资产</span>
                 <select v-model="assetId" @change="selectLibraryAsset">
                   <option value="">
                     选择{{
@@ -1650,8 +1650,8 @@ onBeforeUnmount(() => {
               <button
                 class="icon-button source-refresh"
                 :disabled="loadingSources"
-                title="刷新媒体库"
-                aria-label="刷新媒体库"
+                title="刷新资产库"
+                aria-label="刷新资产库"
                 @click="refreshWorkspaceResources"
               >
                 <RefreshCw :size="16" :class="{ spin: loadingSources }" />
@@ -2019,7 +2019,7 @@ onBeforeUnmount(() => {
           </details>
         </div>
         <div v-else class="empty result-empty">
-          {{ loading ? "正在解析媒体" : "暂无结果" }}
+          {{ loading ? "正在解析数据" : "暂无结果" }}
         </div>
       </section>
 
@@ -2036,7 +2036,7 @@ onBeforeUnmount(() => {
             <h2>
               {{
                 mode === "image"
-                  ? "媒体单元"
+                  ? "解析单元"
                   : mode === "document"
                     ? "页面"
                     : "时间轴"
@@ -2065,7 +2065,7 @@ onBeforeUnmount(() => {
               >
             </button>
           </div>
-          <div v-else class="empty">等待媒体单元</div>
+          <div v-else class="empty">等待解析单元</div>
         </section>
       </div>
     </div>
@@ -2104,7 +2104,7 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div v-else class="empty history-empty">
-        {{ loadingHistory ? "正在加载历史运行" : "当前媒体类型暂无历史运行" }}
+        {{ loadingHistory ? "正在加载历史运行" : "当前数据类型暂无历史运行" }}
       </div>
     </section>
   </section>
@@ -2163,6 +2163,13 @@ onBeforeUnmount(() => {
 .input-origin {
   display: grid;
   gap: 6px;
+}
+.parse-domain-context {
+  min-width: 180px;
+  align-content: start;
+}
+.parse-domain-context strong {
+  font-size: 15px;
 }
 .control-label {
   color: var(--muted);

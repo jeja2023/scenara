@@ -52,6 +52,11 @@ class Settings:
     allow_private_media_sources: bool
     allow_private_webhook_targets: bool
     ocr_engine_factory: str
+    run_artifacts_enabled: bool
+    run_artifact_max_crops: int
+    run_artifact_max_frames: int
+    run_artifact_crop_max_edge: int
+    run_artifact_frame_max_edge: int
 
     @property
     def production(self) -> bool:
@@ -123,6 +128,17 @@ def load_settings() -> Settings:
         allow_private_media_sources=_bool("SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES", False),
         allow_private_webhook_targets=_bool("SCENARA_ALLOW_PRIVATE_WEBHOOK_TARGETS", False),
         ocr_engine_factory=os.getenv("SCENARA_OCR_ENGINE_FACTORY", "").strip(),
+        run_artifacts_enabled=_bool("SCENARA_RUN_ARTIFACTS_ENABLED", True),
+        run_artifact_max_crops=max(0, min(5_000, int(os.getenv("SCENARA_RUN_ARTIFACT_MAX_CROPS", "200")))),
+        run_artifact_max_frames=max(0, min(1_000, int(os.getenv("SCENARA_RUN_ARTIFACT_MAX_FRAMES", "64")))),
+        run_artifact_crop_max_edge=max(
+            32,
+            min(2_048, int(os.getenv("SCENARA_RUN_ARTIFACT_CROP_MAX_EDGE", "256"))),
+        ),
+        run_artifact_frame_max_edge=max(
+            64,
+            min(8_192, int(os.getenv("SCENARA_RUN_ARTIFACT_FRAME_MAX_EDGE", "1920"))),
+        ),
         enterprise_license_path=_optional_path("SCENARA_ENTERPRISE_LICENSE_PATH"),
         enterprise_public_key_path=_optional_path("SCENARA_ENTERPRISE_PUBLIC_KEY_PATH"),
         raw_media_retention_days=max(1, min(3650, int(os.getenv("SCENARA_RAW_MEDIA_RETENTION_DAYS", "7")))),

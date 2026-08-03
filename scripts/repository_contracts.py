@@ -83,9 +83,7 @@ def contract_definitions() -> list[dict[str, Any]]:
         created_by="service-account:model-feedback-exporter",
         created_at=1_785_369_600.0,
     )
-    hard_sample = hard_sample.model_copy(
-        update={"sha256": hard_sample_digest(hard_sample.model_dump(mode="json"))}
-    )
+    hard_sample = hard_sample.model_copy(update={"sha256": hard_sample_digest(hard_sample.model_dump(mode="json"))})
     return [
         {
             "contract_id": "model-package-admission",
@@ -104,9 +102,7 @@ def contract_definitions() -> list[dict[str, Any]]:
                 source_uri=f"oci://registry.example/scenara/person-detector@sha256:{artifact_sha}",
                 license_id="LicenseRef-Proprietary-Approved",
                 model_card=f"https://artifacts.example/model-card.json#sha256={card_sha}",
-                evaluation_evidence=(
-                    f"https://artifacts.example/evaluation.json#sha256={evidence_sha}",
-                ),
+                evaluation_evidence=(f"https://artifacts.example/evaluation.json#sha256={evidence_sha}",),
                 vram_mb=4096,
                 regression_samples=("portrait-regression-v1",),
                 production_ready=True,
@@ -295,16 +291,12 @@ def compatibility_errors(
     for keyword in ("minimum", "exclusiveMinimum", "minLength", "minItems", "minProperties"):
         old_value = previous.get(keyword)
         new_value = candidate.get(keyword)
-        if isinstance(new_value, (int, float)) and (
-            not isinstance(old_value, (int, float)) or new_value > old_value
-        ):
+        if isinstance(new_value, (int, float)) and (not isinstance(old_value, (int, float)) or new_value > old_value):
             errors.append(f"{path}: tightened {keyword} from {old_value} to {new_value}")
     for keyword in ("maximum", "exclusiveMaximum", "maxLength", "maxItems", "maxProperties"):
         old_value = previous.get(keyword)
         new_value = candidate.get(keyword)
-        if isinstance(new_value, (int, float)) and (
-            not isinstance(old_value, (int, float)) or new_value < old_value
-        ):
+        if isinstance(new_value, (int, float)) and (not isinstance(old_value, (int, float)) or new_value < old_value):
             errors.append(f"{path}: tightened {keyword} from {old_value} to {new_value}")
     if previous.get("additionalProperties", True) is not False and candidate.get("additionalProperties", True) is False:
         errors.append(f"{path}: additional properties are no longer accepted")
@@ -384,7 +376,11 @@ def write_files(output_dir: Path, files: dict[str, bytes]) -> None:
 
 
 def check_files(output_dir: Path, files: dict[str, bytes]) -> None:
-    drift = [name for name, document in files.items() if not (output_dir / name).is_file() or (output_dir / name).read_bytes() != document]
+    drift = [
+        name
+        for name, document in files.items()
+        if not (output_dir / name).is_file() or (output_dir / name).read_bytes() != document
+    ]
     unexpected = sorted(path.name for path in output_dir.glob("*.json") if path.name not in files)
     if drift or unexpected:
         details = [*(f"drifted: {name}" for name in drift), *(f"unexpected: {name}" for name in unexpected)]
@@ -402,9 +398,7 @@ def check_release_index(output_dir: Path) -> None:
         raise SystemExit(f"repository contract release {CONTRACT_RELEASE_VERSION} is not published")
     manifest = output_dir / "manifest.json"
     if release.get("manifest_sha256") != sha256(manifest.read_bytes()):
-        raise SystemExit(
-            "published repository contract release is immutable; publish a new semantic version"
-        )
+        raise SystemExit("published repository contract release is immutable; publish a new semantic version")
 
 
 def build_bundle(output: Path, source_dir: Path) -> None:

@@ -14,9 +14,9 @@ import pytest
 from numpy.typing import NDArray
 from PIL import Image
 
-from scenara.platform.media_batch import MediaInput, SamplePlan, decode_media
+from scenara.platform.media_batch import DecodeMediaOperator, MediaInput, SamplePlan, decode_media
 from scenara.platform.models import MediaKind, SampleStrategy
-from scenara.platform.pipeline import ExecutionControl, PipelineError
+from scenara.platform.pipeline import ExecutionContext, ExecutionControl, PipelineError
 
 
 def _solid_frame(value: int, *, width: int = 32, height: int = 24) -> NDArray[np.uint8]:
@@ -212,6 +212,57 @@ def test_frame_max_edge_downscales_sampled_frames(fake_capture: type[_FakeCaptur
     assert decoded.metadata.frame_max_edge == 200
     assert all(max(unit.width, unit.height) == 200 for unit in decoded.units)
     assert all(unit.width == 200 and unit.height == 150 for unit in decoded.units)
+
+
+def test_video_batch_is_downscaled_to_the_memory_budget(
+    fake_capture: type[_FakeCapture],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fake_capture.frames = [_solid_frame(64, width=800, height=600) for _ in range(4)]
+    monkeypatch.setattr("scenara.platform.media_batch.DECODED_BATCH_MEMORY_BUDGET_BYTES", 360_000)
+    decoded = decode_media(
+        _video_media(),
+        max_units=4,
+        sample_interval_ms=40,
+    )
+    assert decoded.metadata.frame_max_edge == 200
+    assert all((unit.width, unit.height) == (200, 150) for unit in decoded.units)
+
+
+@pytest.mark.asyncio
+async def test_decode_operator_streams_video_units_before_materialization(
+    fake_capture: type[_FakeCapture],
+) -> None:
+    fake_capture.frames = [_solid_frame(index * 8) for index in range(20)]
+    context = ExecutionContext(
+        run_id="run_progressive_decode",
+        tenant_id="tenant",
+        project_id="project",
+        pipeline_id="portrait.person-detection",
+        pipeline_version="0.1.0",
+        asset_id="asset",
+        source_id=None,
+        filename="clip.mp4",
+        content_type="video/mp4",
+    )
+
+    output = await DecodeMediaOperator().execute(
+        context,
+        {"media": _video_media()},
+        {"max_units": 5, "sample_interval_ms": 120},
+    )
+    decoded = output["batch"]
+
+    assert decoded.stream is not None
+    assert decoded.units == []
+    batches = []
+    async for batch, expected_units in decoded.iter_batches(2):
+        batches.append([unit.unit_id for unit in batch])
+        assert expected_units == 5
+
+    assert batches == [["frame_0", "frame_3"], ["frame_6", "frame_9"], ["frame_12"]]
+    assert decoded.metadata.sampled_units == 5
+    assert decoded.termination_reason == "max_units_reached"
 
 
 def test_image_decoding_honours_frame_max_edge() -> None:

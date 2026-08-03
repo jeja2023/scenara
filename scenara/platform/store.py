@@ -12,6 +12,7 @@ from scenara.platform.models import (
     ResultReference,
     RunEvent,
     RunRecord,
+    RunStatus,
     WebhookDeliveryRecord,
     WebhookSubscription,
 )
@@ -80,7 +81,17 @@ class StateStore(Protocol):
 
     async def get_asset(self, tenant_id: str, project_id: str, asset_id: str) -> MediaAsset | None: ...
 
-    async def list_assets(self, tenant_id: str, project_id: str) -> list[MediaAsset]: ...
+    async def list_assets(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        include_deleted: bool = True,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[MediaAsset]: ...
+
+    async def count_assets(self, tenant_id: str, project_id: str, *, include_deleted: bool = True) -> int: ...
 
     async def delete_asset(self, tenant_id: str, project_id: str, asset_id: str) -> MediaAsset | None: ...
 
@@ -88,7 +99,16 @@ class StateStore(Protocol):
 
     async def get_source(self, tenant_id: str, project_id: str, source_id: str) -> MediaSource | None: ...
 
-    async def list_sources(self, tenant_id: str, project_id: str) -> list[MediaSource]: ...
+    async def list_sources(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[MediaSource]: ...
+
+    async def count_sources(self, tenant_id: str, project_id: str) -> int: ...
 
     async def delete_source(self, tenant_id: str, project_id: str, source_id: str) -> MediaSource | None: ...
 
@@ -102,7 +122,36 @@ class StateStore(Protocol):
 
     async def get_run(self, tenant_id: str, project_id: str, run_id: str) -> RunRecord | None: ...
 
-    async def list_runs(self, tenant_id: str, project_id: str) -> list[RunRecord]: ...
+    async def list_runs(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        status: RunStatus | None = None,
+        domain: str | None = None,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[RunRecord]: ...
+
+    async def count_runs(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        status: RunStatus | None = None,
+        domain: str | None = None,
+    ) -> int: ...
+
+    async def recoverable_runs(self) -> list[RunRecord]: ...
+
+    async def has_non_terminal_run(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        asset_id: str | None = None,
+        source_id: str | None = None,
+    ) -> bool: ...
 
     async def delete_run(self, tenant_id: str, project_id: str, run_id: str) -> RunRecord | None: ...
 
@@ -131,6 +180,28 @@ class StateStore(Protocol):
         project_id: str,
         run_id: str,
     ) -> ResultReference | None: ...
+
+    async def list_result_references(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        domain: str | None = None,
+        media_kind: str | None = None,
+        query: str | None = None,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[ResultReference]: ...
+
+    async def count_result_references(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        domain: str | None = None,
+        media_kind: str | None = None,
+        query: str | None = None,
+    ) -> int: ...
 
     async def append_audit(self, event: AuditEvent) -> None: ...
 

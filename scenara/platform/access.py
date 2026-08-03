@@ -285,14 +285,10 @@ class AccessService:
             return None
         await self.repository.record_api_key_used(record.tenant_id, record.project_id, record.key_id, now)
         scopes = frozenset(
-            scope
-            for scope in record.scopes
-            if _scopes_within(frozenset({scope}), service_account.scopes)
+            scope for scope in record.scopes if _scopes_within(frozenset({scope}), service_account.scopes)
         )
         entitlements = await self.repository.list_product_entitlements(record.tenant_id, record.project_id)
-        active_product_ids = frozenset(
-            item.product_id for item in entitlements if item.status.value == "active"
-        )
+        active_product_ids = frozenset(item.product_id for item in entitlements if item.status.value == "active")
         product_ids = record.product_ids & service_account.product_ids & active_product_ids
         return PrincipalContext(
             tenant_id=record.tenant_id,
@@ -305,7 +301,9 @@ class AccessService:
     async def create_organization(self, context: PrincipalContext, body: CreateOrganizationRequest) -> Organization:
         await self._authorize(context, "create")
         now = time.time()
-        record = Organization(tenant_id=context.tenant_id, display_name=body.display_name, created_at=now, updated_at=now)
+        record = Organization(
+            tenant_id=context.tenant_id, display_name=body.display_name, created_at=now, updated_at=now
+        )
         created = await self.repository.create_organization(record)
         await self._record(context, "iam.organization.create", "organization", created.tenant_id)
         return created
@@ -384,10 +382,7 @@ class AccessService:
             principal_exists = any(item.user_id == body.principal_id for item in users)
         else:
             principal_exists = (
-                await self.repository.get_service_account(
-                    context.tenant_id, project_id, body.principal_id
-                )
-                is not None
+                await self.repository.get_service_account(context.tenant_id, project_id, body.principal_id) is not None
             )
         if not principal_exists:
             raise AccessNotFound("membership principal not found")
@@ -440,7 +435,9 @@ class AccessService:
         self, context: PrincipalContext, service_account_id: str, body: CreateApiKeyRequest
     ) -> CreateApiKeyResponse:
         await self._authorize(context, "create")
-        service_account = await self.repository.get_service_account(context.tenant_id, context.project_id, service_account_id)
+        service_account = await self.repository.get_service_account(
+            context.tenant_id, context.project_id, service_account_id
+        )
         if service_account is None:
             raise AccessNotFound("service account not found")
         now = time.time()
@@ -509,14 +506,10 @@ class AccessService:
         body: UpdateProductEntitlementRequest,
     ) -> ProductEntitlement:
         await self._authorize(context, "update")
-        current = await self.repository.get_product_entitlement(
-            context.tenant_id, context.project_id, product_id
-        )
+        current = await self.repository.get_product_entitlement(context.tenant_id, context.project_id, product_id)
         if current is None:
             raise AccessNotFound("product entitlement not found")
-        updated = current.model_copy(
-            update={"status": body.status, "source": body.source, "updated_at": time.time()}
-        )
+        updated = current.model_copy(update={"status": body.status, "source": body.source, "updated_at": time.time()})
         saved = await self.repository.save_product_entitlement(updated)
         await self._record(
             context,

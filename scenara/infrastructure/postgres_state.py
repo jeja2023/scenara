@@ -6,6 +6,7 @@ from uuid import uuid4
 from scenara.platform.audit import AuditEvent
 from scenara.platform.model_runtime import ModelPackageManifest
 from scenara.platform.models import (
+    TERMINAL_RUN_STATUSES,
     MediaAsset,
     MediaSource,
     ObjectRetentionRecord,
@@ -13,6 +14,7 @@ from scenara.platform.models import (
     ResultReference,
     RunEvent,
     RunRecord,
+    RunStatus,
     WebhookDeliveryRecord,
     WebhookSubscription,
 )
@@ -218,9 +220,7 @@ class PostgresStateStore:
         return WebhookSubscription.model_validate(row) if row else None
 
     async def list_webhook_subscriptions(self, tenant_id: str, project_id: str) -> list[WebhookSubscription]:
-        rows = await self._list_documents(
-            "scenara_webhook_subscriptions", "endpoint_id", tenant_id, project_id
-        )
+        rows = await self._list_documents("scenara_webhook_subscriptions", "endpoint_id", tenant_id, project_id)
         return [WebhookSubscription.model_validate(row) for row in rows]
 
     async def delete_webhook_subscription(
@@ -293,9 +293,7 @@ class PostgresStateStore:
             if cursor.rowcount != 1:
                 raise StateConflict("webhook delivery does not exist")
 
-    async def list_webhook_deliveries(
-        self, tenant_id: str, project_id: str, limit: int
-    ) -> list[WebhookDeliveryRecord]:
+    async def list_webhook_deliveries(self, tenant_id: str, project_id: str, limit: int) -> list[WebhookDeliveryRecord]:
         async with self._pool.connection() as conn:
             cursor = await conn.execute(
                 """SELECT document FROM scenara_webhook_deliveries
@@ -314,9 +312,44 @@ class PostgresStateStore:
         row = await self._get_document("scenara_media_assets", "asset_id", tenant_id, project_id, asset_id)
         return MediaAsset.model_validate(row) if row else None
 
-    async def list_assets(self, tenant_id: str, project_id: str) -> list[MediaAsset]:
-        rows = await self._list_documents("scenara_media_assets", "asset_id", tenant_id, project_id)
+    async def list_assets(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        include_deleted: bool = True,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[MediaAsset]:
+        conditions = ["tenant_id = %s", "project_id = %s"]
+        parameters: list[Any] = [tenant_id, project_id]
+        if not include_deleted:
+            conditions.append("document ->> 'deleted_at' IS NULL")
+        query = f"""SELECT document FROM scenara_media_assets
+                    WHERE {" AND ".join(conditions)}
+                    ORDER BY created_at DESC, asset_id DESC"""
+        if limit is not None:
+            query += " LIMIT %s"
+            parameters.append(limit)
+        if offset:
+            query += " OFFSET %s"
+            parameters.append(offset)
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(query, parameters)
+            result = await cursor.fetchall()
+        rows = [row[0] for row in result]
         return [MediaAsset.model_validate(row) for row in rows]
+
+    async def count_assets(self, tenant_id: str, project_id: str, *, include_deleted: bool = True) -> int:
+        deleted_filter = "" if include_deleted else " AND document ->> 'deleted_at' IS NULL"
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                f"""SELECT count(*) FROM scenara_media_assets
+                    WHERE tenant_id = %s AND project_id = %s{deleted_filter}""",
+                (tenant_id, project_id),
+            )
+            row = await cursor.fetchone()
+        return int(row[0])
 
     async def delete_asset(self, tenant_id: str, project_id: str, asset_id: str) -> MediaAsset | None:
         async with self._pool.connection() as conn, conn.transaction():
@@ -336,9 +369,39 @@ class PostgresStateStore:
         row = await self._get_document("scenara_media_sources", "source_id", tenant_id, project_id, source_id)
         return MediaSource.model_validate(row) if row else None
 
-    async def list_sources(self, tenant_id: str, project_id: str) -> list[MediaSource]:
-        rows = await self._list_documents("scenara_media_sources", "source_id", tenant_id, project_id)
+    async def list_sources(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[MediaSource]:
+        query = """SELECT document FROM scenara_media_sources
+                   WHERE tenant_id = %s AND project_id = %s
+                   ORDER BY created_at DESC, source_id DESC"""
+        parameters: list[Any] = [tenant_id, project_id]
+        if limit is not None:
+            query += " LIMIT %s"
+            parameters.append(limit)
+        if offset:
+            query += " OFFSET %s"
+            parameters.append(offset)
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(query, parameters)
+            result = await cursor.fetchall()
+        rows = [row[0] for row in result]
         return [MediaSource.model_validate(row) for row in rows]
+
+    async def count_sources(self, tenant_id: str, project_id: str) -> int:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT count(*) FROM scenara_media_sources
+                   WHERE tenant_id = %s AND project_id = %s""",
+                (tenant_id, project_id),
+            )
+            row = await cursor.fetchone()
+        return int(row[0])
 
     async def delete_source(self, tenant_id: str, project_id: str, source_id: str) -> MediaSource | None:
         async with self._pool.connection() as conn, conn.transaction():
@@ -381,7 +444,8 @@ class PostgresStateStore:
             try:
                 await conn.execute(
                     """INSERT INTO scenara_runs
-                       (tenant_id, project_id, run_id, domain, status, revision, priority, created_at, updated_at, document)
+                       (tenant_id, project_id, run_id, domain, status, revision, priority,
+                        created_at, updated_at, document)
                        VALUES (%s, %s, %s, %s, %s, %s, %s, to_timestamp(%s), to_timestamp(%s), %s)""",
                     (
                         run.tenant_id,
@@ -412,16 +476,99 @@ class PostgresStateStore:
         row = await self._get_document("scenara_runs", "run_id", tenant_id, project_id, run_id)
         return RunRecord.model_validate(row) if row else None
 
-    async def list_runs(self, tenant_id: str, project_id: str) -> list[RunRecord]:
+    async def list_runs(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        status: RunStatus | None = None,
+        domain: str | None = None,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[RunRecord]:
+        conditions = ["tenant_id = %s", "project_id = %s"]
+        parameters: list[Any] = [tenant_id, project_id]
+        if status is not None:
+            conditions.append("status = %s")
+            parameters.append(status.value)
+        if domain is not None:
+            conditions.append("domain = %s")
+            parameters.append(domain)
+        query = f"""SELECT document FROM scenara_runs
+                    WHERE {" AND ".join(conditions)}
+                    ORDER BY created_at DESC, run_id DESC"""
+        if limit is not None:
+            query += " LIMIT %s"
+            parameters.append(limit)
+        if offset:
+            query += " OFFSET %s"
+            parameters.append(offset)
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(query, parameters)
+            rows = await cursor.fetchall()
+        return [RunRecord.model_validate(row[0]) for row in rows]
+
+    async def count_runs(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        status: RunStatus | None = None,
+        domain: str | None = None,
+    ) -> int:
+        conditions = ["tenant_id = %s", "project_id = %s"]
+        parameters: list[Any] = [tenant_id, project_id]
+        if status is not None:
+            conditions.append("status = %s")
+            parameters.append(status.value)
+        if domain is not None:
+            conditions.append("domain = %s")
+            parameters.append(domain)
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                f"SELECT count(*) FROM scenara_runs WHERE {' AND '.join(conditions)}",
+                parameters,
+            )
+            row = await cursor.fetchone()
+        return int(row[0])
+
+    async def recoverable_runs(self) -> list[RunRecord]:
+        terminal_statuses = sorted(status.value for status in TERMINAL_RUN_STATUSES)
         async with self._pool.connection() as conn:
             cursor = await conn.execute(
                 """SELECT document FROM scenara_runs
-                   WHERE tenant_id = %s AND project_id = %s
-                   ORDER BY created_at DESC, run_id DESC""",
-                (tenant_id, project_id),
+                   WHERE status NOT IN (%s, %s, %s)
+                   ORDER BY created_at ASC, run_id ASC""",
+                terminal_statuses,
             )
             rows = await cursor.fetchall()
         return [RunRecord.model_validate(row[0]) for row in rows]
+
+    async def has_non_terminal_run(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        asset_id: str | None = None,
+        source_id: str | None = None,
+    ) -> bool:
+        if (asset_id is None) == (source_id is None):
+            raise ValueError("exactly one of asset_id or source_id is required")
+        reference_field = "asset_id" if asset_id is not None else "source_id"
+        reference_id = asset_id if asset_id is not None else source_id
+        terminal_statuses = sorted(status.value for status in TERMINAL_RUN_STATUSES)
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                f"""SELECT EXISTS (
+                    SELECT 1 FROM scenara_runs
+                    WHERE tenant_id = %s AND project_id = %s
+                      AND status NOT IN (%s, %s, %s)
+                      AND document ->> '{reference_field}' = %s
+                )""",
+                (tenant_id, project_id, *terminal_statuses, reference_id),
+            )
+            row = await cursor.fetchone()
+        return bool(row[0])
 
     async def delete_run(self, tenant_id: str, project_id: str, run_id: str) -> RunRecord | None:
         async with self._pool.connection() as conn, conn.transaction():
@@ -604,7 +751,8 @@ class PostgresStateStore:
         async with self._pool.connection() as conn, conn.transaction():
             await conn.execute(
                 """INSERT INTO scenara_run_results
-                   (tenant_id, project_id, run_id, domain, schema_version, object_key, sha256, unit_count, created_at, summary)
+                   (tenant_id, project_id, run_id, domain, schema_version, object_key, sha256,
+                    unit_count, created_at, summary)
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, to_timestamp(%s), %s)
                    ON CONFLICT (tenant_id, project_id, run_id) DO UPDATE SET
                      domain = EXCLUDED.domain, schema_version = EXCLUDED.schema_version,
@@ -779,6 +927,84 @@ class PostgresStateStore:
             )
             row = await cursor.fetchone()
         return ResultReference.model_validate(row[0]) if row else None
+
+    async def list_result_references(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        domain: str | None = None,
+        media_kind: str | None = None,
+        query: str | None = None,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[ResultReference]:
+        clauses = ["tenant_id = %s", "project_id = %s"]
+        parameters: list[Any] = [tenant_id, project_id]
+        if domain:
+            clauses.append("domain = %s")
+            parameters.append(domain)
+        if media_kind:
+            clauses.append("summary->>'media_kind' = %s")
+            parameters.append(media_kind)
+        if query:
+            clauses.append(
+                "(lower(coalesce(summary->>'resource_name', '')) LIKE lower(%s) "
+                "OR run_id ILIKE %s "
+                "OR coalesce(summary->>'asset_id', '') ILIKE %s "
+                "OR coalesce(summary->>'source_id', '') ILIKE %s)"
+            )
+            search = f"%{query}%"
+            parameters.extend([search, search, search, search])
+        query_sql = (
+            "SELECT summary FROM scenara_run_results WHERE "
+            + " AND ".join(clauses)
+            + " ORDER BY created_at DESC, run_id DESC"
+        )
+        if limit is not None:
+            query_sql += " LIMIT %s"
+            parameters.append(limit)
+        if offset:
+            query_sql += " OFFSET %s"
+            parameters.append(offset)
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(query_sql, parameters)
+            rows = await cursor.fetchall()
+        return [ResultReference.model_validate(row[0]) for row in rows]
+
+    async def count_result_references(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        domain: str | None = None,
+        media_kind: str | None = None,
+        query: str | None = None,
+    ) -> int:
+        clauses = ["tenant_id = %s", "project_id = %s"]
+        parameters: list[Any] = [tenant_id, project_id]
+        if domain:
+            clauses.append("domain = %s")
+            parameters.append(domain)
+        if media_kind:
+            clauses.append("summary->>'media_kind' = %s")
+            parameters.append(media_kind)
+        if query:
+            clauses.append(
+                "(lower(coalesce(summary->>'resource_name', '')) LIKE lower(%s) "
+                "OR run_id ILIKE %s "
+                "OR coalesce(summary->>'asset_id', '') ILIKE %s "
+                "OR coalesce(summary->>'source_id', '') ILIKE %s)"
+            )
+            search = f"%{query}%"
+            parameters.extend([search, search, search, search])
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                "SELECT count(*) FROM scenara_run_results WHERE " + " AND ".join(clauses),
+                parameters,
+            )
+            row = await cursor.fetchone()
+        return int(row[0])
 
     async def _insert_document(self, table: str, id_column: str, value_id: str, model: Any) -> None:
         from psycopg.types.json import Jsonb

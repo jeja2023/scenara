@@ -5,10 +5,10 @@ import numpy as np
 import numpy.typing as npt
 import onnxruntime as ort
 
+from app.exception_utils import exception_log_summary
 from app.metrics import record_cpu_fallback, record_session_provider
 from app.model_config import model_config
 from app.observability import logger
-from app.portrait_response import exception_log_summary
 from app.settings import (
     CPU_FALLBACK_ENABLED,
     CPU_PROVIDERS,
@@ -40,10 +40,7 @@ def runtime_provider_status(available: list[str] | None = None) -> dict[str, Any
     providers = available if available is not None else ort.get_available_providers()
     cuda_available = "CUDAExecutionProvider" in providers
     cpu_available = "CPUExecutionProvider" in providers
-    if FORCE_CPU:
-        ready = cpu_available
-    else:
-        ready = cuda_available or (CPU_FALLBACK_ENABLED and cpu_available)
+    ready = cpu_available if FORCE_CPU else cuda_available or (CPU_FALLBACK_ENABLED and cpu_available)
     return {
         "available_providers": providers,
         "cuda_available": cuda_available,
@@ -84,6 +81,8 @@ def io_meta(session: ort.InferenceSession) -> dict[str, Any]:
             for item in session.get_outputs()
         ],
     }
+
+
 def session_providers(
     cache_key_value: str | None = None,
     device_id: int | None = None,
@@ -117,9 +116,7 @@ def session_providers(
                 cache_key_value,
             )
             return CPU_PROVIDERS
-        raise RuntimeError(
-            f"TensorrtExecutionProvider is not available. available providers: {sorted(available)}"
-        )
+        raise RuntimeError(f"TensorrtExecutionProvider is not available. available providers: {sorted(available)}")
     return [
         (
             "TensorrtExecutionProvider",
@@ -143,7 +140,9 @@ def _finalize_session(session: ort.InferenceSession, *, fallback_reason: str | N
     return session
 
 
-def create_session(model_path: Path, cache_key_value: str | None = None, device_id: int | None = None) -> ort.InferenceSession:
+def create_session(
+    model_path: Path, cache_key_value: str | None = None, device_id: int | None = None
+) -> ort.InferenceSession:
     available = set(ort.get_available_providers())
     if FORCE_CPU:
         # 显式纯 CPU：一次性建 CPU 会话，跳过 CUDA 探测与“active 无 CUDA”导致的丢弃重建。
@@ -182,15 +181,19 @@ def create_session(model_path: Path, cache_key_value: str | None = None, device_
         if "CPUExecutionProvider" not in active:
             raise RuntimeError(f"模型会话未启用 CPU。活动提供程序： {active}")
         return _finalize_session(session)
-    if requested_providers and isinstance(requested_providers[0], tuple) and requested_providers[0][0] == "TensorrtExecutionProvider":
-        if "TensorrtExecutionProvider" not in active:
-            if CPU_FALLBACK_ENABLED and "CPUExecutionProvider" in available:
-                logger.warning("模型 session 未启用 TensorRT；回退到 CPU。活跃 providers: %s", active)
-                return _finalize_session(
-                    ort.InferenceSession(str(model_path), providers=CPU_PROVIDERS),
-                    fallback_reason="tensorrt_not_active",
-                )
-            raise RuntimeError(f"模型会话未启用 TensorRT。活动提供程序： {active}")
+    if (
+        requested_providers
+        and isinstance(requested_providers[0], tuple)
+        and requested_providers[0][0] == "TensorrtExecutionProvider"
+        and "TensorrtExecutionProvider" not in active
+    ):
+        if CPU_FALLBACK_ENABLED and "CPUExecutionProvider" in available:
+            logger.warning("模型 session 未启用 TensorRT；回退到 CPU。活跃 providers: %s", active)
+            return _finalize_session(
+                ort.InferenceSession(str(model_path), providers=CPU_PROVIDERS),
+                fallback_reason="tensorrt_not_active",
+            )
+        raise RuntimeError(f"模型会话未启用 TensorRT。活动提供程序： {active}")
     if "CUDAExecutionProvider" not in active:
         if CPU_FALLBACK_ENABLED and "CPUExecutionProvider" in available:
             logger.warning("模型 session 未启用 CUDA；回退到 CPU。活跃 providers: %s", active)
@@ -200,6 +203,8 @@ def create_session(model_path: Path, cache_key_value: str | None = None, device_
             )
         raise RuntimeError(f"模型会话未启用 CUDA。活动提供程序： {active}")
     return _finalize_session(session)
+
+
 def input_dtype(input_type: str) -> Any:
     if "double" in input_type:
         return np.float64
@@ -212,6 +217,8 @@ def input_dtype(input_type: str) -> Any:
     if "bool" in input_type:
         return np.bool_
     return np.float32
+
+
 def run_session(session: ort.InferenceSession, input_array: Array) -> list[Array]:
     input_meta = session.get_inputs()[0]
     dtype = input_dtype(input_meta.type)

@@ -1,0 +1,10 @@
+* text=auto
+
+# Published contract digests are computed over repository bytes.
+contracts/repository/**/*.json text eol=lf
+
+# The TypeScript SDK publishes the checked-in dist/ output.
+sdk/typescript/dist/** text eol=lf
+
+# Shell entrypoints are mounted directly into Linux containers.
+deploy/scripts/**/*.sh text eol=lf
