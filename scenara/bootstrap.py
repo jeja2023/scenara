@@ -28,7 +28,7 @@ from scenara.infrastructure.postgres_state import PostgresStateStore
 from scenara.infrastructure.queue import InlineRunQueue, RedisRunQueue
 from scenara.platform.access import AccessRepository, AccessService, MemoryAccessRepository
 from scenara.platform.audit import AuditLogger
-from scenara.platform.control_plane import ControlPlaneService, MemoryControlPlaneStore
+from scenara.platform.control_plane import ControlPlaneService, ControlPlaneStore, MemoryControlPlaneStore
 from scenara.platform.dataset import DatasetService
 from scenara.platform.features import FeatureStore, MemoryFeatureStore
 from scenara.platform.feedback import FeedbackRepository, FeedbackService, MemoryFeedbackRepository
@@ -104,6 +104,7 @@ def build_runtime(
     settings = settings or load_settings()
     if ocr_engine is None and settings.ocr_engine_factory:
         ocr_engine = load_ocr_engine(settings.ocr_engine_factory)
+    control_plane_store: ControlPlaneStore
     if settings.state_backend == "postgres":
         postgres_state = PostgresStateStore(settings.postgres_dsn)
         state: StateStore = postgres_state

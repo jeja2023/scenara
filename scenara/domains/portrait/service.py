@@ -597,7 +597,7 @@ class PortraitService:
         *,
         feature_space_id: str | None = None,
         threshold: float | None = None,
-        mode: Literal["image", "asset"] = "image",
+        mode: Literal["image", "asset", "mixed"] = "image",
     ) -> PortraitCompareResponse:
         await require_allowed(
             self.policy,

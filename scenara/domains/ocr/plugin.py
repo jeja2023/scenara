@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from scenara.domains.ocr.operators import OcrDocumentOperator, OcrEngine
 from scenara.platform.models import PipelineStatus
-from scenara.platform.pipeline import PipelineDefinition, PipelineNode
+from scenara.platform.pipeline import PipelineDefinition, PipelineNode, PipelineParameterDefinition
 from scenara.platform.plugins import DomainManifest
 
 
@@ -70,26 +70,22 @@ class OcrPlugin:
                     "language_hint",
                 },
                 parameter_schema={
-                    "layout_required": {
-                        "label": "版面分析",
-                        "control": "boolean",
-                        "default": False,
-                    },
-                    "min_score": {
-                        "label": "最低置信度",
-                        "control": "number",
-                        "default": 0.5,
-                        "minimum": 0,
-                        "maximum": 1,
-                        "step": 0.05,
-                        "advanced": True,
-                    },
-                    "language_hint": {
-                        "label": "语言提示",
-                        "control": "text",
-                        "placeholder": "例如 zh、en",
-                        "advanced": True,
-                    },
+                    "layout_required": PipelineParameterDefinition(label="版面分析", control="boolean", default=False),
+                    "min_score": PipelineParameterDefinition(
+                        label="最低置信度",
+                        control="number",
+                        default=0.5,
+                        minimum=0,
+                        maximum=1,
+                        step=0.05,
+                        advanced=True,
+                    ),
+                    "language_hint": PipelineParameterDefinition(
+                        label="语言提示",
+                        control="text",
+                        placeholder="例如 zh、en",
+                        advanced=True,
+                    ),
                 },
                 pausable=True,
             ),

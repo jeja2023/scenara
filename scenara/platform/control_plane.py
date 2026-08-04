@@ -12,7 +12,7 @@ import hashlib
 import secrets
 import time
 from enum import StrEnum
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
 from uuid import uuid4
 
 from pydantic import Field
@@ -43,6 +43,9 @@ class SessionAccessResolver(Protocol):
 
 class AuditRetentionStore(Protocol):
     async def delete_audit_events_before(self, tenant_id: str, project_id: str, before: float) -> int: ...
+
+
+RecordT = TypeVar("RecordT", bound=StrictModel)
 
 
 class MemoryControlPlaneStore:
@@ -889,29 +892,38 @@ class ControlPlaneService:
         context: PrincipalContext,
         action: str,
         resource: str,
-        resource_id: str,
+        resource_id: str | None,
         evidence: dict[str, Any] | None = None,
     ) -> None:
         await self.audit.record(
             context, action=action, resource_type=resource, resource_id=resource_id, evidence=evidence or {}
         )
 
-    async def _save(self, kind: str, record: StrictModel) -> StrictModel:
-        record_id = getattr(record, "record_id", None) or getattr(record, "session_id", None)
-        if not record_id:
+    async def _save(self, kind: str, record: RecordT) -> RecordT:
+        payload = record.model_dump(mode="json")
+        record_id = payload.get("record_id") or payload.get("session_id")
+        tenant_id = payload.get("tenant_id")
+        project_id = payload.get("project_id")
+        if not isinstance(record_id, str) or not record_id:
             raise ValueError(f"control-plane record {kind} has no stable identifier")
+        if not isinstance(tenant_id, str) or not isinstance(project_id, str):
+            raise ValueError(f"control-plane record {kind} has no tenant/project scope")
         await self.store.put(
-            kind, record.tenant_id, record.project_id, str(record_id), record.model_dump(mode="json")
+            kind,
+            tenant_id,
+            project_id,
+            record_id,
+            payload,
         )
         return record
 
     async def _get(
-        self, kind: str, tenant_id: str, project_id: str, record_id: str, model: type[StrictModel]
-    ) -> StrictModel | None:
+        self, kind: str, tenant_id: str, project_id: str, record_id: str, model: type[RecordT]
+    ) -> RecordT | None:
         document = await self.store.get(kind, tenant_id, project_id, record_id)
         return model.model_validate(document) if document else None
 
-    async def _list(self, kind: str, tenant_id: str, project_id: str, model: type[StrictModel]) -> list[StrictModel]:
+    async def _list(self, kind: str, tenant_id: str, project_id: str, model: type[RecordT]) -> list[RecordT]:
         return [model.model_validate(item) for item in await self.store.list(kind, tenant_id, project_id)]
 
     async def create_identity_provider(
@@ -935,7 +947,7 @@ class ControlPlaneService:
 
     async def list_identity_providers(self, context: PrincipalContext) -> list[IdentityProvider]:
         await self._check(context, "read", "iam")
-        return await self._list("identity_provider", context.tenant_id, context.project_id, IdentityProvider)  # type: ignore[return-value]
+        return await self._list("identity_provider", context.tenant_id, context.project_id, IdentityProvider)
 
     async def probe_identity_provider(self, context: PrincipalContext, provider_id: str) -> IdentityProvider:
         await self._check(context, "write", "iam")
@@ -1083,7 +1095,7 @@ class ControlPlaneService:
         await self._check(context, "read", "iam")
         return await self._list(
             "project_lifecycle_request", context.tenant_id, "*", ProjectLifecycleRequest
-        )  # type: ignore[return-value]
+        )
 
     async def decide_project_lifecycle(
         self, context: PrincipalContext, request_id: str, body: DecideProjectLifecycleRequest
@@ -1221,7 +1233,7 @@ class ControlPlaneService:
 
     async def list_quota_plans(self, context: PrincipalContext) -> list[QuotaPlan]:
         await self._check(context, "read", "enterprise")
-        return await self._list("quota_plan", context.tenant_id, context.project_id, QuotaPlan)  # type: ignore[return-value]
+        return await self._list("quota_plan", context.tenant_id, context.project_id, QuotaPlan)
 
     async def check_quota(self, context: PrincipalContext, body: QuotaCheckRequest) -> QuotaCheckResponse:
         await self._check(context, "read", "operations")
@@ -1274,7 +1286,7 @@ class ControlPlaneService:
 
     async def list_billing_accounts(self, context: PrincipalContext) -> list[BillingAccount]:
         await self._check(context, "read", "enterprise")
-        return await self._list("billing_account", context.tenant_id, context.project_id, BillingAccount)  # type: ignore[return-value]
+        return await self._list("billing_account", context.tenant_id, context.project_id, BillingAccount)
 
     async def record_meter_event(self, context: PrincipalContext, body: RecordMeterEventRequest) -> MeterEvent:
         await self._check(context, "write", "enterprise")
@@ -1332,7 +1344,7 @@ class ControlPlaneService:
     async def list_billing_usage(self, context: PrincipalContext, account_id: str | None = None) -> list[BillingUsage]:
         await self._check(context, "read", "enterprise")
         rows = await self._list("billing_usage", context.tenant_id, context.project_id, BillingUsage)
-        return [item for item in rows if account_id is None or item.account_id == account_id]  # type: ignore[return-value]
+        return [item for item in rows if account_id is None or item.account_id == account_id]
 
     async def assign_billing_seat(self, context: PrincipalContext, body: AssignSeatRequest) -> SeatAssignment:
         await self._check(context, "write", "enterprise")
@@ -1353,7 +1365,7 @@ class ControlPlaneService:
             None,
         )
         if current is not None:
-            return current  # type: ignore[return-value]
+            return current
         active_count = sum(1 for item in existing if item.account_id == account.record_id and item.status == "active")
         if active_count >= account.seat_limit:
             raise ValueError("billing seat limit exceeded")
@@ -1375,7 +1387,7 @@ class ControlPlaneService:
     ) -> list[SeatAssignment]:
         await self._check(context, "read", "enterprise")
         rows = await self._list("seat_assignment", context.tenant_id, context.project_id, SeatAssignment)
-        return [item for item in rows if account_id is None or item.account_id == account_id]  # type: ignore[return-value]
+        return [item for item in rows if account_id is None or item.account_id == account_id]
 
     async def create_annotation_task(
         self, context: PrincipalContext, body: CreateAnnotationTaskRequest
@@ -1403,7 +1415,7 @@ class ControlPlaneService:
 
     async def list_annotation_tasks(self, context: PrincipalContext) -> list[AnnotationTask]:
         await self._check(context, "read", "data")
-        return await self._list("annotation_task", context.tenant_id, context.project_id, AnnotationTask)  # type: ignore[return-value]
+        return await self._list("annotation_task", context.tenant_id, context.project_id, AnnotationTask)
 
     async def register_annotation_provider(
         self, context: PrincipalContext, body: CreateAnnotationProviderRequest
@@ -1424,7 +1436,7 @@ class ControlPlaneService:
 
     async def list_annotation_providers(self, context: PrincipalContext) -> list[AnnotationProvider]:
         await self._check(context, "read", "data")
-        return await self._list("annotation_provider", context.tenant_id, context.project_id, AnnotationProvider)  # type: ignore[return-value]
+        return await self._list("annotation_provider", context.tenant_id, context.project_id, AnnotationProvider)
 
     async def probe_annotation_provider(self, context: PrincipalContext, provider_id: str) -> AnnotationProvider:
         await self._check(context, "write", "data")
@@ -1501,7 +1513,7 @@ class ControlPlaneService:
 
     async def list_index_backends(self, context: PrincipalContext) -> list[IndexBackend]:
         await self._check(context, "read", "search_index")
-        return await self._list("index_backend", context.tenant_id, context.project_id, IndexBackend)  # type: ignore[return-value]
+        return await self._list("index_backend", context.tenant_id, context.project_id, IndexBackend)
 
     async def probe_index_backend(self, context: PrincipalContext, backend_id: str) -> IndexBackend:
         await self._check(context, "write", "search_index")
@@ -1534,7 +1546,7 @@ class ControlPlaneService:
 
     async def list_search_rerankers(self, context: PrincipalContext) -> list[SearchReranker]:
         await self._check(context, "read", "search_index")
-        return await self._list("search_reranker", context.tenant_id, context.project_id, SearchReranker)  # type: ignore[return-value]
+        return await self._list("search_reranker", context.tenant_id, context.project_id, SearchReranker)
 
     async def probe_search_reranker(self, context: PrincipalContext, reranker_id: str) -> SearchReranker:
         await self._check(context, "write", "search_index")
@@ -1550,13 +1562,13 @@ class ControlPlaneService:
 
     async def list_search_profiles(self, context: PrincipalContext) -> list[SearchRankingProfile]:
         await self._check(context, "read", "search_index")
-        return await self._list("search_profile", context.tenant_id, context.project_id, SearchRankingProfile)  # type: ignore[return-value]
+        return await self._list("search_profile", context.tenant_id, context.project_id, SearchRankingProfile)
 
     async def get_search_profile(self, context: PrincipalContext, profile_id: str) -> SearchRankingProfile | None:
         await self._check(context, "query", "search_index")
         return await self._get(
             "search_profile", context.tenant_id, context.project_id, profile_id, SearchRankingProfile
-        )  # type: ignore[return-value]
+        )
 
     async def submit_search_feedback(
         self, context: PrincipalContext, body: CreateSearchRelevanceFeedbackRequest
@@ -1698,7 +1710,7 @@ class ControlPlaneService:
 
     async def list_flows(self, context: PrincipalContext) -> list[FlowDefinition]:
         await self._check(context, "read", "flow")
-        return await self._list("flow", context.tenant_id, context.project_id, FlowDefinition)  # type: ignore[return-value]
+        return await self._list("flow", context.tenant_id, context.project_id, FlowDefinition)
 
     async def execute_flow(self, context: PrincipalContext, flow_id: str, body: ExecuteFlowRequest) -> FlowExecution:
         await self._check(context, "write", "flow")
@@ -1775,6 +1787,8 @@ class ControlPlaneService:
             next_node: str | None
             if node.kind == FlowNodeKind.CONDITION and len(node.next_nodes) > 1:
                 field = node.config.get("field")
+                if not isinstance(field, str):
+                    raise ValueError(f"condition node {node_id} is missing a string field")
                 expected = node.config.get("equals", True)
                 next_node = node.next_nodes[0] if current.context.get(field) == expected else node.next_nodes[1]
             else:
@@ -1857,7 +1871,7 @@ class ControlPlaneService:
 
     async def list_clusters(self, context: PrincipalContext) -> list[PortraitCluster]:
         await self._check(context, "read", "portrait")
-        return await self._list("portrait_cluster", context.tenant_id, context.project_id, PortraitCluster)  # type: ignore[return-value]
+        return await self._list("portrait_cluster", context.tenant_id, context.project_id, PortraitCluster)
 
     async def create_association(
         self, context: PrincipalContext, body: CreatePortraitAssociationRequest
@@ -1876,7 +1890,7 @@ class ControlPlaneService:
 
     async def list_associations(self, context: PrincipalContext) -> list[PortraitAssociation]:
         await self._check(context, "read", "portrait")
-        return await self._list("portrait_association", context.tenant_id, context.project_id, PortraitAssociation)  # type: ignore[return-value]
+        return await self._list("portrait_association", context.tenant_id, context.project_id, PortraitAssociation)
 
     async def create_event(self, context: PrincipalContext, body: CreatePortraitEventRequest) -> PortraitEvent:
         await self._check(context, "write", "portrait")
@@ -1889,7 +1903,7 @@ class ControlPlaneService:
 
     async def list_events(self, context: PrincipalContext) -> list[PortraitEvent]:
         await self._check(context, "read", "portrait")
-        return await self._list("portrait_event", context.tenant_id, context.project_id, PortraitEvent)  # type: ignore[return-value]
+        return await self._list("portrait_event", context.tenant_id, context.project_id, PortraitEvent)
 
     async def register_device(self, context: PrincipalContext, body: RegisterEdgeDeviceRequest) -> EdgeDevice:
         await self._check(context, "write", "edge")
@@ -1910,7 +1924,7 @@ class ControlPlaneService:
 
     async def list_devices(self, context: PrincipalContext) -> list[EdgeDevice]:
         await self._check(context, "read", "edge")
-        return await self._list("edge_device", context.tenant_id, context.project_id, EdgeDevice)  # type: ignore[return-value]
+        return await self._list("edge_device", context.tenant_id, context.project_id, EdgeDevice)
 
     async def deploy_edge(self, context: PrincipalContext, body: CreateEdgeDeploymentRequest) -> EdgeDeployment:
         await self._check(context, "write", "edge")
@@ -1938,7 +1952,7 @@ class ControlPlaneService:
 
     async def list_edge_deployments(self, context: PrincipalContext) -> list[EdgeDeployment]:
         await self._check(context, "read", "edge")
-        return await self._list("edge_deployment", context.tenant_id, context.project_id, EdgeDeployment)  # type: ignore[return-value]
+        return await self._list("edge_deployment", context.tenant_id, context.project_id, EdgeDeployment)
 
     async def acknowledge_edge_deployment(
         self, context: PrincipalContext, deployment_id: str, body: AcknowledgeEdgeDeploymentRequest
@@ -2064,7 +2078,7 @@ class ControlPlaneService:
         return [
             item.model_copy(update={"status": "expired" if item.lease_expires_at <= now else item.status})
             for item in workers
-        ]  # type: ignore[return-value]
+        ]
 
     async def register_tool(self, context: PrincipalContext, body: RegisterAgentToolRequest) -> AgentTool:
         await self._check(context, "write", "agent")
@@ -2081,7 +2095,7 @@ class ControlPlaneService:
 
     async def list_tools(self, context: PrincipalContext) -> list[AgentTool]:
         await self._check(context, "read", "agent")
-        return await self._list("agent_tool", context.tenant_id, context.project_id, AgentTool)  # type: ignore[return-value]
+        return await self._list("agent_tool", context.tenant_id, context.project_id, AgentTool)
 
     async def propose_action(self, context: PrincipalContext, body: ProposeAgentActionRequest) -> AgentAction:
         await self._check(context, "write", "agent")
@@ -2172,7 +2186,7 @@ class ControlPlaneService:
 
     async def list_agent_traces(self, context: PrincipalContext) -> list[AgentTrace]:
         await self._check(context, "read", "agent")
-        return await self._list("agent_trace", context.tenant_id, context.project_id, AgentTrace)  # type: ignore[return-value]
+        return await self._list("agent_trace", context.tenant_id, context.project_id, AgentTrace)
 
     async def record_agent_evaluation(
         self, context: PrincipalContext, body: CreateAgentEvaluationRequest
@@ -2192,7 +2206,7 @@ class ControlPlaneService:
 
     async def list_agent_evaluations(self, context: PrincipalContext) -> list[AgentEvaluation]:
         await self._check(context, "read", "agent")
-        return await self._list("agent_evaluation", context.tenant_id, context.project_id, AgentEvaluation)  # type: ignore[return-value]
+        return await self._list("agent_evaluation", context.tenant_id, context.project_id, AgentEvaluation)
 
     async def put_agent_memory(self, context: PrincipalContext, body: PutAgentMemoryRequest) -> AgentMemoryEntry:
         await self._check(context, "write", "agent")

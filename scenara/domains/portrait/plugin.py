@@ -7,7 +7,7 @@ from scenara.domains.portrait.analysis import (
 )
 from scenara.domains.portrait.operators import PortraitPersonDetectionOperator
 from scenara.platform.models import PipelineStatus
-from scenara.platform.pipeline import Operator, PipelineDefinition, PipelineNode
+from scenara.platform.pipeline import Operator, PipelineDefinition, PipelineNode, PipelineParameterDefinition
 from scenara.platform.plugins import DomainManifest
 
 
@@ -71,32 +71,27 @@ class PortraitPlugin:
                     "page_scale",
                 },
                 parameter_schema={
-                    "confidence": {
-                        "label": "最低置信度",
-                        "control": "number",
-                        "default": 0.5,
-                        "minimum": 0,
-                        "maximum": 1,
-                        "step": 0.05,
-                    },
-                    "iou": {
-                        "label": "重叠阈值",
-                        "control": "number",
-                        "default": 0.45,
-                        "minimum": 0,
-                        "maximum": 1,
-                        "step": 0.05,
-                        "advanced": True,
-                    },
-                    "max_detections": {
-                        "label": "最大目标数",
-                        "control": "integer",
-                        "default": 300,
-                        "minimum": 1,
-                        "maximum": 10000,
-                        "step": 1,
-                        "advanced": True,
-                    },
+                    "confidence": PipelineParameterDefinition(
+                        label="最低置信度", control="number", default=0.5, minimum=0, maximum=1, step=0.05
+                    ),
+                    "iou": PipelineParameterDefinition(
+                        label="重叠阈值",
+                        control="number",
+                        default=0.45,
+                        minimum=0,
+                        maximum=1,
+                        step=0.05,
+                        advanced=True,
+                    ),
+                    "max_detections": PipelineParameterDefinition(
+                        label="最大目标数",
+                        control="integer",
+                        default=300,
+                        minimum=1,
+                        maximum=10000,
+                        step=1,
+                        advanced=True,
+                    ),
                 },
                 pausable=True,
             ),

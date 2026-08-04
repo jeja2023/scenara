@@ -96,7 +96,7 @@ class ResultOperator:
         return {
             "result": ResultEnvelope(
                 run_id=context.run_id,
-                domain="integration",
+                domain="ocr",
                 pipeline=PipelineRef(
                     pipeline_id=context.pipeline_id,
                     version=context.pipeline_version,
