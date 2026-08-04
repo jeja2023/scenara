@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import csv
 import hmac
+import io
 import re
 import time
 from collections.abc import AsyncIterator
@@ -19,9 +21,11 @@ from starlette.staticfiles import StaticFiles
 from scenara import __version__
 from scenara.bootstrap import Runtime, build_runtime
 from scenara.domains.portrait.capabilities import portrait_capability_snapshot
+from scenara.domains.portrait.encoder import PortraitEncodingError
 from scenara.domains.portrait.service import (
     CreateIdentityRequest,
     EnrollIdentityRequest,
+    PortraitAssetCompareRequest,
     PortraitCompareRequest,
     PortraitCompareResponse,
     PortraitConflict,
@@ -46,7 +50,87 @@ from scenara.enterprise.service import (
 )
 from scenara.platform.access import AccessNotFound
 from scenara.platform.access_foundation import build_access_foundation
-from scenara.platform.audit import AuditUnavailable
+from scenara.platform.audit import AuditEventPage, AuditEventView, AuditUnavailable, audit_event_view
+from scenara.platform.control_plane import (
+    AcknowledgeEdgeDeploymentRequest,
+    AcknowledgeEdgeSyncRequest,
+    AgentAction,
+    AgentEvaluation,
+    AgentMemoryEntry,
+    AgentTool,
+    AgentTrace,
+    AnnotationProvider,
+    AnnotationTask,
+    ApproveAgentActionRequest,
+    AssignSeatRequest,
+    AuditRetentionPolicy,
+    BillingAccount,
+    BillingUsage,
+    CreateAgentEvaluationRequest,
+    CreateAgentTraceRequest,
+    CreateAnnotationProviderRequest,
+    CreateAnnotationTaskRequest,
+    CreateBillingAccountRequest,
+    CreateEdgeDeploymentRequest,
+    CreateFlowRequest,
+    CreateIdentityProviderRequest,
+    CreateIndexBackendRequest,
+    CreateIndexRebuildRequest,
+    CreatePortraitAssociationRequest,
+    CreatePortraitClusterRequest,
+    CreatePortraitEventRequest,
+    CreateProjectLifecycleRequest,
+    CreateQuotaPlanRequest,
+    CreateSearchEvaluationRequest,
+    CreateSearchRankingProfileRequest,
+    CreateSearchRelevanceFeedbackRequest,
+    CreateSearchRerankerRequest,
+    CreateSessionRequest,
+    DecideApprovalRequest,
+    DecideProjectLifecycleRequest,
+    DeploymentTopology,
+    EdgeDeployment,
+    EdgeDevice,
+    EdgeHeartbeatRequest,
+    EdgeSyncItem,
+    ExecuteFlowRequest,
+    FlowApproval,
+    FlowDefinition,
+    FlowExecution,
+    IdentityProvider,
+    IndexBackend,
+    IndexRebuildJob,
+    MeterEvent,
+    ModelHealthSnapshot,
+    ModelMetricPoint,
+    PortraitAssociation,
+    PortraitCluster,
+    PortraitEvent,
+    ProjectLifecycleRequest,
+    ProposeAgentActionRequest,
+    PurgeAuditRequest,
+    PurgeAuditResponse,
+    PutAgentMemoryRequest,
+    QuotaCheckRequest,
+    QuotaCheckResponse,
+    QuotaPlan,
+    RecordMeterEventRequest,
+    RegisterAgentToolRequest,
+    RegisterEdgeDeviceRequest,
+    RegisterWorkerRequest,
+    ResourceLifecycleRecord,
+    ReviewAnnotationTaskRequest,
+    SearchEvaluation,
+    SearchRankingProfile,
+    SearchRelevanceFeedback,
+    SearchReranker,
+    SeatAssignment,
+    SessionResponse,
+    SetAuditRetentionPolicyRequest,
+    WorkerHeartbeatRequest,
+    WorkerLease,
+)
+from scenara.platform.dataset import DatasetConflict, DatasetNotFound
 from scenara.platform.features import FeatureStoreError
 from scenara.platform.feedback import (
     CreateFeedbackRequest,
@@ -62,6 +146,14 @@ from scenara.platform.feedback import (
     RollbackModelReleaseRequest,
     TransitionModelReleaseRequest,
 )
+from scenara.platform.index import (
+    IndexDefinition,
+    IndexHit,
+    IndexRecordView,
+    IndexStoreError,
+    IndexTextQueryRequest,
+    IndexVectorQueryRequest,
+)
 from scenara.platform.model_runtime import ModelPackageManifest
 from scenara.platform.models import (
     TERMINAL_RUN_STATUSES,
@@ -72,6 +164,8 @@ from scenara.platform.models import (
     ApiKeyRecord,
     CreateApiKeyRequest,
     CreateApiKeyResponse,
+    CreateDatasetRequest,
+    CreateDatasetVersionRequest,
     CreateMediaSourceRequest,
     CreateMembershipRequest,
     CreateOrganizationRequest,
@@ -79,9 +173,14 @@ from scenara.platform.models import (
     CreateProjectRequest,
     CreateRoleRequest,
     CreateRunRequest,
+    CreateSavedSearchRequest,
     CreateServiceAccountRequest,
     CreateUserRequest,
     CreateWebhookSubscriptionRequest,
+    DatasetPage,
+    DatasetRecord,
+    DatasetVersion,
+    DatasetVersionPage,
     DomainId,
     IamSummary,
     MediaAsset,
@@ -111,9 +210,14 @@ from scenara.platform.models import (
     RunRecord,
     RunStatus,
     SampleStrategy,
+    SavedSearch,
+    SavedSearchPage,
     ServiceAccount,
     SystemStatus,
+    TransitionDatasetVersionRequest,
+    UpdateDatasetRequest,
     UpdateProductEntitlementRequest,
+    UpdateSavedSearchRequest,
     UserAccount,
     WebhookDeliveryRecord,
     WebhookSubscriptionView,
@@ -129,6 +233,13 @@ from scenara.platform.repository_contracts import (
     load_repository_contract_catalog,
 )
 from scenara.platform.repository_topology import build_repository_topology
+from scenara.platform.search import (
+    SavedSearchConflict,
+    SavedSearchNotFound,
+    SearchAssetRequest,
+    SearchResponse,
+    SearchTextRequest,
+)
 from scenara.platform.services import InvalidTransition, ResourceNotFound, sse_payload
 from scenara.platform.store import StateConflict
 from scenara.platform.webhook_service import WebhookNotFound
@@ -195,7 +306,20 @@ async def principal_context(
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid bearer token")
         credential = await runtime.access.authenticate_api_key(token)
         if credential is None:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid bearer token")
+            session_context = await runtime.control_plane.authenticate_session(token)
+            if session_context is None:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid bearer token")
+            if await runtime.access.is_user_disabled(session_context.tenant_id, session_context.principal_id):
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user session is disabled")
+            if x_principal_id:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST, detail="principal identity is credential-derived"
+                )
+            if x_tenant_id and x_tenant_id != session_context.tenant_id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="session tenant mismatch")
+            if x_project_id and x_project_id != session_context.project_id:
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="session project mismatch")
+            return session_context
         if x_principal_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="principal identity is credential-derived"
@@ -316,6 +440,26 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     async def portrait_conflict(request: Request, exc: PortraitConflict) -> JSONResponse:
         return error_response(request, 409, "PORTRAIT_CONFLICT", str(exc))
 
+    @app.exception_handler(PortraitEncodingError)
+    async def portrait_encoding_error(request: Request, exc: PortraitEncodingError) -> JSONResponse:
+        return error_response(request, 422, "PORTRAIT_ENCODING_ERROR", str(exc))
+
+    @app.exception_handler(DatasetNotFound)
+    async def dataset_not_found(request: Request, exc: DatasetNotFound) -> JSONResponse:
+        return error_response(request, 404, "DATASET_NOT_FOUND", str(exc))
+
+    @app.exception_handler(DatasetConflict)
+    async def dataset_conflict(request: Request, exc: DatasetConflict) -> JSONResponse:
+        return error_response(request, 409, "DATASET_CONFLICT", str(exc))
+
+    @app.exception_handler(SavedSearchNotFound)
+    async def saved_search_not_found(request: Request, exc: SavedSearchNotFound) -> JSONResponse:
+        return error_response(request, 404, "SAVED_SEARCH_NOT_FOUND", str(exc))
+
+    @app.exception_handler(SavedSearchConflict)
+    async def saved_search_conflict(request: Request, exc: SavedSearchConflict) -> JSONResponse:
+        return error_response(request, 409, "SAVED_SEARCH_CONFLICT", str(exc))
+
     @app.exception_handler(AccessNotFound)
     async def access_not_found(request: Request, exc: AccessNotFound) -> JSONResponse:
         return error_response(request, 404, "ACCESS_NOT_FOUND", str(exc))
@@ -323,6 +467,10 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     @app.exception_handler(FeatureStoreError)
     async def feature_store_error(request: Request, exc: FeatureStoreError) -> JSONResponse:
         return error_response(request, 409, "FEATURE_SPACE_CONFLICT", str(exc))
+
+    @app.exception_handler(IndexStoreError)
+    async def index_store_error(request: Request, exc: IndexStoreError) -> JSONResponse:
+        return error_response(request, 409, "INDEX_CONTRACT_ERROR", str(exc))
 
     @app.exception_handler(PolicyDenied)
     async def policy_denied(request: Request, exc: PolicyDenied) -> JSONResponse:
@@ -517,6 +665,75 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         await runtime.runs.delete_source(context, source_id)
         return Response(status_code=204)
 
+    @app.post("/api/v1/datasets", status_code=201, tags=["Data"])
+    async def create_dataset(
+        body: CreateDatasetRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[DatasetRecord]:
+        result = await runtime.datasets.create(context, body)
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.get("/api/v1/datasets", tags=["Data"])
+    async def list_datasets(
+        request: Request,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[DatasetPage]:
+        result = await runtime.datasets.list(context, offset=offset, limit=limit)
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.get("/api/v1/datasets/{dataset_id}", tags=["Data"])
+    async def get_dataset(
+        dataset_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[DatasetRecord]:
+        result = await runtime.datasets.get(context, dataset_id)
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.patch("/api/v1/datasets/{dataset_id}", tags=["Data"])
+    async def update_dataset(
+        dataset_id: str,
+        body: UpdateDatasetRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[DatasetRecord]:
+        result = await runtime.datasets.update(context, dataset_id, body)
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.post("/api/v1/datasets/{dataset_id}/versions", status_code=201, tags=["Data"])
+    async def create_dataset_version(
+        dataset_id: str,
+        body: CreateDatasetVersionRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[DatasetVersion]:
+        result = await runtime.datasets.create_version(context, dataset_id, body)
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.get("/api/v1/datasets/{dataset_id}/versions", tags=["Data"])
+    async def list_dataset_versions(
+        dataset_id: str,
+        request: Request,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[DatasetVersionPage]:
+        result = await runtime.datasets.list_versions(context, dataset_id, offset=offset, limit=limit)
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.post("/api/v1/dataset-versions/{version_id}/transition", tags=["Data"])
+    async def transition_dataset_version(
+        version_id: str,
+        body: TransitionDatasetVersionRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[DatasetVersion]:
+        result = await runtime.datasets.transition_version(context, version_id, body)
+        return _envelope(request, result)  # type: ignore[return-value]
+
     @app.post("/api/v1/runs", status_code=202, tags=["Runs"])
     async def create_run(
         body: CreateRunRequest,
@@ -616,6 +833,121 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             request,
             ResultSummaryPage(items=items, offset=offset, limit=limit, total=total),
         )  # type: ignore[return-value]
+
+    async def _query_audit_events(
+        context: PrincipalContext,
+        *,
+        action: str | None,
+        resource_type: str | None,
+        principal_id: str | None,
+        outcome: str | None,
+        created_after: float | None,
+        created_before: float | None,
+        offset: int,
+        limit: int,
+    ) -> tuple[list[AuditEventView], int]:
+        await require_allowed(runtime.policy, context, "read", "audit_event")
+        events = await runtime.state.audit_events(context.tenant_id, context.project_id)
+        filtered = [
+            event
+            for event in events
+            if (action is None or event.action == action)
+            and (resource_type is None or event.resource_type == resource_type)
+            and (principal_id is None or event.principal_id == principal_id)
+            and (outcome is None or event.outcome == outcome)
+            and (created_after is None or event.created_at >= created_after)
+            and (created_before is None or event.created_at <= created_before)
+        ]
+        filtered.sort(key=lambda event: (event.created_at, event.event_id), reverse=True)
+        page = [audit_event_view(event) for event in filtered[offset : offset + limit]]
+        return page, len(filtered)
+
+    @app.get("/api/v1/audit/events", tags=["Operations"])
+    async def list_audit_events(
+        request: Request,
+        action: Annotated[str | None, Query(max_length=128)] = None,
+        resource_type: Annotated[str | None, Query(max_length=128)] = None,
+        principal_id: Annotated[str | None, Query(max_length=128)] = None,
+        outcome: Annotated[str | None, Query(max_length=32)] = None,
+        created_after: Annotated[float | None, Query(ge=0)] = None,
+        created_before: Annotated[float | None, Query(ge=0)] = None,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[AuditEventPage]:
+        page, total = await _query_audit_events(
+            context,
+            action=action,
+            resource_type=resource_type,
+            principal_id=principal_id,
+            outcome=outcome,
+            created_after=created_after,
+            created_before=created_before,
+            offset=offset,
+            limit=limit,
+        )
+        return _envelope(request, AuditEventPage(items=page, offset=offset, limit=limit, total=total))  # type: ignore[return-value]
+
+    @app.get("/api/v1/audit/export", tags=["Operations"])
+    async def export_audit_events(
+        format: Annotated[str, Query(pattern="^(json|csv)$")] = "json",
+        action: Annotated[str | None, Query(max_length=128)] = None,
+        resource_type: Annotated[str | None, Query(max_length=128)] = None,
+        principal_id: Annotated[str | None, Query(max_length=128)] = None,
+        outcome: Annotated[str | None, Query(max_length=32)] = None,
+        created_after: Annotated[float | None, Query(ge=0)] = None,
+        created_before: Annotated[float | None, Query(ge=0)] = None,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> Response:
+        page, _ = await _query_audit_events(
+            context,
+            action=action,
+            resource_type=resource_type,
+            principal_id=principal_id,
+            outcome=outcome,
+            created_after=created_after,
+            created_before=created_before,
+            offset=0,
+            limit=200,
+        )
+        if format == "json":
+            return Response(
+                content=AuditEventPage(items=page, offset=0, limit=len(page), total=len(page)).model_dump_json(),
+                media_type="application/json",
+                headers={"Content-Disposition": "attachment; filename=scenara-audit.json"},
+            )
+        output = io.StringIO()
+        writer = csv.writer(output)
+        writer.writerow(
+            [
+                "event_id",
+                "created_at",
+                "principal_id",
+                "action",
+                "resource_type",
+                "resource_id",
+                "outcome",
+                "evidence",
+            ]
+        )
+        for event in page:
+            writer.writerow(
+                [
+                    event.event_id,
+                    event.created_at,
+                    event.principal_id,
+                    event.action,
+                    event.resource_type,
+                    event.resource_id or "",
+                    event.outcome,
+                    event.model_dump_json(include={"evidence"}),
+                ]
+            )
+        return Response(
+            content=output.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": "attachment; filename=scenara-audit.csv"},
+        )
 
     @app.get("/api/v1/runs/{run_id}/artifacts/{artifact_id}", tags=["Results"])
     async def get_result_artifact(
@@ -885,6 +1217,31 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         enrollment = await runtime.portrait.enroll(context, identity_id, body)
         return _envelope(request, enrollment)  # type: ignore[return-value]
 
+    @app.post(
+        "/api/v1/portrait/identities/{identity_id}/enrollments/image",
+        status_code=201,
+        tags=["Portrait"],
+    )
+    async def enroll_portrait_identity_image(
+        identity_id: str,
+        file: Annotated[UploadFile, File()],
+        request: Request,
+        feature_space_id: Annotated[str | None, Form()] = None,
+        quality: Annotated[float | None, Form(ge=0, le=1)] = None,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[PortraitEnrollment]:
+        data = await file.read(runtime.settings.max_image_bytes + 1)
+        if len(data) > runtime.settings.max_image_bytes:
+            raise ValueError(f"image exceeds {runtime.settings.max_image_bytes} bytes")
+        enrollment = await runtime.portrait.enroll_image(
+            context,
+            identity_id,
+            data,
+            feature_space_id=feature_space_id,
+            quality_override=quality,
+        )
+        return _envelope(request, enrollment)  # type: ignore[return-value]
+
     @app.post("/api/v1/portrait/search", tags=["Portrait"])
     async def search_portrait_identities(
         body: PortraitSearchRequest,
@@ -892,6 +1249,27 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[PortraitSearchResponse]:
         result = await runtime.portrait.search(context, body)
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.post("/api/v1/portrait/search/image", tags=["Portrait"])
+    async def search_portrait_identities_image(
+        file: Annotated[UploadFile, File()],
+        request: Request,
+        feature_space_id: Annotated[str | None, Form()] = None,
+        limit: Annotated[int, Form(ge=1, le=200)] = 20,
+        threshold: Annotated[float | None, Form(ge=-1, le=1)] = None,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[PortraitSearchResponse]:
+        data = await file.read(runtime.settings.max_image_bytes + 1)
+        if len(data) > runtime.settings.max_image_bytes:
+            raise ValueError(f"image exceeds {runtime.settings.max_image_bytes} bytes")
+        result = await runtime.portrait.search_image(
+            context,
+            data,
+            feature_space_id=feature_space_id,
+            limit=limit,
+            threshold=threshold,
+        )
         return _envelope(request, result)  # type: ignore[return-value]
 
     @app.post("/api/v1/portrait/compare", tags=["Portrait"])
@@ -902,6 +1280,350 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     ) -> ApiEnvelope[PortraitCompareResponse]:
         result = await runtime.portrait.compare(context, body)
         return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.post("/api/v1/portrait/compare/images", tags=["Portrait"])
+    async def compare_portrait_images(
+        left: Annotated[UploadFile, File()],
+        right: Annotated[UploadFile, File()],
+        request: Request,
+        feature_space_id: Annotated[str | None, Form()] = None,
+        threshold: Annotated[float | None, Form(ge=-1, le=1)] = None,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[PortraitCompareResponse]:
+        left_data = await left.read(runtime.settings.max_image_bytes + 1)
+        right_data = await right.read(runtime.settings.max_image_bytes + 1)
+        if len(left_data) > runtime.settings.max_image_bytes or len(right_data) > runtime.settings.max_image_bytes:
+            raise ValueError(f"image exceeds {runtime.settings.max_image_bytes} bytes")
+        result = await runtime.portrait.compare_images(
+            context,
+            left_data,
+            right_data,
+            feature_space_id=feature_space_id,
+            threshold=threshold,
+        )
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.post("/api/v1/portrait/compare/assets", tags=["Portrait"])
+    async def compare_portrait_assets(
+        body: PortraitAssetCompareRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[PortraitCompareResponse]:
+        await require_allowed(runtime.policy, context, "read", "media_asset", {"asset_id": body.left_asset_id})
+        await require_allowed(runtime.policy, context, "read", "media_asset", {"asset_id": body.right_asset_id})
+        left_asset = await runtime.state.get_asset(context.tenant_id, context.project_id, body.left_asset_id)
+        right_asset = await runtime.state.get_asset(context.tenant_id, context.project_id, body.right_asset_id)
+        if (
+            left_asset is None
+            or right_asset is None
+            or left_asset.deleted_at is not None
+            or right_asset.deleted_at is not None
+            or left_asset.original_deleted_at is not None
+            or right_asset.original_deleted_at is not None
+        ):
+            raise PortraitNotFound("portrait comparison asset not found")
+        if left_asset.kind.value != "image" or right_asset.kind.value != "image":
+            raise ValueError("portrait comparison assets must be images")
+        result = await runtime.portrait.compare_images(
+            context,
+            await runtime.objects.get(left_asset.object_key),
+            await runtime.objects.get(right_asset.object_key),
+            feature_space_id=body.feature_space_id,
+            threshold=body.threshold,
+            mode="asset",
+        )
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.post("/api/v1/portrait/compare/asset-image", tags=["Portrait"])
+    async def compare_portrait_asset_image(
+        asset_id: Annotated[str, Form()],
+        file: Annotated[UploadFile, File()],
+        request: Request,
+        feature_space_id: Annotated[str | None, Form()] = None,
+        threshold: Annotated[float | None, Form(ge=-1, le=1)] = None,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[PortraitCompareResponse]:
+        await require_allowed(runtime.policy, context, "read", "media_asset", {"asset_id": asset_id})
+        asset = await runtime.state.get_asset(context.tenant_id, context.project_id, asset_id)
+        if asset is None or asset.deleted_at is not None or asset.original_deleted_at is not None:
+            raise PortraitNotFound("portrait comparison asset not found")
+        if asset.kind != MediaKind.IMAGE:
+            raise ValueError("portrait comparison assets must be images")
+        right_data = await file.read(runtime.settings.max_image_bytes + 1)
+        if len(right_data) > runtime.settings.max_image_bytes:
+            raise ValueError(f"image exceeds {runtime.settings.max_image_bytes} bytes")
+        result = await runtime.portrait.compare_images(
+            context,
+            await runtime.objects.get(asset.object_key),
+            right_data,
+            feature_space_id=feature_space_id,
+            threshold=threshold,
+            mode="mixed",
+        )
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.post("/api/v1/portrait/compare/image-asset", tags=["Portrait"])
+    async def compare_portrait_image_asset(
+        file: Annotated[UploadFile, File()],
+        asset_id: Annotated[str, Form()],
+        request: Request,
+        feature_space_id: Annotated[str | None, Form()] = None,
+        threshold: Annotated[float | None, Form(ge=-1, le=1)] = None,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[PortraitCompareResponse]:
+        await require_allowed(runtime.policy, context, "read", "media_asset", {"asset_id": asset_id})
+        asset = await runtime.state.get_asset(context.tenant_id, context.project_id, asset_id)
+        if asset is None or asset.deleted_at is not None or asset.original_deleted_at is not None:
+            raise PortraitNotFound("portrait comparison asset not found")
+        if asset.kind != MediaKind.IMAGE:
+            raise ValueError("portrait comparison assets must be images")
+        left_data = await file.read(runtime.settings.max_image_bytes + 1)
+        if len(left_data) > runtime.settings.max_image_bytes:
+            raise ValueError(f"image exceeds {runtime.settings.max_image_bytes} bytes")
+        result = await runtime.portrait.compare_images(
+            context,
+            left_data,
+            await runtime.objects.get(asset.object_key),
+            feature_space_id=feature_space_id,
+            threshold=threshold,
+            mode="mixed",
+        )
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.post("/api/v1/search/text", tags=["Search"])
+    async def search_text(
+        body: SearchTextRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SearchResponse]:
+        result = await runtime.search.text(context, body)
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.post("/api/v1/search/image", tags=["Search"])
+    async def search_portrait_image(
+        file: Annotated[UploadFile, File()],
+        request: Request,
+        feature_space_id: Annotated[str | None, Form()] = None,
+        profile_id: Annotated[str | None, Form()] = None,
+        media_kinds: Annotated[str | None, Form()] = None,
+        limit: Annotated[int, Form(ge=1, le=200)] = 50,
+        threshold: Annotated[float | None, Form(ge=-1, le=1)] = None,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SearchResponse]:
+        data = await file.read(runtime.settings.max_image_bytes + 1)
+        if len(data) > runtime.settings.max_image_bytes:
+            raise ValueError(f"image exceeds {runtime.settings.max_image_bytes} bytes")
+        selected_kinds = [MediaKind(value.strip()) for value in (media_kinds or "").split(",") if value.strip()]
+        result = await runtime.search.portrait_image(
+            context,
+            data,
+            feature_space_id=feature_space_id,
+            profile_id=profile_id,
+            media_kinds=selected_kinds,
+            limit=limit,
+            threshold=threshold,
+        )
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.post("/api/v1/search/asset", tags=["Search"])
+    async def search_portrait_asset(
+        body: SearchAssetRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SearchResponse]:
+        await require_allowed(runtime.policy, context, "read", "media_asset", {"asset_id": body.asset_id})
+        asset = await runtime.state.get_asset(context.tenant_id, context.project_id, body.asset_id)
+        if asset is None or asset.deleted_at is not None or asset.original_deleted_at is not None:
+            raise ResourceNotFound("search asset not found")
+        if asset.kind != MediaKind.IMAGE:
+            raise ValueError("portrait search assets must be images")
+        result = await runtime.search.portrait_image(
+            context,
+            await runtime.objects.get(asset.object_key),
+            feature_space_id=body.feature_space_id,
+            profile_id=body.profile_id,
+            media_kinds=body.media_kinds,
+            limit=body.limit,
+            threshold=body.threshold,
+        )
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.post("/api/v1/search/saved", status_code=201, tags=["Search"])
+    async def create_saved_search(
+        body: CreateSavedSearchRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SavedSearch]:
+        result = await runtime.search.create_saved_search(context, body)
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.get("/api/v1/search/saved", tags=["Search"])
+    async def list_saved_searches(
+        request: Request,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SavedSearchPage]:
+        result = await runtime.search.list_saved_searches(context, offset=offset, limit=limit)
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.get("/api/v1/search/saved/{saved_search_id}", tags=["Search"])
+    async def get_saved_search(
+        saved_search_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SavedSearch]:
+        result = await runtime.search.get_saved_search(context, saved_search_id)
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.patch("/api/v1/search/saved/{saved_search_id}", tags=["Search"])
+    async def update_saved_search(
+        saved_search_id: str,
+        body: UpdateSavedSearchRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SavedSearch]:
+        result = await runtime.search.update_saved_search(context, saved_search_id, body)
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.delete("/api/v1/search/saved/{saved_search_id}", status_code=204, tags=["Search"])
+    async def delete_saved_search(
+        saved_search_id: str,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> Response:
+        await runtime.search.delete_saved_search(context, saved_search_id)
+        return Response(status_code=204)
+
+    @app.post("/api/v1/search/saved/{saved_search_id}/run", tags=["Search"])
+    async def run_saved_search(
+        saved_search_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SearchResponse]:
+        result = await runtime.search.run_saved_search(context, saved_search_id)
+        return _envelope(request, result)  # type: ignore[return-value]
+
+    @app.get("/api/v1/indexes", tags=["Search"])
+    async def list_search_indexes(
+        request: Request,
+        domain: Annotated[str | None, Query()] = None,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[list[IndexDefinition]]:
+        await require_allowed(runtime.policy, context, "list", "search_index", {"domain": domain})
+        rows = await runtime.indexes.list_indexes(context.tenant_id, context.project_id, domain=domain)
+        return _envelope(request, rows)  # type: ignore[return-value]
+
+    @app.post("/api/v1/indexes", status_code=201, tags=["Search"])
+    async def create_search_index(
+        body: IndexDefinition,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[IndexDefinition]:
+        await require_allowed(runtime.policy, context, "write", "search_index", {"index_id": body.index_id})
+        created = await runtime.indexes.create_index(body)
+        await runtime.audit.record(
+            context,
+            action="index.create",
+            resource_type="search_index",
+            resource_id=created.index_id,
+            evidence={"domain": created.domain, "record_kind": created.record_kind.value},
+        )
+        return _envelope(request, created)  # type: ignore[return-value]
+
+    @app.get("/api/v1/indexes/{index_id}/records", tags=["Search"])
+    async def list_search_index_records(
+        index_id: str,
+        request: Request,
+        source_type: Annotated[str | None, Query()] = None,
+        source_id: Annotated[str | None, Query()] = None,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[list[IndexRecordView]]:
+        await require_allowed(runtime.policy, context, "read", "search_index", {"index_id": index_id})
+        if await runtime.indexes.get_index(index_id) is None:
+            raise PortraitNotFound("search index not found")
+        rows = await runtime.indexes.list_records(
+            context.tenant_id,
+            context.project_id,
+            index_id=index_id,
+            source_type=source_type,
+            source_id=source_id,
+            offset=offset,
+            limit=limit,
+        )
+        views = [
+            IndexRecordView(
+                record_id=row.record_id,
+                index_id=row.index_id,
+                domain=row.domain,
+                kind=row.kind,
+                source=row.source,
+                feature_id=row.feature_id,
+                has_vector=row.vector is not None or row.feature_id is not None,
+                text_snippet=(row.text or "")[:240] or None,
+                metadata=row.metadata,
+                status=row.status,
+                created_at=row.created_at,
+                expires_at=row.expires_at,
+                deleted_at=row.deleted_at,
+            )
+            for row in rows
+        ]
+        return _envelope(request, views)  # type: ignore[return-value]
+
+    @app.post("/api/v1/indexes/{index_id}/query/text", tags=["Search"])
+    async def query_search_index_text(
+        index_id: str,
+        body: IndexTextQueryRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[list[dict[str, object]]]:
+        await require_allowed(runtime.policy, context, "query", "search_index", {"index_id": index_id})
+        if await runtime.indexes.get_index(index_id) is None:
+            raise PortraitNotFound("search index not found")
+        hits = await runtime.indexes.query_text(
+            context.tenant_id,
+            context.project_id,
+            index_id,
+            body.query,
+            limit=body.limit,
+        )
+        await runtime.audit.record(
+            context,
+            action="index.query.text",
+            resource_type="search_index",
+            resource_id=index_id,
+            evidence={"query_length": len(body.query), "hit_count": len(hits)},
+        )
+        return _envelope(request, [hit.model_dump(mode="json") for hit in hits])  # type: ignore[return-value]
+
+    @app.post("/api/v1/indexes/{index_id}/query/vector", tags=["Search"])
+    async def query_search_index_vector(
+        index_id: str,
+        body: IndexVectorQueryRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[list[IndexHit]]:
+        await require_allowed(runtime.policy, context, "query", "search_index", {"index_id": index_id})
+        if await runtime.indexes.get_index(index_id) is None:
+            raise PortraitNotFound("search index not found")
+        hits = await runtime.indexes.query_vector(
+            context.tenant_id,
+            context.project_id,
+            index_id,
+            body.vector,
+            limit=body.limit,
+            threshold=body.threshold,
+        )
+        await runtime.audit.record(
+            context,
+            action="index.query.vector",
+            resource_type="search_index",
+            resource_id=index_id,
+            evidence={"dimension": len(body.vector), "hit_count": len(hits)},
+        )
+        return _envelope(request, hits)  # type: ignore[return-value]
 
     @app.get("/api/v1/enterprise/status", tags=["Enterprise"])
     async def enterprise_status(
@@ -1297,6 +2019,22 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     ) -> ApiEnvelope[list[UserAccount]]:
         return _envelope(request, await runtime.access.list_users(context))  # type: ignore[return-value]
 
+    @app.post("/api/v1/platform/users/{user_id}/disable", tags=["IAM"])
+    async def disable_user(
+        user_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[UserAccount]:
+        return _envelope(request, await runtime.access.set_user_disabled(context, user_id, True))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/users/{user_id}/restore", tags=["IAM"])
+    async def restore_user(
+        user_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[UserAccount]:
+        return _envelope(request, await runtime.access.set_user_disabled(context, user_id, False))  # type: ignore[return-value]
+
     @app.post("/api/v1/platform/roles", status_code=201, tags=["IAM"])
     async def create_role(
         body: CreateRoleRequest,
@@ -1338,6 +2076,22 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request, context: PrincipalContext = Depends(principal_context)
     ) -> ApiEnvelope[list[ServiceAccount]]:
         return _envelope(request, await runtime.access.list_service_accounts(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/service-accounts/{service_account_id}/disable", tags=["IAM"])
+    async def disable_service_account(
+        service_account_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[ServiceAccount]:
+        return _envelope(request, await runtime.access.set_service_account_disabled(context, service_account_id, True))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/service-accounts/{service_account_id}/restore", tags=["IAM"])
+    async def restore_service_account(
+        service_account_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[ServiceAccount]:
+        return _envelope(request, await runtime.access.set_service_account_disabled(context, service_account_id, False))  # type: ignore[return-value]
 
     @app.post("/api/v1/platform/service-accounts/{service_account_id}/api-keys", status_code=201, tags=["IAM"])
     async def create_api_key(
@@ -1393,6 +2147,584 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             request,
             await runtime.access.update_product_entitlement(context, product_id, body),
         )  # type: ignore[return-value]
+
+    # The following product modules share one control plane.  They are kept
+    # behind explicit scopes and all mutations emit the same audit records as
+    # the existing Parse/Model/Data resources.
+    @app.post("/api/v1/platform/identity-providers", status_code=201, tags=["IAM"])
+    async def create_identity_provider(
+        body: CreateIdentityProviderRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[IdentityProvider]:
+        return _envelope(request, await runtime.control_plane.create_identity_provider(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/identity-providers", tags=["IAM"])
+    async def list_identity_providers(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[IdentityProvider]]:
+        return _envelope(request, await runtime.control_plane.list_identity_providers(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/identity-providers/{provider_id}/probe", tags=["IAM"])
+    async def probe_identity_provider(
+        provider_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[IdentityProvider]:
+        return _envelope(
+            request, await runtime.control_plane.probe_identity_provider(context, provider_id)
+        )  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/sessions", status_code=201, tags=["IAM"])
+    async def create_interactive_session(
+        body: CreateSessionRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SessionResponse]:
+        if await runtime.access.is_user_disabled(context.tenant_id, body.user_id):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="user is disabled")
+        return _envelope(request, await runtime.control_plane.create_session(context, body))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/projects/lifecycle-requests", status_code=202, tags=["IAM"])
+    async def request_project_lifecycle(
+        body: CreateProjectLifecycleRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[ProjectLifecycleRequest]:
+        return _envelope(request, await runtime.control_plane.request_project_lifecycle(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/projects/lifecycle-requests", tags=["IAM"])
+    async def list_project_lifecycle_requests(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[ProjectLifecycleRequest]]:
+        return _envelope(request, await runtime.control_plane.list_project_lifecycle_requests(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/projects/lifecycle-requests/{request_id}/decide", tags=["IAM"])
+    async def decide_project_lifecycle(
+        request_id: str,
+        body: DecideProjectLifecycleRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[ProjectLifecycleRequest]:
+        return _envelope(
+            request, await runtime.control_plane.decide_project_lifecycle(context, request_id, body)
+        )  # type: ignore[return-value]
+
+    @app.put("/api/v1/platform/audit/retention", tags=["Operations"])
+    async def set_audit_retention_policy(
+        body: SetAuditRetentionPolicyRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[AuditRetentionPolicy]:
+        return _envelope(request, await runtime.control_plane.set_audit_retention_policy(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/audit/retention", tags=["Operations"])
+    async def get_audit_retention_policy(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[AuditRetentionPolicy]:
+        return _envelope(request, await runtime.control_plane.get_audit_retention_policy(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/audit/purge", tags=["Operations"])
+    async def purge_audit_events(
+        body: PurgeAuditRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[PurgeAuditResponse]:
+        return _envelope(request, await runtime.control_plane.purge_audit_events(context, body))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/lifecycle/{resource_type}/{resource_id}/{action}", tags=["IAM"])
+    async def transition_resource_lifecycle(
+        resource_type: str,
+        resource_id: str,
+        action: str,
+        request: Request,
+        reason: str = Query(default="", max_length=2_000),
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[ResourceLifecycleRecord]:
+        return _envelope(
+            request, await runtime.control_plane.lifecycle(context, resource_type, resource_id, action, reason)
+        )  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/quotas/plans", status_code=201, tags=["Enterprise"])
+    async def create_quota_plan(
+        body: CreateQuotaPlanRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[QuotaPlan]:
+        return _envelope(request, await runtime.control_plane.create_quota_plan(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/quotas/plans", tags=["Enterprise"])
+    async def list_quota_plans(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[QuotaPlan]]:
+        return _envelope(request, await runtime.control_plane.list_quota_plans(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/quotas/check", tags=["Enterprise"])
+    async def check_quota(
+        body: QuotaCheckRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[QuotaCheckResponse]:
+        return _envelope(request, await runtime.control_plane.check_quota(context, body))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/billing/accounts", status_code=201, tags=["Enterprise"])
+    async def create_billing_account(
+        body: CreateBillingAccountRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[BillingAccount]:
+        return _envelope(request, await runtime.control_plane.create_billing_account(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/billing/accounts", tags=["Enterprise"])
+    async def list_billing_accounts(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[BillingAccount]]:
+        return _envelope(request, await runtime.control_plane.list_billing_accounts(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/billing/meter-events", status_code=201, tags=["Enterprise"])
+    async def record_meter_event(
+        body: RecordMeterEventRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[MeterEvent]:
+        return _envelope(request, await runtime.control_plane.record_meter_event(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/billing/usage", tags=["Enterprise"])
+    async def list_billing_usage(
+        request: Request,
+        account_id: str | None = None,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[list[BillingUsage]]:
+        return _envelope(request, await runtime.control_plane.list_billing_usage(context, account_id))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/billing/seats", status_code=201, tags=["Enterprise"])
+    async def assign_billing_seat(
+        body: AssignSeatRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SeatAssignment]:
+        return _envelope(request, await runtime.control_plane.assign_billing_seat(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/billing/seats", tags=["Enterprise"])
+    async def list_billing_seats(
+        request: Request,
+        account_id: str | None = None,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[list[SeatAssignment]]:
+        return _envelope(request, await runtime.control_plane.list_billing_seats(context, account_id))  # type: ignore[return-value]
+
+    @app.post("/api/v1/data/annotation-tasks", status_code=201, tags=["Data"])
+    async def create_annotation_task(
+        body: CreateAnnotationTaskRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[AnnotationTask]:
+        return _envelope(request, await runtime.control_plane.create_annotation_task(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/data/annotation-tasks", tags=["Data"])
+    async def list_annotation_tasks(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[AnnotationTask]]:
+        return _envelope(request, await runtime.control_plane.list_annotation_tasks(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/data/annotation-providers", status_code=201, tags=["Data"])
+    async def register_annotation_provider(
+        body: CreateAnnotationProviderRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[AnnotationProvider]:
+        return _envelope(request, await runtime.control_plane.register_annotation_provider(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/data/annotation-providers", tags=["Data"])
+    async def list_annotation_providers(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[AnnotationProvider]]:
+        return _envelope(request, await runtime.control_plane.list_annotation_providers(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/data/annotation-providers/{provider_id}/probe", tags=["Data"])
+    async def probe_annotation_provider(
+        provider_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[AnnotationProvider]:
+        return _envelope(request, await runtime.control_plane.probe_annotation_provider(context, provider_id))  # type: ignore[return-value]
+
+    @app.post("/api/v1/data/annotation-tasks/{task_id}/review", tags=["Data"])
+    async def review_annotation_task(
+        task_id: str,
+        body: ReviewAnnotationTaskRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[AnnotationTask]:
+        return _envelope(request, await runtime.control_plane.review_annotation_task(context, task_id, body))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/model-metrics", status_code=201, tags=["Model Governance"])
+    async def record_model_metric(
+        body: ModelMetricPoint,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[ModelMetricPoint]:
+        return _envelope(request, await runtime.control_plane.record_model_metric(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/model-health", tags=["Model Governance"])
+    async def model_health(
+        model_id: str,
+        model_version: str,
+        capability: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[ModelHealthSnapshot]:
+        return _envelope(
+            request, await runtime.control_plane.model_health(context, model_id, model_version, capability)
+        )  # type: ignore[return-value]
+
+    @app.post("/api/v1/search/ranking-profiles", status_code=201, tags=["Search"])
+    async def create_search_ranking_profile(
+        body: CreateSearchRankingProfileRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SearchRankingProfile]:
+        return _envelope(request, await runtime.control_plane.create_search_profile(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/search/ranking-profiles", tags=["Search"])
+    async def list_search_ranking_profiles(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[SearchRankingProfile]]:
+        return _envelope(request, await runtime.control_plane.list_search_profiles(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/search/index-backends", status_code=201, tags=["Search"])
+    async def register_index_backend(
+        body: CreateIndexBackendRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[IndexBackend]:
+        return _envelope(request, await runtime.control_plane.register_index_backend(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/search/index-backends", tags=["Search"])
+    async def list_index_backends(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[IndexBackend]]:
+        return _envelope(request, await runtime.control_plane.list_index_backends(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/search/index-backends/{backend_id}/probe", tags=["Search"])
+    async def probe_index_backend(
+        backend_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[IndexBackend]:
+        return _envelope(request, await runtime.control_plane.probe_index_backend(context, backend_id))  # type: ignore[return-value]
+
+    @app.post("/api/v1/search/rerankers", status_code=201, tags=["Search"])
+    async def register_search_reranker(
+        body: CreateSearchRerankerRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SearchReranker]:
+        return _envelope(request, await runtime.control_plane.register_search_reranker(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/search/rerankers", tags=["Search"])
+    async def list_search_rerankers(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[SearchReranker]]:
+        return _envelope(request, await runtime.control_plane.list_search_rerankers(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/search/rerankers/{reranker_id}/probe", tags=["Search"])
+    async def probe_search_reranker(
+        reranker_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SearchReranker]:
+        return _envelope(
+            request, await runtime.control_plane.probe_search_reranker(context, reranker_id)
+        )  # type: ignore[return-value]
+
+    @app.post("/api/v1/search/relevance-feedback", status_code=201, tags=["Search"])
+    async def submit_search_relevance_feedback(
+        body: CreateSearchRelevanceFeedbackRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SearchRelevanceFeedback]:
+        return _envelope(request, await runtime.control_plane.submit_search_feedback(context, body))  # type: ignore[return-value]
+
+    @app.post("/api/v1/search/evaluations", status_code=201, tags=["Search"])
+    async def evaluate_search(
+        body: CreateSearchEvaluationRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SearchEvaluation]:
+        return _envelope(request, await runtime.control_plane.evaluate_search(context, body))  # type: ignore[return-value]
+
+    @app.post("/api/v1/indexes/rebuild", status_code=202, tags=["Search"])
+    async def rebuild_index(
+        body: CreateIndexRebuildRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[IndexRebuildJob]:
+        return _envelope(request, await runtime.control_plane.rebuild_index(context, body))  # type: ignore[return-value]
+
+    @app.post("/api/v1/flows", status_code=201, tags=["Flow"])
+    async def create_flow(
+        body: CreateFlowRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[FlowDefinition]:
+        return _envelope(request, await runtime.control_plane.create_flow(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/flows", tags=["Flow"])
+    async def list_flows(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[FlowDefinition]]:
+        return _envelope(request, await runtime.control_plane.list_flows(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/flows/{flow_id}/execute", status_code=202, tags=["Flow"])
+    async def execute_flow(
+        flow_id: str,
+        body: ExecuteFlowRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[FlowExecution]:
+        return _envelope(request, await runtime.control_plane.execute_flow(context, flow_id, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/flows/{flow_id}/executions/{execution_id}/approvals", tags=["Flow"])
+    async def list_flow_approvals(
+        flow_id: str,
+        execution_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[list[FlowApproval]]:
+        del flow_id
+        return _envelope(request, await runtime.control_plane.list_flow_approvals(context, execution_id))  # type: ignore[return-value]
+
+    @app.post("/api/v1/flows/approvals/{approval_id}/decide", tags=["Flow"])
+    async def decide_flow_approval(
+        approval_id: str,
+        body: DecideApprovalRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[FlowApproval]:
+        return _envelope(request, await runtime.control_plane.decide_flow_approval(context, approval_id, body))  # type: ignore[return-value]
+
+    @app.post("/api/v1/portrait/clusters", status_code=201, tags=["Portrait Intelligence"])
+    async def create_portrait_cluster(
+        body: CreatePortraitClusterRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[PortraitCluster]:
+        return _envelope(request, await runtime.control_plane.create_cluster(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/portrait/clusters", tags=["Portrait Intelligence"])
+    async def list_portrait_clusters(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[PortraitCluster]]:
+        return _envelope(request, await runtime.control_plane.list_clusters(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/portrait/associations", status_code=201, tags=["Portrait Intelligence"])
+    async def create_portrait_association(
+        body: CreatePortraitAssociationRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[PortraitAssociation]:
+        return _envelope(request, await runtime.control_plane.create_association(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/portrait/associations", tags=["Portrait Intelligence"])
+    async def list_portrait_associations(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[PortraitAssociation]]:
+        return _envelope(request, await runtime.control_plane.list_associations(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/portrait/events", status_code=201, tags=["Portrait Intelligence"])
+    async def create_portrait_event(
+        body: CreatePortraitEventRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[PortraitEvent]:
+        return _envelope(request, await runtime.control_plane.create_event(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/portrait/events", tags=["Portrait Intelligence"])
+    async def list_portrait_events(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[PortraitEvent]]:
+        return _envelope(request, await runtime.control_plane.list_events(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/edge/devices", status_code=201, tags=["Edge"])
+    async def register_edge_device(
+        body: RegisterEdgeDeviceRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[EdgeDevice]:
+        return _envelope(request, await runtime.control_plane.register_device(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/edge/devices", tags=["Edge"])
+    async def list_edge_devices(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[EdgeDevice]]:
+        return _envelope(request, await runtime.control_plane.list_devices(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/edge/deployments", status_code=202, tags=["Edge"])
+    async def create_edge_deployment(
+        body: CreateEdgeDeploymentRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[EdgeDeployment]:
+        return _envelope(request, await runtime.control_plane.deploy_edge(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/edge/deployments", tags=["Edge"])
+    async def list_edge_deployments(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[EdgeDeployment]]:
+        return _envelope(request, await runtime.control_plane.list_edge_deployments(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/edge/deployments/{deployment_id}/acknowledge", tags=["Edge"])
+    async def acknowledge_edge_deployment(
+        deployment_id: str,
+        body: AcknowledgeEdgeDeploymentRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[EdgeDeployment]:
+        return _envelope(
+            request, await runtime.control_plane.acknowledge_edge_deployment(context, deployment_id, body)
+        )  # type: ignore[return-value]
+
+    @app.post("/api/v1/edge/devices/{device_id}/sync", status_code=202, tags=["Edge"])
+    async def enqueue_edge_sync(
+        device_id: str,
+        object_ref: str,
+        sha256: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[EdgeSyncItem]:
+        return _envelope(request, await runtime.control_plane.edge_sync(context, device_id, object_ref, sha256))  # type: ignore[return-value]
+
+    @app.post("/api/v1/edge/devices/{device_id}/heartbeat", tags=["Edge"])
+    async def edge_device_heartbeat(
+        device_id: str,
+        body: EdgeHeartbeatRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[EdgeDevice]:
+        return _envelope(request, await runtime.control_plane.edge_heartbeat(context, device_id, body))  # type: ignore[return-value]
+
+    @app.post("/api/v1/edge/sync/{item_id}/acknowledge", tags=["Edge"])
+    async def acknowledge_edge_sync(
+        item_id: str,
+        body: AcknowledgeEdgeSyncRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[EdgeSyncItem]:
+        return _envelope(request, await runtime.control_plane.acknowledge_edge_sync(context, item_id, body))  # type: ignore[return-value]
+
+    @app.post("/api/v1/agents/tools", status_code=201, tags=["Agent"])
+    async def register_agent_tool(
+        body: RegisterAgentToolRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[AgentTool]:
+        return _envelope(request, await runtime.control_plane.register_tool(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/agents/tools", tags=["Agent"])
+    async def list_agent_tools(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[AgentTool]]:
+        return _envelope(request, await runtime.control_plane.list_tools(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/agents/actions", status_code=202, tags=["Agent"])
+    async def propose_agent_action(
+        body: ProposeAgentActionRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[AgentAction]:
+        return _envelope(request, await runtime.control_plane.propose_action(context, body))  # type: ignore[return-value]
+
+    @app.post("/api/v1/agents/actions/{action_id}/decide", tags=["Agent"])
+    async def decide_agent_action(
+        action_id: str,
+        body: ApproveAgentActionRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[AgentAction]:
+        return _envelope(request, await runtime.control_plane.decide_action(context, action_id, body))  # type: ignore[return-value]
+
+    @app.post("/api/v1/agents/actions/{action_id}/execute", tags=["Agent"])
+    async def execute_agent_action(
+        action_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[AgentAction]:
+        return _envelope(request, await runtime.control_plane.execute_action(context, action_id))  # type: ignore[return-value]
+
+    @app.post("/api/v1/agents/traces", status_code=201, tags=["Agent"])
+    async def record_agent_trace(
+        body: CreateAgentTraceRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[AgentTrace]:
+        return _envelope(request, await runtime.control_plane.record_agent_trace(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/agents/traces", tags=["Agent"])
+    async def list_agent_traces(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[AgentTrace]]:
+        return _envelope(request, await runtime.control_plane.list_agent_traces(context))  # type: ignore[return-value]
+
+    @app.post("/api/v1/agents/evaluations", status_code=201, tags=["Agent"])
+    async def record_agent_evaluation(
+        body: CreateAgentEvaluationRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[AgentEvaluation]:
+        return _envelope(request, await runtime.control_plane.record_agent_evaluation(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/agents/evaluations", tags=["Agent"])
+    async def list_agent_evaluations(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[AgentEvaluation]]:
+        return _envelope(request, await runtime.control_plane.list_agent_evaluations(context))  # type: ignore[return-value]
+
+    @app.put("/api/v1/agents/memory", tags=["Agent"])
+    async def put_agent_memory(
+        body: PutAgentMemoryRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[AgentMemoryEntry]:
+        return _envelope(request, await runtime.control_plane.put_agent_memory(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/agents/memory", tags=["Agent"])
+    async def get_agent_memory(
+        namespace: str,
+        key: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[AgentMemoryEntry | None]:
+        return _envelope(request, await runtime.control_plane.get_agent_memory(context, namespace, key))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/workers", status_code=201, tags=["Operations"])
+    async def register_worker(
+        body: RegisterWorkerRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[WorkerLease]:
+        return _envelope(request, await runtime.control_plane.register_worker(context, body))  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/workers/{worker_id}/heartbeat", tags=["Operations"])
+    async def heartbeat_worker(
+        worker_id: str,
+        body: WorkerHeartbeatRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[WorkerLease]:
+        return _envelope(request, await runtime.control_plane.heartbeat_worker(context, worker_id, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/workers", tags=["Operations"])
+    async def list_workers(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[list[WorkerLease]]:
+        return _envelope(request, await runtime.control_plane.list_workers(context))  # type: ignore[return-value]
+
+    @app.get("/api/v1/platform/deployment/topology", tags=["Operations"])
+    async def deployment_topology(
+        request: Request, context: PrincipalContext = Depends(principal_context)
+    ) -> ApiEnvelope[DeploymentTopology]:
+        return _envelope(request, await runtime.control_plane.topology(context))  # type: ignore[return-value]
 
     @app.get("/api/v1/system/status", tags=["Operations"])
     async def system_status(

@@ -6,6 +6,9 @@ from typing import Any, Protocol
 from scenara.platform.models import PrincipalContext
 
 RESOURCE_PRODUCTS = {
+    "audit_event": "console",
+    "dataset": "data",
+    "dataset_version": "data",
     "enterprise_compliance": "console",
     "enterprise_incident": "console",
     "enterprise_sla": "console",
@@ -22,6 +25,8 @@ RESOURCE_PRODUCTS = {
     "pipeline": "parse",
     "portrait_feature": "parse",
     "portrait_identity": "parse",
+    "search_index": "parse",
+    "saved_search": "search",
     "run": "parse",
     "webhook_delivery": "api",
     "webhook_subscription": "api",

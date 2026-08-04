@@ -95,6 +95,7 @@ def compare_embeddings(space: FeatureSpace, left: list[float], right: list[float
         if left_norm == 0 or right_norm == 0:
             raise FeatureStoreError("cosine comparison rejects a zero vector")
         score = sum(a * b for a, b in zip(left, right, strict=True)) / (left_norm * right_norm)
+        score = max(-1.0, min(1.0, score))
         return score, 1.0 - score
     if space.distance_metric == DistanceMetric.L2:
         distance = math.sqrt(sum((a - b) ** 2 for a, b in zip(left, right, strict=True)))

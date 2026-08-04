@@ -13,6 +13,7 @@ from uuid import uuid4
 
 from scenara.platform.artifacts import RunArtifactSink
 from scenara.platform.audit import AuditLogger
+from scenara.platform.index import IndexDefinition, IndexRecord, IndexRecordKind, IndexSourceRef, IndexStore
 from scenara.platform.media_batch import MediaInput, inspect_media
 from scenara.platform.model_runtime import RuntimeModelBinding, runtime_binding_scope
 from scenara.platform.models import (
@@ -108,6 +109,7 @@ class RunService:
         run_artifact_max_frames: int = 64,
         run_artifact_crop_max_edge: int = 256,
         run_artifact_frame_max_edge: int = 1920,
+        indexes: IndexStore | None = None,
     ) -> None:
         self.state = state
         self.objects = objects
@@ -132,6 +134,7 @@ class RunService:
         self.run_artifact_max_frames = run_artifact_max_frames
         self.run_artifact_crop_max_edge = run_artifact_crop_max_edge
         self.run_artifact_frame_max_edge = run_artifact_frame_max_edge
+        self.indexes = indexes
         self.queue.set_handler(self.execute_run)
 
     async def create_asset(
@@ -345,6 +348,8 @@ class RunService:
             await self.objects.delete(object_key)
         await self.state.mark_objects_deleted(object_keys, time.time())
         await self.state.delete_asset(context.tenant_id, context.project_id, asset_id)
+        if self.indexes is not None:
+            await self.indexes.delete_asset(context.tenant_id, context.project_id, asset_id)
 
     async def create_source(
         self,
@@ -1135,6 +1140,12 @@ class RunService:
                     expires_at=run.created_at + self.preview_retention_days * 86_400,
                 ):
                     await self.state.track_object(record)
+            if not partial and self.indexes is not None:
+                try:
+                    await self._index_result(run, result)
+                except Exception:
+                    logger.exception("result index update failed for run %s", run.run_id)
+                    reference = reference.model_copy(update={"index_status": "partial"})
             await self.state.save_result_reference(run.tenant_id, run.project_id, reference)
             if previous is not None and previous.object_key != reference.object_key:
                 previous_keys = [previous.object_key, *previous.shard_keys]
@@ -1151,6 +1162,177 @@ class RunService:
             with suppress(Exception):
                 await self.state.mark_objects_deleted(written_keys, time.time())
             raise
+
+    async def _index_result(self, run: RunRecord, result: ResultEnvelope) -> None:
+        if self.indexes is None:
+            return
+        index_id = f"result.{result.domain}"
+        await self.indexes.delete_source(run.tenant_id, run.project_id, "run_result", run.run_id)
+        await self.indexes.create_index(
+            IndexDefinition(
+                index_id=index_id,
+                domain=result.domain,
+                record_kind=IndexRecordKind.MULTIMODAL,
+                text_analyzer="simple",
+            )
+        )
+        index_expires_at = run.created_at + self.structured_result_retention_days * 86_400
+
+        def safe_metadata(value: object) -> dict[str, object]:
+            if not isinstance(value, dict):
+                return {}
+            return {
+                str(key): nested
+                for key, nested in value.items()
+                if str(key) not in {"embedding", "_tracking_embedding", "vector", "crop"}
+                and isinstance(nested, (str, int, float, bool, list, dict, type(None)))
+            }
+
+        records: list[IndexRecord] = []
+        for unit in result.units:
+            for item in unit.objects:
+                records.append(
+                    IndexRecord(
+                        record_id=f"idxr_{run.run_id}_{unit.unit_id}_{item.object_id}",
+                        tenant_id=run.tenant_id,
+                        project_id=run.project_id,
+                        index_id=index_id,
+                        domain=result.domain,
+                        kind=IndexRecordKind.MULTIMODAL,
+                        source=IndexSourceRef(
+                            source_type="run_result",
+                            source_id=run.run_id,
+                            asset_id=run.asset_id,
+                            run_id=run.run_id,
+                            unit_id=unit.unit_id,
+                            object_id=item.object_id,
+                            artifact_id=item.crop_artifact_id,
+                            page_number=unit.page_number,
+                            pts_ms=unit.pts_ms,
+                        ),
+                        metadata={
+                            "object_type": item.object_type,
+                            "score": item.score,
+                            "bbox": item.bbox.model_dump(mode="json") if item.bbox else None,
+                            "attributes": safe_metadata(item.attributes),
+                            "source_id": run.source_id,
+                        },
+                        expires_at=index_expires_at,
+                    )
+                )
+        payload = result.domain_payload
+        full_text = str(getattr(payload, "text", "") or "")
+        if full_text:
+            records.append(
+                IndexRecord(
+                    record_id=f"idxr_{run.run_id}_text",
+                    tenant_id=run.tenant_id,
+                    project_id=run.project_id,
+                    index_id=index_id,
+                    domain=result.domain,
+                    kind=IndexRecordKind.MULTIMODAL,
+                    source=IndexSourceRef(
+                        source_type="run_result",
+                        source_id=run.run_id,
+                        asset_id=run.asset_id,
+                        run_id=run.run_id,
+                    ),
+                    text=full_text,
+                    metadata={
+                        "language": getattr(payload, "language", None),
+                        "block_count": len(getattr(payload, "blocks", [])),
+                        "source_id": run.source_id,
+                    },
+                    expires_at=index_expires_at,
+                )
+            )
+        for block in getattr(payload, "blocks", []):
+            block_id = str(getattr(block, "block_id", ""))
+            text = str(getattr(block, "text", "") or "")
+            if not block_id or not text:
+                continue
+            records.append(
+                IndexRecord(
+                    record_id=f"idxr_{run.run_id}_block_{block_id}",
+                    tenant_id=run.tenant_id,
+                    project_id=run.project_id,
+                    index_id=index_id,
+                    domain=result.domain,
+                    kind=IndexRecordKind.MULTIMODAL,
+                    source=IndexSourceRef(
+                        source_type="run_result",
+                        source_id=run.run_id,
+                        asset_id=run.asset_id,
+                        run_id=run.run_id,
+                    ),
+                    text=text,
+                    metadata={
+                        "score": getattr(block, "score", None),
+                        "block_type": getattr(block, "block_type", "text"),
+                        "source_id": run.source_id,
+                    },
+                    expires_at=index_expires_at,
+                )
+            )
+        for record in records:
+            await self.indexes.upsert(record)
+        for hint in result._index_vectors:
+            vector_index_id = f"result.{hint.feature_space_id}"
+            await self.indexes.create_index(
+                IndexDefinition(
+                    index_id=vector_index_id,
+                    domain=result.domain,
+                    record_kind=IndexRecordKind.VECTOR,
+                    vector_dimension=len(hint.vector),
+                    vector_model_id=hint.model_id,
+                    vector_model_version=hint.model_version,
+                    distance_metric="cosine",
+                    threshold=0.8,
+                )
+            )
+            location: tuple[str | None, int | None, int | None, int | None] = (None, None, None, None)
+            artifact_id: str | None = None
+            for unit in result.units:
+                for item in unit.objects:
+                    if item.object_id == hint.object_id:
+                        location = (unit.unit_id, unit.page_number, unit.pts_ms, unit.index)
+                        artifact_id = item.crop_artifact_id
+                        break
+                if location[0] is not None:
+                    break
+            unit_id, page_number, pts_ms, unit_index = location
+            await self.indexes.upsert(
+                IndexRecord(
+                    record_id=f"idxv_{run.run_id}_{hint.object_id}",
+                    tenant_id=run.tenant_id,
+                    project_id=run.project_id,
+                    index_id=vector_index_id,
+                    domain=result.domain,
+                    kind=IndexRecordKind.VECTOR,
+                    source=IndexSourceRef(
+                        source_type="run_result",
+                        source_id=run.run_id,
+                        asset_id=run.asset_id,
+                        run_id=run.run_id,
+                        unit_id=unit_id,
+                        object_id=hint.object_id,
+                        artifact_id=artifact_id,
+                        page_number=page_number,
+                        pts_ms=pts_ms,
+                    ),
+                    vector=hint.vector,
+                    metadata={
+                        "object_type": "face",
+                        "feature_space_id": hint.feature_space_id,
+                        "model_id": hint.model_id,
+                        "model_version": hint.model_version,
+                        "quality": hint.quality,
+                        "unit_index": unit_index,
+                        "source_id": run.source_id,
+                    },
+                    expires_at=index_expires_at,
+                )
+            )
 
     async def _discard_partial_result(self, run: RunRecord) -> None:
         try:

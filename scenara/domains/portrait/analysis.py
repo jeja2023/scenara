@@ -19,6 +19,7 @@ from scenara.platform.models import (
     PortraitDomainPayload,
     ProvenanceEvidence,
     ResultEnvelope,
+    ResultIndexVector,
     ResultRelation,
     VisionObject,
 )
@@ -322,6 +323,7 @@ class PortraitFullAnalysisOperator:
         faces: list[VisionObject] = []
         unit_results: list[MediaUnitResult] = []
         relations: list[ResultRelation] = []
+        index_vectors: list[ResultIndexVector] = []
         for unit, analysis in zip(decoded.units, output.units, strict=True):
             objects: list[VisionObject] = []
             unit_persons: list[VisionObject] = []
@@ -351,6 +353,26 @@ class PortraitFullAnalysisOperator:
                 )
                 faces.append(face)
                 objects.append(face)
+                embedding = item.get("embedding")
+                if isinstance(embedding, list) and embedding:
+                    model_id = str(item.get("embedding_model_id") or item.get("model_id") or "unknown")
+                    model_version = str(
+                        item.get("embedding_model_version") or item.get("model_version") or "unknown"
+                    )
+                    quality = item.get("quality")
+                    quality_score = None
+                    if isinstance(quality, dict) and quality.get("score") is not None:
+                        quality_score = max(0.0, min(1.0, float(quality["score"])))
+                    index_vectors.append(
+                        ResultIndexVector(
+                            object_id=face.object_id,
+                            feature_space_id=f"portrait.face.{model_id}.{model_version}",
+                            model_id=model_id,
+                            model_version=model_version,
+                            vector=[float(value) for value in embedding],
+                            quality=quality_score,
+                        )
+                    )
                 if unit_persons:
                     relations.append(
                         ResultRelation(
@@ -422,6 +444,7 @@ class PortraitFullAnalysisOperator:
             provenance=ProvenanceEvidence(development_substitutes=sorted(output.development_substitutes)),
             created_at=time.time(),
         )
+        result._index_vectors = index_vectors
         return {"result": result}
 
 

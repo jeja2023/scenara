@@ -9,6 +9,8 @@ from scenara.platform.audit import AuditEvent
 from scenara.platform.model_runtime import ModelPackageManifest
 from scenara.platform.models import (
     TERMINAL_RUN_STATUSES,
+    DatasetRecord,
+    DatasetVersion,
     MediaAsset,
     MediaSource,
     ObjectRetentionRecord,
@@ -17,6 +19,7 @@ from scenara.platform.models import (
     RunEvent,
     RunRecord,
     RunStatus,
+    SavedSearch,
     WebhookDeliveryRecord,
     WebhookSubscription,
 )
@@ -31,6 +34,9 @@ class MemoryStateStore:
         self._lock = asyncio.Lock()
         self._assets: dict[tuple[str, str, str], MediaAsset] = {}
         self._sources: dict[tuple[str, str, str], MediaSource] = {}
+        self._datasets: dict[tuple[str, str, str], DatasetRecord] = {}
+        self._dataset_versions: dict[tuple[str, str, str], DatasetVersion] = {}
+        self._saved_searches: dict[tuple[str, str, str], SavedSearch] = {}
         self._runs: dict[tuple[str, str, str], RunRecord] = {}
         self._events: dict[tuple[str, str, str], list[RunEvent]] = {}
         self._results: dict[tuple[str, str, str], ResultReference] = {}
@@ -276,6 +282,161 @@ class MemoryStateStore:
         async with self._lock:
             return self._sources.pop(self._key(tenant_id, project_id, source_id), None)
 
+    async def create_dataset(self, dataset: DatasetRecord) -> DatasetRecord:
+        async with self._lock:
+            key = self._key(dataset.tenant_id, dataset.project_id, dataset.dataset_id)
+            if key in self._datasets:
+                raise StateConflict("dataset already exists")
+            self._datasets[key] = dataset.model_copy(deep=True)
+            return dataset.model_copy(deep=True)
+
+    async def get_dataset(self, tenant_id: str, project_id: str, dataset_id: str) -> DatasetRecord | None:
+        async with self._lock:
+            value = self._datasets.get(self._key(tenant_id, project_id, dataset_id))
+            return value.model_copy(deep=True) if value else None
+
+    async def list_datasets(
+        self, tenant_id: str, project_id: str, *, offset: int = 0, limit: int = 50
+    ) -> list[DatasetRecord]:
+        if offset < 0 or not 1 <= limit <= 200:
+            raise StateConflict("invalid dataset pagination")
+        async with self._lock:
+            rows = [
+                item
+                for key, item in self._datasets.items()
+                if key[:2] == (tenant_id, project_id)
+            ]
+            rows.sort(key=lambda item: (item.updated_at, item.dataset_id), reverse=True)
+            return [item.model_copy(deep=True) for item in rows[offset : offset + limit]]
+
+    async def count_datasets(self, tenant_id: str, project_id: str) -> int:
+        async with self._lock:
+            return sum(1 for key in self._datasets if key[:2] == (tenant_id, project_id))
+
+    async def save_dataset(self, dataset: DatasetRecord) -> DatasetRecord:
+        async with self._lock:
+            key = self._key(dataset.tenant_id, dataset.project_id, dataset.dataset_id)
+            if key not in self._datasets:
+                raise StateConflict("dataset not found")
+            self._datasets[key] = dataset.model_copy(deep=True)
+            return dataset.model_copy(deep=True)
+
+    async def create_dataset_version(self, version: DatasetVersion) -> DatasetVersion:
+        async with self._lock:
+            key = self._key(version.tenant_id, version.project_id, version.version_id)
+            if key in self._dataset_versions:
+                raise StateConflict("dataset version already exists")
+            duplicate = any(
+                item.dataset_id == version.dataset_id and item.version == version.version
+                for item in self._dataset_versions.values()
+                if (item.tenant_id, item.project_id) == (version.tenant_id, version.project_id)
+            )
+            if duplicate:
+                raise StateConflict("dataset version already exists")
+            self._dataset_versions[key] = version.model_copy(deep=True)
+            return version.model_copy(deep=True)
+
+    async def get_dataset_version(
+        self, tenant_id: str, project_id: str, version_id: str
+    ) -> DatasetVersion | None:
+        async with self._lock:
+            value = self._dataset_versions.get(self._key(tenant_id, project_id, version_id))
+            return value.model_copy(deep=True) if value else None
+
+    async def save_dataset_version(self, version: DatasetVersion) -> DatasetVersion:
+        async with self._lock:
+            key = self._key(version.tenant_id, version.project_id, version.version_id)
+            if key not in self._dataset_versions:
+                raise StateConflict("dataset version not found")
+            self._dataset_versions[key] = version.model_copy(deep=True)
+            return version.model_copy(deep=True)
+
+    async def list_dataset_versions(
+        self,
+        tenant_id: str,
+        project_id: str,
+        dataset_id: str,
+        *,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> list[DatasetVersion]:
+        if offset < 0 or not 1 <= limit <= 200:
+            raise StateConflict("invalid dataset version pagination")
+        async with self._lock:
+            rows = [
+                item
+                for key, item in self._dataset_versions.items()
+                if key[:2] == (tenant_id, project_id) and item.dataset_id == dataset_id
+            ]
+            rows.sort(key=lambda item: (item.created_at, item.version_id), reverse=True)
+            return [item.model_copy(deep=True) for item in rows[offset : offset + limit]]
+
+    async def count_dataset_versions(self, tenant_id: str, project_id: str, dataset_id: str) -> int:
+        async with self._lock:
+            return sum(
+                1
+                for key, item in self._dataset_versions.items()
+                if key[:2] == (tenant_id, project_id) and item.dataset_id == dataset_id
+            )
+
+    async def create_saved_search(self, saved_search: SavedSearch) -> SavedSearch:
+        async with self._lock:
+            key = self._key(saved_search.tenant_id, saved_search.project_id, saved_search.saved_search_id)
+            if key in self._saved_searches:
+                raise StateConflict("saved search already exists")
+            duplicate = any(
+                item.name == saved_search.name
+                for item in self._saved_searches.values()
+                if (item.tenant_id, item.project_id) == (saved_search.tenant_id, saved_search.project_id)
+            )
+            if duplicate:
+                raise StateConflict("saved search name already exists")
+            self._saved_searches[key] = saved_search.model_copy(deep=True)
+            return saved_search.model_copy(deep=True)
+
+    async def get_saved_search(
+        self, tenant_id: str, project_id: str, saved_search_id: str
+    ) -> SavedSearch | None:
+        async with self._lock:
+            value = self._saved_searches.get(self._key(tenant_id, project_id, saved_search_id))
+            return value.model_copy(deep=True) if value else None
+
+    async def list_saved_searches(
+        self, tenant_id: str, project_id: str, *, offset: int = 0, limit: int = 50
+    ) -> list[SavedSearch]:
+        if offset < 0 or not 1 <= limit <= 200:
+            raise StateConflict("invalid saved search pagination")
+        async with self._lock:
+            rows = [item for key, item in self._saved_searches.items() if key[:2] == (tenant_id, project_id)]
+            rows.sort(key=lambda item: (item.updated_at, item.saved_search_id), reverse=True)
+            return [item.model_copy(deep=True) for item in rows[offset : offset + limit]]
+
+    async def count_saved_searches(self, tenant_id: str, project_id: str) -> int:
+        async with self._lock:
+            return sum(1 for key in self._saved_searches if key[:2] == (tenant_id, project_id))
+
+    async def save_saved_search(self, saved_search: SavedSearch) -> SavedSearch:
+        async with self._lock:
+            key = self._key(saved_search.tenant_id, saved_search.project_id, saved_search.saved_search_id)
+            if key not in self._saved_searches:
+                raise StateConflict("saved search not found")
+            duplicate = any(
+                item.name == saved_search.name and item.saved_search_id != saved_search.saved_search_id
+                for item in self._saved_searches.values()
+                if (item.tenant_id, item.project_id) == (saved_search.tenant_id, saved_search.project_id)
+            )
+            if duplicate:
+                raise StateConflict("saved search name already exists")
+            self._saved_searches[key] = saved_search.model_copy(deep=True)
+            return saved_search.model_copy(deep=True)
+
+    async def delete_saved_search(
+        self, tenant_id: str, project_id: str, saved_search_id: str
+    ) -> SavedSearch | None:
+        async with self._lock:
+            value = self._saved_searches.pop(self._key(tenant_id, project_id, saved_search_id), None)
+            return value.model_copy(deep=True) if value else None
+
     async def create_run_idempotent(
         self,
         run: RunRecord,
@@ -518,7 +679,10 @@ class MemoryStateStore:
                 if (row_tenant, row_project) == (tenant_id, project_id)
                 and (domain is None or item.domain == domain)
                 and (media_kind is None or (item.media_kind and item.media_kind.value == media_kind))
-                and (query is None or query.lower() in json.dumps(item.model_dump(mode="json"), ensure_ascii=False).lower())
+                and (
+                    query is None
+                    or query.lower() in json.dumps(item.model_dump(mode="json"), ensure_ascii=False).lower()
+                )
             ]
             rows.sort(key=lambda item: (item.created_at, item.run_id), reverse=True)
             sliced = rows[offset:] if limit is None else rows[offset : offset + limit]
@@ -549,6 +713,17 @@ class MemoryStateStore:
     async def audit_events(self, tenant_id: str, project_id: str) -> list[AuditEvent]:
         async with self._lock:
             return [item for item in self._audits if item.tenant_id == tenant_id and item.project_id == project_id]
+
+    async def delete_audit_events_before(self, tenant_id: str, project_id: str, before: float) -> int:
+        async with self._lock:
+            retained = [
+                item
+                for item in self._audits
+                if not (item.tenant_id == tenant_id and item.project_id == project_id and item.created_at < before)
+            ]
+            deleted = len(self._audits) - len(retained)
+            self._audits = retained
+            return deleted
 
     async def track_object(self, record: ObjectRetentionRecord) -> None:
         async with self._lock:

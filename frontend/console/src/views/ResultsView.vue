@@ -115,10 +115,12 @@ async function refresh(): Promise<void> {
     }
     const requestedRun =
       typeof route.query.run === "string" ? route.query.run : "";
+    const requestedUnit =
+      typeof route.query.unit === "string" ? route.query.unit : "";
     const requestedItem = requestedRun
       ? items.value.find((item) => item.run_id === requestedRun)
       : null;
-    if (requestedItem) await openResult(requestedItem);
+    if (requestedItem) await openResult(requestedItem, requestedUnit);
     else if (!selected.value && items.value[0])
       await openResult(items.value[0]);
     if (!items.value.length) {
@@ -132,7 +134,7 @@ async function refresh(): Promise<void> {
   }
 }
 
-async function openResult(item: ResultSummary): Promise<void> {
+async function openResult(item: ResultSummary, unitId = ""): Promise<void> {
   selected.value = item;
   detailLoading.value = true;
   error.value = "";
@@ -142,7 +144,10 @@ async function openResult(item: ResultSummary): Promise<void> {
     );
     result.value = page.result;
     unitTotal.value = page.unit_total;
-    selectedUnit.value = result.value.units[0] ?? null;
+    selectedUnit.value =
+      result.value.units.find((unit) => unit.unit_id === unitId) ??
+      result.value.units[0] ??
+      null;
   } catch (caught) {
     result.value = null;
     error.value = userFacingError(caught, "结果详情加载失败，请稍后重试");

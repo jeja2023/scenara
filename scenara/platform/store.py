@@ -5,6 +5,8 @@ from typing import Protocol
 from scenara.platform.audit import AuditEvent
 from scenara.platform.model_runtime import ModelPackageManifest
 from scenara.platform.models import (
+    DatasetRecord,
+    DatasetVersion,
     MediaAsset,
     MediaSource,
     ObjectRetentionRecord,
@@ -13,6 +15,7 @@ from scenara.platform.models import (
     RunEvent,
     RunRecord,
     RunStatus,
+    SavedSearch,
     WebhookDeliveryRecord,
     WebhookSubscription,
 )
@@ -111,6 +114,61 @@ class StateStore(Protocol):
     async def count_sources(self, tenant_id: str, project_id: str) -> int: ...
 
     async def delete_source(self, tenant_id: str, project_id: str, source_id: str) -> MediaSource | None: ...
+
+    async def create_dataset(self, dataset: DatasetRecord) -> DatasetRecord: ...
+
+    async def get_dataset(self, tenant_id: str, project_id: str, dataset_id: str) -> DatasetRecord | None: ...
+
+    async def list_datasets(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> list[DatasetRecord]: ...
+
+    async def count_datasets(self, tenant_id: str, project_id: str) -> int: ...
+
+    async def save_dataset(self, dataset: DatasetRecord) -> DatasetRecord: ...
+
+    async def create_dataset_version(self, version: DatasetVersion) -> DatasetVersion: ...
+
+    async def save_dataset_version(self, version: DatasetVersion) -> DatasetVersion: ...
+
+    async def get_dataset_version(
+        self, tenant_id: str, project_id: str, version_id: str
+    ) -> DatasetVersion | None: ...
+
+    async def list_dataset_versions(
+        self,
+        tenant_id: str,
+        project_id: str,
+        dataset_id: str,
+        *,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> list[DatasetVersion]: ...
+
+    async def count_dataset_versions(self, tenant_id: str, project_id: str, dataset_id: str) -> int: ...
+
+    async def create_saved_search(self, saved_search: SavedSearch) -> SavedSearch: ...
+
+    async def get_saved_search(
+        self, tenant_id: str, project_id: str, saved_search_id: str
+    ) -> SavedSearch | None: ...
+
+    async def list_saved_searches(
+        self, tenant_id: str, project_id: str, *, offset: int = 0, limit: int = 50
+    ) -> list[SavedSearch]: ...
+
+    async def count_saved_searches(self, tenant_id: str, project_id: str) -> int: ...
+
+    async def save_saved_search(self, saved_search: SavedSearch) -> SavedSearch: ...
+
+    async def delete_saved_search(
+        self, tenant_id: str, project_id: str, saved_search_id: str
+    ) -> SavedSearch | None: ...
 
     async def create_run_idempotent(
         self,
@@ -212,6 +270,8 @@ class StateStore(Protocol):
     async def mark_objects_deleted(self, object_keys: list[str], deleted_at: float) -> None: ...
 
     async def audit_events(self, tenant_id: str, project_id: str) -> list[AuditEvent]: ...
+
+    async def delete_audit_events_before(self, tenant_id: str, project_id: str, before: float) -> int: ...
 
 
 __all__ = ["StateConflict", "StateStore"]

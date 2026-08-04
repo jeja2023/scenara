@@ -70,6 +70,26 @@ class PostgresAccessRepository:
         rows = await self._list_documents("scenara_users", "tenant_id = %s", (tenant_id,))
         return [UserAccount.model_validate(row) for row in rows]
 
+    async def save_user(self, record: UserAccount) -> UserAccount:
+        from psycopg.types.json import Jsonb
+
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """UPDATE scenara_users
+                   SET disabled = %s, updated_at = to_timestamp(%s::double precision), document = %s
+                   WHERE tenant_id = %s AND user_id = %s""",
+                (
+                    record.disabled,
+                    record.updated_at,
+                    Jsonb(record.model_dump(mode="json")),
+                    record.tenant_id,
+                    record.user_id,
+                ),
+            )
+            if cursor.rowcount == 0:
+                raise AccessNotFound("user not found")
+        return record.model_copy(deep=True)
+
     async def create_role(self, record: Role) -> Role:
         await self._insert_document(
             "scenara_roles",
@@ -161,6 +181,27 @@ class PostgresAccessRepository:
             "scenara_service_accounts", "tenant_id = %s AND project_id = %s", (tenant_id, project_id)
         )
         return [ServiceAccount.model_validate(row) for row in rows]
+
+    async def save_service_account(self, record: ServiceAccount) -> ServiceAccount:
+        from psycopg.types.json import Jsonb
+
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """UPDATE scenara_service_accounts
+                   SET disabled = %s, updated_at = to_timestamp(%s::double precision), document = %s
+                   WHERE tenant_id = %s AND project_id = %s AND service_account_id = %s""",
+                (
+                    record.disabled,
+                    record.updated_at,
+                    Jsonb(record.model_dump(mode="json")),
+                    record.tenant_id,
+                    record.project_id,
+                    record.service_account_id,
+                ),
+            )
+            if cursor.rowcount == 0:
+                raise AccessNotFound("service account not found")
+        return record.model_copy(deep=True)
 
     async def create_api_key(self, record: ApiKeyRecord, *, token_sha256: str) -> ApiKeyRecord:
         await self._insert_document(

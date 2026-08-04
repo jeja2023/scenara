@@ -47,6 +47,7 @@ function localizedHttpError(status: number, code: string): string {
     FEEDBACK_CONFLICT: "反馈或发布状态冲突，请刷新后重试",
     FEEDBACK_NOT_FOUND: "未找到指定的反馈或发布记录",
     INVALID_ARGUMENT: "提交的参数无效，请检查后重试",
+    INDEX_CONTRACT_ERROR: "索引契约不匹配，请刷新索引或调整输入",
     INVALID_RUN_TRANSITION: "当前运行状态不允许执行此操作",
     NETWORK_ERROR: "无法连接到服务，请检查接口地址和网络",
     NOT_FOUND: "未找到请求的资源",
@@ -54,6 +55,7 @@ function localizedHttpError(status: number, code: string): string {
     POLICY_DENIED: "当前身份无权执行此操作",
     POLICY_UNAVAILABLE: "权限策略服务不可用，请稍后重试",
     PORTRAIT_CONFLICT: "人像数据状态冲突，请刷新后重试",
+    PORTRAIT_ENCODING_ERROR: "图片无法提取有效人像特征，请更换清晰图片",
     PORTRAIT_NOT_FOUND: "未找到指定的人像数据",
     STATE_CONFLICT: "数据状态已变化，请刷新后重试",
     VALIDATION_ERROR: "提交内容未通过校验，请检查必填项和格式",
@@ -136,6 +138,10 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     );
   }
   return (body as Envelope<T>).data;
+}
+
+export async function apiForm<T>(path: string, form: FormData): Promise<T> {
+  return api<T>(path, { method: "POST", body: form });
 }
 
 export async function apiBlob(path: string): Promise<Blob> {

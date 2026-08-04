@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "eaa6fb8c12733cca0af76dfce006f159a74881092e62b649b1a8c2f9e50aedab" /** gitleaks:allow - public contract digest */;
+export declare const OPENAPI_SHA256 = "e76a4c676e437b47d454728bd148d98f3cc9fa471fb1e6022ef6162ee78788d2" /** gitleaks:allow - public contract digest */;
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
@@ -21,13 +21,165 @@ export declare namespace OpenApi {
         tenant_id: string;
     };
     type AccessId = string;
+    type AcknowledgeEdgeDeploymentRequest = {
+        applied?: boolean;
+        error?: (string) | (null);
+    };
+    type AcknowledgeEdgeSyncRequest = {
+        acknowledged?: boolean;
+    };
+    type AgentAction = {
+        created_at: number;
+        created_by: string;
+        error?: (string) | (null);
+        input?: {
+            [key: string]: unknown;
+        };
+        output?: {
+            [key: string]: unknown;
+        };
+        project_id: string;
+        record_id: string;
+        status?: AgentActionStatus;
+        tenant_id: string;
+        tool_id: string;
+        updated_at: number;
+    };
+    type AgentActionStatus = "proposed" | "pending_approval" | "approved" | "rejected" | "executed" | "failed";
+    type AgentEvaluation = {
+        created_at: number;
+        created_by: string;
+        policy_violation_count?: number;
+        project_id: string;
+        record_id: string;
+        sample_count: number;
+        success_rate: number;
+        suite_name: string;
+        tenant_id: string;
+    };
+    type AgentMemoryEntry = {
+        expires_at?: (number) | (null);
+        key: string;
+        namespace: string;
+        project_id: string;
+        record_id: string;
+        tenant_id: string;
+        updated_at: number;
+        updated_by: string;
+        value?: {
+            [key: string]: unknown;
+        };
+    };
+    type AgentTool = {
+        created_at: number;
+        description: string;
+        enabled?: boolean;
+        name: string;
+        project_id: string;
+        record_id: string;
+        requires_approval?: boolean;
+        scopes?: Array<string>;
+        tenant_id: string;
+    };
+    type AgentTrace = {
+        action_id?: (string) | (null);
+        created_at: number;
+        created_by: string;
+        payload?: {
+            [key: string]: unknown;
+        };
+        project_id: string;
+        record_id: string;
+        tenant_id: string;
+        trace_type: string;
+    };
+    type AnnotationProvider = {
+        created_at: number;
+        enabled?: boolean;
+        endpoint: string;
+        kind: string;
+        last_health?: string;
+        name: string;
+        project_id: string;
+        record_id: string;
+        tenant_id: string;
+        updated_at: number;
+    };
+    type AnnotationTask = {
+        asset_ids: Array<string>;
+        assignee?: (string) | (null);
+        consistency_score?: (number) | (null);
+        created_at: number;
+        created_by: string;
+        labels?: {
+            [key: string]: unknown;
+        };
+        project_id: string;
+        record_id: string;
+        review_comment?: string;
+        schema_name: string;
+        status?: AnnotationTaskStatus;
+        tenant_id: string;
+        updated_at: number;
+    };
+    type AnnotationTaskStatus = "queued" | "in_review" | "approved" | "rejected";
     type ApiEnvelope_AccessFoundationStatus_ = {
         data: AccessFoundationStatus;
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_AgentAction_ = {
+        data: AgentAction;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_AgentEvaluation_ = {
+        data: AgentEvaluation;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_AgentMemoryEntry_ = {
+        data: AgentMemoryEntry;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_AgentTool_ = {
+        data: AgentTool;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_AgentTrace_ = {
+        data: AgentTrace;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_AnnotationProvider_ = {
+        data: AnnotationProvider;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_AnnotationTask_ = {
+        data: AnnotationTask;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_ApiKeyRecord_ = {
         data: ApiKeyRecord;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_AuditEventPage_ = {
+        data: AuditEventPage;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_AuditRetentionPolicy_ = {
+        data: AuditRetentionPolicy;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_BillingAccount_ = {
+        data: BillingAccount;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -41,6 +193,46 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_DatasetPage_ = {
+        data: DatasetPage;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_DatasetRecord_ = {
+        data: DatasetRecord;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_DatasetVersionPage_ = {
+        data: DatasetVersionPage;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_DatasetVersion_ = {
+        data: DatasetVersion;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_DeploymentTopology_ = {
+        data: DeploymentTopology;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_EdgeDeployment_ = {
+        data: EdgeDeployment;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_EdgeDevice_ = {
+        data: EdgeDevice;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_EdgeSyncItem_ = {
+        data: EdgeSyncItem;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_EnterpriseStatus_ = {
         data: EnterpriseStatus;
         request_id: string;
@@ -48,6 +240,21 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_FeedbackRecord_ = {
         data: FeedbackRecord;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_FlowApproval_ = {
+        data: FlowApproval;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_FlowDefinition_ = {
+        data: FlowDefinition;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_FlowExecution_ = {
+        data: FlowExecution;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -61,8 +268,28 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_IdentityProvider_ = {
+        data: IdentityProvider;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_Incident_ = {
         data: Incident;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_IndexBackend_ = {
+        data: IndexBackend;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_IndexDefinition_ = {
+        data: IndexDefinition;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_IndexRebuildJob_ = {
+        data: IndexRebuildJob;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -96,6 +323,21 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_MeterEvent_ = {
+        data: MeterEvent;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_ModelHealthSnapshot_ = {
+        data: ModelHealthSnapshot;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_ModelMetricPoint_ = {
+        data: ModelMetricPoint;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_ModelPackageManifest_ = {
         data: ModelPackageManifest;
         request_id: string;
@@ -126,6 +368,16 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_PortraitAssociation_ = {
+        data: PortraitAssociation;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_PortraitCluster_ = {
+        data: PortraitCluster;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_PortraitCompareResponse_ = {
         data: PortraitCompareResponse;
         request_id: string;
@@ -133,6 +385,11 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_PortraitEnrollment_ = {
         data: PortraitEnrollment;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_PortraitEvent_ = {
+        data: PortraitEvent;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -161,8 +418,28 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_ProjectLifecycleRequest_ = {
+        data: ProjectLifecycleRequest;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_Project_ = {
         data: Project;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_PurgeAuditResponse_ = {
+        data: PurgeAuditResponse;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_QuotaCheckResponse_ = {
+        data: QuotaCheckResponse;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_QuotaPlan_ = {
+        data: QuotaPlan;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -173,6 +450,11 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_RepositoryTopology_ = {
         data: RepositoryTopology;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_ResourceLifecycleRecord_ = {
+        data: ResourceLifecycleRecord;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -201,8 +483,53 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_SavedSearchPage_ = {
+        data: SavedSearchPage;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_SavedSearch_ = {
+        data: SavedSearch;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_SearchEvaluation_ = {
+        data: SearchEvaluation;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_SearchRankingProfile_ = {
+        data: SearchRankingProfile;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_SearchRelevanceFeedback_ = {
+        data: SearchRelevanceFeedback;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_SearchReranker_ = {
+        data: SearchReranker;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_SearchResponse_ = {
+        data: SearchResponse;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_SeatAssignment_ = {
+        data: SeatAssignment;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_ServiceAccount_ = {
         data: ServiceAccount;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_SessionResponse_ = {
+        data: SessionResponse;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -221,6 +548,11 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_Union_AgentMemoryEntry__NoneType__ = {
+        data: (AgentMemoryEntry) | (null);
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_UserAccount_ = {
         data: UserAccount;
         request_id: string;
@@ -228,6 +560,11 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_WebhookSubscriptionView_ = {
         data: WebhookSubscriptionView;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_WorkerLease_ = {
+        data: WorkerLease;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -245,8 +582,43 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_list_AgentEvaluation__ = {
+        data: Array<AgentEvaluation>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_AgentTool__ = {
+        data: Array<AgentTool>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_AgentTrace__ = {
+        data: Array<AgentTrace>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_AnnotationProvider__ = {
+        data: Array<AnnotationProvider>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_AnnotationTask__ = {
+        data: Array<AnnotationTask>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_list_ApiKeyRecord__ = {
         data: Array<ApiKeyRecord>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_BillingAccount__ = {
+        data: Array<BillingAccount>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_BillingUsage__ = {
+        data: Array<BillingUsage>;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -255,8 +627,28 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_list_EdgeDeployment__ = {
+        data: Array<EdgeDeployment>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_EdgeDevice__ = {
+        data: Array<EdgeDevice>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_list_FeedbackRecord__ = {
         data: Array<FeedbackRecord>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_FlowApproval__ = {
+        data: Array<FlowApproval>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_FlowDefinition__ = {
+        data: Array<FlowDefinition>;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -265,8 +657,33 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_list_IdentityProvider__ = {
+        data: Array<IdentityProvider>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_list_Incident__ = {
         data: Array<Incident>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_IndexBackend__ = {
+        data: Array<IndexBackend>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_IndexDefinition__ = {
+        data: Array<IndexDefinition>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_IndexHit__ = {
+        data: Array<IndexHit>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_IndexRecordView__ = {
+        data: Array<IndexRecordView>;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -290,6 +707,21 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_list_PortraitAssociation__ = {
+        data: Array<PortraitAssociation>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_PortraitCluster__ = {
+        data: Array<PortraitCluster>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_PortraitEvent__ = {
+        data: Array<PortraitEvent>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_list_ProductCatalogItem__ = {
         data: Array<ProductCatalogItem>;
         request_id: string;
@@ -300,13 +732,38 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_list_ProjectLifecycleRequest__ = {
+        data: Array<ProjectLifecycleRequest>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_list_Project__ = {
         data: Array<Project>;
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_list_QuotaPlan__ = {
+        data: Array<QuotaPlan>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_list_Role__ = {
         data: Array<Role>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_SearchRankingProfile__ = {
+        data: Array<SearchRankingProfile>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_SearchReranker__ = {
+        data: Array<SearchReranker>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_SeatAssignment__ = {
+        data: Array<SeatAssignment>;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -335,6 +792,11 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_list_WorkerLease__ = {
+        data: Array<WorkerLease>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_list_dict_str__object___ = {
         data: Array<{
             [key: string]: unknown;
@@ -356,9 +818,96 @@ export declare namespace OpenApi {
         tenant_id: AccessId;
         token_prefix: string;
     };
+    type ApproveAgentActionRequest = {
+        approved: boolean;
+        comment?: string;
+    };
+    type AssignSeatRequest = {
+        account_id: string;
+        user_id: string;
+    };
+    type AuditEventPage = {
+        items: Array<AuditEventView>;
+        limit: number;
+        offset: number;
+        total: number;
+    };
+    type AuditEventView = {
+        action: string;
+        created_at: number;
+        event_id: string;
+        evidence?: {
+            [key: string]: unknown;
+        };
+        outcome: string;
+        principal_id: string;
+        project_id: string;
+        request_id?: (string) | (null);
+        resource_id?: (string) | (null);
+        resource_type: string;
+        tenant_id: string;
+    };
+    type AuditRetentionPolicy = {
+        created_at: number;
+        enabled?: boolean;
+        export_approval_required?: boolean;
+        project_id: string;
+        record_id: string;
+        retention_days: number;
+        tenant_id: string;
+        updated_at: number;
+        updated_by: string;
+    };
+    type BillingAccount = {
+        created_at: number;
+        currency?: string;
+        period_ends_at: number;
+        period_started_at: number;
+        plan_id: string;
+        project_id: string;
+        record_id: string;
+        seat_limit?: number;
+        status?: string;
+        tenant_id: string;
+        updated_at: number;
+    };
+    type BillingUsage = {
+        account_id: string;
+        amount: number;
+        metric: string;
+        period_ends_at: number;
+        period_started_at: number;
+        project_id: string;
+        record_id: string;
+        tenant_id: string;
+        updated_at: number;
+    };
+    type Body_compare_portrait_asset_image_api_v1_portrait_compare_asset_image_post = {
+        asset_id: string;
+        feature_space_id?: (string) | (null);
+        file: string;
+        threshold?: (number) | (null);
+    };
+    type Body_compare_portrait_image_asset_api_v1_portrait_compare_image_asset_post = {
+        asset_id: string;
+        feature_space_id?: (string) | (null);
+        file: string;
+        threshold?: (number) | (null);
+    };
+    type Body_compare_portrait_images_api_v1_portrait_compare_images_post = {
+        feature_space_id?: (string) | (null);
+        left: string;
+        right: string;
+        threshold?: (number) | (null);
+    };
     type Body_create_media_asset_api_v1_media_assets_post = {
         file: string;
         kind?: MediaKind;
+    };
+    type Body_enroll_portrait_identity_image_api_v1_portrait_identities__identity_id__enrollments_image_post = {
+        feature_space_id?: (string) | (null);
+        file: string;
+        quality?: (number) | (null);
     };
     type Body_parse_document_api_v1_parse_document_post = {
         domain?: DomainId;
@@ -390,6 +939,20 @@ export declare namespace OpenApi {
         scene_change_threshold?: number;
         wait_ms?: number;
     };
+    type Body_search_portrait_identities_image_api_v1_portrait_search_image_post = {
+        feature_space_id?: (string) | (null);
+        file: string;
+        limit?: number;
+        threshold?: (number) | (null);
+    };
+    type Body_search_portrait_image_api_v1_search_image_post = {
+        feature_space_id?: (string) | (null);
+        file: string;
+        limit?: number;
+        media_kinds?: (string) | (null);
+        profile_id?: (string) | (null);
+        threshold?: (number) | (null);
+    };
     type BoundingBox = {
         height: number;
         width: number;
@@ -409,6 +972,32 @@ export declare namespace OpenApi {
         signed_by: string;
         tenant_id: string;
     };
+    type CreateAgentEvaluationRequest = {
+        policy_violation_count?: number;
+        sample_count: number;
+        success_rate: number;
+        suite_name: string;
+    };
+    type CreateAgentTraceRequest = {
+        action_id?: (string) | (null);
+        payload?: {
+            [key: string]: unknown;
+        };
+        trace_type: string;
+    };
+    type CreateAnnotationProviderRequest = {
+        endpoint: string;
+        kind: string;
+        name: string;
+    };
+    type CreateAnnotationTaskRequest = {
+        asset_ids: Array<string>;
+        assignee?: (string) | (null);
+        labels?: {
+            [key: string]: unknown;
+        };
+        schema_name: string;
+    };
     type CreateApiKeyRequest = {
         expires_at?: (number) | (null);
         name: string;
@@ -419,6 +1008,12 @@ export declare namespace OpenApi {
         api_key: string;
         record: ApiKeyRecord;
     };
+    type CreateBillingAccountRequest = {
+        currency?: string;
+        period_seconds?: number;
+        plan_id: string;
+        seat_limit?: number;
+    };
     type CreateComplianceEvidenceRequest = {
         evidence_type: string;
         metadata?: {
@@ -427,6 +1022,33 @@ export declare namespace OpenApi {
         object_ref: string;
         sha256: string;
         signed_by: string;
+    };
+    type CreateDatasetRequest = {
+        description?: string;
+        metadata?: {
+            [key: string]: unknown;
+        };
+        name: string;
+    };
+    type CreateDatasetVersionRequest = {
+        annotation_summary?: {
+            [key: string]: unknown;
+        };
+        asset_ids?: Array<string>;
+        lineage?: {
+            [key: string]: unknown;
+        };
+        manifest_sha256: string;
+        quality_score?: (number) | (null);
+        version: string;
+    };
+    type CreateEdgeDeploymentRequest = {
+        artifact_sha256: string;
+        device_id: string;
+        model_id: string;
+        model_version: string;
+        pipeline_id: string;
+        pipeline_version: string;
     };
     type CreateFeedbackRequest = {
         authorized_for_training?: boolean;
@@ -439,12 +1061,25 @@ export declare namespace OpenApi {
         model_version: string;
         run_id: string;
     };
+    type CreateFlowRequest = {
+        entry_node_id: string;
+        name: string;
+        nodes: Array<FlowNode>;
+        version: string;
+    };
     type CreateHardSampleManifestRequest = {
         dataset_id: string;
         feedback_ids: Array<string>;
         label_schema?: string;
         split?: "train" | "validation" | "test";
         version: string;
+    };
+    type CreateIdentityProviderRequest = {
+        client_id: string;
+        display_name: string;
+        issuer_url: string;
+        kind: IdentityProviderKind;
+        scopes?: Array<string>;
     };
     type CreateIdentityRequest = {
         display_name: string;
@@ -457,6 +1092,15 @@ export declare namespace OpenApi {
         started_at?: (number) | (null);
         summary?: string;
         title: string;
+    };
+    type CreateIndexBackendRequest = {
+        capabilities?: Array<string>;
+        endpoint: string;
+        kind: string;
+        name: string;
+    };
+    type CreateIndexRebuildRequest = {
+        index_id: string;
     };
     type CreateMediaSourceRequest = {
         metadata?: {
@@ -480,15 +1124,51 @@ export declare namespace OpenApi {
     type CreateOrganizationRequest = {
         display_name: string;
     };
+    type CreatePortraitAssociationRequest = {
+        feature_space_id: string;
+        left_record_id: string;
+        right_record_id: string;
+        score: number;
+        source?: string;
+    };
+    type CreatePortraitClusterRequest = {
+        confidence?: number;
+        feature_space_id: string;
+        label?: string;
+        member_record_ids: Array<string>;
+    };
+    type CreatePortraitEventRequest = {
+        confidence?: number;
+        ended_at?: (number) | (null);
+        event_type: string;
+        metadata?: {
+            [key: string]: unknown;
+        };
+        source_ids?: Array<string>;
+        started_at: number;
+        subject_record_ids?: Array<string>;
+    };
     type CreateProductEntitlementRequest = {
         product_id: ProductId;
         project_id?: (AccessId) | (null);
         source?: "manual" | "enterprise_license" | "system";
         status?: EntitlementStatus;
     };
+    type CreateProjectLifecycleRequest = {
+        action: string;
+        project_id: string;
+        reason?: string;
+    };
     type CreateProjectRequest = {
         display_name: string;
         project_id?: (AccessId) | (null);
+    };
+    type CreateQuotaPlanRequest = {
+        limits?: {
+            [key: string]: number;
+        };
+        name: string;
+        window_seconds?: number;
     };
     type CreateRoleRequest = {
         display_name: string;
@@ -507,11 +1187,45 @@ export declare namespace OpenApi {
         source_id?: (string) | (null);
         wait_ms?: number;
     };
+    type CreateSavedSearchRequest = {
+        definition?: {
+            [key: string]: unknown;
+        };
+        description?: string;
+        mode: SavedSearchMode;
+        name: string;
+    };
+    type CreateSearchEvaluationRequest = {
+        expected_record_ids?: Array<string>;
+        profile_id?: (string) | (null);
+        query: string;
+        result_record_ids?: Array<string>;
+    };
+    type CreateSearchRankingProfileRequest = {
+        exact_weight?: number;
+        name: string;
+        reranker?: string;
+        vector_weight?: number;
+    };
+    type CreateSearchRelevanceFeedbackRequest = {
+        hit_record_id: string;
+        relevant: boolean;
+        search_id: string;
+    };
+    type CreateSearchRerankerRequest = {
+        endpoint: string;
+        kind: string;
+        name: string;
+    };
     type CreateServiceAccountRequest = {
         display_name: string;
         product_ids?: Array<ProductId>;
         scopes: Array<string>;
         service_account_id?: (AccessId) | (null);
+    };
+    type CreateSessionRequest = {
+        ttl_seconds?: number;
+        user_id: string;
     };
     type CreateSupportCaseRequest = {
         description: string;
@@ -529,8 +1243,126 @@ export declare namespace OpenApi {
         secret: string;
         url: string;
     };
+    type DatasetPage = {
+        items: Array<DatasetRecord>;
+        limit: number;
+        offset: number;
+        total: number;
+    };
+    type DatasetRecord = {
+        created_at: number;
+        dataset_id: string;
+        description?: string;
+        metadata?: {
+            [key: string]: unknown;
+        };
+        name: string;
+        project_id: string;
+        status?: DatasetStatus;
+        tenant_id: string;
+        updated_at: number;
+    };
+    type DatasetStatus = "draft" | "active" | "archived";
+    type DatasetVersion = {
+        annotation_summary?: {
+            [key: string]: unknown;
+        };
+        asset_ids?: Array<string>;
+        created_at: number;
+        created_by: string;
+        dataset_id: string;
+        item_count?: number;
+        lineage?: {
+            [key: string]: unknown;
+        };
+        manifest_sha256: string;
+        project_id: string;
+        quality_score?: (number) | (null);
+        status?: DatasetVersionStatus;
+        tenant_id: string;
+        updated_at: number;
+        version: string;
+        version_id: string;
+    };
+    type DatasetVersionPage = {
+        items: Array<DatasetVersion>;
+        limit: number;
+        offset: number;
+        total: number;
+    };
+    type DatasetVersionStatus = "draft" | "validated" | "published" | "retired";
+    type DecideApprovalRequest = {
+        approved: boolean;
+        comment?: string;
+    };
+    type DecideProjectLifecycleRequest = {
+        approved: boolean;
+        comment?: string;
+    };
+    type DeploymentTopology = {
+        constraints?: Array<string>;
+        lanes?: {
+            [key: string]: number;
+        };
+        mode?: string;
+        project_id: string;
+        readiness?: string;
+        record_id: string;
+        tenant_id: string;
+        updated_at: number;
+        workers?: number;
+    };
     type DistanceMetric = "cosine" | "l2" | "inner_product";
     type DomainId = string;
+    type EdgeDeployment = {
+        applied_at?: (number) | (null);
+        artifact_sha256: string;
+        created_at: number;
+        device_id: string;
+        model_id: string;
+        model_version: string;
+        pipeline_id: string;
+        pipeline_version: string;
+        project_id: string;
+        record_id: string;
+        status?: string;
+        tenant_id: string;
+        updated_at: number;
+    };
+    type EdgeDevice = {
+        capabilities?: Array<string>;
+        certificate_fingerprint: string;
+        created_at: number;
+        last_seen_at?: (number) | (null);
+        metadata?: {
+            [key: string]: unknown;
+        };
+        name: string;
+        project_id: string;
+        record_id: string;
+        status?: EdgeDeviceStatus;
+        tenant_id: string;
+        updated_at: number;
+    };
+    type EdgeDeviceStatus = "pending" | "online" | "offline" | "revoked";
+    type EdgeHeartbeatRequest = {
+        metadata?: {
+            [key: string]: unknown;
+        };
+        status?: EdgeDeviceStatus;
+    };
+    type EdgeSyncItem = {
+        acknowledged_at?: (number) | (null);
+        created_at: number;
+        device_id: string;
+        direction?: string;
+        object_ref: string;
+        project_id: string;
+        record_id: string;
+        sha256: string;
+        status?: string;
+        tenant_id: string;
+    };
     type EnrollIdentityRequest = {
         distance_metric?: DistanceMetric;
         embedding: Array<number>;
@@ -562,6 +1394,11 @@ export declare namespace OpenApi {
         };
     };
     type EntitlementStatus = "active" | "suspended";
+    type ExecuteFlowRequest = {
+        context?: {
+            [key: string]: unknown;
+        };
+    };
     type FeedbackKind = "false_positive" | "false_negative" | "wrong_attribute" | "wrong_identity" | "ocr_correction";
     type FeedbackRecord = {
         authorized_for_training: boolean;
@@ -589,6 +1426,55 @@ export declare namespace OpenApi {
         updated_at: number;
     };
     type FeedbackStatus = "pending" | "approved" | "rejected";
+    type FlowApproval = {
+        comment?: string;
+        created_at: number;
+        decided_by?: (string) | (null);
+        execution_id: string;
+        node_id: string;
+        project_id: string;
+        record_id: string;
+        status?: string;
+        tenant_id: string;
+        updated_at: number;
+    };
+    type FlowDefinition = {
+        created_at: number;
+        created_by: string;
+        entry_node_id: string;
+        name: string;
+        nodes: Array<FlowNode>;
+        project_id: string;
+        record_id: string;
+        status?: string;
+        tenant_id: string;
+        updated_at: number;
+        version: string;
+    };
+    type FlowExecution = {
+        completed_at?: (number) | (null);
+        context?: {
+            [key: string]: unknown;
+        };
+        created_at: number;
+        created_by: string;
+        current_node_id: string;
+        flow_id: string;
+        project_id: string;
+        record_id: string;
+        status?: string;
+        tenant_id: string;
+        updated_at: number;
+    };
+    type FlowNode = {
+        config?: {
+            [key: string]: unknown;
+        };
+        kind: FlowNodeKind;
+        next_nodes?: Array<string>;
+        node_id: string;
+    };
+    type FlowNodeKind = "run" | "condition" | "approval" | "webhook";
     type GenericDomainPayload = {
         domain: DomainId;
         schema_version?: string;
@@ -643,6 +1529,21 @@ export declare namespace OpenApi {
         schema_version?: "1.0";
         tenant_id: string;
     };
+    type IdentityProvider = {
+        client_id: string;
+        created_at: number;
+        display_name: string;
+        enabled?: boolean;
+        issuer_url: string;
+        kind: IdentityProviderKind;
+        last_health?: string;
+        project_id: string;
+        record_id: string;
+        scopes?: Array<string>;
+        tenant_id: string;
+        updated_at: number;
+    };
+    type IdentityProviderKind = "oidc" | "saml" | "scim";
     type Incident = {
         created_at: number;
         incident_id: string;
@@ -656,6 +1557,111 @@ export declare namespace OpenApi {
         title: string;
         updated_at: number;
     };
+    type IndexBackend = {
+        capabilities?: Array<string>;
+        created_at: number;
+        enabled?: boolean;
+        endpoint: string;
+        health?: string;
+        kind: string;
+        name: string;
+        project_id: string;
+        record_id: string;
+        tenant_id: string;
+        updated_at: number;
+    };
+    type IndexDefinition = {
+        created_at?: number;
+        distance_metric?: (string) | (null);
+        domain: string;
+        index_id: string;
+        record_kind: IndexRecordKind;
+        schema_version?: string;
+        text_analyzer?: (string) | (null);
+        threshold?: (number) | (null);
+        vector_dimension?: (number) | (null);
+        vector_model_id?: (string) | (null);
+        vector_model_version?: (string) | (null);
+    };
+    type IndexHit = {
+        distance?: (number) | (null);
+        domain: string;
+        feature_id?: (string) | (null);
+        index_id: string;
+        metadata?: {
+            [key: string]: unknown;
+        };
+        record_id: string;
+        score?: (number) | (null);
+        source: IndexSourceRef;
+        text_snippet?: (string) | (null);
+    };
+    type IndexRebuildJob = {
+        completed_at?: (number) | (null);
+        created_at: number;
+        created_by: string;
+        index_id: string;
+        project_id: string;
+        record_id: string;
+        records_rebuilt?: number;
+        records_seen?: number;
+        status?: string;
+        tenant_id: string;
+    };
+    type IndexRecordKind = "vector" | "text" | "multimodal";
+    type IndexRecordStatus = "ready" | "pending" | "failed" | "deleted";
+    type IndexRecordView = {
+        created_at: number;
+        deleted_at?: (number) | (null);
+        domain: string;
+        expires_at?: (number) | (null);
+        feature_id?: (string) | (null);
+        has_vector?: boolean;
+        index_id: string;
+        kind: IndexRecordKind;
+        metadata?: {
+            [key: string]: unknown;
+        };
+        record_id: string;
+        source: IndexSourceRef;
+        status: IndexRecordStatus;
+        text_snippet?: (string) | (null);
+    };
+    type IndexSourceRef = {
+        artifact_id?: (string) | (null);
+        asset_id?: (string) | (null);
+        object_id?: (string) | (null);
+        page_number?: (number) | (null);
+        pts_ms?: (number) | (null);
+        run_id?: (string) | (null);
+        source_id: string;
+        source_type: string;
+        unit_id?: (string) | (null);
+    };
+    type IndexTextQueryRequest = {
+        limit?: number;
+        query: string;
+    };
+    type IndexVectorQueryRequest = {
+        limit?: number;
+        threshold?: (number) | (null);
+        vector: Array<number>;
+    };
+    type InteractiveSession = {
+        created_at: number;
+        expires_at: number;
+        last_used_at?: (number) | (null);
+        product_ids?: Array<string>;
+        project_id: string;
+        revoked_at?: (number) | (null);
+        scopes?: Array<string>;
+        session_id: string;
+        tenant_id: string;
+        token_prefix: string;
+        token_sha256: string;
+        user_id: string;
+    };
+    type LifecycleStatus = "active" | "disabled" | "deleted" | "pending_restore";
     type MediaAsset = {
         asset_id: string;
         content_type: string;
@@ -750,6 +1756,19 @@ export declare namespace OpenApi {
         tenant_id: AccessId;
         updated_at: number;
     };
+    type MeterEvent = {
+        account_id: string;
+        amount: number;
+        created_at: number;
+        idempotency_key: string;
+        metadata?: {
+            [key: string]: unknown;
+        };
+        metric: string;
+        project_id: string;
+        record_id: string;
+        tenant_id: string;
+    };
     type ModelDeploymentEvent = {
         action: string;
         audit_id: string;
@@ -767,6 +1786,31 @@ export declare namespace OpenApi {
         tenant_id: string;
         to_status: ModelReleaseStatus;
         version: string;
+    };
+    type ModelHealthSnapshot = {
+        capability: string;
+        degraded?: boolean;
+        error_rate: number;
+        evaluated_at: number;
+        model_id: string;
+        model_version: string;
+        p95_latency_ms?: (number) | (null);
+        quality_score?: (number) | (null);
+        rollback_recommended?: boolean;
+        sample_count: number;
+    };
+    type ModelMetricPoint = {
+        capability: string;
+        created_at: number;
+        error_rate?: number;
+        latency_ms: number;
+        model_id: string;
+        model_version: string;
+        project_id: string;
+        quality_score?: (number) | (null);
+        record_id: string;
+        tenant_id: string;
+        throughput?: (number) | (null);
     };
     type ModelPackageManifest = {
         adapter: string;
@@ -873,6 +1917,12 @@ export declare namespace OpenApi {
         x: number;
         y: number;
     };
+    type PortraitAssetCompareRequest = {
+        feature_space_id?: (string) | (null);
+        left_asset_id: string;
+        right_asset_id: string;
+        threshold?: (number) | (null);
+    };
     type PortraitAssetItem = {
         asset_id: PortraitModuleId;
         depends_on_modules?: Array<PortraitModuleId>;
@@ -880,6 +1930,17 @@ export declare namespace OpenApi {
         name: string;
         next_gate: string;
         summary: string;
+    };
+    type PortraitAssociation = {
+        created_at: number;
+        feature_space_id: string;
+        left_record_id: string;
+        project_id: string;
+        record_id: string;
+        right_record_id: string;
+        score: number;
+        source?: string;
+        tenant_id: string;
     };
     type PortraitCapabilityItem = {
         capability_id: string;
@@ -891,15 +1952,31 @@ export declare namespace OpenApi {
         target_model?: (string) | (null);
     };
     type PortraitCapabilityReadiness = "ready" | "fallback" | "placeholder" | "not_configured";
+    type PortraitCluster = {
+        confidence?: number;
+        confirmed?: boolean;
+        created_at: number;
+        feature_space_id: string;
+        label?: string;
+        member_record_ids?: Array<string>;
+        project_id: string;
+        record_id: string;
+        tenant_id: string;
+        updated_at: number;
+    };
     type PortraitCompareRequest = {
         feature_space_id: string;
         left: Array<number>;
         right: Array<number>;
     };
     type PortraitCompareResponse = {
+        comparison_id?: (string) | (null);
         distance: number;
         feature_space_id: string;
+        left?: (PortraitInputSummary) | (null);
         matched: (boolean) | (null);
+        mode?: "vector" | "image" | "asset" | "mixed";
+        right?: (PortraitInputSummary) | (null);
         score: number;
         threshold: (number) | (null);
     };
@@ -917,12 +1994,28 @@ export declare namespace OpenApi {
     type PortraitEnrollment = {
         created_at: number;
         enrollment_id: string;
+        expires_at?: (number) | (null);
         feature_id: string;
         feature_space_id: string;
         identity_id: string;
+        index_record_id?: (string) | (null);
         modality: "face" | "body" | "gait" | "appearance";
         project_id: string;
         quality: number;
+        tenant_id: string;
+    };
+    type PortraitEvent = {
+        confidence?: number;
+        ended_at?: (number) | (null);
+        event_type: string;
+        metadata?: {
+            [key: string]: unknown;
+        };
+        project_id: string;
+        record_id: string;
+        source_ids?: Array<string>;
+        started_at: number;
+        subject_record_ids?: Array<string>;
         tenant_id: string;
     };
     type PortraitIdentity = {
@@ -941,6 +2034,19 @@ export declare namespace OpenApi {
         limit: number;
         offset: number;
         total: number;
+    };
+    type PortraitInputSummary = {
+        embedding_dimension: number;
+        face_count: number;
+        fallback?: boolean;
+        metadata?: {
+            [key: string]: unknown;
+        };
+        model_id: string;
+        model_version: string;
+        quality_score?: (number) | (null);
+        selected_face_box?: (Array<number>) | (null);
+        selected_face_index: number;
     };
     type PortraitIntelligenceStatus = {
         assets: Array<PortraitAssetItem>;
@@ -1011,10 +2117,104 @@ export declare namespace OpenApi {
         tenant_id: AccessId;
         updated_at: number;
     };
+    type ProjectLifecycleRequest = {
+        action: string;
+        created_at: number;
+        decided_at?: (number) | (null);
+        decided_by?: (string) | (null);
+        decision_comment?: string;
+        project_id: string;
+        reason?: string;
+        record_id: string;
+        requested_by: string;
+        status?: string;
+        tenant_id: string;
+        updated_at: number;
+    };
+    type ProposeAgentActionRequest = {
+        input?: {
+            [key: string]: unknown;
+        };
+        tool_id: string;
+    };
     type ProvenanceEvidence = {
         development_substitutes?: Array<string>;
         generated_by?: string;
         source_sha256?: (string) | (null);
+    };
+    type PurgeAuditRequest = {
+        dry_run?: boolean;
+        reason: string;
+    };
+    type PurgeAuditResponse = {
+        cutoff_at: number;
+        deleted_count: number;
+        dry_run: boolean;
+        executed_at: number;
+    };
+    type PutAgentMemoryRequest = {
+        key: string;
+        namespace: string;
+        ttl_seconds?: (number) | (null);
+        value?: {
+            [key: string]: unknown;
+        };
+    };
+    type QuotaCheckRequest = {
+        amount?: number;
+        metric: string;
+    };
+    type QuotaCheckResponse = {
+        allowed: boolean;
+        usage: QuotaUsage;
+    };
+    type QuotaPlan = {
+        created_at: number;
+        enabled?: boolean;
+        limits?: {
+            [key: string]: number;
+        };
+        name: string;
+        project_id: string;
+        record_id: string;
+        tenant_id: string;
+        updated_at: number;
+        window_seconds?: number;
+    };
+    type QuotaUsage = {
+        limit?: (number) | (null);
+        metric: string;
+        used?: number;
+        window_ends_at: number;
+        window_started_at: number;
+    };
+    type RecordMeterEventRequest = {
+        account_id: string;
+        amount: number;
+        idempotency_key: string;
+        metadata?: {
+            [key: string]: unknown;
+        };
+        metric: string;
+    };
+    type RegisterAgentToolRequest = {
+        description: string;
+        name: string;
+        requires_approval?: boolean;
+        scopes?: Array<string>;
+    };
+    type RegisterEdgeDeviceRequest = {
+        capabilities?: Array<string>;
+        metadata?: {
+            [key: string]: unknown;
+        };
+        name: string;
+    };
+    type RegisterWorkerRequest = {
+        capacity?: number;
+        lane: string;
+        lease_seconds?: number;
+        worker_id: string;
     };
     type RepositoryBoundaryRule = "versioned_contracts_only" | "no_shared_database" | "no_cross_repository_source_imports" | "immutable_artifact_references";
     type RepositoryContractArtifact = {
@@ -1074,6 +2274,19 @@ export declare namespace OpenApi {
     };
     type ResolveIncidentRequest = {
         summary?: string;
+    };
+    type ResourceLifecycleRecord = {
+        created_at: number;
+        deleted_at?: (number) | (null);
+        project_id: string;
+        reason?: string;
+        record_id: string;
+        resource_id: string;
+        resource_type: string;
+        status?: LifecycleStatus;
+        tenant_id: string;
+        updated_at: number;
+        updated_by: string;
     };
     type ResultArtifact = {
         artifact_id: string;
@@ -1140,6 +2353,11 @@ export declare namespace OpenApi {
         offset: number;
         total: number;
     };
+    type ReviewAnnotationTaskRequest = {
+        approved: boolean;
+        comment?: string;
+        consistency_score: number;
+    };
     type ReviewFeedbackRequest = {
         notes?: string;
         status: FeedbackStatus;
@@ -1188,6 +2406,137 @@ export declare namespace OpenApi {
     };
     type RunStatus = "queued" | "running" | "pausing" | "paused" | "completed" | "failed" | "cancelling" | "cancelled";
     type SampleStrategy = "interval" | "keyframe" | "scene_change" | "uniform";
+    type SavedSearch = {
+        created_at: number;
+        created_by: string;
+        definition?: {
+            [key: string]: unknown;
+        };
+        description?: string;
+        last_run_at?: (number) | (null);
+        mode: SavedSearchMode;
+        name: string;
+        project_id: string;
+        saved_search_id: string;
+        tenant_id: string;
+        updated_at: number;
+    };
+    type SavedSearchMode = "text" | "portrait";
+    type SavedSearchPage = {
+        items: Array<SavedSearch>;
+        limit: number;
+        offset: number;
+        total: number;
+    };
+    type SearchAssetRequest = {
+        asset_id: string;
+        feature_space_id?: (string) | (null);
+        limit?: number;
+        media_kinds?: Array<MediaKind>;
+        profile_id?: (string) | (null);
+        threshold?: (number) | (null);
+    };
+    type SearchEvaluation = {
+        created_at: number;
+        created_by: string;
+        expected_record_ids?: Array<string>;
+        precision: number;
+        profile_id?: (string) | (null);
+        project_id: string;
+        query: string;
+        recall: number;
+        record_id: string;
+        result_record_ids?: Array<string>;
+        tenant_id: string;
+    };
+    type SearchImageInputSummary = {
+        embedding_dimension: number;
+        face_count: number;
+        fallback?: boolean;
+        feature_space_id: string;
+        model_id: string;
+        model_version: string;
+        quality_score?: (number) | (null);
+        selected_face_index: number;
+    };
+    type SearchRankingProfile = {
+        active?: boolean;
+        created_at: number;
+        exact_weight?: number;
+        name: string;
+        project_id: string;
+        record_id: string;
+        reranker?: string;
+        tenant_id: string;
+        updated_at: number;
+        vector_weight?: number;
+    };
+    type SearchRelevanceFeedback = {
+        created_at: number;
+        created_by: string;
+        hit_record_id: string;
+        project_id: string;
+        record_id: string;
+        relevant: boolean;
+        search_id: string;
+        tenant_id: string;
+    };
+    type SearchReranker = {
+        created_at: number;
+        enabled?: boolean;
+        endpoint: string;
+        health?: string;
+        kind: string;
+        name: string;
+        project_id: string;
+        record_id: string;
+        tenant_id: string;
+        updated_at: number;
+    };
+    type SearchResponse = {
+        feature_space_id?: (string) | (null);
+        hits: Array<SearchResultHit>;
+        mode: "text" | "portrait";
+        query?: (string) | (null);
+        query_summary?: (SearchImageInputSummary) | (null);
+        search_id: string;
+        searched_indexes?: Array<string>;
+        total: number;
+    };
+    type SearchResultHit = {
+        distance?: (number) | (null);
+        domain: string;
+        index_id: string;
+        media_kind?: (MediaKind) | (null);
+        metadata?: {
+            [key: string]: unknown;
+        };
+        record_id: string;
+        resource_name?: (string) | (null);
+        score?: (number) | (null);
+        source: {
+            [key: string]: unknown;
+        };
+        text_snippet?: (string) | (null);
+    };
+    type SearchTextRequest = {
+        domains?: Array<string>;
+        limit?: number;
+        media_kinds?: Array<MediaKind>;
+        profile_id?: (string) | (null);
+        query: string;
+    };
+    type SeatAssignment = {
+        account_id: string;
+        assigned_by: string;
+        created_at: number;
+        project_id: string;
+        record_id: string;
+        revoked_at?: (number) | (null);
+        status?: string;
+        tenant_id: string;
+        user_id: string;
+    };
     type ServiceAccount = {
         created_at: number;
         disabled?: boolean;
@@ -1198,6 +2547,15 @@ export declare namespace OpenApi {
         service_account_id: AccessId;
         tenant_id: AccessId;
         updated_at: number;
+    };
+    type SessionResponse = {
+        session: InteractiveSession;
+        token: string;
+    };
+    type SetAuditRetentionPolicyRequest = {
+        enabled?: boolean;
+        export_approval_required?: boolean;
+        retention_days: number;
     };
     type SlaSnapshot = {
         breaches: Array<string>;
@@ -1232,13 +2590,31 @@ export declare namespace OpenApi {
         state_backend: string;
         version: string;
     };
+    type TransitionDatasetVersionRequest = {
+        status: DatasetVersionStatus;
+    };
     type TransitionModelReleaseRequest = {
         reason: string;
         status: ModelReleaseStatus;
     };
+    type UpdateDatasetRequest = {
+        description?: (string) | (null);
+        metadata?: ({
+            [key: string]: unknown;
+        }) | (null);
+        name?: (string) | (null);
+        status?: (DatasetStatus) | (null);
+    };
     type UpdateProductEntitlementRequest = {
         source?: "manual" | "enterprise_license" | "system";
         status: EntitlementStatus;
+    };
+    type UpdateSavedSearchRequest = {
+        definition?: ({
+            [key: string]: unknown;
+        }) | (null);
+        description?: (string) | (null);
+        name?: (string) | (null);
     };
     type UserAccount = {
         created_at: number;
@@ -1296,6 +2672,21 @@ export declare namespace OpenApi {
         event_types: Array<string>;
         name: string;
         url: string;
+    };
+    type WorkerHeartbeatRequest = {
+        lease_seconds?: number;
+    };
+    type WorkerLease = {
+        capacity?: number;
+        created_at: number;
+        lane: string;
+        last_heartbeat_at: number;
+        lease_expires_at: number;
+        project_id: string;
+        record_id: string;
+        status?: string;
+        tenant_id: string;
+        worker_id: string;
     };
 }
 //# sourceMappingURL=generated.d.ts.map

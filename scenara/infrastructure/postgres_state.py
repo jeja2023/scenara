@@ -7,6 +7,8 @@ from scenara.platform.audit import AuditEvent
 from scenara.platform.model_runtime import ModelPackageManifest
 from scenara.platform.models import (
     TERMINAL_RUN_STATUSES,
+    DatasetRecord,
+    DatasetVersion,
     MediaAsset,
     MediaSource,
     ObjectRetentionRecord,
@@ -15,6 +17,7 @@ from scenara.platform.models import (
     RunEvent,
     RunRecord,
     RunStatus,
+    SavedSearch,
     WebhookDeliveryRecord,
     WebhookSubscription,
 )
@@ -412,6 +415,267 @@ class PostgresStateStore:
             )
             row = await cursor.fetchone()
         return MediaSource.model_validate(row[0]) if row else None
+
+    async def create_dataset(self, dataset: DatasetRecord) -> DatasetRecord:
+        from psycopg.types.json import Jsonb
+
+        async with self._pool.connection() as conn:
+            await conn.execute(
+                """INSERT INTO scenara_datasets
+                   (tenant_id, project_id, dataset_id, created_at, updated_at, status, document)
+                   VALUES (%s, %s, %s, to_timestamp(%s), to_timestamp(%s), %s, %s)""",
+                (
+                    dataset.tenant_id,
+                    dataset.project_id,
+                    dataset.dataset_id,
+                    dataset.created_at,
+                    dataset.updated_at,
+                    dataset.status.value,
+                    Jsonb(dataset.model_dump(mode="json")),
+                ),
+            )
+        return dataset.model_copy(deep=True)
+
+    async def get_dataset(self, tenant_id: str, project_id: str, dataset_id: str) -> DatasetRecord | None:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT document FROM scenara_datasets
+                   WHERE tenant_id = %s AND project_id = %s AND dataset_id = %s""",
+                (tenant_id, project_id, dataset_id),
+            )
+            row = await cursor.fetchone()
+        return DatasetRecord.model_validate(row[0]) if row else None
+
+    async def list_datasets(
+        self, tenant_id: str, project_id: str, *, offset: int = 0, limit: int = 50
+    ) -> list[DatasetRecord]:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT document FROM scenara_datasets
+                   WHERE tenant_id = %s AND project_id = %s
+                   ORDER BY updated_at DESC, dataset_id DESC LIMIT %s OFFSET %s""",
+                (tenant_id, project_id, limit, offset),
+            )
+            rows = await cursor.fetchall()
+        return [DatasetRecord.model_validate(row[0]) for row in rows]
+
+    async def count_datasets(self, tenant_id: str, project_id: str) -> int:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT count(*) FROM scenara_datasets
+                   WHERE tenant_id = %s AND project_id = %s""",
+                (tenant_id, project_id),
+            )
+            row = await cursor.fetchone()
+        return int(row[0])
+
+    async def save_dataset(self, dataset: DatasetRecord) -> DatasetRecord:
+        from psycopg.types.json import Jsonb
+
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """UPDATE scenara_datasets
+                   SET updated_at = to_timestamp(%s), status = %s, document = %s
+                   WHERE tenant_id = %s AND project_id = %s AND dataset_id = %s""",
+                (
+                    dataset.updated_at,
+                    dataset.status.value,
+                    Jsonb(dataset.model_dump(mode="json")),
+                    dataset.tenant_id,
+                    dataset.project_id,
+                    dataset.dataset_id,
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise StateConflict("dataset not found")
+        return dataset.model_copy(deep=True)
+
+    async def create_dataset_version(self, version: DatasetVersion) -> DatasetVersion:
+        from psycopg.types.json import Jsonb
+
+        async with self._pool.connection() as conn:
+            await conn.execute(
+                """INSERT INTO scenara_dataset_versions
+                   (tenant_id, project_id, version_id, dataset_id, version, status,
+                    manifest_sha256, created_at, updated_at, document)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, to_timestamp(%s), to_timestamp(%s), %s)""",
+                (
+                    version.tenant_id,
+                    version.project_id,
+                    version.version_id,
+                    version.dataset_id,
+                    version.version,
+                    version.status.value,
+                    version.manifest_sha256,
+                    version.created_at,
+                    version.updated_at,
+                    Jsonb(version.model_dump(mode="json")),
+                ),
+            )
+        return version.model_copy(deep=True)
+
+    async def get_dataset_version(
+        self, tenant_id: str, project_id: str, version_id: str
+    ) -> DatasetVersion | None:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT document FROM scenara_dataset_versions
+                   WHERE tenant_id = %s AND project_id = %s AND version_id = %s""",
+                (tenant_id, project_id, version_id),
+            )
+            row = await cursor.fetchone()
+        return DatasetVersion.model_validate(row[0]) if row else None
+
+    async def save_dataset_version(self, version: DatasetVersion) -> DatasetVersion:
+        from psycopg.types.json import Jsonb
+
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """UPDATE scenara_dataset_versions
+                   SET updated_at = to_timestamp(%s), status = %s, document = %s
+                   WHERE tenant_id = %s AND project_id = %s AND version_id = %s""",
+                (
+                    version.updated_at,
+                    version.status.value,
+                    Jsonb(version.model_dump(mode="json")),
+                    version.tenant_id,
+                    version.project_id,
+                    version.version_id,
+                ),
+            )
+            if cursor.rowcount != 1:
+                raise StateConflict("dataset version not found")
+        return version.model_copy(deep=True)
+
+    async def list_dataset_versions(
+        self,
+        tenant_id: str,
+        project_id: str,
+        dataset_id: str,
+        *,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> list[DatasetVersion]:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT document FROM scenara_dataset_versions
+                   WHERE tenant_id = %s AND project_id = %s AND dataset_id = %s
+                   ORDER BY created_at DESC, version_id DESC LIMIT %s OFFSET %s""",
+                (tenant_id, project_id, dataset_id, limit, offset),
+            )
+            rows = await cursor.fetchall()
+        return [DatasetVersion.model_validate(row[0]) for row in rows]
+
+    async def count_dataset_versions(self, tenant_id: str, project_id: str, dataset_id: str) -> int:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT count(*) FROM scenara_dataset_versions
+                   WHERE tenant_id = %s AND project_id = %s AND dataset_id = %s""",
+                (tenant_id, project_id, dataset_id),
+            )
+            row = await cursor.fetchone()
+        return int(row[0])
+
+    async def create_saved_search(self, saved_search: SavedSearch) -> SavedSearch:
+        from psycopg.types.json import Jsonb
+
+        async with self._pool.connection() as conn:
+            try:
+                await conn.execute(
+                    """INSERT INTO scenara_saved_searches
+                       (tenant_id, project_id, saved_search_id, name, mode, created_at, updated_at, document)
+                       VALUES (%s, %s, %s, %s, %s, to_timestamp(%s), to_timestamp(%s), %s)""",
+                    (
+                        saved_search.tenant_id,
+                        saved_search.project_id,
+                        saved_search.saved_search_id,
+                        saved_search.name,
+                        saved_search.mode.value,
+                        saved_search.created_at,
+                        saved_search.updated_at,
+                        Jsonb(saved_search.model_dump(mode="json")),
+                    ),
+                )
+            except Exception as exc:
+                if exc.__class__.__name__ in {"UniqueViolation", "IntegrityError"}:
+                    raise StateConflict("saved search already exists") from exc
+                raise
+        return saved_search.model_copy(deep=True)
+
+    async def get_saved_search(
+        self, tenant_id: str, project_id: str, saved_search_id: str
+    ) -> SavedSearch | None:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT document FROM scenara_saved_searches
+                   WHERE tenant_id = %s AND project_id = %s AND saved_search_id = %s""",
+                (tenant_id, project_id, saved_search_id),
+            )
+            row = await cursor.fetchone()
+        return SavedSearch.model_validate(row[0]) if row else None
+
+    async def list_saved_searches(
+        self, tenant_id: str, project_id: str, *, offset: int = 0, limit: int = 50
+    ) -> list[SavedSearch]:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT document FROM scenara_saved_searches
+                   WHERE tenant_id = %s AND project_id = %s
+                   ORDER BY updated_at DESC, saved_search_id DESC LIMIT %s OFFSET %s""",
+                (tenant_id, project_id, limit, offset),
+            )
+            rows = await cursor.fetchall()
+        return [SavedSearch.model_validate(row[0]) for row in rows]
+
+    async def count_saved_searches(self, tenant_id: str, project_id: str) -> int:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT count(*) FROM scenara_saved_searches
+                   WHERE tenant_id = %s AND project_id = %s""",
+                (tenant_id, project_id),
+            )
+            row = await cursor.fetchone()
+        return int(row[0])
+
+    async def save_saved_search(self, saved_search: SavedSearch) -> SavedSearch:
+        from psycopg.types.json import Jsonb
+
+        async with self._pool.connection() as conn, conn.transaction():
+            try:
+                cursor = await conn.execute(
+                    """UPDATE scenara_saved_searches
+                       SET name = %s, mode = %s, updated_at = to_timestamp(%s), document = %s
+                       WHERE tenant_id = %s AND project_id = %s AND saved_search_id = %s""",
+                    (
+                        saved_search.name,
+                        saved_search.mode.value,
+                        saved_search.updated_at,
+                        Jsonb(saved_search.model_dump(mode="json")),
+                        saved_search.tenant_id,
+                        saved_search.project_id,
+                        saved_search.saved_search_id,
+                    ),
+                )
+            except Exception as exc:
+                if exc.__class__.__name__ in {"UniqueViolation", "IntegrityError"}:
+                    raise StateConflict("saved search name already exists") from exc
+                raise
+            if cursor.rowcount != 1:
+                raise StateConflict("saved search not found")
+        return saved_search.model_copy(deep=True)
+
+    async def delete_saved_search(
+        self, tenant_id: str, project_id: str, saved_search_id: str
+    ) -> SavedSearch | None:
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """DELETE FROM scenara_saved_searches
+                   WHERE tenant_id = %s AND project_id = %s AND saved_search_id = %s
+                   RETURNING document""",
+                (tenant_id, project_id, saved_search_id),
+            )
+            row = await cursor.fetchone()
+        return SavedSearch.model_validate(row[0]) if row else None
 
     async def create_run_idempotent(
         self,
@@ -821,6 +1085,18 @@ class PostgresStateStore:
             )
             for row in rows
         ]
+
+    async def delete_audit_events_before(self, tenant_id: str, project_id: str, before: float) -> int:
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                (
+                    "DELETE FROM scenara_audit_events "
+                    "WHERE tenant_id = %s AND project_id = %s "
+                    "AND created_at < to_timestamp(%s)"
+                ),
+                (tenant_id, project_id, before),
+            )
+        return int(cursor.rowcount)
 
     async def track_object(self, record: ObjectRetentionRecord) -> None:
         async with self._pool.connection() as conn, conn.transaction():

@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 from typing import Any, Protocol
 from uuid import uuid4
 
+from pydantic import BaseModel, ConfigDict, Field
+
 from scenara.platform.models import PrincipalContext
 
 
@@ -25,6 +27,47 @@ class AuditEvent:
     request_id: str | None
     evidence: dict[str, Any] = field(default_factory=dict)
     created_at: float = field(default_factory=time.time)
+
+
+class AuditEventView(BaseModel):
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    event_id: str
+    tenant_id: str
+    project_id: str
+    principal_id: str
+    action: str
+    resource_type: str
+    resource_id: str | None = None
+    outcome: str
+    request_id: str | None = None
+    evidence: dict[str, Any] = Field(default_factory=dict)
+    created_at: float
+
+
+class AuditEventPage(BaseModel):
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    items: list[AuditEventView]
+    offset: int
+    limit: int
+    total: int
+
+
+def audit_event_view(event: AuditEvent) -> AuditEventView:
+    return AuditEventView(
+        event_id=event.event_id,
+        tenant_id=event.tenant_id,
+        project_id=event.project_id,
+        principal_id=event.principal_id,
+        action=event.action,
+        resource_type=event.resource_type,
+        resource_id=event.resource_id,
+        outcome=event.outcome,
+        request_id=event.request_id,
+        evidence=event.evidence,
+        created_at=event.created_at,
+    )
 
 
 class AuditSink(Protocol):
@@ -67,4 +110,12 @@ class AuditLogger:
         return event
 
 
-__all__ = ["AuditEvent", "AuditLogger", "AuditSink", "AuditUnavailable"]
+__all__ = [
+    "AuditEvent",
+    "AuditEventPage",
+    "AuditEventView",
+    "AuditLogger",
+    "AuditSink",
+    "AuditUnavailable",
+    "audit_event_view",
+]

@@ -21,9 +21,13 @@ REQUIRED_IMPLEMENTATION = (
     "scenara/platform/features.py",
     "scenara/platform/feedback.py",
     "scenara/infrastructure/postgres_feedback.py",
+    "scenara/platform/control_plane.py",
+    "scenara/infrastructure/postgres_control_plane.py",
+    "migrations/0009_control_plane_records.sql",
     "frontend/console/src/views/ResultsView.vue",
     "frontend/console/src/views/EnterpriseWorkspaceView.vue",
     "frontend/console/src/views/FeedbackView.vue",
+    "frontend/console/src/views/GovernanceView.vue",
     "sdk/python/scenara_sdk/client.py",
     "sdk/typescript/src/generated.ts",
     "deploy/compose.yml",
@@ -36,6 +40,8 @@ REQUIRED_IMPLEMENTATION = (
     "requirements/production.lock",
     "frontend/console/playwright.config.ts",
     "frontend/console/e2e/workspaces.spec.ts",
+    "tests/test_control_plane.py",
+    "docs/release/0.3.0-dev.9.md",
     "docs/release/SUPPORT_MATRIX.md",
     "docs/release/EVIDENCE_OWNERS.md",
     "docs/release/evidence/manifest.example.json",
@@ -139,9 +145,7 @@ def _number(value: Any, default: float) -> float:
         return default
 
 
-def _string_set(
-    metadata: dict[str, Any], field: str, evidence_type: str, errors: list[str]
-) -> set[str]:
+def _string_set(metadata: dict[str, Any], field: str, evidence_type: str, errors: list[str]) -> set[str]:
     value = metadata.get(field)
     if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
         errors.append(f"{evidence_type}: metadata.{field} must be a list of non-empty strings")
@@ -197,9 +201,7 @@ def _metadata_errors(evidence_type: str, metadata: dict[str, Any]) -> list[str]:
         if metadata.get("all_rights_cleared") is not True or not models:
             errors.append("model_rights: every production model must have cleared rights")
     elif evidence_type == "software_license_approval":
-        errors.extend(
-            _required_values(metadata, {"license_sha256", "approval_reference"}, evidence_type)
-        )
+        errors.extend(_required_values(metadata, {"license_sha256", "approval_reference"}, evidence_type))
         if metadata.get("reviewed_by_legal") is not True:
             errors.append("software_license_approval: legal review must be confirmed")
     elif evidence_type == "offline_install":
@@ -211,9 +213,10 @@ def _metadata_errors(evidence_type: str, metadata: dict[str, Any]) -> list[str]:
             errors.append("offline_install: checksums and all smoke checks must pass")
     elif evidence_type == "backup_restore":
         required = {"tenants", "projects", "media", "runs", "results", "pipelines", "models", "audit", "biometrics"}
-        if _number(metadata.get("rpo_hours"), float("inf")) > 24 or _number(
-            metadata.get("rto_hours"), float("inf")
-        ) > 4:
+        if (
+            _number(metadata.get("rpo_hours"), float("inf")) > 24
+            or _number(metadata.get("rto_hours"), float("inf")) > 4
+        ):
             errors.append("backup_restore: RPO must be <=24h and RTO must be <=4h")
         if not required <= _string_set(metadata, "entities_verified", evidence_type, errors):
             errors.append("backup_restore: all required business entities must be verified")

@@ -17,6 +17,9 @@ async def run_once() -> tuple[int, int, int, int]:
         scheduler = RetentionScheduler(runtime.state, runtime.objects)
         retained = await scheduler.sweep()
         expired_features = await runtime.features.delete_expired(time.time(), 1000)
+        indexes = getattr(runtime, "indexes", None)
+        if indexes is not None:
+            await indexes.delete_expired(time.time(), 1000)
         delivered, failed = await runtime.webhooks.deliver_due()
         return retained, expired_features, delivered, failed
     finally:

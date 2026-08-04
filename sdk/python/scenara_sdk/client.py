@@ -12,6 +12,8 @@ from .models import (
     AccessFoundationStatus,
     ApiKeyRecord,
     CreateApiKeyResponse,
+    DatasetRecord,
+    DatasetVersion,
     Domain,
     FeedbackRecord,
     HardSampleManifest,
@@ -37,6 +39,7 @@ from .models import (
     Role,
     Run,
     SampleStrategy,
+    SavedSearch,
     ServiceAccount,
     UserAccount,
     WebhookDelivery,
@@ -68,7 +71,7 @@ class ScenaraClient:
         headers = {
             "X-Tenant-Id": tenant_id,
             "X-Project-Id": project_id,
-            "User-Agent": "scenara-sdk-python/0.3.0.dev6",
+            "User-Agent": "scenara-sdk-python/0.3.0.dev9",
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -312,9 +315,7 @@ class ScenaraClient:
         wait_ms: int = 0,
         idempotency_key: str | None = None,
     ) -> Run:
-        selected_pipeline = pipeline_id or (
-            "portrait.person-detection" if domain == "portrait" else "ocr.document"
-        )
+        selected_pipeline = pipeline_id or ("portrait.person-detection" if domain == "portrait" else "ocr.document")
         parameters: dict[str, object] = {
             "sample_interval_ms": sample_interval_ms,
             "max_units": max_units,
@@ -357,6 +358,138 @@ class ScenaraClient:
 
     def delete_asset(self, asset_id: str) -> None:
         self._request("DELETE", f"/api/v1/media/assets/{asset_id}")
+
+    def list_datasets(self, *, offset: int = 0, limit: int = 50) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self._request("GET", "/api/v1/datasets", params={"offset": offset, "limit": limit}),
+        )
+
+    def create_dataset(
+        self, *, name: str, description: str = "", metadata: dict[str, Any] | None = None
+    ) -> DatasetRecord:
+        return cast(
+            DatasetRecord,
+            self._request(
+                "POST",
+                "/api/v1/datasets",
+                json={"name": name, "description": description, "metadata": metadata or {}},
+            ),
+        )
+
+    def get_dataset(self, dataset_id: str) -> DatasetRecord:
+        return cast(DatasetRecord, self._request("GET", f"/api/v1/datasets/{dataset_id}"))
+
+    def update_dataset(
+        self,
+        dataset_id: str,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        status: str | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> DatasetRecord:
+        values = {"name": name, "description": description, "status": status, "metadata": metadata}
+        payload = {key: value for key, value in values.items() if value is not None}
+        return cast(DatasetRecord, self._request("PATCH", f"/api/v1/datasets/{dataset_id}", json=payload))
+
+    def create_dataset_version(
+        self,
+        dataset_id: str,
+        *,
+        version: str,
+        manifest_sha256: str,
+        asset_ids: list[str] | None = None,
+        quality_score: float | None = None,
+        lineage: dict[str, Any] | None = None,
+        annotation_summary: dict[str, Any] | None = None,
+    ) -> DatasetVersion:
+        return cast(
+            DatasetVersion,
+            self._request(
+                "POST",
+                f"/api/v1/datasets/{dataset_id}/versions",
+                json={
+                    "version": version,
+                    "manifest_sha256": manifest_sha256,
+                    "asset_ids": asset_ids or [],
+                    "quality_score": quality_score,
+                    "lineage": lineage or {},
+                    "annotation_summary": annotation_summary or {},
+                },
+            ),
+        )
+
+    def list_dataset_versions(self, dataset_id: str, *, offset: int = 0, limit: int = 50) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self._request("GET", f"/api/v1/datasets/{dataset_id}/versions", params={"offset": offset, "limit": limit}),
+        )
+
+    def transition_dataset_version(self, version_id: str, status: str) -> DatasetVersion:
+        return cast(
+            DatasetVersion,
+            self._request("POST", f"/api/v1/dataset-versions/{version_id}/transition", json={"status": status}),
+        )
+
+    def list_audit_events(self, **filters: Any) -> dict[str, Any]:
+        return cast(dict[str, Any], self._request("GET", "/api/v1/audit/events", params=filters))
+
+    def create_saved_search(
+        self,
+        *,
+        name: str,
+        mode: str,
+        definition: dict[str, Any],
+        description: str = "",
+    ) -> SavedSearch:
+        return cast(
+            SavedSearch,
+            self._request(
+                "POST",
+                "/api/v1/search/saved",
+                json={"name": name, "description": description, "mode": mode, "definition": definition},
+            ),
+        )
+
+    def list_saved_searches(self, *, offset: int = 0, limit: int = 50) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self._request("GET", "/api/v1/search/saved", params={"offset": offset, "limit": limit}),
+        )
+
+    def get_saved_search(self, saved_search_id: str) -> SavedSearch:
+        return cast(SavedSearch, self._request("GET", f"/api/v1/search/saved/{saved_search_id}"))
+
+    def update_saved_search(
+        self,
+        saved_search_id: str,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        definition: dict[str, Any] | None = None,
+    ) -> SavedSearch:
+        payload = {
+            key: value
+            for key, value in {"name": name, "description": description, "definition": definition}.items()
+            if value is not None
+        }
+        return cast(
+            SavedSearch,
+            self._request("PATCH", f"/api/v1/search/saved/{saved_search_id}", json=payload),
+        )
+
+    def run_saved_search(self, saved_search_id: str) -> dict[str, Any]:
+        return cast(dict[str, Any], self._request("POST", f"/api/v1/search/saved/{saved_search_id}/run"))
+
+    def delete_saved_search(self, saved_search_id: str) -> None:
+        self._request("DELETE", f"/api/v1/search/saved/{saved_search_id}")
+
+    def export_audit(self, *, format: str = "json", **filters: Any) -> bytes:
+        response = self._client.get("/api/v1/audit/export", params={"format": format, **filters})
+        if response.is_error:
+            self._raise_response_error(response)
+        return response.content
 
     def get_asset_preview(self, asset_id: str) -> bytes:
         response = self._client.get(f"/api/v1/media/assets/{asset_id}/preview")
@@ -708,6 +841,251 @@ class ScenaraClient:
             self._request("POST", "/api/v1/portrait/compare", json=comparison),
         )
 
+    def enroll_portrait_identity_image(
+        self,
+        identity_id: str,
+        path: str | Path,
+        *,
+        feature_space_id: str | None = None,
+        quality: float | None = None,
+    ) -> dict[str, Any]:
+        source = Path(path)
+        content_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
+        data = {"feature_space_id": feature_space_id, "quality": quality}
+        with source.open("rb") as handle:
+            return cast(
+                dict[str, Any],
+                self._request(
+                    "POST",
+                    f"/api/v1/portrait/identities/{identity_id}/enrollments/image",
+                    files={"file": (source.name, handle, content_type)},
+                    data={key: str(value) for key, value in data.items() if value is not None},
+                ),
+            )
+
+    def search_portrait_image(
+        self,
+        path: str | Path,
+        *,
+        feature_space_id: str | None = None,
+        limit: int = 20,
+        threshold: float | None = None,
+    ) -> dict[str, Any]:
+        source = Path(path)
+        content_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
+        data = {"feature_space_id": feature_space_id, "limit": limit, "threshold": threshold}
+        with source.open("rb") as handle:
+            return cast(
+                dict[str, Any],
+                self._request(
+                    "POST",
+                    "/api/v1/portrait/search/image",
+                    files={"file": (source.name, handle, content_type)},
+                    data={key: str(value) for key, value in data.items() if value is not None},
+                ),
+            )
+
+    def compare_portrait_images(
+        self,
+        left_path: str | Path,
+        right_path: str | Path,
+        *,
+        feature_space_id: str | None = None,
+        threshold: float | None = None,
+    ) -> dict[str, Any]:
+        left = Path(left_path)
+        right = Path(right_path)
+        left_type = mimetypes.guess_type(left.name)[0] or "application/octet-stream"
+        right_type = mimetypes.guess_type(right.name)[0] or "application/octet-stream"
+        data = {"feature_space_id": feature_space_id, "threshold": threshold}
+        with left.open("rb") as left_handle, right.open("rb") as right_handle:
+            return cast(
+                dict[str, Any],
+                self._request(
+                    "POST",
+                    "/api/v1/portrait/compare/images",
+                    files={
+                        "left": (left.name, left_handle, left_type),
+                        "right": (right.name, right_handle, right_type),
+                    },
+                    data={key: str(value) for key, value in data.items() if value is not None},
+                ),
+            )
+
+    def compare_portrait_asset_image(
+        self,
+        asset_id: str,
+        image_path: str | Path,
+        *,
+        feature_space_id: str | None = None,
+        threshold: float | None = None,
+    ) -> dict[str, Any]:
+        source = Path(image_path)
+        content_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
+        data = {"asset_id": asset_id, "feature_space_id": feature_space_id, "threshold": threshold}
+        with source.open("rb") as handle:
+            return cast(
+                dict[str, Any],
+                self._request(
+                    "POST",
+                    "/api/v1/portrait/compare/asset-image",
+                    files={"file": (source.name, handle, content_type)},
+                    data={key: str(value) for key, value in data.items() if value is not None},
+                ),
+            )
+
+    def compare_portrait_image_asset(
+        self,
+        image_path: str | Path,
+        asset_id: str,
+        *,
+        feature_space_id: str | None = None,
+        threshold: float | None = None,
+    ) -> dict[str, Any]:
+        source = Path(image_path)
+        content_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
+        data = {"asset_id": asset_id, "feature_space_id": feature_space_id, "threshold": threshold}
+        with source.open("rb") as handle:
+            return cast(
+                dict[str, Any],
+                self._request(
+                    "POST",
+                    "/api/v1/portrait/compare/image-asset",
+                    files={"file": (source.name, handle, content_type)},
+                    data={key: str(value) for key, value in data.items() if value is not None},
+                ),
+            )
+
+    def search_text(
+        self,
+        query: str,
+        *,
+        domains: list[str] | None = None,
+        media_kinds: list[str] | None = None,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self._request(
+                "POST",
+                "/api/v1/search/text",
+                json={
+                    "query": query,
+                    "domains": domains or [],
+                    "media_kinds": media_kinds or [],
+                    "limit": limit,
+                },
+            ),
+        )
+
+    def search_portrait_results(
+        self,
+        path: str | Path,
+        *,
+        feature_space_id: str | None = None,
+        media_kinds: list[str] | None = None,
+        limit: int = 50,
+        threshold: float | None = None,
+    ) -> dict[str, Any]:
+        source = Path(path)
+        content_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
+        data = {
+            "feature_space_id": feature_space_id,
+            "media_kinds": ",".join(media_kinds or []),
+            "limit": limit,
+            "threshold": threshold,
+        }
+        with source.open("rb") as handle:
+            return cast(
+                dict[str, Any],
+                self._request(
+                    "POST",
+                    "/api/v1/search/image",
+                    files={"file": (source.name, handle, content_type)},
+                    data={key: str(value) for key, value in data.items() if value not in (None, "")},
+                ),
+            )
+
+    def search_portrait_asset(
+        self,
+        asset_id: str,
+        *,
+        feature_space_id: str | None = None,
+        media_kinds: list[str] | None = None,
+        limit: int = 50,
+        threshold: float | None = None,
+    ) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self._request(
+                "POST",
+                "/api/v1/search/asset",
+                json={
+                    "asset_id": asset_id,
+                    "feature_space_id": feature_space_id,
+                    "media_kinds": media_kinds or [],
+                    "limit": limit,
+                    "threshold": threshold,
+                },
+            ),
+        )
+
+    def list_search_indexes(self, *, domain: str | None = None) -> list[dict[str, Any]]:
+        return cast(
+            list[dict[str, Any]],
+            self._request("GET", "/api/v1/indexes", params={"domain": domain} if domain else None),
+        )
+
+    def list_search_index_records(
+        self,
+        index_id: str,
+        *,
+        source_type: str | None = None,
+        source_id: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        return cast(
+            list[dict[str, Any]],
+            self._request(
+                "GET",
+                f"/api/v1/indexes/{index_id}/records",
+                params={
+                    "source_type": source_type,
+                    "source_id": source_id,
+                    "offset": offset,
+                    "limit": limit,
+                },
+            ),
+        )
+
+    def query_search_index_text(self, index_id: str, query: str, *, limit: int = 20) -> list[dict[str, Any]]:
+        return cast(
+            list[dict[str, Any]],
+            self._request(
+                "POST",
+                f"/api/v1/indexes/{index_id}/query/text",
+                json={"query": query, "limit": limit},
+            ),
+        )
+
+    def query_search_index_vector(
+        self,
+        index_id: str,
+        vector: list[float],
+        *,
+        limit: int = 20,
+        threshold: float | None = None,
+    ) -> list[dict[str, Any]]:
+        return cast(
+            list[dict[str, Any]],
+            self._request(
+                "POST",
+                f"/api/v1/indexes/{index_id}/query/vector",
+                json={"vector": vector, "limit": limit, "threshold": threshold},
+            ),
+        )
+
     def enterprise_status(self) -> dict[str, Any]:
         return cast(dict[str, Any], self._request("GET", "/api/v1/enterprise/status"))
 
@@ -787,6 +1165,198 @@ class ScenaraClient:
         return cast(
             list[ModelDeploymentEvent],
             self._request("GET", "/api/v1/model-deployment-events", params={"limit": limit}),
+        )
+
+    def control_plane_request(
+        self,
+        method: str,
+        path: str,
+        *,
+        json: dict[str, Any] | None = None,
+        params: dict[str, Any] | None = None,
+    ) -> Any:
+        """Call a versioned post-1.0 control-plane resource.
+
+        The generic escape hatch keeps the Python SDK usable as new product
+        modules are enabled while their resource-specific types are generated
+        from OpenAPI.
+        """
+        return self._request(method, path, json=json, params=params)
+
+    def create_identity_provider(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(
+            dict[str, Any], self.control_plane_request("POST", "/api/v1/platform/identity-providers", json=body)
+        )
+
+    def list_identity_providers(self) -> list[dict[str, Any]]:
+        return cast(list[dict[str, Any]], self.control_plane_request("GET", "/api/v1/platform/identity-providers"))
+
+    def probe_identity_provider(self, provider_id: str) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self.control_plane_request("POST", f"/api/v1/platform/identity-providers/{provider_id}/probe"),
+        )
+
+    def request_project_lifecycle(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self.control_plane_request("POST", "/api/v1/platform/projects/lifecycle-requests", json=body),
+        )
+
+    def decide_project_lifecycle(self, request_id: str, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self.control_plane_request(
+                "POST", f"/api/v1/platform/projects/lifecycle-requests/{request_id}/decide", json=body
+            ),
+        )
+
+    def set_audit_retention(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("PUT", "/api/v1/platform/audit/retention", json=body))
+
+    def purge_audit(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/platform/audit/purge", json=body))
+
+    def create_billing_account(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/platform/billing/accounts", json=body))
+
+    def record_meter_event(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self.control_plane_request("POST", "/api/v1/platform/billing/meter-events", json=body),
+        )
+
+    def list_billing_usage(self, *, account_id: str | None = None) -> list[dict[str, Any]]:
+        return cast(
+            list[dict[str, Any]],
+            self.control_plane_request("GET", "/api/v1/platform/billing/usage", params={"account_id": account_id}),
+        )
+
+    def assign_billing_seat(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/platform/billing/seats", json=body))
+
+    def create_session(self, user_id: str, *, ttl_seconds: int = 3600) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self.control_plane_request(
+                "POST", "/api/v1/platform/sessions", json={"user_id": user_id, "ttl_seconds": ttl_seconds}
+            ),
+        )
+
+    def create_annotation_task(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/data/annotation-tasks", json=body))
+
+    def register_annotation_provider(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(
+            dict[str, Any], self.control_plane_request("POST", "/api/v1/data/annotation-providers", json=body)
+        )
+
+    def probe_annotation_provider(self, provider_id: str) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self.control_plane_request("POST", f"/api/v1/data/annotation-providers/{provider_id}/probe"),
+        )
+
+    def review_annotation_task(self, task_id: str, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self.control_plane_request("POST", f"/api/v1/data/annotation-tasks/{task_id}/review", json=body),
+        )
+
+    def create_flow(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/flows", json=body))
+
+    def execute_flow(self, flow_id: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self.control_plane_request("POST", f"/api/v1/flows/{flow_id}/execute", json={"context": context or {}}),
+        )
+
+    def decide_flow_approval(self, approval_id: str, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self.control_plane_request("POST", f"/api/v1/flows/approvals/{approval_id}/decide", json=body),
+        )
+
+    def create_search_ranking_profile(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/search/ranking-profiles", json=body))
+
+    def register_index_backend(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/search/index-backends", json=body))
+
+    def probe_index_backend(self, backend_id: str) -> dict[str, Any]:
+        return cast(
+            dict[str, Any], self.control_plane_request("POST", f"/api/v1/search/index-backends/{backend_id}/probe")
+        )
+
+    def register_search_reranker(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/search/rerankers", json=body))
+
+    def probe_search_reranker(self, reranker_id: str) -> dict[str, Any]:
+        return cast(
+            dict[str, Any], self.control_plane_request("POST", f"/api/v1/search/rerankers/{reranker_id}/probe")
+        )
+
+    def evaluate_search(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/search/evaluations", json=body))
+
+    def rebuild_index(self, index_id: str) -> dict[str, Any]:
+        return cast(
+            dict[str, Any], self.control_plane_request("POST", "/api/v1/indexes/rebuild", json={"index_id": index_id})
+        )
+
+    def create_index(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/indexes", json=body))
+
+    def register_edge_device(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/edge/devices", json=body))
+
+    def heartbeat_edge_device(self, device_id: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self.control_plane_request("POST", f"/api/v1/edge/devices/{device_id}/heartbeat", json=body or {}),
+        )
+
+    def deploy_edge(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/edge/deployments", json=body))
+
+    def acknowledge_edge_deployment(self, deployment_id: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self.control_plane_request(
+                "POST", f"/api/v1/edge/deployments/{deployment_id}/acknowledge", json=body or {}
+            ),
+        )
+
+    def register_agent_tool(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/agents/tools", json=body))
+
+    def propose_agent_action(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/agents/actions", json=body))
+
+    def decide_agent_action(self, action_id: str, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(
+            dict[str, Any], self.control_plane_request("POST", f"/api/v1/agents/actions/{action_id}/decide", json=body)
+        )
+
+    def execute_agent_action(self, action_id: str) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", f"/api/v1/agents/actions/{action_id}/execute"))
+
+    def record_agent_trace(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/agents/traces", json=body))
+
+    def record_agent_evaluation(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/agents/evaluations", json=body))
+
+    def put_agent_memory(self, body: dict[str, Any]) -> dict[str, Any]:
+        return cast(dict[str, Any], self.control_plane_request("PUT", "/api/v1/agents/memory", json=body))
+
+    def get_agent_memory(self, namespace: str, key: str) -> dict[str, Any] | None:
+        return cast(
+            dict[str, Any] | None,
+            self.control_plane_request(
+                "GET", "/api/v1/agents/memory", params={"namespace": namespace, "key": key}
+            ),
         )
 
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:

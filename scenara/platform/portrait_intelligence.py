@@ -126,7 +126,7 @@ def build_portrait_intelligence(
         PortraitModuleItem(
             module_id="data_governance",
             name="Data Governance",
-            maturity=PortraitModuleMaturity.PLANNED,
+            maturity=PortraitModuleMaturity.SEED,
             summary=(
                 "Versioned, lineage-complete portrait training and evaluation data assets "
                 "using FiftyOne, LakeFS, and DVC."
@@ -136,10 +136,12 @@ def build_portrait_intelligence(
                 "HardSampleManifest cross-repository contract (v1.0.0)",
                 "DatasetVersionReference cross-repository contract (v1.0.0)",
                 "Hard-sample export with approval, authorization, and deidentification",
+                "Dataset catalog and version lifecycle",
+                "Asset manifest binding, quality score, and lineage summary",
             ],
             not_in_scope_yet=[
-                "Dataset catalog and versioning",
-                "Data quality scoring and lineage explorer",
+                "Data lake object management",
+                "Data quality explorer and automated distribution checks",
                 "FiftyOne / LakeFS / DVC integration",
                 "Embedding version migration tooling",
             ],
@@ -151,7 +153,7 @@ def build_portrait_intelligence(
         PortraitModuleItem(
             module_id="annotation",
             name="Annotation Platform",
-            maturity=PortraitModuleMaturity.PLANNED,
+            maturity=PortraitModuleMaturity.SEED,
             summary=(
                 "Image, video, and stream-frame annotation and review workflows "
                 "using CVAT and Label Studio, closing the hard-sample feedback loop."
@@ -160,13 +162,14 @@ def build_portrait_intelligence(
             current_scope=[
                 "Feedback collection API (POST /api/v1/feedback)",
                 "Hard-sample approval and manifest export",
+                "Tenant-scoped annotation task queue and review status",
+                "Consistency score and review comment capture",
                 "scenara-data consumer contract defined",
             ],
             not_in_scope_yet=[
                 "CVAT / Label Studio integration",
-                "Annotation consistency scoring",
                 "Review ratio and quality gate",
-                "Labeling task queue and assignment",
+                "External annotation provider synchronization",
             ],
             next_gate=(
                 "Build data governance foundation first; annotation tooling belongs to "
@@ -203,11 +206,7 @@ def build_portrait_intelligence(
         PortraitModuleItem(
             module_id="algorithms",
             name="Portrait Algorithms",
-            maturity=(
-                PortraitModuleMaturity.PARTIAL
-                if portrait_installed
-                else PortraitModuleMaturity.PLANNED
-            ),
+            maturity=(PortraitModuleMaturity.PARTIAL if portrait_installed else PortraitModuleMaturity.PLANNED),
             summary=(
                 "Complete portrait AI capability matrix: person detection, face detection, "
                 "face embedding (ArcFace), body ReID, pose estimation (RTMPose), "
@@ -246,6 +245,8 @@ def build_portrait_intelligence(
                 "FeatureStore protocol with cosine / L2 / inner-product metrics",
                 "MemoryFeatureStore (development) and PostgresFeatureStore (production)",
                 "Multi-dimensional feature spaces isolated by domain, modality, model, version",
+                "Tenant-scoped IndexStore and portrait result search",
+                "Cluster, association, and event records with audit trail",
             ],
             not_in_scope_yet=[
                 "Qdrant infrastructure implementation under scenara/infrastructure/ FeatureStore protocol",
@@ -268,14 +269,15 @@ def build_portrait_intelligence(
                 "Model release state machine with deployment event audit",
                 "Webhook delivery of deployment state changes to scenara-model",
                 "Per-tenant/project model activation and rollback",
+                "Per-model latency, error-rate, throughput, and quality metric points",
+                "p95 health snapshot and degradation/rollback recommendation",
                 "Fail-closed production configuration checks (scenara/settings.py)",
             ],
             not_in_scope_yet=[
                 "Triton Inference Server integration (replaces direct ONNXRuntime inference)",
                 "Kubernetes deployment manifests and HPA configuration",
-                "Real-time inference latency and throughput monitoring",
-                "Model performance degradation detection and automatic rollback trigger",
                 "MLflow experiment linkage to ModelPackageManifest",
+                "Automatic active-version rollback execution",
             ],
             next_gate=(
                 "Qualify 1.0 with ONNXRuntime single-node baseline; "

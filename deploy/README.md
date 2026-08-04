@@ -34,7 +34,7 @@ On a connected Ubuntu build host:
 
 Transfer the generated tar archive through the approved channel, extract it, then install on the target:
 
-    deploy/scripts/install-offline.sh /srv/scenara-offline-0.3.0-dev.6 /secure/scenara.env
+    deploy/scripts/install-offline.sh /srv/scenara-offline-0.3.0-dev.9 /secure/scenara.env
 
 The approved model package directory is mandatory and is copied into the checksummed offline bundle; the repository never supplies or substitutes model weights. The installer verifies Ubuntu 24.04 x86_64, Docker Engine 27+, Docker Compose 2.29+, CUDA 12.8 driver compatibility, exactly one NVIDIA GPU, and the 24 GB memory class before loading images. It starts Compose with `--no-build --wait`, verifies the dependency readiness endpoint and Chinese console, and rejects any required service that is not running.
 

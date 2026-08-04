@@ -78,6 +78,68 @@ export interface MediaSourceProbe {
   metadata: MediaTechnicalMetadata;
   checked_at: number;
 }
+
+export type DatasetStatus = "draft" | "active" | "archived";
+export type DatasetVersionStatus =
+  "draft" | "validated" | "published" | "retired";
+
+export interface DatasetRecord {
+  dataset_id: string;
+  tenant_id: string;
+  project_id: string;
+  name: string;
+  description: string;
+  status: DatasetStatus;
+  metadata: Record<string, unknown>;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface DatasetVersion {
+  version_id: string;
+  dataset_id: string;
+  tenant_id: string;
+  project_id: string;
+  version: string;
+  status: DatasetVersionStatus;
+  manifest_sha256: string;
+  asset_ids: string[];
+  item_count: number;
+  quality_score: number | null;
+  lineage: Record<string, unknown>;
+  annotation_summary: Record<string, unknown>;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface AuditEvent {
+  event_id: string;
+  tenant_id: string;
+  project_id: string;
+  principal_id: string;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  outcome: string;
+  request_id: string | null;
+  evidence: Record<string, unknown>;
+  created_at: number;
+}
+
+export interface SavedSearch {
+  saved_search_id: string;
+  tenant_id: string;
+  project_id: string;
+  name: string;
+  description: string;
+  mode: "text" | "portrait";
+  definition: Record<string, unknown>;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+  last_run_at: number | null;
+}
 export interface ModelPackage {
   schema_version: "1.0";
   model_id: string;

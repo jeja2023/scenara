@@ -204,3 +204,13 @@ async def test_full_portrait_pipeline_exposes_all_capabilities_without_embedding
         }
         assert not contains_embedding(result)
         assert result["provenance"]["development_substitutes"] == []
+        vector_index = await runtime.indexes.get_index("result.portrait.face.unknown.unknown")
+        assert vector_index is not None
+        vector_records = await runtime.indexes.list_records(
+            "default",
+            "default",
+            index_id="result.portrait.face.unknown.unknown",
+            source_id=run.json()["data"]["run_id"],
+        )
+        assert vector_records
+        assert vector_records[0].vector is not None

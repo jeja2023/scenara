@@ -23,6 +23,7 @@ const allowedInterfaceTerms = new Set([
   "Scenara",
   "Agent",
   "Console",
+  "CSV",
   "Data",
   "Edge",
   "Flow",
@@ -43,10 +44,13 @@ async function expectChineseInterface(
 }
 
 const workspaces = [
+  ["datasets", "数据集", "数据集治理"],
+  ["audit", "审计中心", "审计中心"],
   ["", "总览", "总览"],
   ["parse/portrait", "解析工作区", "解析"],
   ["assets", "数据资产", "数据资产"],
   ["results", "解析结果", "解析结果"],
+  ["search", "检索", "检索"],
   ["runs", "运行", "运行"],
   ["capabilities", "领域与能力", "领域与能力"],
   ["pipelines", "流水线", "流水线"],
@@ -72,6 +76,11 @@ test.beforeEach(async ({ page }) => {
       return;
     }
     let data: unknown = [];
+    if (path === "/api/v1/datasets" || path === "/api/v1/audit/events") {
+      data = { items: [], offset: 0, limit: 50, total: 0 };
+    } else if (path === "/api/v1/search/saved") {
+      data = { items: [], offset: 0, limit: 100, total: 0 };
+    }
     if (path === "/api/v1/media/assets" || path === "/api/v1/media/sources") {
       data = { items: [], offset: 0, limit: 50, total: 0 };
     } else if (path === "/api/v1/results") {
@@ -103,7 +112,7 @@ test.beforeEach(async ({ page }) => {
       data = { items: [], offset: 0, limit: 100, total: 0 };
     } else if (path === "/api/v1/system/status") {
       data = {
-        version: "0.3.0.dev6",
+        version: "0.3.0.dev9",
         profile: "development",
         state_backend: "memory",
         object_backend: "local",
@@ -120,7 +129,7 @@ test.beforeEach(async ({ page }) => {
         ["api", "developer_surface", "available"],
         ["sdk", "developer_surface", "available"],
         ["index", "foundation", "seed"],
-        ["search", "product_module", "planned"],
+        ["search", "product_module", "seed"],
         ["flow", "product_module", "planned"],
         ["edge", "product_module", "gated"],
         ["agent", "product_module", "gated"],
@@ -409,9 +418,7 @@ test("mobile navigation opens and reaches another workspace", async ({
   expect(pageErrors).toEqual([]);
 });
 
-test("解析菜单只负责展开领域入口，不会导航到默认解析页", async ({
-  page,
-}) => {
+test("解析菜单只负责展开领域入口，不会导航到默认解析页", async ({ page }) => {
   await page.goto("");
   const mobileMenu = page.locator(".mobile-menu");
   if (await mobileMenu.isVisible()) await mobileMenu.click();
@@ -421,9 +428,9 @@ test("解析菜单只负责展开领域入口，不会导航到默认解析页",
   await expect(parseMenu).toHaveAttribute("aria-expanded", "true");
   await expect(page.locator(".parse-subnav")).toBeVisible();
   await expect(page).toHaveURL(/\/console\/$/);
-  await expect(
-    page.getByRole("heading", { name: "解析工作区" }),
-  ).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "解析工作区" })).toHaveCount(
+    0,
+  );
 
   await parseMenu.click();
   await expect(parseMenu).toHaveAttribute("aria-expanded", "false");
@@ -478,7 +485,9 @@ test("parse domain pages keep media tabs inside the workspace", async ({
   await expect(page.locator(".parse-domain-link small")).toHaveCount(0);
   await portraitMenu.click();
   await expect(page).toHaveURL(/\/parse\/portrait$/);
-  await expect(page.getByRole("tab", { name: "图片", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("tab", { name: "图片", exact: true }),
+  ).toBeVisible();
 });
 
 test("parse workbench completes every media flow and cancellation", async ({

@@ -1,8 +1,9 @@
-import type { AccessFoundationStatus, ApiKeyRecord, CreateApiKeyResponse, Domain, FeedbackRecord, HardSampleManifest, IamSummary, MediaAsset, MediaAssetPage, MediaSource, MediaSourcePage, MediaSourceProbe, Membership, ModelDeploymentEvent, ModelPackage, ModelRelease, Organization, ParseDocumentResponse, ParseImageResponse, ParseVideoResponse, PortraitIntelligenceStatus, ProductCatalogItem, ProductEntitlement, Project, RepositoryContractCatalog, RepositoryTopology, ResultEnvelope, Run, RunPage, RunStatus, SampleStrategy, Role, ServiceAccount, UserAccount, WebhookDelivery, WebhookSubscription } from "./types.js";
-export type ScenaraTransport = <T>(method: "GET" | "POST" | "PUT" | "DELETE", path: string, options?: {
+import type { AccessFoundationStatus, AuditEventPage, ApiKeyRecord, CreateApiKeyResponse, DatasetRecord, DatasetVersion, Domain, FeedbackRecord, HardSampleManifest, IamSummary, MediaAsset, MediaAssetPage, MediaSource, MediaSourcePage, MediaSourceProbe, Membership, ModelDeploymentEvent, ModelPackage, ModelRelease, Organization, ParseDocumentResponse, ParseImageResponse, ParseVideoResponse, PortraitCompareResponse, IndexDefinition, IndexHit, IndexRecordView, SearchResponse, SavedSearch, SavedSearchPage, PortraitIntelligenceStatus, ProductCatalogItem, ProductEntitlement, Project, RepositoryContractCatalog, RepositoryTopology, ResultEnvelope, Run, RunPage, RunStatus, SampleStrategy, Role, ServiceAccount, UserAccount, WebhookDelivery, WebhookSubscription } from "./types.js";
+export type ScenaraTransport = <T>(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", path: string, options?: {
     body?: unknown;
     idempotencyKey?: string;
 }) => Promise<T>;
+export type ControlPlaneRecord = Record<string, unknown>;
 export interface CreateRunInput {
     domain: Domain;
     pipelineId: string;
@@ -68,6 +69,7 @@ export declare class ScenaraError extends Error {
 export declare class ScenaraClient {
     private readonly transport;
     constructor(options: ScenaraClientOptions);
+    controlPlane<T = ControlPlaneRecord>(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", path: string, body?: ControlPlaneRecord): Promise<T>;
     getRun(runId: string): Promise<Run>;
     listRuns(filters?: {
         status?: RunStatus;
@@ -189,6 +191,167 @@ export declare class ScenaraClient {
     enrollPortraitIdentity(identityId: string, enrollment: Record<string, unknown>): Promise<Record<string, unknown>>;
     searchPortrait(query: Record<string, unknown>): Promise<Record<string, unknown>>;
     comparePortrait(comparison: Record<string, unknown>): Promise<Record<string, unknown>>;
+    createIdentityProvider(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    listIdentityProviders(): Promise<ControlPlaneRecord[]>;
+    probeIdentityProvider(providerId: string): Promise<ControlPlaneRecord>;
+    requestProjectLifecycle(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    decideProjectLifecycle(requestId: string, input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    setAuditRetention(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    purgeAudit(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    createBillingAccount(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    recordMeterEvent(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    listBillingUsage(accountId?: string): Promise<ControlPlaneRecord[]>;
+    assignBillingSeat(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    createSession(input: {
+        userId: string;
+        ttlSeconds?: number;
+    }): Promise<ControlPlaneRecord>;
+    setUserDisabled(userId: string, disabled: boolean): Promise<UserAccount>;
+    createQuotaPlan(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    checkQuota(metric: string, amount?: number): Promise<ControlPlaneRecord>;
+    createAnnotationTask(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    registerAnnotationProvider(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    probeAnnotationProvider(providerId: string): Promise<ControlPlaneRecord>;
+    reviewAnnotationTask(taskId: string, input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    createFlow(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    executeFlow(flowId: string, input?: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    decideFlowApproval(approvalId: string, input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    createSearchRankingProfile(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    evaluateSearch(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    rebuildIndex(indexId: string): Promise<ControlPlaneRecord>;
+    createIndex(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    registerIndexBackend(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    probeIndexBackend(backendId: string): Promise<ControlPlaneRecord>;
+    registerSearchReranker(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    probeSearchReranker(rerankerId: string): Promise<ControlPlaneRecord>;
+    registerEdgeDevice(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    heartbeatEdgeDevice(deviceId: string, input?: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    deployEdge(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    acknowledgeEdgeDeployment(deploymentId: string, input?: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    registerAgentTool(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    proposeAgentAction(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    decideAgentAction(actionId: string, input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    executeAgentAction(actionId: string): Promise<ControlPlaneRecord>;
+    recordAgentTrace(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    recordAgentEvaluation(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    putAgentMemory(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
+    getAgentMemory(namespace: string, key: string): Promise<ControlPlaneRecord | null>;
+    getDeploymentTopology(): Promise<ControlPlaneRecord>;
+    listDatasets(offset?: number, limit?: number): Promise<{
+        items: DatasetRecord[];
+        offset: number;
+        limit: number;
+        total: number;
+    }>;
+    createDataset(input: {
+        name: string;
+        description?: string;
+        metadata?: Record<string, unknown>;
+    }): Promise<DatasetRecord>;
+    getDataset(datasetId: string): Promise<DatasetRecord>;
+    updateDataset(datasetId: string, input: Partial<Pick<DatasetRecord, "name" | "description" | "status" | "metadata">>): Promise<DatasetRecord>;
+    createDatasetVersion(datasetId: string, input: {
+        version: string;
+        manifestSha256: string;
+        assetIds?: string[];
+        qualityScore?: number | null;
+        lineage?: Record<string, unknown>;
+        annotationSummary?: Record<string, unknown>;
+    }): Promise<DatasetVersion>;
+    listDatasetVersions(datasetId: string, offset?: number, limit?: number): Promise<{
+        items: DatasetVersion[];
+        offset: number;
+        limit: number;
+        total: number;
+    }>;
+    transitionDatasetVersion(versionId: string, status: "validated" | "published" | "retired"): Promise<DatasetVersion>;
+    listAuditEvents(filters?: {
+        action?: string;
+        resourceType?: string;
+        principalId?: string;
+        outcome?: string;
+        offset?: number;
+        limit?: number;
+    }): Promise<AuditEventPage>;
+    enrollPortraitIdentityImage(identityId: string, file: Blob, filename?: string, options?: {
+        featureSpaceId?: string;
+        quality?: number;
+    }): Promise<Record<string, unknown>>;
+    searchPortraitImage(file: Blob, filename?: string, options?: {
+        featureSpaceId?: string;
+        limit?: number;
+        threshold?: number;
+    }): Promise<Record<string, unknown>>;
+    comparePortraitImages(left: Blob, right: Blob, options?: {
+        leftFilename?: string;
+        rightFilename?: string;
+        featureSpaceId?: string;
+        threshold?: number;
+    }): Promise<PortraitCompareResponse>;
+    comparePortraitAssets(input: {
+        leftAssetId: string;
+        rightAssetId: string;
+        featureSpaceId?: string;
+        threshold?: number;
+    }): Promise<PortraitCompareResponse>;
+    comparePortraitAssetImage(assetId: string, image: Blob, options?: {
+        filename?: string;
+        featureSpaceId?: string;
+        threshold?: number;
+    }): Promise<PortraitCompareResponse>;
+    comparePortraitImageAsset(image: Blob, assetId: string, options?: {
+        filename?: string;
+        featureSpaceId?: string;
+        threshold?: number;
+    }): Promise<PortraitCompareResponse>;
+    listSearchIndexes(domain?: string): Promise<IndexDefinition[]>;
+    listSearchIndexRecords(indexId: string, filters?: {
+        sourceType?: string;
+        sourceId?: string;
+        offset?: number;
+        limit?: number;
+    }): Promise<IndexRecordView[]>;
+    querySearchIndexText(indexId: string, query: string, limit?: number): Promise<Record<string, unknown>[]>;
+    querySearchIndexVector(indexId: string, vector: number[], options?: {
+        limit?: number;
+        threshold?: number;
+    }): Promise<IndexHit[]>;
+    searchText(input: {
+        query: string;
+        domains?: string[];
+        mediaKinds?: string[];
+        limit?: number;
+    }): Promise<SearchResponse>;
+    searchPortraitResults(input: {
+        file: Blob;
+        filename?: string;
+        featureSpaceId?: string;
+        mediaKinds?: string[];
+        limit?: number;
+        threshold?: number;
+    }): Promise<SearchResponse>;
+    searchPortraitAsset(input: {
+        assetId: string;
+        featureSpaceId?: string;
+        mediaKinds?: string[];
+        limit?: number;
+        threshold?: number;
+    }): Promise<SearchResponse>;
+    createSavedSearch(input: {
+        name: string;
+        mode: "text" | "portrait";
+        definition: Record<string, unknown>;
+        description?: string;
+    }): Promise<SavedSearch>;
+    listSavedSearches(offset?: number, limit?: number): Promise<SavedSearchPage>;
+    getSavedSearch(savedSearchId: string): Promise<SavedSearch>;
+    updateSavedSearch(savedSearchId: string, input: {
+        name?: string;
+        description?: string;
+        definition?: Record<string, unknown>;
+    }): Promise<SavedSearch>;
+    runSavedSearch(savedSearchId: string): Promise<SearchResponse>;
+    deleteSavedSearch(savedSearchId: string): Promise<void>;
     enterpriseStatus(): Promise<Record<string, unknown>>;
     createFeedback(feedback: Record<string, unknown>): Promise<FeedbackRecord>;
     listFeedback(): Promise<FeedbackRecord[]>;

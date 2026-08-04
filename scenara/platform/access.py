@@ -23,6 +23,7 @@ from scenara.platform.models import (
     Membership,
     Organization,
     PrincipalContext,
+    PrincipalType,
     ProductEntitlement,
     Project,
     Role,
@@ -53,6 +54,8 @@ class AccessRepository(Protocol):
 
     async def list_users(self, tenant_id: str) -> list[UserAccount]: ...
 
+    async def save_user(self, record: UserAccount) -> UserAccount: ...
+
     async def create_role(self, record: Role) -> Role: ...
 
     async def list_roles(self, tenant_id: str) -> list[Role]: ...
@@ -68,6 +71,8 @@ class AccessRepository(Protocol):
     ) -> ServiceAccount | None: ...
 
     async def list_service_accounts(self, tenant_id: str, project_id: str) -> list[ServiceAccount]: ...
+
+    async def save_service_account(self, record: ServiceAccount) -> ServiceAccount: ...
 
     async def create_api_key(self, record: ApiKeyRecord, *, token_sha256: str) -> ApiKeyRecord: ...
 
@@ -140,6 +145,13 @@ class MemoryAccessRepository:
             reverse=True,
         )
 
+    async def save_user(self, record: UserAccount) -> UserAccount:
+        key = (record.tenant_id, record.user_id)
+        if key not in self._users:
+            raise AccessNotFound("user not found")
+        self._users[key] = record.model_copy(deep=True)
+        return record.model_copy(deep=True)
+
     async def create_role(self, record: Role) -> Role:
         key = (record.tenant_id, record.role_id)
         if key in self._roles:
@@ -195,6 +207,13 @@ class MemoryAccessRepository:
             key=lambda item: (item.created_at, item.service_account_id),
             reverse=True,
         )
+
+    async def save_service_account(self, record: ServiceAccount) -> ServiceAccount:
+        key = (record.tenant_id, record.project_id, record.service_account_id)
+        if key not in self._service_accounts:
+            raise AccessNotFound("service account not found")
+        self._service_accounts[key] = record.model_copy(deep=True)
+        return record.model_copy(deep=True)
 
     async def create_api_key(self, record: ApiKeyRecord, *, token_sha256: str) -> ApiKeyRecord:
         key = (record.tenant_id, record.project_id, record.key_id)
@@ -298,6 +317,41 @@ class AccessService:
             product_ids=product_ids,
         )
 
+    async def is_user_disabled(self, tenant_id: str, user_id: str) -> bool:
+        """Return the current lifecycle flag for session authentication."""
+        users = await self.repository.list_users(tenant_id)
+        user = next((item for item in users if item.user_id == user_id), None)
+        return bool(user and user.disabled)
+
+    async def resolve_user_context(self, tenant_id: str, project_id: str, user_id: str) -> PrincipalContext | None:
+        """Resolve a user's effective scopes from project memberships and roles."""
+        users = await self.repository.list_users(tenant_id)
+        user = next((item for item in users if item.user_id == user_id), None)
+        if user is None or user.disabled:
+            return None
+        memberships = await self.repository.list_memberships(tenant_id, project_id)
+        membership = next(
+            item for item in memberships if item.principal_id == user_id and item.principal_type == PrincipalType.USER
+        ) if memberships else None
+        if membership is None:
+            return None
+        roles = {item.role_id: item for item in await self.repository.list_roles(tenant_id)}
+        scopes = frozenset(
+            scope for role_id in membership.role_ids for scope in (roles[role_id].scopes if role_id in roles else ())
+        )
+        products = frozenset(
+            product
+            for role_id in membership.role_ids
+            for product in (roles[role_id].product_ids if role_id in roles else ())
+        )
+        return PrincipalContext(
+            tenant_id=tenant_id,
+            project_id=project_id,
+            principal_id=user_id,
+            scopes=scopes,
+            product_ids=products,
+        )
+
     async def create_organization(self, context: PrincipalContext, body: CreateOrganizationRequest) -> Organization:
         await self._authorize(context, "create")
         now = time.time()
@@ -350,6 +404,17 @@ class AccessService:
     async def list_users(self, context: PrincipalContext) -> list[UserAccount]:
         await self._authorize(context, "read")
         return await self.repository.list_users(context.tenant_id)
+
+    async def set_user_disabled(self, context: PrincipalContext, user_id: str, disabled: bool) -> UserAccount:
+        await self._authorize(context, "write")
+        users = await self.repository.list_users(context.tenant_id)
+        user = next((item for item in users if item.user_id == user_id), None)
+        if user is None:
+            raise AccessNotFound("user not found")
+        updated = user.model_copy(update={"disabled": disabled, "updated_at": time.time()})
+        result = await self.repository.save_user(updated)
+        await self._record(context, "iam.user.disable" if disabled else "iam.user.restore", "user", user_id)
+        return result
 
     async def create_role(self, context: PrincipalContext, body: CreateRoleRequest) -> Role:
         await self._authorize(context, "create")
@@ -430,6 +495,25 @@ class AccessService:
     async def list_service_accounts(self, context: PrincipalContext) -> list[ServiceAccount]:
         await self._authorize(context, "read")
         return await self.repository.list_service_accounts(context.tenant_id, context.project_id)
+
+    async def set_service_account_disabled(
+        self, context: PrincipalContext, service_account_id: str, disabled: bool
+    ) -> ServiceAccount:
+        await self._authorize(context, "write")
+        service_account = await self.repository.get_service_account(
+            context.tenant_id, context.project_id, service_account_id
+        )
+        if service_account is None:
+            raise AccessNotFound("service account not found")
+        updated = service_account.model_copy(update={"disabled": disabled, "updated_at": time.time()})
+        result = await self.repository.save_service_account(updated)
+        await self._record(
+            context,
+            "iam.service-account.disable" if disabled else "iam.service-account.restore",
+            "service_account",
+            service_account_id,
+        )
+        return result
 
     async def create_api_key(
         self, context: PrincipalContext, service_account_id: str, body: CreateApiKeyRequest

@@ -1,4 +1,5 @@
 export type Domain = "portrait" | "ocr";
+export type MediaKind = "image" | "video" | "document" | "stream";
 export type SampleStrategy = "interval" | "keyframe" | "scene_change" | "uniform";
 export type RunStatus = "queued" | "running" | "pausing" | "paused" | "completed" | "failed" | "cancelling" | "cancelled";
 export type FeedbackStatus = "pending" | "approved" | "rejected";
@@ -82,6 +83,81 @@ export interface MediaSourceProbe {
   latency_ms: number;
   metadata: MediaTechnicalMetadata;
   checked_at: number;
+}
+
+export type DatasetStatus = "draft" | "active" | "archived";
+export type DatasetVersionStatus = "draft" | "validated" | "published" | "retired";
+
+export interface DatasetRecord {
+  dataset_id: string;
+  tenant_id: string;
+  project_id: string;
+  name: string;
+  description: string;
+  status: DatasetStatus;
+  metadata: Record<string, unknown>;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface DatasetVersion {
+  version_id: string;
+  dataset_id: string;
+  tenant_id: string;
+  project_id: string;
+  version: string;
+  status: DatasetVersionStatus;
+  manifest_sha256: string;
+  asset_ids: string[];
+  item_count: number;
+  quality_score: number | null;
+  lineage: Record<string, unknown>;
+  annotation_summary: Record<string, unknown>;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface AuditEvent {
+  event_id: string;
+  tenant_id: string;
+  project_id: string;
+  principal_id: string;
+  action: string;
+  resource_type: string;
+  resource_id: string | null;
+  outcome: string;
+  request_id: string | null;
+  evidence: Record<string, unknown>;
+  created_at: number;
+}
+
+export interface AuditEventPage {
+  items: AuditEvent[];
+  offset: number;
+  limit: number;
+  total: number;
+}
+
+export interface SavedSearch {
+  saved_search_id: string;
+  tenant_id: string;
+  project_id: string;
+  name: string;
+  description: string;
+  mode: "text" | "portrait";
+  definition: Record<string, unknown>;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+  last_run_at: number | null;
+}
+
+export interface SavedSearchPage {
+  items: SavedSearch[];
+  offset: number;
+  limit: number;
+  total: number;
 }
 
 export interface ModelPackage {
@@ -507,4 +583,105 @@ export interface ParseDocumentResponse {
   asset: MediaAsset;
   run: Run;
   result: ResultEnvelope | null;
+}
+
+export interface PortraitInputSummary {
+  face_count: number;
+  selected_face_index: number;
+  selected_face_box?: number[] | null;
+  quality_score?: number | null;
+  model_id: string;
+  model_version: string;
+  embedding_dimension: number;
+  fallback: boolean;
+  metadata: Record<string, unknown>;
+}
+
+export interface PortraitCompareResponse {
+  feature_space_id: string;
+  score: number;
+  distance: number;
+  threshold?: number | null;
+  matched?: boolean | null;
+  mode: "vector" | "image" | "asset" | "mixed";
+  comparison_id?: string | null;
+  left?: PortraitInputSummary | null;
+  right?: PortraitInputSummary | null;
+}
+
+export interface IndexDefinition {
+  index_id: string;
+  schema_version: string;
+  domain: string;
+  record_kind: "vector" | "text" | "multimodal";
+  vector_dimension?: number | null;
+  vector_model_id?: string | null;
+  vector_model_version?: string | null;
+  distance_metric?: string | null;
+  threshold?: number | null;
+  text_analyzer?: string | null;
+  created_at: number;
+}
+
+export interface IndexRecordView {
+  record_id: string;
+  index_id: string;
+  domain: string;
+  kind: "vector" | "text" | "multimodal";
+  source: Record<string, unknown>;
+  feature_id?: string | null;
+  has_vector: boolean;
+  text_snippet?: string | null;
+  metadata: Record<string, unknown>;
+  status: "ready" | "pending" | "failed" | "deleted";
+  created_at: number;
+  expires_at?: number | null;
+  deleted_at?: number | null;
+}
+
+export interface IndexHit {
+  record_id: string;
+  index_id: string;
+  domain: string;
+  source: Record<string, unknown>;
+  feature_id?: string | null;
+  score?: number | null;
+  distance?: number | null;
+  text_snippet?: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface SearchImageInputSummary {
+  face_count: number;
+  selected_face_index: number;
+  quality_score?: number | null;
+  feature_space_id: string;
+  model_id: string;
+  model_version: string;
+  embedding_dimension: number;
+  fallback: boolean;
+}
+
+export interface SearchResultHit {
+  record_id: string;
+  index_id: string;
+  domain: string;
+  source: Record<string, unknown>;
+  score?: number | null;
+  distance?: number | null;
+  text_snippet?: string | null;
+  metadata: Record<string, unknown>;
+  media_kind?: MediaKind | null;
+  resource_name?: string | null;
+}
+
+export interface SearchResponse {
+  search_id: string;
+  mode: "text" | "portrait";
+  query?: string | null;
+  feature_space_id?: string | null;
+  query_summary?: SearchImageInputSummary | null;
+  hits: SearchResultHit[];
+  total: number;
+  searched_indexes: string[];
 }

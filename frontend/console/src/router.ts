@@ -1,12 +1,16 @@
 import {
   Activity,
   Boxes,
+  Database,
   FileSearch,
+  FileClock,
   Images,
   LayoutDashboard,
   MessageSquareText,
   PlaySquare,
+  Search,
   ScanSearch,
+  ScanFace,
   Settings2,
   ShieldCheck,
   Workflow,
@@ -55,6 +59,12 @@ const routes = [
     meta: { title: "数据资产", icon: Images, section: "数据" },
   },
   {
+    path: "/datasets",
+    name: "datasets",
+    component: () => import("./views/DatasetView.vue"),
+    meta: { title: "数据集治理", icon: Database, section: "数据" },
+  },
+  {
     path: "/media",
     redirect: "/assets",
   },
@@ -77,6 +87,18 @@ const routes = [
     name: "results",
     component: () => import("./views/ResultsView.vue"),
     meta: { title: "解析结果", icon: FileSearch, section: "结果" },
+  },
+  {
+    path: "/search",
+    name: "search",
+    component: () => import("./views/SearchView.vue"),
+    meta: { title: "检索", icon: Search, section: "检索" },
+  },
+  {
+    path: "/search/portrait-compare",
+    name: "portrait-compare",
+    component: () => import("./views/PortraitCompareView.vue"),
+    meta: { title: "人像比对", icon: ScanFace, section: "检索" },
   },
   {
     path: "/capabilities",
@@ -115,10 +137,30 @@ const routes = [
     meta: { title: "运维", icon: Activity, section: "治理" },
   },
   {
+    path: "/audit",
+    name: "audit",
+    component: () => import("./views/AuditView.vue"),
+    meta: { title: "审计中心", icon: FileClock, section: "治理" },
+  },
+  {
     path: "/enterprise",
     name: "enterprise",
     component: () => import("./views/EnterpriseWorkspaceView.vue"),
-    meta: { title: "企业", icon: ShieldCheck, section: "治理" },
+    meta: {
+      title: "企业",
+      icon: ShieldCheck,
+      section: "治理",
+    },
+  },
+  {
+    path: "/governance",
+    name: "governance",
+    component: () => import("./views/GovernanceView.vue"),
+    meta: {
+      title: "平台治理",
+      icon: ShieldCheck,
+      section: "治理",
+    },
   },
   { path: "/:pathMatch(.*)*", redirect: "/" },
 ];

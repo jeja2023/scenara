@@ -87,6 +87,68 @@ class MediaSourceProbe(TypedDict):
     checked_at: float
 
 
+DatasetStatus = Literal["draft", "active", "archived"]
+DatasetVersionStatus = Literal["draft", "validated", "published", "retired"]
+
+
+class DatasetRecord(TypedDict):
+    dataset_id: str
+    tenant_id: str
+    project_id: str
+    name: str
+    description: str
+    status: DatasetStatus
+    metadata: dict[str, Any]
+    created_at: float
+    updated_at: float
+
+
+class DatasetVersion(TypedDict):
+    version_id: str
+    dataset_id: str
+    tenant_id: str
+    project_id: str
+    version: str
+    status: DatasetVersionStatus
+    manifest_sha256: str
+    asset_ids: list[str]
+    item_count: int
+    quality_score: float | None
+    lineage: dict[str, Any]
+    annotation_summary: dict[str, Any]
+    created_by: str
+    created_at: float
+    updated_at: float
+
+
+class AuditEvent(TypedDict):
+    event_id: str
+    tenant_id: str
+    project_id: str
+    principal_id: str
+    action: str
+    resource_type: str
+    resource_id: str | None
+    outcome: str
+    request_id: str | None
+    evidence: dict[str, Any]
+    created_at: float
+
+
+class SavedSearch(TypedDict):
+    saved_search_id: str
+    tenant_id: str
+    project_id: str
+    name: str
+    description: str
+    mode: Literal["text", "portrait"]
+    definition: dict[str, Any]
+    created_by: str
+    created_at: float
+    updated_at: float
+    last_run_at: float | None
+
+
 class ModelPackage(TypedDict):
     schema_version: Literal["1.0"]
     model_id: str

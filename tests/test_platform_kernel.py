@@ -485,11 +485,19 @@ async def test_retention_sweep_expires_result_index_and_shards(kernel_client) ->
     reference = await runtime.state.get_result_reference("default", "default", run["run_id"])
     assert reference is not None
     result_keys = [reference.object_key, *reference.shard_keys]
+    result_index_id = f"result.{reference.domain}"
+    indexed = await runtime.indexes.list_records(
+        "default", "default", index_id=result_index_id, source_id=run["run_id"]
+    )
+    assert indexed
+    assert all(item.expires_at == pytest.approx(reference.created_at + 180 * 86_400) for item in indexed)
 
     deleted = await RetentionScheduler(runtime.state, runtime.objects).sweep(
         before=reference.created_at + 181 * 86_400,
     )
     assert deleted == len(result_keys) + 2
+    assert await runtime.indexes.delete_expired(reference.created_at + 181 * 86_400) == len(indexed)
+    assert await runtime.indexes.list_records("default", "default", index_id=result_index_id) == []
     assert await runtime.state.get_result_reference("default", "default", run["run_id"]) is None
     for object_key in result_keys:
         with pytest.raises(FileNotFoundError):

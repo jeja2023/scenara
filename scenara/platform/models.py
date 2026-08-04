@@ -3,7 +3,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 
 class StrictModel(BaseModel):
@@ -146,6 +146,128 @@ class MediaSourceProbe(StrictModel):
     latency_ms: int = Field(ge=0)
     metadata: MediaTechnicalMetadata = Field(default_factory=MediaTechnicalMetadata)
     checked_at: float
+
+
+class DatasetStatus(StrEnum):
+    DRAFT = "draft"
+    ACTIVE = "active"
+    ARCHIVED = "archived"
+
+
+class DatasetVersionStatus(StrEnum):
+    DRAFT = "draft"
+    VALIDATED = "validated"
+    PUBLISHED = "published"
+    RETIRED = "retired"
+
+
+class DatasetRecord(StrictModel):
+    dataset_id: str = Field(min_length=2, max_length=128)
+    tenant_id: str
+    project_id: str
+    name: str = Field(min_length=1, max_length=256)
+    description: str = Field(default="", max_length=4_000)
+    status: DatasetStatus = DatasetStatus.DRAFT
+    metadata: dict[str, Any] = Field(default_factory=dict)
+    created_at: float
+    updated_at: float
+
+
+class DatasetVersion(StrictModel):
+    version_id: str = Field(min_length=2, max_length=128)
+    dataset_id: str
+    tenant_id: str
+    project_id: str
+    version: str = Field(min_length=1, max_length=64)
+    status: DatasetVersionStatus = DatasetVersionStatus.DRAFT
+    manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    asset_ids: list[str] = Field(default_factory=list, max_length=100_000)
+    item_count: int = Field(default=0, ge=0)
+    quality_score: float | None = Field(default=None, ge=0, le=1)
+    lineage: dict[str, Any] = Field(default_factory=dict)
+    annotation_summary: dict[str, Any] = Field(default_factory=dict)
+    created_by: str
+    created_at: float
+    updated_at: float
+
+
+class CreateDatasetRequest(StrictModel):
+    name: str = Field(min_length=1, max_length=256)
+    description: str = Field(default="", max_length=4_000)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class UpdateDatasetRequest(StrictModel):
+    name: str | None = Field(default=None, min_length=1, max_length=256)
+    description: str | None = Field(default=None, max_length=4_000)
+    status: DatasetStatus | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class CreateDatasetVersionRequest(StrictModel):
+    version: str = Field(min_length=1, max_length=64)
+    manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    asset_ids: list[str] = Field(default_factory=list, max_length=100_000)
+    quality_score: float | None = Field(default=None, ge=0, le=1)
+    lineage: dict[str, Any] = Field(default_factory=dict)
+    annotation_summary: dict[str, Any] = Field(default_factory=dict)
+
+
+class TransitionDatasetVersionRequest(StrictModel):
+    status: DatasetVersionStatus
+
+
+class DatasetPage(StrictModel):
+    items: list[DatasetRecord]
+    offset: int
+    limit: int
+    total: int
+
+
+class DatasetVersionPage(StrictModel):
+    items: list[DatasetVersion]
+    offset: int
+    limit: int
+    total: int
+
+
+class SavedSearchMode(StrEnum):
+    TEXT = "text"
+    PORTRAIT = "portrait"
+
+
+class SavedSearch(StrictModel):
+    saved_search_id: str = Field(min_length=2, max_length=128)
+    tenant_id: str
+    project_id: str
+    name: str = Field(min_length=1, max_length=160)
+    description: str = Field(default="", max_length=2_000)
+    mode: SavedSearchMode
+    definition: dict[str, Any] = Field(default_factory=dict)
+    created_by: str
+    created_at: float
+    updated_at: float
+    last_run_at: float | None = None
+
+
+class CreateSavedSearchRequest(StrictModel):
+    name: str = Field(min_length=1, max_length=160)
+    description: str = Field(default="", max_length=2_000)
+    mode: SavedSearchMode
+    definition: dict[str, Any] = Field(default_factory=dict)
+
+
+class UpdateSavedSearchRequest(StrictModel):
+    name: str | None = Field(default=None, min_length=1, max_length=160)
+    description: str | None = Field(default=None, max_length=2_000)
+    definition: dict[str, Any] | None = None
+
+
+class SavedSearchPage(StrictModel):
+    items: list[SavedSearch]
+    offset: int
+    limit: int
+    total: int
 
 
 class CreateWebhookSubscriptionRequest(StrictModel):
@@ -350,6 +472,22 @@ class ResultArtifact(StrictModel):
     sha256: str = Field(min_length=64, max_length=64)
 
 
+class ResultIndexVector(StrictModel):
+    """Protected vector hint consumed while a result is being indexed.
+
+    This field is intentionally attached to the in-memory result only. It is
+    never serialized into the public result document or API response.
+    """
+
+    object_id: str
+    feature_space_id: str
+    model_id: str
+    model_version: str
+    vector: list[float] = Field(min_length=1, max_length=65_536)
+    quality: float | None = Field(default=None, ge=0, le=1)
+    modality: str = "face"
+
+
 class ProvenanceEvidence(StrictModel):
     source_sha256: str | None = None
     generated_by: str = "scenara"
@@ -373,6 +511,7 @@ class ResultEnvelope(StrictModel):
     warnings: list[str] = Field(default_factory=list)
     provenance: ProvenanceEvidence = Field(default_factory=ProvenanceEvidence)
     created_at: float
+    _index_vectors: list[ResultIndexVector] = PrivateAttr(default_factory=list)
 
     @model_validator(mode="after")
     def validate_domain_payload(self) -> ResultEnvelope:

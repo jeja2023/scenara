@@ -41,9 +41,14 @@ def build_access_foundation(
                 name="Tenant and project context",
                 status=AccessCapabilityStatus.AVAILABLE,
                 summary="Every request and IAM resource is scoped by tenant and project identifiers.",
-                current_scope=["organization records", "project records", "tenant/project scoped storage keys"],
-                not_in_scope_yet=["project suspension", "project deletion workflow"],
-                next_gate="Add project lifecycle controls after tenant provisioning rules settle.",
+                current_scope=[
+                    "organization records",
+                    "project records",
+                    "tenant/project scoped storage keys",
+                    "project lifecycle approval requests",
+                ],
+                not_in_scope_yet=["cross-tenant project moves", "irreversible storage erasure evidence"],
+                next_gate="Bind lifecycle approvals to the deployment evidence and retention owner.",
             ),
             AccessCapabilityItem(
                 capability_id="api_authentication",
@@ -51,8 +56,8 @@ def build_access_foundation(
                 status=AccessCapabilityStatus.AVAILABLE,
                 summary="Production accepts a root bearer token and revocable scoped service-account API keys.",
                 current_scope=["single configured bearer token", "service account API keys", "scoped API keys"],
-                not_in_scope_yet=["OAuth applications", "external identity federation"],
-                next_gate="Add SSO and OAuth only after service-account and API-key administration settle.",
+                not_in_scope_yet=["OAuth applications", "signed external identity assertion exchange"],
+                next_gate="Connect a deployment-owned OIDC/SAML/SCIM adapter with verified assertions.",
             ),
             AccessCapabilityItem(
                 capability_id="policy_provider",
@@ -77,7 +82,7 @@ def build_access_foundation(
                     "service account and API key product limits",
                     "runtime resource-to-product enforcement",
                 ],
-                not_in_scope_yet=["plan assignment", "seat allocation", "self-service billing"],
+                not_in_scope_yet=["plan-to-entitlement automation", "self-service billing settlement"],
                 next_gate="Require every future product module to register its resource-to-product policy mapping.",
             ),
             AccessCapabilityItem(
@@ -85,9 +90,19 @@ def build_access_foundation(
                 name="Audit trail",
                 status=AccessCapabilityStatus.AVAILABLE,
                 summary="Platform services emit audit events for sensitive workflows.",
-                current_scope=["service-level audit events", "enterprise evidence workflows", "IAM audit events"],
-                not_in_scope_yet=["central audit search", "retention policy UI", "export approvals"],
-                next_gate="Expose tenant-scoped audit search and export controls in Console.",
+                current_scope=[
+                    "service-level audit events",
+                    "enterprise evidence workflows",
+                    "IAM audit events",
+                    "tenant-scoped audit search",
+                    "JSON and CSV audit export",
+                    "retention policy and purge controls",
+                ],
+                not_in_scope_yet=["export approval workflow", "long-term archival backend"],
+                next_gate=(
+                    "Add retention policy administration and immutable archival after operational ownership "
+                    "is assigned."
+                ),
             ),
             AccessCapabilityItem(
                 capability_id="role_management",
@@ -96,15 +111,19 @@ def build_access_foundation(
                 summary="Shared users, roles and project memberships are persisted for all Scenara products.",
                 current_scope=["users", "projects", "roles", "memberships"],
                 not_in_scope_yet=["visual permission editor", "hierarchical groups"],
-                next_gate="Resolve role bindings during interactive user authentication.",
+                next_gate="Add group and external-claim mapping without bypassing project memberships.",
             ),
             AccessCapabilityItem(
                 capability_id="sso",
                 name="Single sign-on",
                 status=AccessCapabilityStatus.PLANNED,
-                summary="Future enterprise identity federation for operators and service users.",
-                not_in_scope_yet=["OIDC", "SAML", "SCIM", "session management"],
-                next_gate="Add role management and service account foundations before SSO.",
+                summary=(
+                    "Identity-provider registration and configuration probes are available "
+                    "for enterprise adapters."
+                ),
+                current_scope=["OIDC/SAML/SCIM provider records", "configuration health probes"],
+                not_in_scope_yet=["signed OIDC/SAML assertion exchange", "SCIM user push/pull"],
+                next_gate="Bind a verified deployment adapter and map external claims to project memberships.",
             ),
         ],
     )

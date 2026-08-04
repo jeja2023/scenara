@@ -7,6 +7,7 @@ from scenara.domains.ocr.factory import load_ocr_engine
 from scenara.domains.ocr.operators import OcrEngine
 from scenara.domains.portrait import PortraitPlugin
 from scenara.domains.portrait.analysis import PortraitAnalysisBackend
+from scenara.domains.portrait.encoder import RuntimePortraitImageEncoder
 from scenara.domains.portrait.service import MemoryPortraitRepository, PortraitRepository, PortraitService
 from scenara.enterprise.license import EnterprisePolicyProvider, load_verified_license
 from scenara.enterprise.service import (
@@ -17,16 +18,21 @@ from scenara.enterprise.service import (
 from scenara.infrastructure.memory_state import MemoryStateStore
 from scenara.infrastructure.object_store import LocalObjectStore, S3ObjectStore
 from scenara.infrastructure.postgres_access import PostgresAccessRepository
+from scenara.infrastructure.postgres_control_plane import PostgresControlPlaneStore
 from scenara.infrastructure.postgres_enterprise import PostgresEnterpriseRepository
 from scenara.infrastructure.postgres_features import PostgresFeatureStore
 from scenara.infrastructure.postgres_feedback import PostgresFeedbackRepository
+from scenara.infrastructure.postgres_index import PostgresIndexStore
 from scenara.infrastructure.postgres_portrait import PostgresPortraitRepository
 from scenara.infrastructure.postgres_state import PostgresStateStore
 from scenara.infrastructure.queue import InlineRunQueue, RedisRunQueue
 from scenara.platform.access import AccessRepository, AccessService, MemoryAccessRepository
 from scenara.platform.audit import AuditLogger
+from scenara.platform.control_plane import ControlPlaneService, MemoryControlPlaneStore
+from scenara.platform.dataset import DatasetService
 from scenara.platform.features import FeatureStore, MemoryFeatureStore
 from scenara.platform.feedback import FeedbackRepository, FeedbackService, MemoryFeedbackRepository
+from scenara.platform.index import IndexStore, MemoryIndexStore
 from scenara.platform.media import DecodeImageOperator
 from scenara.platform.media_batch import DecodeMediaOperator
 from scenara.platform.model_runtime import ModelRegistry
@@ -35,6 +41,7 @@ from scenara.platform.pipeline import PipelineRegistry
 from scenara.platform.plugins import DomainPluginRegistry
 from scenara.platform.policy import DenyUnavailablePolicyProvider, DevelopmentPolicyProvider, PolicyProvider
 from scenara.platform.queue import RunQueue
+from scenara.platform.search import SearchService
 from scenara.platform.secrets import EncryptedObjectSecretStore, MemorySecretStore, SecretStore
 from scenara.platform.services import RunService
 from scenara.platform.store import StateStore
@@ -47,6 +54,7 @@ class Runtime:
     settings: Settings
     access: AccessService
     features: FeatureStore
+    indexes: IndexStore
     secrets: SecretStore
     audit: AuditLogger
     policy: PolicyProvider
@@ -60,6 +68,9 @@ class Runtime:
     webhooks: WebhookService
     feedback: FeedbackService
     portrait: PortraitService
+    search: SearchService
+    datasets: DatasetService
+    control_plane: ControlPlaneService
     enterprise: EnterpriseService | None
 
     async def open(self) -> None:
@@ -98,16 +109,20 @@ def build_runtime(
         state: StateStore = postgres_state
         access_repository: AccessRepository = PostgresAccessRepository(postgres_state.pool)
         features: FeatureStore = PostgresFeatureStore(postgres_state.pool)
+        indexes: IndexStore = PostgresIndexStore(postgres_state.pool)
         portrait_repository: PortraitRepository = PostgresPortraitRepository(postgres_state.pool)
         enterprise_repository: EnterpriseRepository = PostgresEnterpriseRepository(postgres_state.pool)
         feedback_repository: FeedbackRepository = PostgresFeedbackRepository(postgres_state.pool)
+        control_plane_store = PostgresControlPlaneStore(postgres_state.pool)
     elif settings.state_backend == "memory":
         state = MemoryStateStore()
         access_repository = MemoryAccessRepository()
         features = MemoryFeatureStore()
+        indexes = MemoryIndexStore()
         portrait_repository = MemoryPortraitRepository()
         enterprise_repository = MemoryEnterpriseRepository()
         feedback_repository = MemoryFeedbackRepository()
+        control_plane_store = MemoryControlPlaneStore()
     else:
         raise RuntimeError(f"unsupported state backend: {settings.state_backend}")
 
@@ -155,7 +170,24 @@ def build_runtime(
     plugins = DomainPluginRegistry(pipelines)
     plugins.register(PortraitPlugin(portrait_backend))
     plugins.register(OcrPlugin(ocr_engine))
-    portrait = PortraitService(portrait_repository, features, policy, audit)
+    portrait_encoder = RuntimePortraitImageEncoder(production=settings.production)
+    portrait = PortraitService(
+        portrait_repository,
+        features,
+        policy,
+        audit,
+        indexes=indexes,
+        encoder=portrait_encoder,
+    )
+    search = SearchService(
+        indexes=indexes,
+        state=state,
+        policy=policy,
+        audit=audit,
+        encoder=portrait_encoder,
+        objects=objects,
+    )
+    datasets = DatasetService(state, policy, audit)
     models = ModelRegistry(production=settings.production, catalog=state)
     webhooks = WebhookService(
         state=state,
@@ -197,8 +229,13 @@ def build_runtime(
         run_artifact_max_frames=settings.run_artifact_max_frames,
         run_artifact_crop_max_edge=settings.run_artifact_crop_max_edge,
         run_artifact_frame_max_edge=settings.run_artifact_frame_max_edge,
+        indexes=indexes,
     )
     access = AccessService(access_repository, audit, policy)
+    control_plane = ControlPlaneService(
+        control_plane_store, policy, audit, indexes=indexes, access=access, audit_store=state
+    )
+    search.profile_resolver = control_plane
     return Runtime(
         settings=settings,
         access=access,
@@ -212,10 +249,14 @@ def build_runtime(
         webhooks=webhooks,
         feedback=feedback,
         features=features,
+        indexes=indexes,
         secrets=secrets,
         audit=audit,
         policy=policy,
         portrait=portrait,
+        search=search,
+        datasets=datasets,
+        control_plane=control_plane,
         enterprise=enterprise,
     )
 

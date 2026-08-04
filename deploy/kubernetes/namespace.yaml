@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: scenara
+  labels:
+    app.kubernetes.io/name: scenara
+    app.kubernetes.io/part-of: scenara-platform
