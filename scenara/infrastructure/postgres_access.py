@@ -12,6 +12,7 @@ from scenara.platform.models import (
     Role,
     ServiceAccount,
     UserAccount,
+    UserCredential,
 )
 from scenara.platform.store import StateConflict
 
@@ -89,6 +90,22 @@ class PostgresAccessRepository:
             if cursor.rowcount == 0:
                 raise AccessNotFound("user not found")
         return record.model_copy(deep=True)
+
+    async def create_user_credential(self, record: UserCredential) -> UserCredential:
+        await self._insert_document(
+            "scenara_user_credentials",
+            ("tenant_id", "user_id", "password_hash", "created_at", "updated_at"),
+            (record.tenant_id, record.user_id, record.password_hash, record.created_at, record.updated_at),
+            record,
+            "user credential already exists",
+        )
+        return record.model_copy(deep=True)
+
+    async def get_user_credential(self, tenant_id: str, user_id: str) -> UserCredential | None:
+        row = await self._get_document(
+            "scenara_user_credentials", "tenant_id = %s AND user_id = %s", (tenant_id, user_id)
+        )
+        return UserCredential.model_validate(row) if row else None
 
     async def create_role(self, record: Role) -> Role:
         await self._insert_document(

@@ -62,6 +62,10 @@ const workspaces = [
 ] as const;
 
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    if (localStorage.getItem("scenara.console.e2e.skip-auth") !== "1")
+      sessionStorage.setItem("scenara.console.auth.v1", "1");
+  });
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
     if (path === "/api/v1/enterprise/status") {
@@ -76,7 +80,18 @@ test.beforeEach(async ({ page }) => {
       return;
     }
     let data: unknown = [];
-    if (path === "/api/v1/datasets" || path === "/api/v1/audit/events") {
+    if (path === "/api/v1/auth/login") {
+      data = {
+        token: "session-token-e2e",
+        session: {
+          session_id: "ses-e2e",
+          tenant_id: "default",
+          project_id: "default",
+          user_id: "console-user",
+          expires_at: Date.now() / 1000 + 3600,
+        },
+      };
+    } else if (path === "/api/v1/datasets" || path === "/api/v1/audit/events") {
       data = { items: [], offset: 0, limit: 50, total: 0 };
     } else if (path === "/api/v1/search/saved") {
       data = { items: [], offset: 0, limit: 100, total: 0 };
@@ -112,7 +127,7 @@ test.beforeEach(async ({ page }) => {
       data = { items: [], offset: 0, limit: 100, total: 0 };
     } else if (path === "/api/v1/system/status") {
       data = {
-        version: "0.3.0.dev9",
+        version: "0.3.0.dev10",
         profile: "development",
         state_backend: "memory",
         object_backend: "local",
@@ -365,6 +380,39 @@ test.beforeEach(async ({ page }) => {
       body: JSON.stringify({ schema_version: "1.0", request_id: "e2e", data }),
     });
   });
+});
+
+test("unauthenticated visitors are sent to the login page", async ({
+  page,
+}) => {
+  await page.goto("runs");
+  await page.evaluate(() => {
+    localStorage.setItem("scenara.console.e2e.skip-auth", "1");
+    sessionStorage.removeItem("scenara.console.auth.v1");
+  });
+  await page.goto("runs");
+  await expect(page).toHaveURL(/\/console\/login\?redirect=\/runs/);
+  await expect(
+    page.getByRole("heading", { level: 2, name: "登录控制台" }),
+  ).toBeVisible();
+});
+
+test("username and password login returns to the workspace", async ({
+  page,
+}) => {
+  await page.goto("runs");
+  await page.evaluate(() => {
+    localStorage.setItem("scenara.console.e2e.skip-auth", "1");
+    sessionStorage.removeItem("scenara.console.auth.v1");
+  });
+  await page.goto("login?redirect=%2Fruns");
+  await page.getByLabel("用户名", { exact: true }).fill("console-user");
+  await page.getByLabel("密码", { exact: true }).fill("local-password");
+  await page.getByRole("button", { name: "登录", exact: true }).click();
+  await expect(page).toHaveURL(/\/console\/runs$/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "运行" }),
+  ).toBeVisible();
 });
 
 for (const [path, heading, title] of workspaces) {

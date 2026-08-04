@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ChevronDown, Menu, RefreshCw, Settings, X } from "@lucide/vue";
-import { computed, nextTick, onMounted, reactive, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { ChevronDown, LogOut, Menu, RefreshCw, Settings, X } from "@lucide/vue";
+import { computed, nextTick, reactive, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
+import { signOut } from "./auth";
 import {
   api,
+  connectionTokenIsPersistent,
   loadConnection,
   saveConnection,
   type ConnectionSettings,
@@ -15,6 +17,8 @@ import { routes } from "./router";
 import type { DomainManifest } from "./types";
 
 const route = useRoute();
+const router = useRouter();
+const isAuthRoute = computed(() => route.meta.layout === "auth");
 const mobileOpen = ref(false);
 const settingsOpen = ref(false);
 const connectionState = ref<"checking" | "online" | "offline">("checking");
@@ -91,19 +95,36 @@ function openSettings(): void {
 }
 
 function applySettings(): void {
-  saveConnection({ ...draft, apiBase: draft.apiBase.replace(/\/$/, "") });
+  saveConnection(
+    { ...draft, apiBase: draft.apiBase.replace(/\/$/, "") },
+    { persistAuth: connectionTokenIsPersistent() },
+  );
   settingsOpen.value = false;
   void checkConnection();
 }
 
-onMounted(() => {
-  void checkConnection();
-  void loadDomainNavigation();
-});
+function logout(): void {
+  signOut();
+  mobileOpen.value = false;
+  settingsOpen.value = false;
+  void router.replace({ name: "login" });
+}
+
+watch(
+  isAuthRoute,
+  (authRoute) => {
+    if (!authRoute) {
+      void checkConnection();
+      void loadDomainNavigation();
+    }
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
-  <div class="shell">
+  <RouterView v-if="isAuthRoute" />
+  <div v-else class="shell">
     <header class="topbar">
       <button
         class="icon-button mobile-menu"
@@ -137,6 +158,9 @@ onMounted(() => {
         </button>
         <button class="icon-button" title="连接设置" @click="openSettings">
           <Settings :size="18" />
+        </button>
+        <button class="icon-button" title="退出登录" @click="logout">
+          <LogOut :size="18" />
         </button>
       </div>
     </header>

@@ -1,6 +1,6 @@
 # Scenara 人像智能基础平台长期战略
 
-适用版本：`0.3.0-dev.9`。本文是景枢人像 AI 方向的长期技术战略，定义平台演进目标、六大核心模块、三项核心资产以及各阶段的门禁与现状差距。本文是战略意图文件，不是已发布能力清单。能力成熟度以 `model-capabilities.yml` 和 [实现矩阵](../release/IMPLEMENTATION_MATRIX.md) 为准。
+适用版本：`0.3.0-dev.10`。本文是景枢人像 AI 方向的长期技术战略，定义平台演进目标、六大核心模块、三项核心资产以及各阶段的门禁与现状差距。本文是战略意图文件，不是已发布能力清单。能力成熟度以 `model-capabilities.yml` 和 [实现矩阵](../release/IMPLEMENTATION_MATRIX.md) 为准。
 
 ---
 
@@ -337,7 +337,7 @@ Python SDK 使用 `get_portrait_intelligence()`，TypeScript SDK 使用 `getPort
 契约构建器 `scenara/platform/portrait_intelligence.py` 是纯函数，能力快照由调用方注入，因此 `scenara/platform` 不导入 `app.*`，符合 `tests/test_architecture.py` 的架构边界约束。修改模块归属或能力清单时，必须同时更新构建器、OpenAPI、两个 SDK、Console 标签层与契约测试。
 
 该接口是本文的机器可读事实来源；本文件解释其战略意图。接口反映当前成熟度与差距，不代表已部署的模型质量——推理时的权威能力状态始终以 `model-capabilities.yml` 为准。
-## 0.3.0-dev.9 已落地的索引、比对与治理闭环
+## 0.3.0-dev.10 已落地的索引、比对与治理闭环
 
 本版本完成了人像比对从“调用方提交向量”到“图片输入、模型编码、特征空间校验、身份/图片搜索、审计和删除”的完整闭环。`PortraitImageEncoder` 是领域适配边界，生产模式没有人脸时会拒绝请求，开发模式的图像指纹 fallback 会在响应和审计证据中明确标记。
 

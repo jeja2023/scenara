@@ -5,14 +5,15 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until signed, reproducible evidence is committed.
 
-Current development version: `0.3.0-dev.9` (`0.3.0.dev9` for Python packages).
+Current development version: `0.3.0-dev.10` (`0.3.0.dev10` for Python packages).
 This version is an engineering qualification snapshot, not a `1.0.0` production release.
 
-The `0.3.0-dev.9` engineering baseline cumulatively adds domain-scoped Parse
+The `0.3.0-dev.10` engineering baseline cumulatively adds domain-scoped Parse
 workspaces, a first-class cross-domain Results center, Data Assets terminology,
 dataset version governance, tenant-scoped audit search/export, saved Search
 definitions, a tenant/project-scoped result-summary query path backed by
-PostgreSQL indexes, and the remaining non-model P0-P2 control-plane contracts.
+PostgreSQL indexes, the remaining non-model P0-P2 control-plane contracts,
+username/password login, salted password credentials, and browser sessions.
 It retains the `0.3.0-dev.5` migration, capacity, coverage, progressive media
 decoding, monotonic Run progress, and replaceable partial Result guarantees.
 
@@ -59,13 +60,13 @@ The following checks were executed on 2026-08-04 and are supporting implementati
 
 | Check | Result |
 |---|---|
-| `.venv\\Scripts\\python.exe -m pytest -q` | 173 passed, 8 integration tests skipped by default; lifecycle approval, audit retention, billing, adapter probes, Agent records, control-plane, index rebuild, weighted Search, dataset, audit, saved-search and portrait image closure tests included |
+| `.venv\\Scripts\\python.exe -m pytest -q` | 176 passed, 8 integration tests skipped by default; username/password login, bootstrap admin validation, lifecycle approval, audit retention, billing, adapter probes, Agent records, control-plane, index rebuild, weighted Search, dataset, audit, saved-search and portrait image closure tests included |
 | Real GOP keyframe cross-check | PyAV and Scenara both selected frames `0, 12, 24, 36, 48, 60, 72, 84, 96, 108`; normal decode no longer uses the FFmpeg raw-only keyframe flag |
 | Real-time video and stream browser qualification | HEVC file Run `run_915a658dcd69469a81877c21ee2f22ab` exposed 8/16/24-unit partial results before completing 32 units with 21 objects; HTTP MPEG-TS Run `run_2e3c39dd7f6b4c4aa65f27b3820a277c` exposed units 1-8 individually and completed with 7 objects; after an API container force-recreate, persisted Source `src_1cd455c67c7548cdad6aa9f35f1ed63a` successfully previewed and Run `run_9816db5634ec4b13a057e36566901224` exposed 4/8 units before completing with 9 objects; crop JPEGs, 1920x1080 full frames, highlights, and Results-page replay loaded successfully |
 | `SCENARA_RUN_INTEGRATION=1 python -m pytest -q -m integration tests/integration` | 8 tests collected for PostgreSQL/pgvector, Redis and MinIO; the dev.4 pagination and artifact additions require the CI real-service job or a local Compose qualification run |
 | `scripts/local_backup_restore_drill.ps1` | passed; PostgreSQL and MinIO markers restored and verified |
-| `pnpm run check` | passed; Prettier, warning-free console lint, 18 console tests, typecheck, build and TypeScript SDK runtime/contract check |
-| `npm run console:e2e` | 44 passed across desktop Chrome and Pixel 7 viewports; all workspaces plus complete image/video/PDF/stream controls, governance workflows and cancellation tracking checked for page errors and horizontal overflow |
+| `pnpm run check` | passed; Prettier, warning-free console lint, 19 console tests, typecheck, build and TypeScript SDK runtime/contract check |
+| `npm run console:e2e` | 48 passed across desktop Chrome and Pixel 7 viewports; login redirect, username/password login, all workspaces plus complete image/video/PDF/stream controls, governance workflows and cancellation tracking checked for page errors and horizontal overflow |
 | Ruff (including `app/` correctness rules), Mypy, OpenAPI/SDK drift, published repository-contract drift/compatibility, repository gate, implementation release gate | all passed |
 | `python -m pip_audit -r requirements/dev.txt` and `pnpm audit --audit-level high` | no known vulnerabilities in the committed dependency definitions |
 | Deployment script syntax | all `deploy/scripts/*.sh` files passed `bash -n` in a cached Linux container |
@@ -75,7 +76,7 @@ Local results do not satisfy software-license legal approval, the target GPU, li
 
 ## Product matrix gates after 0.3.0
 
-- Local interactive sessions, identity-provider registration/probes, user lifecycle checks, and login-time Membership/Role scope resolution are implemented; signed OIDC/SAML/SCIM assertion exchange remains deployment-gated.
+- Local username/password login, interactive sessions, identity-provider registration/probes, user lifecycle checks, and login-time Membership/Role scope resolution are implemented; signed OIDC/SAML/SCIM assertion exchange remains deployment-gated.
 - Quota plans, fail-closed usage checks, billing accounts, idempotent metering, usage aggregation, and seat limits are implemented; payment settlement, invoices, taxes and self-service purchase remain deployment-gated.
 - Project disable/restore/delete approval requests and audit retention policy/purge controls are implemented; tenant-scoped audit search and JSON/CSV export remain available.
 - Annotation task/review plus provider probes, Edge device/sync/deployment acknowledgements, Search evaluation/ranking profiles with weighted retrieval plus index-backend/reranker probes, Flow run/condition/approval/webhook execution, Worker leases, and Agent least-scope approval/execution with trace/evaluation/memory records are implemented. Real ANN/semantic model execution and model training remain gated. Kubernetes manifests are provided as a pre-production topology and still require target-cluster evidence.

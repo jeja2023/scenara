@@ -170,6 +170,94 @@ async def test_interactive_session_is_usable_as_a_bearer_credential(development_
 
 
 @pytest.mark.asyncio
+async def test_username_password_login_issues_a_scoped_session(development_settings) -> None:
+    runtime = build_runtime(development_settings)
+    app = create_app(runtime=runtime)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as api:
+        assert (
+            await api.post("/api/v1/platform/organizations", json={"display_name": "Default Organization"})
+        ).status_code == 201
+        assert (
+            await api.post(
+                "/api/v1/platform/projects",
+                json={"project_id": "default", "display_name": "Default Project"},
+            )
+        ).status_code == 201
+        user = await api.post(
+            "/api/v1/platform/users",
+            json={
+                "user_id": "console-user",
+                "display_name": "Console User",
+                "email": "console@example.test",
+                "password": "correct-password",
+            },
+        )
+        assert user.status_code == 201, user.text
+        assert "password" not in user.text
+        assert (
+            await api.post(
+                "/api/v1/platform/roles",
+                json={
+                    "role_id": "console-user",
+                    "display_name": "Console User",
+                    "scopes": ["iam:read"],
+                    "product_ids": ["console"],
+                },
+            )
+        ).status_code == 201
+        assert (
+            await api.post(
+                "/api/v1/platform/memberships",
+                json={
+                    "principal_id": "console-user",
+                    "principal_type": "user",
+                    "role_ids": ["console-user"],
+                },
+            )
+        ).status_code == 201
+
+        denied = await api.post(
+            "/api/v1/auth/login",
+            json={"username": "console-user", "password": "wrong-password"},
+        )
+        assert denied.status_code == 401
+
+        login = await api.post(
+            "/api/v1/auth/login",
+            json={"username": "console-user", "password": "correct-password"},
+        )
+        assert login.status_code == 200, login.text
+        token = login.json()["data"]["token"]
+        foundation = await api.get(
+            "/api/v1/platform/access-foundation",
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert foundation.status_code == 200, foundation.text
+        assert foundation.json()["data"]["principal_id"] == "console-user"
+
+
+@pytest.mark.asyncio
+async def test_bootstrap_admin_can_log_in_without_a_default_password(development_settings) -> None:
+    settings = replace(
+        development_settings,
+        bootstrap_admin_username="bootstrap-admin",
+        bootstrap_admin_password="bootstrap-password",
+    )
+    runtime = build_runtime(settings)
+    await runtime.open()
+    try:
+        app = create_app(runtime=runtime)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as api:
+            login = await api.post(
+                "/api/v1/auth/login",
+                json={"username": "bootstrap-admin", "password": "bootstrap-password"},
+            )
+            assert login.status_code == 200, login.text
+    finally:
+        await runtime.close()
+
+
+@pytest.mark.asyncio
 async def test_flow_runner_and_index_rebuild_are_durable(control_plane_client: httpx.AsyncClient) -> None:
     api = control_plane_client
     index = await api.post(
@@ -200,7 +288,7 @@ async def test_flow_runner_and_index_rebuild_are_durable(control_plane_client: h
     execution = await api.post(f"/api/v1/flows/{flow_id}/execute", json={})
     assert execution.status_code == 202
     assert execution.json()["data"]["status"] == "waiting_approval"
-    approval = (await api.get(f"/api/v1/flows/{flow_id}/executions/{execution.json()['data']['record_id']}/approvals"))
+    approval = await api.get(f"/api/v1/flows/{flow_id}/executions/{execution.json()['data']['record_id']}/approvals")
     approval_id = approval.json()["data"][0]["record_id"]
     decided = await api.post(f"/api/v1/flows/approvals/{approval_id}/decide", json={"approved": True})
     assert decided.status_code == 200
@@ -276,9 +364,7 @@ async def test_control_plane_lifecycle_audit_billing_and_provider_contracts(
     usage = await api.get("/api/v1/platform/billing/usage", params={"account_id": account_id})
     assert usage.status_code == 200
     assert usage.json()["data"][0]["amount"] == 3
-    seat = await api.post(
-        "/api/v1/platform/billing/seats", json={"account_id": account_id, "user_id": "operator-1"}
-    )
+    seat = await api.post("/api/v1/platform/billing/seats", json={"account_id": account_id, "user_id": "operator-1"})
     assert seat.status_code == 201, seat.text
     over_limit = await api.post(
         "/api/v1/platform/billing/seats", json={"account_id": account_id, "user_id": "operator-2"}
@@ -350,9 +436,7 @@ async def test_external_adapter_registration_and_probe_contracts(control_plane_c
         "/api/v1/search/index-backends",
         json={"name": "ann", "kind": "pgvector", "endpoint": "postgresql://db", "capabilities": ["ann"]},
     )
-    backend_probe = await api.post(
-        f"/api/v1/search/index-backends/{backend.json()['data']['record_id']}/probe"
-    )
+    backend_probe = await api.post(f"/api/v1/search/index-backends/{backend.json()['data']['record_id']}/probe")
     assert backend_probe.status_code == 200
     assert backend_probe.json()["data"]["health"] == "configured"
 
@@ -360,8 +444,6 @@ async def test_external_adapter_registration_and_probe_contracts(control_plane_c
         "/api/v1/search/rerankers",
         json={"name": "semantic", "kind": "http", "endpoint": "https://reranker.example.test"},
     )
-    reranker_probe = await api.post(
-        f"/api/v1/search/rerankers/{reranker.json()['data']['record_id']}/probe"
-    )
+    reranker_probe = await api.post(f"/api/v1/search/rerankers/{reranker.json()['data']['record_id']}/probe")
     assert reranker_probe.status_code == 200
     assert reranker_probe.json()["data"]["health"] == "configured"

@@ -75,6 +75,12 @@ class Runtime:
 
     async def open(self) -> None:
         await self.state.open()
+        await self.access.ensure_bootstrap_admin(
+            tenant_id=self.settings.default_tenant_id,
+            project_id=self.settings.default_project_id,
+            username=self.settings.bootstrap_admin_username,
+            password=self.settings.bootstrap_admin_password,
+        )
         await self.runs.sync_pipeline_catalog()
         await self.objects.open()
         await self.queue.open()

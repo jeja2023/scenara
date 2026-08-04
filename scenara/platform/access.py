@@ -7,6 +7,7 @@ from typing import Protocol
 from uuid import uuid4
 
 from scenara.platform.audit import AuditLogger
+from scenara.platform.credentials import hash_password, verify_password
 from scenara.platform.models import (
     ApiKeyRecord,
     CreateApiKeyRequest,
@@ -30,6 +31,7 @@ from scenara.platform.models import (
     ServiceAccount,
     UpdateProductEntitlementRequest,
     UserAccount,
+    UserCredential,
 )
 from scenara.platform.policy import PolicyDenied, PolicyProvider, require_allowed
 from scenara.platform.store import StateConflict
@@ -55,6 +57,10 @@ class AccessRepository(Protocol):
     async def list_users(self, tenant_id: str) -> list[UserAccount]: ...
 
     async def save_user(self, record: UserAccount) -> UserAccount: ...
+
+    async def create_user_credential(self, record: UserCredential) -> UserCredential: ...
+
+    async def get_user_credential(self, tenant_id: str, user_id: str) -> UserCredential | None: ...
 
     async def create_role(self, record: Role) -> Role: ...
 
@@ -100,6 +106,7 @@ class MemoryAccessRepository:
         self._organizations: dict[str, Organization] = {}
         self._projects: dict[tuple[str, str], Project] = {}
         self._users: dict[tuple[str, str], UserAccount] = {}
+        self._user_credentials: dict[tuple[str, str], UserCredential] = {}
         self._roles: dict[tuple[str, str], Role] = {}
         self._memberships: dict[tuple[str, str, str], Membership] = {}
         self._service_accounts: dict[tuple[str, str, str], ServiceAccount] = {}
@@ -151,6 +158,17 @@ class MemoryAccessRepository:
             raise AccessNotFound("user not found")
         self._users[key] = record.model_copy(deep=True)
         return record.model_copy(deep=True)
+
+    async def create_user_credential(self, record: UserCredential) -> UserCredential:
+        key = (record.tenant_id, record.user_id)
+        if key in self._user_credentials:
+            raise StateConflict("user credential already exists")
+        self._user_credentials[key] = record.model_copy(deep=True)
+        return record.model_copy(deep=True)
+
+    async def get_user_credential(self, tenant_id: str, user_id: str) -> UserCredential | None:
+        record = self._user_credentials.get((tenant_id, user_id))
+        return record.model_copy(deep=True) if record else None
 
     async def create_role(self, record: Role) -> Role:
         key = (record.tenant_id, record.role_id)
@@ -317,11 +335,102 @@ class AccessService:
             product_ids=product_ids,
         )
 
+    async def ensure_bootstrap_admin(
+        self,
+        *,
+        tenant_id: str,
+        project_id: str,
+        username: str,
+        password: str,
+    ) -> None:
+        if not username or not password:
+            return
+        now = time.time()
+        if not await self.repository.list_organizations(tenant_id):
+            await self.repository.create_organization(
+                Organization(
+                    tenant_id=tenant_id,
+                    display_name="Scenara",
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+        if not any(item.project_id == project_id for item in await self.repository.list_projects(tenant_id)):
+            await self.repository.create_project(
+                Project(
+                    tenant_id=tenant_id,
+                    project_id=project_id,
+                    display_name="Scenara Console",
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+        users = await self.repository.list_users(tenant_id)
+        if not any(item.user_id == username for item in users):
+            await self.repository.create_user(
+                UserAccount(
+                    tenant_id=tenant_id,
+                    user_id=username,
+                    display_name=username,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+        if await self.repository.get_user_credential(tenant_id, username) is None:
+            await self.repository.create_user_credential(
+                UserCredential(
+                    tenant_id=tenant_id,
+                    user_id=username,
+                    password_hash=hash_password(password),
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+        role_id = "console-admin"
+        roles = await self.repository.list_roles(tenant_id)
+        if not any(item.role_id == role_id for item in roles):
+            await self.repository.create_role(
+                Role(
+                    tenant_id=tenant_id,
+                    role_id=role_id,
+                    display_name="Console Administrator",
+                    scopes=ADMIN_SCOPES,
+                    product_ids=frozenset(),
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+        memberships = await self.repository.list_memberships(tenant_id, project_id)
+        if not any(item.principal_id == username for item in memberships):
+            await self.repository.create_membership(
+                Membership(
+                    tenant_id=tenant_id,
+                    project_id=project_id,
+                    principal_id=username,
+                    principal_type=PrincipalType.USER,
+                    role_ids=frozenset({role_id}),
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+
     async def is_user_disabled(self, tenant_id: str, user_id: str) -> bool:
         """Return the current lifecycle flag for session authentication."""
         users = await self.repository.list_users(tenant_id)
         user = next((item for item in users if item.user_id == user_id), None)
         return bool(user and user.disabled)
+
+    async def authenticate_user(
+        self, username: str, password: str, tenant_id: str, project_id: str
+    ) -> PrincipalContext | None:
+        users = await self.repository.list_users(tenant_id)
+        user = next((item for item in users if item.user_id == username), None)
+        if user is None or user.disabled:
+            return None
+        credential = await self.repository.get_user_credential(tenant_id, username)
+        if credential is None or not verify_password(password, credential.password_hash):
+            return None
+        return await self.resolve_user_context(tenant_id, project_id, username)
 
     async def resolve_user_context(self, tenant_id: str, project_id: str, user_id: str) -> PrincipalContext | None:
         """Resolve a user's effective scopes from project memberships and roles."""
@@ -330,9 +439,15 @@ class AccessService:
         if user is None or user.disabled:
             return None
         memberships = await self.repository.list_memberships(tenant_id, project_id)
-        membership = next(
-            item for item in memberships if item.principal_id == user_id and item.principal_type == PrincipalType.USER
-        ) if memberships else None
+        membership = (
+            next(
+                item
+                for item in memberships
+                if item.principal_id == user_id and item.principal_type == PrincipalType.USER
+            )
+            if memberships
+            else None
+        )
         if membership is None:
             return None
         roles = {item.role_id: item for item in await self.repository.list_roles(tenant_id)}
@@ -398,6 +513,17 @@ class AccessService:
             updated_at=now,
         )
         created = await self.repository.create_user(record)
+        if body.password:
+            now = time.time()
+            await self.repository.create_user_credential(
+                UserCredential(
+                    tenant_id=created.tenant_id,
+                    user_id=created.user_id,
+                    password_hash=hash_password(body.password),
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
         await self._record(context, "iam.user.create", "user", created.user_id)
         return created
 

@@ -183,6 +183,7 @@ from scenara.platform.models import (
     DatasetVersionPage,
     DomainId,
     IamSummary,
+    LoginRequest,
     MediaAsset,
     MediaAssetPage,
     MediaKind,
@@ -286,7 +287,7 @@ async def principal_context(
 ) -> PrincipalContext:
     runtime: Runtime = request.app.state.runtime
     settings = runtime.settings
-    if settings.auth_required:
+    if settings.auth_required or authorization:
         expected = f"Bearer {settings.api_token}"
         if not authorization:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid bearer token")
@@ -1977,6 +1978,21 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     ) -> ApiEnvelope[IamSummary]:
         return _envelope(request, await runtime.access.summary(context))  # type: ignore[return-value]
 
+    @app.post("/api/v1/auth/login", tags=["IAM"])
+    async def login(body: LoginRequest, request: Request) -> ApiEnvelope[SessionResponse]:
+        context = await runtime.access.authenticate_user(
+            body.username,
+            body.password,
+            runtime.settings.default_tenant_id,
+            runtime.settings.default_project_id,
+        )
+        if context is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid username or password")
+        return _envelope(  # type: ignore[return-value]
+            request,
+            await runtime.control_plane.create_authenticated_session(context, ttl_seconds=body.ttl_seconds),
+        )
+
     @app.post("/api/v1/platform/organizations", status_code=201, tags=["IAM"])
     async def create_organization(
         body: CreateOrganizationRequest,
@@ -2171,9 +2187,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[IdentityProvider]:
-        return _envelope(
-            request, await runtime.control_plane.probe_identity_provider(context, provider_id)
-        )  # type: ignore[return-value]
+        return _envelope(request, await runtime.control_plane.probe_identity_provider(context, provider_id))  # type: ignore[return-value]
 
     @app.post("/api/v1/platform/sessions", status_code=201, tags=["IAM"])
     async def create_interactive_session(
@@ -2206,9 +2220,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[ProjectLifecycleRequest]:
-        return _envelope(
-            request, await runtime.control_plane.decide_project_lifecycle(context, request_id, body)
-        )  # type: ignore[return-value]
+        return _envelope(request, await runtime.control_plane.decide_project_lifecycle(context, request_id, body))  # type: ignore[return-value]
 
     @app.put("/api/v1/platform/audit/retention", tags=["Operations"])
     async def set_audit_retention_policy(
@@ -2434,9 +2446,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[SearchReranker]:
-        return _envelope(
-            request, await runtime.control_plane.probe_search_reranker(context, reranker_id)
-        )  # type: ignore[return-value]
+        return _envelope(request, await runtime.control_plane.probe_search_reranker(context, reranker_id))  # type: ignore[return-value]
 
     @app.post("/api/v1/search/relevance-feedback", status_code=201, tags=["Search"])
     async def submit_search_relevance_feedback(
@@ -2581,9 +2591,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[EdgeDeployment]:
-        return _envelope(
-            request, await runtime.control_plane.acknowledge_edge_deployment(context, deployment_id, body)
-        )  # type: ignore[return-value]
+        return _envelope(request, await runtime.control_plane.acknowledge_edge_deployment(context, deployment_id, body))  # type: ignore[return-value]
 
     @app.post("/api/v1/edge/devices/{device_id}/sync", status_code=202, tags=["Edge"])
     async def enqueue_edge_sync(

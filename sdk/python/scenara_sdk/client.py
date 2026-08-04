@@ -71,7 +71,7 @@ class ScenaraClient:
         headers = {
             "X-Tenant-Id": tenant_id,
             "X-Project-Id": project_id,
-            "User-Agent": "scenara-sdk-python/0.3.0.dev9",
+            "User-Agent": "scenara-sdk-python/0.3.0.dev10",
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -598,13 +598,19 @@ class ScenaraClient:
         *,
         user_id: str | None = None,
         email: str | None = None,
+        password: str | None = None,
     ) -> UserAccount:
         return cast(
             UserAccount,
             self._request(
                 "POST",
                 "/api/v1/platform/users",
-                json={"display_name": display_name, "user_id": user_id, "email": email},
+                json={
+                    "display_name": display_name,
+                    "user_id": user_id,
+                    "email": email,
+                    "password": password,
+                },
             ),
         )
 
@@ -1247,9 +1253,7 @@ class ScenaraClient:
         return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/data/annotation-tasks", json=body))
 
     def register_annotation_provider(self, body: dict[str, Any]) -> dict[str, Any]:
-        return cast(
-            dict[str, Any], self.control_plane_request("POST", "/api/v1/data/annotation-providers", json=body)
-        )
+        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/data/annotation-providers", json=body))
 
     def probe_annotation_provider(self, provider_id: str) -> dict[str, Any]:
         return cast(
@@ -1293,9 +1297,7 @@ class ScenaraClient:
         return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/search/rerankers", json=body))
 
     def probe_search_reranker(self, reranker_id: str) -> dict[str, Any]:
-        return cast(
-            dict[str, Any], self.control_plane_request("POST", f"/api/v1/search/rerankers/{reranker_id}/probe")
-        )
+        return cast(dict[str, Any], self.control_plane_request("POST", f"/api/v1/search/rerankers/{reranker_id}/probe"))
 
     def evaluate_search(self, body: dict[str, Any]) -> dict[str, Any]:
         return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/search/evaluations", json=body))
@@ -1354,9 +1356,7 @@ class ScenaraClient:
     def get_agent_memory(self, namespace: str, key: str) -> dict[str, Any] | None:
         return cast(
             dict[str, Any] | None,
-            self.control_plane_request(
-                "GET", "/api/v1/agents/memory", params={"namespace": namespace, "key": key}
-            ),
+            self.control_plane_request("GET", "/api/v1/agents/memory", params={"namespace": namespace, "key": key}),
         )
 
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:

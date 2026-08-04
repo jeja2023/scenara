@@ -36,9 +36,7 @@ class ControlPlaneStore(Protocol):
 
 
 class SessionAccessResolver(Protocol):
-    async def resolve_user_context(
-        self, tenant_id: str, project_id: str, user_id: str
-    ) -> PrincipalContext | None: ...
+    async def resolve_user_context(self, tenant_id: str, project_id: str, user_id: str) -> PrincipalContext | None: ...
 
 
 class AuditRetentionStore(Protocol):
@@ -963,28 +961,35 @@ class ControlPlaneService:
 
     async def create_session(self, context: PrincipalContext, body: CreateSessionRequest) -> SessionResponse:
         await self._check(context, "write", "iam")
+        return await self._issue_session(context, body.user_id, body.ttl_seconds)
+
+    async def create_authenticated_session(self, context: PrincipalContext, *, ttl_seconds: int) -> SessionResponse:
+        """Issue a session after the caller has already verified a user password."""
+        return await self._issue_session(context, context.principal_id, ttl_seconds)
+
+    async def _issue_session(self, context: PrincipalContext, user_id: str, ttl_seconds: int) -> SessionResponse:
         now = time.time()
         token = secrets.token_urlsafe(32)
         resolved = (
-            await self.access.resolve_user_context(context.tenant_id, context.project_id, body.user_id)
+            await self.access.resolve_user_context(context.tenant_id, context.project_id, user_id)
             if self.access is not None
             else None
         )
         if self.access is not None and resolved is None:
             raise ValueError("session user is unknown, disabled, or has no project membership")
-        if resolved is not None and resolved.principal_id != body.user_id:
+        if resolved is not None and resolved.principal_id != user_id:
             raise ValueError("session principal resolution failed")
         record = InteractiveSession(
             session_id=_id("ses"),
             tenant_id=context.tenant_id,
             project_id=context.project_id,
-            user_id=body.user_id,
+            user_id=user_id,
             token_prefix=token[:8],
             token_sha256=_sha(token),
             scopes=resolved.scopes if resolved is not None else context.scopes,
             product_ids=resolved.product_ids if resolved is not None else context.product_ids,
             created_at=now,
-            expires_at=now + body.ttl_seconds,
+            expires_at=now + ttl_seconds,
         )
         await self._save("session", record)
         await self._record(
@@ -992,7 +997,7 @@ class ControlPlaneService:
             "iam.session.create",
             "session",
             record.session_id,
-            {"user_id": body.user_id, "expires_at": record.expires_at},
+            {"user_id": user_id, "expires_at": record.expires_at},
         )
         return SessionResponse(session=record, token=token)
 
@@ -1093,9 +1098,7 @@ class ControlPlaneService:
 
     async def list_project_lifecycle_requests(self, context: PrincipalContext) -> list[ProjectLifecycleRequest]:
         await self._check(context, "read", "iam")
-        return await self._list(
-            "project_lifecycle_request", context.tenant_id, "*", ProjectLifecycleRequest
-        )
+        return await self._list("project_lifecycle_request", context.tenant_id, "*", ProjectLifecycleRequest)
 
     async def decide_project_lifecycle(
         self, context: PrincipalContext, request_id: str, body: DecideProjectLifecycleRequest
@@ -1109,9 +1112,7 @@ class ControlPlaneService:
             ProjectLifecycleRequest,
         )
         if request is None:
-            candidates = await self.store.list(
-                "project_lifecycle_request", context.tenant_id, "*"
-            )
+            candidates = await self.store.list("project_lifecycle_request", context.tenant_id, "*")
             request = next(
                 (
                     ProjectLifecycleRequest.model_validate(item)
@@ -1198,9 +1199,7 @@ class ControlPlaneService:
         if not body.dry_run:
             if self.audit_store is None:
                 raise RuntimeError("audit retention store is not configured")
-            deleted = await self.audit_store.delete_audit_events_before(
-                context.tenant_id, context.project_id, cutoff
-            )
+            deleted = await self.audit_store.delete_audit_events_before(context.tenant_id, context.project_id, cutoff)
         result = PurgeAuditResponse(
             deleted_count=deleted,
             cutoff_at=cutoff,
@@ -1358,9 +1357,7 @@ class ControlPlaneService:
             (
                 item
                 for item in existing
-                if item.account_id == account.record_id
-                and item.user_id == body.user_id
-                and item.status == "active"
+                if item.account_id == account.record_id and item.user_id == body.user_id and item.status == "active"
             ),
             None,
         )
@@ -1494,9 +1491,7 @@ class ControlPlaneService:
         await self._record(context, "search.profile.create", "search_profile", record.record_id)
         return record
 
-    async def register_index_backend(
-        self, context: PrincipalContext, body: CreateIndexBackendRequest
-    ) -> IndexBackend:
+    async def register_index_backend(self, context: PrincipalContext, body: CreateIndexBackendRequest) -> IndexBackend:
         await self._check(context, "write", "search_index")
         now = time.time()
         backend = IndexBackend(
@@ -1517,9 +1512,7 @@ class ControlPlaneService:
 
     async def probe_index_backend(self, context: PrincipalContext, backend_id: str) -> IndexBackend:
         await self._check(context, "write", "search_index")
-        backend = await self._get(
-            "index_backend", context.tenant_id, context.project_id, backend_id, IndexBackend
-        )
+        backend = await self._get("index_backend", context.tenant_id, context.project_id, backend_id, IndexBackend)
         if backend is None:
             raise ValueError("index backend not found")
         updated = backend.model_copy(update={"health": "configured", "updated_at": time.time()})
@@ -1624,9 +1617,7 @@ class ControlPlaneService:
         now = time.time()
         if self.indexes is None:
             raise RuntimeError("index store is not configured")
-        records_seen, records_rebuilt = await self.indexes.rebuild(
-            context.tenant_id, context.project_id, body.index_id
-        )
+        records_seen, records_rebuilt = await self.indexes.rebuild(context.tenant_id, context.project_id, body.index_id)
         record = IndexRebuildJob(
             record_id=_id("rebuild"),
             tenant_id=context.tenant_id,
@@ -1766,8 +1757,12 @@ class ControlPlaneService:
                 )
                 await self._save("flow_approval", approval)
                 current = current.model_copy(
-                    update={"status": "waiting_approval", "current_node_id": node_id,
-                            "updated_at": now, "completed_at": None}
+                    update={
+                        "status": "waiting_approval",
+                        "current_node_id": node_id,
+                        "updated_at": now,
+                        "completed_at": None,
+                    }
                 )
                 await self._save("flow_execution", current)
                 return current
@@ -1794,8 +1789,7 @@ class ControlPlaneService:
             else:
                 next_node = node.next_nodes[0] if node.next_nodes else None
             current = current.model_copy(
-                update={"status": "running", "current_node_id": node_id, "context": current.context,
-                        "updated_at": now}
+                update={"status": "running", "current_node_id": node_id, "context": current.context, "updated_at": now}
             )
             if next_node is None:
                 current = current.model_copy(update={"status": "completed", "completed_at": now})

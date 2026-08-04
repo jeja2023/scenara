@@ -64,6 +64,9 @@ def check() -> list[str]:
     migration = ROOT / "migrations/0009_control_plane_records.sql"
     if not migration.is_file():
         errors.append("missing 0009 control-plane migration")
+    credential_migration = ROOT / "migrations/0010_user_credentials.sql"
+    if not credential_migration.is_file():
+        errors.append("missing 0010 user-credentials migration")
 
     app = create_app()
     paths = set(app.openapi().get("paths", {}))

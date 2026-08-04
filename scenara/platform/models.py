@@ -832,6 +832,14 @@ class UserAccount(StrictModel):
     updated_at: float
 
 
+class UserCredential(StrictModel):
+    tenant_id: AccessId
+    user_id: AccessId
+    password_hash: str = Field(min_length=32, max_length=512)
+    created_at: float
+    updated_at: float
+
+
 class Role(StrictModel):
     tenant_id: AccessId
     role_id: AccessId
@@ -902,6 +910,13 @@ class CreateUserRequest(StrictModel):
     user_id: AccessId | None = None
     display_name: str = Field(min_length=1, max_length=256)
     email: str | None = Field(default=None, max_length=320)
+    password: str | None = Field(default=None, min_length=8, max_length=256)
+
+
+class LoginRequest(StrictModel):
+    username: AccessId
+    password: str = Field(min_length=1, max_length=256)
+    ttl_seconds: int = Field(default=28_800, ge=60, le=86_400)
 
 
 class CreateRoleRequest(StrictModel):

@@ -54,8 +54,17 @@ def build_access_foundation(
                 capability_id="api_authentication",
                 name="API authentication",
                 status=AccessCapabilityStatus.AVAILABLE,
-                summary="Production accepts a root bearer token and revocable scoped service-account API keys.",
-                current_scope=["single configured bearer token", "service account API keys", "scoped API keys"],
+                summary=(
+                    "Users authenticate with local password credentials and receive scoped sessions; "
+                    "production also accepts a root bearer token and revocable service-account API keys."
+                ),
+                current_scope=[
+                    "username and password login",
+                    "scoped interactive sessions",
+                    "single configured bearer token",
+                    "service account API keys",
+                    "scoped API keys",
+                ],
                 not_in_scope_yet=["OAuth applications", "signed external identity assertion exchange"],
                 next_gate="Connect a deployment-owned OIDC/SAML/SCIM adapter with verified assertions.",
             ),
@@ -118,8 +127,7 @@ def build_access_foundation(
                 name="Single sign-on",
                 status=AccessCapabilityStatus.PLANNED,
                 summary=(
-                    "Identity-provider registration and configuration probes are available "
-                    "for enterprise adapters."
+                    "Identity-provider registration and configuration probes are available for enterprise adapters."
                 ),
                 current_scope=["OIDC/SAML/SCIM provider records", "configuration health probes"],
                 not_in_scope_yet=["signed OIDC/SAML assertion exchange", "SCIM user push/pull"],

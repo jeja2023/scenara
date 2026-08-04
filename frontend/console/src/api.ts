@@ -7,7 +7,20 @@ export interface ConnectionSettings {
   projectId: string;
 }
 
+export interface LoginSession {
+  token: string;
+  session: {
+    session_id: string;
+    tenant_id: string;
+    project_id: string;
+    user_id: string;
+    expires_at: number;
+  };
+}
+
 const STORAGE_KEY = "scenara.console.connection.v1";
+const SESSION_TOKEN_KEY = "scenara.console.token.session.v1";
+const PERSISTENT_TOKEN_KEY = "scenara.console.token.local.v1";
 const defaults: ConnectionSettings = {
   apiBase: "",
   token: "",
@@ -17,17 +30,63 @@ const defaults: ConnectionSettings = {
 
 export function loadConnection(): ConnectionSettings {
   try {
+    const stored = JSON.parse(
+      localStorage.getItem(STORAGE_KEY) ?? "{}",
+    ) as Partial<ConnectionSettings>;
     return {
       ...defaults,
-      ...JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}"),
+      ...stored,
+      token:
+        sessionStorage.getItem(SESSION_TOKEN_KEY) ??
+        localStorage.getItem(PERSISTENT_TOKEN_KEY) ??
+        stored.token ??
+        "",
     } as ConnectionSettings;
   } catch {
     return { ...defaults };
   }
 }
 
-export function saveConnection(value: ConnectionSettings): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
+export function saveConnection(
+  value: ConnectionSettings,
+  options: { persistAuth?: boolean } = {},
+): void {
+  const context: Omit<ConnectionSettings, "token"> = {
+    apiBase: value.apiBase,
+    tenantId: value.tenantId,
+    projectId: value.projectId,
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(context));
+  sessionStorage.removeItem(SESSION_TOKEN_KEY);
+  localStorage.removeItem(PERSISTENT_TOKEN_KEY);
+  const tokenStorage =
+    options.persistAuth === false ? sessionStorage : localStorage;
+  if (value.token) {
+    tokenStorage.setItem(
+      options.persistAuth === false ? SESSION_TOKEN_KEY : PERSISTENT_TOKEN_KEY,
+      value.token,
+    );
+  }
+}
+
+export function connectionTokenIsPersistent(): boolean {
+  return localStorage.getItem(PERSISTENT_TOKEN_KEY) !== null;
+}
+
+export function clearConnectionToken(): void {
+  sessionStorage.removeItem(SESSION_TOKEN_KEY);
+  localStorage.removeItem(PERSISTENT_TOKEN_KEY);
+  try {
+    const stored = JSON.parse(
+      localStorage.getItem(STORAGE_KEY) ?? "{}",
+    ) as Partial<ConnectionSettings>;
+    if ("token" in stored) {
+      delete stored.token;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+    }
+  } catch {
+    localStorage.removeItem(STORAGE_KEY);
+  }
 }
 
 export class ApiError extends Error {
@@ -77,7 +136,13 @@ export function userFacingError(
 }
 
 function requestHeaders(init: RequestInit): Headers {
-  const connection = loadConnection();
+  return requestHeadersForConnection(init, loadConnection());
+}
+
+function requestHeadersForConnection(
+  init: RequestInit,
+  connection: ConnectionSettings,
+): Headers {
   const headers = new Headers(init.headers);
   if (!headers.has("Accept")) headers.set("Accept", "application/json");
   headers.set("X-Tenant-Id", connection.tenantId);
@@ -91,6 +156,43 @@ function requestHeaders(init: RequestInit): Headers {
   )
     headers.set("Content-Type", "application/json");
   return headers;
+}
+
+export async function login(
+  username: string,
+  password: string,
+): Promise<LoginSession> {
+  const connection = loadConnection();
+  let response: Response;
+  try {
+    response = await fetch(`${connection.apiBase}/api/v1/auth/login`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username, password }),
+      cache: "no-store",
+    });
+  } catch {
+    throw new ApiError(
+      0,
+      "NETWORK_ERROR",
+      localizedHttpError(0, "NETWORK_ERROR"),
+    );
+  }
+  const body = (await response.json().catch(() => ({}))) as
+    Envelope<LoginSession> | ApiErrorBody;
+  if (!response.ok) {
+    const error = (body as ApiErrorBody).error;
+    throw new ApiError(
+      response.status,
+      error?.code ?? "HTTP_ERROR",
+      localizedHttpError(response.status, error?.code ?? "HTTP_ERROR"),
+      (body as ApiErrorBody).request_id,
+    );
+  }
+  return (body as Envelope<LoginSession>).data;
 }
 
 async function request(path: string, init: RequestInit): Promise<Response> {

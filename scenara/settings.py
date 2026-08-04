@@ -35,6 +35,8 @@ class Settings:
     auth_required: bool
     default_tenant_id: str
     default_project_id: str
+    bootstrap_admin_username: str
+    bootstrap_admin_password: str
     max_image_bytes: int
     max_media_bytes: int
     max_media_units: int
@@ -63,6 +65,12 @@ class Settings:
         return self.profile in {"prod", "production"}
 
     def validate(self) -> None:
+        if bool(self.bootstrap_admin_username) != bool(self.bootstrap_admin_password):
+            raise RuntimeError(
+                "SCENARA_BOOTSTRAP_ADMIN_USERNAME and SCENARA_BOOTSTRAP_ADMIN_PASSWORD must be configured together"
+            )
+        if self.bootstrap_admin_password and len(self.bootstrap_admin_password) < 12:
+            raise RuntimeError("SCENARA_BOOTSTRAP_ADMIN_PASSWORD must contain at least 12 characters")
         if not self.production:
             return
         errors: list[str] = []
@@ -113,6 +121,8 @@ def load_settings() -> Settings:
         auth_required=_bool("SCENARA_AUTH_REQUIRED", profile in {"prod", "production"}),
         default_tenant_id=os.getenv("SCENARA_DEFAULT_TENANT_ID", "default").strip(),
         default_project_id=os.getenv("SCENARA_DEFAULT_PROJECT_ID", "default").strip(),
+        bootstrap_admin_username=os.getenv("SCENARA_BOOTSTRAP_ADMIN_USERNAME", "").strip(),
+        bootstrap_admin_password=os.getenv("SCENARA_BOOTSTRAP_ADMIN_PASSWORD", ""),
         max_image_bytes=max(1, int(os.getenv("SCENARA_MAX_IMAGE_BYTES", str(25 * 1024 * 1024)))),
         max_media_bytes=max(1, int(os.getenv("SCENARA_MAX_MEDIA_BYTES", str(512 * 1024 * 1024)))),
         max_media_units=max(1, min(10_000, int(os.getenv("SCENARA_MAX_MEDIA_UNITS", "256")))),

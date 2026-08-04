@@ -17,7 +17,20 @@ import {
 } from "@lucide/vue";
 import { createRouter, createWebHistory } from "vue-router";
 
+import { isSignedIn } from "./auth";
+
 const routes = [
+  {
+    path: "/login",
+    name: "login",
+    component: () => import("./views/LoginView.vue"),
+    meta: {
+      title: "登录",
+      public: true,
+      layout: "auth",
+      hideFromNavigation: true,
+    },
+  },
   {
     path: "/",
     name: "overview",
@@ -168,6 +181,13 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes,
+});
+router.beforeEach((to) => {
+  if (!to.meta.public && !isSignedIn()) {
+    return { name: "login", query: { redirect: to.fullPath } };
+  }
+  if (to.name === "login" && isSignedIn()) return { name: "overview" };
+  return true;
 });
 router.afterEach((to) => {
   document.title = `${String(to.meta.title)} · Scenara 景枢`;

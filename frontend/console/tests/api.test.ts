@@ -7,6 +7,7 @@ import {
   ApiError,
   api,
   apiStream,
+  login,
   saveConnection,
   streamJsonEvents,
   userFacingError,
@@ -64,6 +65,47 @@ describe("console API contract", () => {
     expect(headers.get("Authorization")).toBe("Bearer token");
     expect(headers.get("X-Tenant-Id")).toBe("tenant-a");
     expect(headers.get("X-Project-Id")).toBe("project-a");
+  });
+
+  it("submits username and password to the login boundary", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          schema_version: "1.0",
+          request_id: "req-login",
+          data: {
+            token: "session-token",
+            session: {
+              session_id: "ses-1",
+              tenant_id: "tenant-a",
+              project_id: "project-a",
+              user_id: "console-user",
+              expires_at: 2,
+            },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      login("console-user", "correct-password"),
+    ).resolves.toMatchObject({
+      token: "session-token",
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe("https://scenara.example/api/v1/auth/login");
+    const headers = new Headers(init.headers);
+    expect(headers.get("Authorization")).toBeNull();
+    expect(headers.get("X-Tenant-Id")).toBeNull();
+    expect(headers.get("X-Project-Id")).toBeNull();
+    expect(headers.get("Content-Type")).toBe("application/json");
+    expect(JSON.parse(String(init.body))).toEqual({
+      username: "console-user",
+      password: "correct-password",
+    });
   });
 
   it("preserves stable API errors", async () => {
@@ -198,6 +240,7 @@ describe("console information architecture", () => {
     );
     expect(names).toEqual(
       new Set([
+        "login",
         "overview",
         "parse",
         "parse-domain",

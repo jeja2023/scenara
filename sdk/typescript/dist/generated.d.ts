@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "e76a4c676e437b47d454728bd148d98f3cc9fa471fb1e6022ef6162ee78788d2" /** gitleaks:allow - public contract digest */;
+export declare const OPENAPI_SHA256 = "1708ba15161c1c5576ace464ba76957baa941d77a4214da206ee9cdcfefe2cc0" /** gitleaks:allow - public contract digest */;
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
@@ -1235,6 +1235,7 @@ export declare namespace OpenApi {
     type CreateUserRequest = {
         display_name: string;
         email?: (string) | (null);
+        password?: (string) | (null);
         user_id?: (AccessId) | (null);
     };
     type CreateWebhookSubscriptionRequest = {
@@ -1662,6 +1663,11 @@ export declare namespace OpenApi {
         user_id: string;
     };
     type LifecycleStatus = "active" | "disabled" | "deleted" | "pending_restore";
+    type LoginRequest = {
+        password: string;
+        ttl_seconds?: number;
+        username: AccessId;
+    };
     type MediaAsset = {
         asset_id: string;
         content_type: string;

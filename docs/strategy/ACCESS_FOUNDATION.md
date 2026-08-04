@@ -1,6 +1,6 @@
 # Scenara 访问底座
 
-适用版本：`0.3.0-dev.9`（Python 包为 `0.3.0.dev9`）。
+适用版本：`0.3.0-dev.10`（Python 包为 `0.3.0.dev10`）。
 
 Scenara 的访问底座是产品矩阵共享的控制面能力。它不属于某一个视觉产品，所有 Scenara 产品复用同一套租户、项目、主体、权限范围、服务凭据和产品授权资源。
 
@@ -34,7 +34,7 @@ Scenara 的访问底座是产品矩阵共享的控制面能力。它不属于某
 
 ## 存储与审计
 
-开发配置使用进程内仓库，PostgreSQL 配置通过 `0002_access_foundation.sql` 创建 IAM 表，并通过 `0009_control_plane_records.sql` 持久化身份提供者、会话、生命周期、配额和跨产品控制面资源。所有 IAM 与控制面写操作写入平台审计日志。
+开发配置使用进程内仓库，PostgreSQL 配置通过 `0002_access_foundation.sql` 创建 IAM 表，通过 `0009_control_plane_records.sql` 持久化身份提供者、会话、生命周期、配额和跨产品控制面资源，并通过 `0010_user_credentials.sql` 隔离存储用户密码摘要。所有 IAM 与控制面写操作写入平台审计日志。
 
 Console 的“接入”工作区提供资源库存、组织项目、用户角色、项目成员、服务账号、API Key、产品授权、事件回调和浏览器连接管理。Python 与 TypeScript SDK 提供对应的强类型高层方法。
 
@@ -42,7 +42,7 @@ Console 的“接入”工作区提供资源库存、组织项目、用户角色
 
 以下能力没有由当前底座虚构为已完成：
 
-- 外部 OIDC、SAML、SCIM 身份联邦仍需部署适配器；本地会话、用户生命周期检查、身份提供者配置/探测和登录时解析 Membership/Role 生成有效 scope 已实现；
+- 外部 OIDC、SAML、SCIM 身份联邦仍需部署适配器；本地用户名密码登录、会话、用户生命周期检查、身份提供者配置/探测和登录时解析 Membership/Role 生成有效 scope 已实现；
 - 新产品模块资源映射的自动注册与契约门禁；
 - 配额计划、计量、账单账户、用量聚合和席位上限已实现；支付结算、发票、税务和自助购买仍需外部服务；
 - 用户、服务账号和项目的停用/恢复/删除审批工作流已实现，跨租户不可逆擦除证据仍需外部治理；
@@ -50,6 +50,6 @@ Console 的“接入”工作区提供资源库存、组织项目、用户角色
 
 这些门禁应在共享底座上继续演进，不能在各产品模块中各自复制身份或授权系统。
 
-## 0.3.0-dev.9 开发完成说明
+## 0.3.0-dev.10 开发完成说明
 
-Project lifecycle approval, audit-retention policy and purge, idempotent billing metering, seat limits, and adapter health probes are now first-class shared control-plane contracts. They are persisted by both development and PostgreSQL stores and exposed through OpenAPI, Console, and both SDKs. Signed external assertions, SCIM synchronization, payment settlement, and long-term archival still require deployment-owned credentials and evidence.
+Project lifecycle approval, audit-retention policy and purge, idempotent billing metering, seat limits, adapter health probes, and username/password login are now first-class shared control-plane contracts. Passwords use salted scrypt digests, sessions resolve Membership/Role scopes, and the browser Console uses the same session boundary. They are persisted by both development and PostgreSQL stores and exposed through OpenAPI, Console, and both SDKs. Signed external assertions, SCIM synchronization, payment settlement, and long-term archival still require deployment-owned credentials and evidence.

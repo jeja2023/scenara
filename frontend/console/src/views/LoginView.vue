@@ -1,0 +1,136 @@
+<script setup lang="ts">
+import { Eye, EyeOff, LogIn, ShieldCheck } from "@lucide/vue";
+import { computed, nextTick, onMounted, reactive, ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+
+import { completeSignIn } from "../auth";
+import { ApiError, loadConnection, login, userFacingError } from "../api";
+import brandMark from "../assets/scenara-mark.svg";
+
+const route = useRoute();
+const router = useRouter();
+const form = reactive({ username: "", password: "" });
+const remember = ref(false);
+const revealPassword = ref(false);
+const submitting = ref(false);
+const errorMessage = ref("");
+const passwordInput = ref<HTMLInputElement | null>(null);
+const destination = computed(() => {
+  const requested =
+    typeof route.query.redirect === "string" ? route.query.redirect : "/";
+  return requested.startsWith("/") &&
+    !requested.startsWith("//") &&
+    requested !== "/login"
+    ? requested
+    : "/";
+});
+
+function togglePasswordVisibility(): void {
+  revealPassword.value = !revealPassword.value;
+  void nextTick(() => passwordInput.value?.focus());
+}
+
+async function submit(): Promise<void> {
+  if (submitting.value) return;
+  submitting.value = true;
+  errorMessage.value = "";
+  try {
+    const session = await login(form.username.trim(), form.password);
+    completeSignIn(
+      { ...loadConnection(), token: session.token },
+      remember.value,
+    );
+    await router.replace(destination.value);
+  } catch (caught) {
+    errorMessage.value =
+      caught instanceof ApiError && caught.status === 401
+        ? "用户名或密码错误"
+        : userFacingError(caught, "登录失败，请稍后重试");
+  } finally {
+    submitting.value = false;
+  }
+}
+
+onMounted(() => passwordInput.value?.focus());
+</script>
+
+<template>
+  <main class="login-page">
+    <section class="login-brand-pane" aria-label="Scenara 景枢">
+      <div class="login-brand-lockup">
+        <img :src="brandMark" alt="" />
+        <div><strong>Scenara</strong><span>景枢</span></div>
+      </div>
+      <div class="login-brand-message">
+        <p>视觉 AI 中枢平台</p>
+        <h1>连接视觉<br />理解世界</h1>
+      </div>
+      <div class="login-brand-footer">
+        <ShieldCheck :size="17" />
+        <span>统一身份与访问控制</span>
+      </div>
+    </section>
+
+    <section class="login-form-pane">
+      <div class="login-mobile-brand">
+        <img :src="brandMark" alt="" />
+        <div><strong>Scenara</strong><span>景枢</span></div>
+      </div>
+      <form class="login-form" aria-label="登录" @submit.prevent="submit">
+        <header>
+          <p>Scenara Console</p>
+          <h2>登录控制台</h2>
+          <span>使用你的 Scenara 账号登录。</span>
+        </header>
+
+        <div class="login-field">
+          <label for="username">用户名</label>
+          <input
+            id="username"
+            v-model="form.username"
+            autocomplete="username"
+            required
+          />
+        </div>
+
+        <div class="login-field">
+          <label for="password">密码</label>
+          <span class="login-password-field">
+            <input
+              id="password"
+              ref="passwordInput"
+              v-model="form.password"
+              :type="revealPassword ? 'text' : 'password'"
+              autocomplete="current-password"
+              required
+            />
+            <button
+              type="button"
+              :title="revealPassword ? '隐藏密码' : '显示密码'"
+              :aria-label="revealPassword ? '隐藏密码' : '显示密码'"
+              @click="togglePasswordVisibility"
+            >
+              <EyeOff v-if="revealPassword" :size="18" />
+              <Eye v-else :size="18" />
+            </button>
+          </span>
+        </div>
+
+        <label class="login-remember">
+          <input v-model="remember" type="checkbox" />
+          <span>保持登录</span>
+        </label>
+
+        <p v-if="errorMessage" class="login-error" role="alert">
+          {{ errorMessage }}
+        </p>
+
+        <button class="login-submit" type="submit" :disabled="submitting">
+          <LogIn :size="18" />
+          {{ submitting ? "正在登录" : "登录" }}
+        </button>
+      </form>
+      <footer class="login-form-footer">Scenara 景枢 · 0.3 开发版</footer>
+    </section>
+  </main>
+</template>

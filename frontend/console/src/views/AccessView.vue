@@ -106,7 +106,12 @@ const copied = ref(false);
 
 const organizationForm = reactive({ display_name: "" });
 const projectForm = reactive({ project_id: "", display_name: "" });
-const userForm = reactive({ user_id: "", display_name: "", email: "" });
+const userForm = reactive({
+  user_id: "",
+  display_name: "",
+  email: "",
+  password: "",
+});
 const roleForm = reactive({
   role_id: "",
   display_name: "",
@@ -315,9 +320,15 @@ async function createUser(): Promise<void> {
         ...userForm,
         user_id: userForm.user_id || null,
         email: userForm.email || null,
+        password: userForm.password || null,
       }),
     });
-    Object.assign(userForm, { user_id: "", display_name: "", email: "" });
+    Object.assign(userForm, {
+      user_id: "",
+      display_name: "",
+      email: "",
+      password: "",
+    });
   });
 }
 
@@ -653,9 +664,20 @@ onMounted(refresh);
           <label
             ><span>邮箱</span><input v-model="userForm.email" type="email"
           /></label>
+          <label
+            ><span>密码</span
+            ><input
+              v-model="userForm.password"
+              type="password"
+              autocomplete="new-password"
+              minlength="8"
+            />
+          </label>
           <button
             class="button primary"
-            :disabled="mutating || !userForm.display_name"
+            :disabled="
+              mutating || !userForm.display_name || userForm.password.length < 8
+            "
             @click="createUser"
           >
             <Plus :size="16" />创建
