@@ -16,8 +16,11 @@ import {
   labelAccessCapability,
   labelCapability,
   labelDomain,
+  labelDomainDescription,
+  labelDomainDisplayName,
   labelEntitlementSource,
   labelPipeline,
+  labelPipelineDisplayName,
   labelPortraitAsset,
   labelPortraitCapability,
   labelPortraitMaturity,
@@ -195,8 +198,22 @@ describe("console information architecture", () => {
   it("localizes API identifiers and unknown values", () => {
     expect(labelDomain("portrait")).toBe("人像");
     expect(labelDomain("vehicle.inspection")).toBe("Vehicle Inspection");
+    expect(labelDomainDisplayName("portrait", "Portrait")).toBe("人像");
+    expect(labelDomainDisplayName("thermal", "热成像")).toBe("热成像");
+    expect(labelDomainDisplayName("thermal", "Thermal")).toBe("自定义领域");
+    expect(
+      labelDomainDescription("portrait", "English backend description"),
+    ).toBe("检测人员并分析人像相关的视觉特征。");
+    expect(
+      labelDomainDescription("thermal", "English backend description"),
+    ).toBe(
+      "该领域已接入统一解析工作区，可通过已启用的流水线处理支持的数据类型。",
+    );
     expect(labelCapability("face_detection")).toBe("人脸检测");
     expect(labelPipeline("ocr.document")).toBe("OCR 文档识别");
+    expect(labelPipelineDisplayName("custom.pipeline")).toBe(
+      "自定义解析流水线",
+    );
     expect(labelRunStatus("future-status")).toBe("未知状态");
     expect(labelCapability("future-capability")).toBe("未命名能力");
     expect(labelProductSummary("parse")).toContain("视觉解析");

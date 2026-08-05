@@ -5,15 +5,17 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until signed, reproducible evidence is committed.
 
-Current development version: `0.3.0-dev.10` (`0.3.0.dev10` for Python packages).
+Current development version: `0.3.0-dev.11` (`0.3.0.dev11` for Python packages).
 This version is an engineering qualification snapshot, not a `1.0.0` production release.
 
-The `0.3.0-dev.10` engineering baseline cumulatively adds domain-scoped Parse
+The `0.3.0-dev.11` engineering baseline cumulatively adds domain-scoped Parse
 workspaces, a first-class cross-domain Results center, Data Assets terminology,
 dataset version governance, tenant-scoped audit search/export, saved Search
 definitions, a tenant/project-scoped result-summary query path backed by
 PostgreSQL indexes, the remaining non-model P0-P2 control-plane contracts,
-username/password login, salted password credentials, and browser sessions.
+username/password login, salted password credentials, browser sessions, a
+Chinese-only domain and capability catalog, and fully documented environment
+configuration with safe development and production guidance.
 It retains the `0.3.0-dev.5` migration, capacity, coverage, progressive media
 decoding, monotonic Run progress, and replaceable partial Result guarantees.
 

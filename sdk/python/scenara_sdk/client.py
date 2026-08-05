@@ -71,7 +71,7 @@ class ScenaraClient:
         headers = {
             "X-Tenant-Id": tenant_id,
             "X-Project-Id": project_id,
-            "User-Agent": "scenara-sdk-python/0.3.0.dev10",
+            "User-Agent": "scenara-sdk-python/0.3.0.dev11",
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"

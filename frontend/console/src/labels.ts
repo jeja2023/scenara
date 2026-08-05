@@ -5,6 +5,11 @@ const domainLabels: Record<string, string> = {
   ocr: "OCR 文档",
 };
 
+const domainDescriptionLabels: Record<string, string> = {
+  portrait: "检测人员并分析人像相关的视觉特征。",
+  ocr: "从图片、视频和文档中提取文字、版面结构与阅读顺序。",
+};
+
 const capabilityLabels: Record<string, string> = {
   apparel_attributes: "服饰属性",
   body_reid: "人体重识别",
@@ -497,12 +502,36 @@ export function labelDomain(value: Domain | string): string {
   return domainLabels[value] ?? humanizeIdentifier(value);
 }
 
+export function labelDomainDisplayName(
+  value: Domain | string,
+  displayName?: string,
+): string {
+  if (domainLabels[value]) return domainLabels[value];
+  return displayName && /[\u3400-\u9fff]/u.test(displayName)
+    ? displayName
+    : "自定义领域";
+}
+
+export function labelDomainDescription(
+  value: Domain | string,
+  description?: string,
+): string {
+  if (domainDescriptionLabels[value]) return domainDescriptionLabels[value];
+  return description && /[\u3400-\u9fff]/u.test(description)
+    ? description
+    : "该领域已接入统一解析工作区，可通过已启用的流水线处理支持的数据类型。";
+}
+
 export function labelCapability(value: string): string {
   return capabilityLabels[value] ?? "未命名能力";
 }
 
 export function labelPipeline(value: string): string {
   return pipelineLabels[value] ?? humanizeIdentifier(value);
+}
+
+export function labelPipelineDisplayName(value: string): string {
+  return pipelineLabels[value] ?? "自定义解析流水线";
 }
 
 export function labelOperator(value: string): string {

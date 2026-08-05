@@ -127,7 +127,7 @@ test.beforeEach(async ({ page }) => {
       data = { items: [], offset: 0, limit: 100, total: 0 };
     } else if (path === "/api/v1/system/status") {
       data = {
-        version: "0.3.0.dev10",
+        version: "0.3.0.dev11",
         profile: "development",
         state_backend: "memory",
         object_backend: "local",
@@ -449,6 +449,76 @@ test("overview exposes repository ownership without leaking backend copy", async
     page.getByText("English backend gate must not reach the interface."),
   ).toHaveCount(0);
   await expectChineseInterface(page);
+});
+
+test("领域与能力页面完整屏蔽后端英文文案和技术标识", async ({ page }) => {
+  await page.route("**/api/v1/domains", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        schema_version: "1.0",
+        request_id: "e2e-capabilities",
+        data: [
+          {
+            domain_id: "portrait",
+            display_name: "Portrait Workspace",
+            schema_version: "1.0",
+            console_route: "/parse?domain=portrait",
+            description: "English backend description must not reach the page.",
+            capabilities: ["person_detection", "face_detection"],
+            supported_media_kinds: ["image", "video"],
+            default_pipeline_id: "portrait.analysis",
+            navigation_order: 10,
+          },
+        ],
+      }),
+    });
+  });
+  await page.route("**/api/v1/pipelines", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        schema_version: "1.0",
+        request_id: "e2e-capabilities",
+        data: [
+          {
+            pipeline_id: "portrait.analysis",
+            version: "0.4.0",
+            domain: "portrait",
+            status: "active",
+            pausable: true,
+            nodes: [],
+          },
+          {
+            pipeline_id: "portrait.custom",
+            version: "1.0.0",
+            domain: "portrait",
+            status: "draft",
+            pausable: false,
+            nodes: [],
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto("capabilities");
+  const workspace = page.locator(".capabilities-page");
+  await expect(workspace.getByText("人像", { exact: true })).toBeVisible();
+  await expect(
+    workspace.getByText("检测人员并分析人像相关的视觉特征。"),
+  ).toBeVisible();
+  await expect(workspace.getByText("人像综合分析")).toBeVisible();
+  await expect(workspace.getByText("自定义解析流水线")).toBeVisible();
+  await expect(workspace.getByText("版本 0.4.0")).toBeVisible();
+  await expect(workspace.getByText("启用", { exact: true })).toBeVisible();
+  await expect(workspace.getByText("草稿", { exact: true })).toBeVisible();
+
+  const workspaceText = await workspace.innerText();
+  expect(workspaceText).not.toContain("Portrait Workspace");
+  expect(workspaceText).not.toContain("English backend description");
+  expect(workspaceText).not.toContain("portrait.analysis");
+  expect(workspaceText).not.toContain("portrait.custom");
 });
 
 test("mobile navigation opens and reaches another workspace", async ({

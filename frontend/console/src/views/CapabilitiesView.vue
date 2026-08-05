@@ -3,7 +3,14 @@ import { ArrowRight, RefreshCw, ScanSearch } from "@lucide/vue";
 import { computed, onMounted, ref } from "vue";
 import { RouterLink } from "vue-router";
 import { api, userFacingError } from "../api";
-import { labelCapability, labelMediaKind } from "../labels";
+import {
+  labelCapability,
+  labelDomainDescription,
+  labelDomainDisplayName,
+  labelMediaKind,
+  labelPipelineDisplayName,
+  labelPipelineStatus,
+} from "../labels";
 import type { DomainManifest, Pipeline } from "../types";
 
 const domains = ref<DomainManifest[]>([]);
@@ -35,7 +42,22 @@ async function refresh(): Promise<void> {
 }
 
 function domainPipelines(domainId: string): Pipeline[] {
-  return pipelines.value.filter((item) => item.domain === domainId);
+  return pipelines.value
+    .filter((item) => item.domain === domainId)
+    .sort((left, right) =>
+      labelPipelineDisplayName(left.pipeline_id).localeCompare(
+        labelPipelineDisplayName(right.pipeline_id),
+        "zh-CN",
+      ),
+    );
+}
+
+function domainName(domain: DomainManifest): string {
+  return labelDomainDisplayName(domain.domain_id, domain.display_name);
+}
+
+function domainSummary(domain: DomainManifest): string {
+  return labelDomainDescription(domain.domain_id, domain.description);
 }
 
 onMounted(refresh);
@@ -47,6 +69,18 @@ onMounted(refresh);
       <div>
         <h1>领域与能力</h1>
         <p>查看已安装领域、支持的数据类型和可用解析流水线。</p>
+        <div
+          v-if="!loading"
+          class="capability-summary"
+          aria-label="领域能力概况"
+        >
+          <span
+            >已安装领域 <strong>{{ orderedDomains.length }}</strong> 个</span
+          >
+          <span
+            >可用流水线 <strong>{{ pipelines.length }}</strong> 条</span
+          >
+        </div>
       </div>
       <button class="button secondary" :disabled="loading" @click="refresh">
         <RefreshCw :size="16" :class="{ spin: loading }" />刷新
@@ -64,33 +98,65 @@ onMounted(refresh);
           <div class="capability-card-title">
             <ScanSearch :size="18" />
             <div>
-              <strong>{{ domain.display_name }}</strong>
-              <span class="mono">{{ domain.domain_id }}</span>
+              <strong>{{ domainName(domain) }}</strong>
+              <span>领域契约 {{ domain.schema_version }}</span>
             </div>
           </div>
           <span class="badge active">已安装</span>
         </div>
         <p class="capability-description">
-          {{ domain.description || "该领域已接入统一解析工作区。" }}
+          {{ domainSummary(domain) }}
         </p>
-        <div class="capability-meta">
-          <span v-for="kind in domain.supported_media_kinds ?? []" :key="kind">
-            {{ labelMediaKind(kind) }}
-          </span>
+        <div class="capability-section">
+          <p class="capability-section-title">支持的数据类型</p>
+          <div class="capability-meta">
+            <span
+              v-for="kind in domain.supported_media_kinds ?? []"
+              :key="kind"
+            >
+              {{ labelMediaKind(kind) }}
+            </span>
+            <span
+              v-if="!domain.supported_media_kinds?.length"
+              class="muted-chip"
+            >
+              暂未声明支持类型
+            </span>
+          </div>
         </div>
-        <div class="capability-list">
-          <span v-for="capability in domain.capabilities" :key="capability">
-            {{ labelCapability(capability) }}
-          </span>
+        <div class="capability-section">
+          <p class="capability-section-title">已启用能力</p>
+          <div class="capability-list">
+            <span v-for="capability in domain.capabilities" :key="capability">
+              {{ labelCapability(capability) }}
+            </span>
+            <span v-if="!domain.capabilities.length" class="muted-chip">
+              暂未声明领域能力
+            </span>
+          </div>
         </div>
         <div class="capability-pipelines">
+          <p class="capability-section-title">可用解析流水线</p>
           <div
             v-for="pipeline in domainPipelines(domain.domain_id)"
             :key="pipeline.pipeline_id + pipeline.version"
           >
-            <span>{{ pipeline.pipeline_id }}</span>
-            <small>{{ pipeline.version }}</small>
+            <strong>{{
+              labelPipelineDisplayName(pipeline.pipeline_id)
+            }}</strong>
+            <span class="pipeline-meta">
+              <small>版本 {{ pipeline.version }}</small>
+              <em :class="['pipeline-status', pipeline.status]">
+                {{ labelPipelineStatus(pipeline.status) }}
+              </em>
+            </span>
           </div>
+          <p
+            v-if="!domainPipelines(domain.domain_id).length"
+            class="capability-empty"
+          >
+            暂无可用解析流水线
+          </p>
         </div>
         <RouterLink
           class="button secondary capability-entry"
@@ -101,7 +167,7 @@ onMounted(refresh);
             }
           "
         >
-          进入解析工作区 <ArrowRight :size="14" />
+          进入{{ domainName(domain) }}工作区 <ArrowRight :size="14" />
         </RouterLink>
       </article>
     </div>
@@ -156,6 +222,26 @@ onMounted(refresh);
   color: var(--muted);
   line-height: 1.6;
 }
+.capability-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.capability-summary strong {
+  color: var(--ink);
+}
+.capability-section {
+  margin-top: 12px;
+}
+.capability-section-title {
+  margin: 0 0 7px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
 .capability-meta,
 .capability-list {
   flex-wrap: wrap;
@@ -167,11 +253,16 @@ onMounted(refresh);
   border: 1px solid var(--line);
   font-size: 11px;
 }
+.capability-meta .muted-chip,
+.capability-list .muted-chip {
+  color: var(--muted);
+  background: #f4f6f5;
+}
 .capability-meta span {
   background: #e7f1ee;
 }
 .capability-list {
-  margin-top: 9px;
+  margin-top: 0;
 }
 .capability-pipelines {
   display: grid;
@@ -182,12 +273,42 @@ onMounted(refresh);
 }
 .capability-pipelines div {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   font-size: 12px;
 }
+.capability-pipelines strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+.pipeline-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
 .capability-pipelines small {
   color: var(--muted);
+}
+.pipeline-status {
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 10px;
+  font-style: normal;
+}
+.pipeline-status.active,
+.pipeline-status.approved,
+.pipeline-status.validated {
+  border-color: #9fc8bb;
+  color: #17664f;
+  background: #e7f1ee;
+}
+.capability-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
 }
 .capability-entry {
   justify-content: center;
