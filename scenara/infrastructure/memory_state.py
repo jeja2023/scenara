@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from uuid import uuid4
 
 from scenara.platform.audit import AuditEvent
@@ -466,6 +466,15 @@ class MemoryStateStore:
             run = self._runs.get(self._key(tenant_id, project_id, run_id))
             return run.model_copy(deep=True) if run else None
 
+    async def get_runs(self, tenant_id: str, project_id: str, run_ids: Sequence[str]) -> list[RunRecord]:
+        requested = set(run_ids)
+        async with self._lock:
+            return [
+                run.model_copy(deep=True)
+                for (row_tenant, row_project, row_run_id), run in self._runs.items()
+                if row_tenant == tenant_id and row_project == project_id and row_run_id in requested
+            ]
+
     async def list_runs(
         self,
         tenant_id: str,
@@ -710,9 +719,60 @@ class MemoryStateStore:
         async with self._lock:
             self._audits.append(event)
 
-    async def audit_events(self, tenant_id: str, project_id: str) -> list[AuditEvent]:
+    async def audit_events(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        action: str | None = None,
+        resource_type: str | None = None,
+        principal_id: str | None = None,
+        outcome: str | None = None,
+        created_after: float | None = None,
+        created_before: float | None = None,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[AuditEvent]:
         async with self._lock:
-            return [item for item in self._audits if item.tenant_id == tenant_id and item.project_id == project_id]
+            filtered = [
+                item
+                for item in self._audits
+                if item.tenant_id == tenant_id
+                and item.project_id == project_id
+                and (action is None or item.action == action)
+                and (resource_type is None or item.resource_type == resource_type)
+                and (principal_id is None or item.principal_id == principal_id)
+                and (outcome is None or item.outcome == outcome)
+                and (created_after is None or item.created_at >= created_after)
+                and (created_before is None or item.created_at <= created_before)
+            ]
+            filtered.sort(key=lambda item: (item.created_at, item.event_id), reverse=True)
+            return filtered[offset:] if limit is None else filtered[offset : offset + limit]
+
+    async def count_audit_events(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        action: str | None = None,
+        resource_type: str | None = None,
+        principal_id: str | None = None,
+        outcome: str | None = None,
+        created_after: float | None = None,
+        created_before: float | None = None,
+    ) -> int:
+        return len(
+            await self.audit_events(
+                tenant_id,
+                project_id,
+                action=action,
+                resource_type=resource_type,
+                principal_id=principal_id,
+                outcome=outcome,
+                created_after=created_after,
+                created_before=created_before,
+            )
+        )
 
     async def delete_audit_events_before(self, tenant_id: str, project_id: str, before: float) -> int:
         async with self._lock:

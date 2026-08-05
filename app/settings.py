@@ -174,8 +174,10 @@ DYNAMIC_BATCH_MAX_QUEUE_SIZE = max(1, parse_int_env("DYNAMIC_BATCH_MAX_QUEUE_SIZ
 ENABLE_TENSORRT = parse_bool_env("ENABLE_TENSORRT", False)
 TENSORRT_ENGINE_CACHE_ENABLE = parse_bool_env("TENSORRT_ENGINE_CACHE_ENABLE", True)
 TENSORRT_ENGINE_CACHE_PATH = os.getenv("TENSORRT_ENGINE_CACHE_PATH", "/tmp/tensorrt-engine-cache")
-ROLLOUT_AUDIT_PATH = Path(os.getenv("ROLLOUT_AUDIT_PATH", "rollout-audit.jsonl"))
 RUNTIME_STATE_DIR = Path(os.getenv("RUNTIME_STATE_DIR", "runtime-state"))
+ROLLOUT_AUDIT_PATH = Path(
+    os.getenv("ROLLOUT_AUDIT_PATH", str(RUNTIME_STATE_DIR / "logs" / "rollout-audit.jsonl"))
+)
 VIDEO_UPLOAD_SESSION_STATE_PATH = Path(
     os.getenv("VIDEO_UPLOAD_SESSION_STATE_PATH", str(RUNTIME_STATE_DIR / "video-upload-sessions.json"))
 )

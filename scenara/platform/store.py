@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Protocol
 
 from scenara.platform.audit import AuditEvent
@@ -180,6 +181,8 @@ class StateStore(Protocol):
 
     async def get_run(self, tenant_id: str, project_id: str, run_id: str) -> RunRecord | None: ...
 
+    async def get_runs(self, tenant_id: str, project_id: str, run_ids: Sequence[str]) -> list[RunRecord]: ...
+
     async def list_runs(
         self,
         tenant_id: str,
@@ -269,7 +272,33 @@ class StateStore(Protocol):
 
     async def mark_objects_deleted(self, object_keys: list[str], deleted_at: float) -> None: ...
 
-    async def audit_events(self, tenant_id: str, project_id: str) -> list[AuditEvent]: ...
+    async def audit_events(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        action: str | None = None,
+        resource_type: str | None = None,
+        principal_id: str | None = None,
+        outcome: str | None = None,
+        created_after: float | None = None,
+        created_before: float | None = None,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[AuditEvent]: ...
+
+    async def count_audit_events(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        action: str | None = None,
+        resource_type: str | None = None,
+        principal_id: str | None = None,
+        outcome: str | None = None,
+        created_after: float | None = None,
+        created_before: float | None = None,
+    ) -> int: ...
 
     async def delete_audit_events_before(self, tenant_id: str, project_id: str, before: float) -> int: ...
 

@@ -1,9 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import csv
 import hmac
-import io
 import re
 import time
 from collections.abc import AsyncIterator
@@ -19,6 +17,7 @@ from starlette.middleware.base import RequestResponseEndpoint
 from starlette.staticfiles import StaticFiles
 
 from scenara import __version__
+from scenara.api.routers.audit import build_audit_router
 from scenara.bootstrap import Runtime, build_runtime
 from scenara.domains.portrait.capabilities import portrait_capability_snapshot
 from scenara.domains.portrait.encoder import PortraitEncodingError
@@ -50,7 +49,7 @@ from scenara.enterprise.service import (
 )
 from scenara.platform.access import AccessNotFound
 from scenara.platform.access_foundation import build_access_foundation
-from scenara.platform.audit import AuditEventPage, AuditEventView, AuditUnavailable, audit_event_view
+from scenara.platform.audit import AuditUnavailable
 from scenara.platform.control_plane import (
     AcknowledgeEdgeDeploymentRequest,
     AcknowledgeEdgeSyncRequest,
@@ -382,6 +381,8 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             )
         response.headers["X-Request-Id"] = request.state.request_id
         return response
+
+    app.include_router(build_audit_router(runtime, principal_context, _envelope))
 
     def error_response(
         request: Request,
@@ -806,7 +807,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     ) -> ApiEnvelope[ResultPage]:
         result = await runtime.runs.result(context, run_id)
         total = len(result.units)
-        page = result.model_copy(update={"units": result.units[unit_offset : unit_offset + unit_limit]}, deep=True)
+        page = result.model_copy(update={"units": result.units[unit_offset : unit_offset + unit_limit]})
         return _envelope(
             request,
             ResultPage(result=page, unit_offset=unit_offset, unit_limit=unit_limit, unit_total=total),
@@ -834,121 +835,6 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             request,
             ResultSummaryPage(items=items, offset=offset, limit=limit, total=total),
         )  # type: ignore[return-value]
-
-    async def _query_audit_events(
-        context: PrincipalContext,
-        *,
-        action: str | None,
-        resource_type: str | None,
-        principal_id: str | None,
-        outcome: str | None,
-        created_after: float | None,
-        created_before: float | None,
-        offset: int,
-        limit: int,
-    ) -> tuple[list[AuditEventView], int]:
-        await require_allowed(runtime.policy, context, "read", "audit_event")
-        events = await runtime.state.audit_events(context.tenant_id, context.project_id)
-        filtered = [
-            event
-            for event in events
-            if (action is None or event.action == action)
-            and (resource_type is None or event.resource_type == resource_type)
-            and (principal_id is None or event.principal_id == principal_id)
-            and (outcome is None or event.outcome == outcome)
-            and (created_after is None or event.created_at >= created_after)
-            and (created_before is None or event.created_at <= created_before)
-        ]
-        filtered.sort(key=lambda event: (event.created_at, event.event_id), reverse=True)
-        page = [audit_event_view(event) for event in filtered[offset : offset + limit]]
-        return page, len(filtered)
-
-    @app.get("/api/v1/audit/events", tags=["Operations"])
-    async def list_audit_events(
-        request: Request,
-        action: Annotated[str | None, Query(max_length=128)] = None,
-        resource_type: Annotated[str | None, Query(max_length=128)] = None,
-        principal_id: Annotated[str | None, Query(max_length=128)] = None,
-        outcome: Annotated[str | None, Query(max_length=32)] = None,
-        created_after: Annotated[float | None, Query(ge=0)] = None,
-        created_before: Annotated[float | None, Query(ge=0)] = None,
-        offset: Annotated[int, Query(ge=0)] = 0,
-        limit: Annotated[int, Query(ge=1, le=200)] = 50,
-        context: PrincipalContext = Depends(principal_context),
-    ) -> ApiEnvelope[AuditEventPage]:
-        page, total = await _query_audit_events(
-            context,
-            action=action,
-            resource_type=resource_type,
-            principal_id=principal_id,
-            outcome=outcome,
-            created_after=created_after,
-            created_before=created_before,
-            offset=offset,
-            limit=limit,
-        )
-        return _envelope(request, AuditEventPage(items=page, offset=offset, limit=limit, total=total))  # type: ignore[return-value]
-
-    @app.get("/api/v1/audit/export", tags=["Operations"])
-    async def export_audit_events(
-        format: Annotated[str, Query(pattern="^(json|csv)$")] = "json",
-        action: Annotated[str | None, Query(max_length=128)] = None,
-        resource_type: Annotated[str | None, Query(max_length=128)] = None,
-        principal_id: Annotated[str | None, Query(max_length=128)] = None,
-        outcome: Annotated[str | None, Query(max_length=32)] = None,
-        created_after: Annotated[float | None, Query(ge=0)] = None,
-        created_before: Annotated[float | None, Query(ge=0)] = None,
-        context: PrincipalContext = Depends(principal_context),
-    ) -> Response:
-        page, _ = await _query_audit_events(
-            context,
-            action=action,
-            resource_type=resource_type,
-            principal_id=principal_id,
-            outcome=outcome,
-            created_after=created_after,
-            created_before=created_before,
-            offset=0,
-            limit=200,
-        )
-        if format == "json":
-            return Response(
-                content=AuditEventPage(items=page, offset=0, limit=len(page), total=len(page)).model_dump_json(),
-                media_type="application/json",
-                headers={"Content-Disposition": "attachment; filename=scenara-audit.json"},
-            )
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(
-            [
-                "event_id",
-                "created_at",
-                "principal_id",
-                "action",
-                "resource_type",
-                "resource_id",
-                "outcome",
-                "evidence",
-            ]
-        )
-        for event in page:
-            writer.writerow(
-                [
-                    event.event_id,
-                    event.created_at,
-                    event.principal_id,
-                    event.action,
-                    event.resource_type,
-                    event.resource_id or "",
-                    event.outcome,
-                    event.model_dump_json(include={"evidence"}),
-                ]
-            )
-        return Response(
-            content=output.getvalue(),
-            media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=scenara-audit.csv"},
-        )
 
     @app.get("/api/v1/runs/{run_id}/artifacts/{artifact_id}", tags=["Results"])
     async def get_result_artifact(

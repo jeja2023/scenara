@@ -1,6 +1,6 @@
 {
   "name": "scenara",
-  "version": "0.3.0-dev.11",
+  "version": "0.3.0-dev.12",
   "private": true,
   "type": "commonjs",
   "description": "Scenara enterprise vision parsing platform",

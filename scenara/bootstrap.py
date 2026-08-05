@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import asyncio
+import time
+from contextlib import suppress
 from dataclasses import dataclass
 
 from scenara.domains.ocr import OcrPlugin
@@ -28,7 +31,8 @@ from scenara.infrastructure.postgres_state import PostgresStateStore
 from scenara.infrastructure.queue import InlineRunQueue, RedisRunQueue
 from scenara.platform.access import AccessRepository, AccessService, MemoryAccessRepository
 from scenara.platform.audit import AuditLogger
-from scenara.platform.control_plane import ControlPlaneService, ControlPlaneStore, MemoryControlPlaneStore
+from scenara.platform.control_plane import ControlPlaneService
+from scenara.platform.control_plane_store import ControlPlaneStore, MemoryControlPlaneStore
 from scenara.platform.dataset import DatasetService
 from scenara.platform.features import FeatureStore, MemoryFeatureStore
 from scenara.platform.feedback import FeedbackRepository, FeedbackService, MemoryFeedbackRepository
@@ -72,6 +76,7 @@ class Runtime:
     datasets: DatasetService
     control_plane: ControlPlaneService
     enterprise: EnterpriseService | None
+    _session_cleanup_task: asyncio.Task[None] | None = None
 
     async def open(self) -> None:
         await self.state.open()
@@ -87,12 +92,28 @@ class Runtime:
         if isinstance(self.queue, InlineRunQueue):
             for run in await self.state.recoverable_runs():
                 await self.queue.enqueue(run)
+        self._session_cleanup_task = asyncio.create_task(self._session_cleanup_loop())
 
     async def close(self) -> None:
+        if self._session_cleanup_task is not None:
+            self._session_cleanup_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await self._session_cleanup_task
+            self._session_cleanup_task = None
         await self.queue.close()
         await self.models.close()
         await self.objects.close()
         await self.state.close()
+
+    async def _session_cleanup_loop(self) -> None:
+        while True:
+            await asyncio.sleep(3_600)
+            try:
+                await self.control_plane.purge_expired_sessions(time.time())
+            except Exception:
+                # Session cleanup is best effort; authentication must remain
+                # available if the control-plane database is briefly offline.
+                continue
 
     async def health_check(self) -> dict[str, str]:
         await self.state.health_check()

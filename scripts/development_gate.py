@@ -67,6 +67,9 @@ def check() -> list[str]:
     credential_migration = ROOT / "migrations/0010_user_credentials.sql"
     if not credential_migration.is_file():
         errors.append("missing 0010 user-credentials migration")
+    session_migration = ROOT / "migrations/0011_session_token_index.sql"
+    if not session_migration.is_file():
+        errors.append("missing 0011 session-token index migration")
 
     app = create_app()
     paths = set(app.openapi().get("paths", {}))

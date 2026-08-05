@@ -661,9 +661,17 @@ class RunService:
                 query=query,
             ),
         )
+        runs = {
+            run.run_id: run
+            for run in await self.state.get_runs(
+                context.tenant_id,
+                context.project_id,
+                [reference.run_id for reference in references],
+            )
+        }
         items: list[ResultSummary] = []
         for reference in references:
-            run = await self.state.get_run(context.tenant_id, context.project_id, reference.run_id)
+            run = runs.get(reference.run_id)
             if run is None:
                 continue
             items.append(
@@ -712,19 +720,26 @@ class RunService:
         if reference.shard_keys:
             if len(reference.shard_keys) != len(reference.shard_sha256):
                 raise PipelineError("stored result shard manifest is invalid")
-            units: list[MediaUnitResult] = []
-            for object_key, expected_sha256 in zip(
-                reference.shard_keys,
-                reference.shard_sha256,
-                strict=True,
-            ):
+            async def load_shard(object_key: str, expected_sha256: str) -> list[MediaUnitResult]:
                 shard = await self.objects.get(object_key)
                 if hashlib.sha256(shard).hexdigest() != expected_sha256:
                     raise PipelineError("stored result shard checksum does not match its reference")
                 payload = json.loads(shard)
                 if not isinstance(payload, list):
                     raise PipelineError("stored result shard is not a unit list")
-                units.extend(MediaUnitResult.model_validate(item) for item in payload)
+                return [MediaUnitResult.model_validate(item) for item in payload]
+
+            shard_units = await asyncio.gather(
+                *(
+                    load_shard(object_key, expected_sha256)
+                    for object_key, expected_sha256 in zip(
+                        reference.shard_keys,
+                        reference.shard_sha256,
+                        strict=True,
+                    )
+                )
+            )
+            units = [unit for shard in shard_units for unit in shard]
             if len(units) != reference.unit_count:
                 raise PipelineError("stored result shard count does not match its reference")
             result = result.model_copy(update={"units": units}, deep=True)

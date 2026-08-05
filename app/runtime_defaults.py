@@ -35,7 +35,7 @@ LOCAL_DEV_PATH_KEYS = {
 }
 
 LOCAL_DEV_STATE_PATH_KEYS = {
-    "ROLLOUT_AUDIT_PATH": "rollout-audit.jsonl",
+    "ROLLOUT_AUDIT_PATH": "logs/rollout-audit.jsonl",
     "VIDEO_UPLOAD_SESSION_STATE_PATH": "video-upload-sessions.json",
     "VIDEO_UPLOAD_PART_DIR": "video-upload-parts",
     "MODEL_CONFIG_HISTORY_DIR": "model-config-history",

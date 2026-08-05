@@ -7,6 +7,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: scenara-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   python:
     runs-on: ubuntu-24.04
@@ -124,14 +128,16 @@ jobs:
         if: always()
         env:
           SCENARA_OCR_ENGINE_FACTORY: compose_interpolation_only:create_engine
-        run: docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml logs --no-color > integration-services.compose.log
+        run: |
+          mkdir -p runtime-state/logs
+          docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml logs --no-color > runtime-state/logs/integration-services.compose.log
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: integration-services
           path: |
             integration-services.junit.xml
-            integration-services.compose.log
+            runtime-state/logs/integration-services.compose.log
       - name: Stop integration services
         if: always()
         env:

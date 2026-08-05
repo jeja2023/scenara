@@ -14997,7 +14997,7 @@
   "info": {
     "description": "Scenara 景枢视觉 AI 中枢平台",
     "title": "Scenara API",
-    "version": "0.3.0.dev11"
+    "version": "0.3.0.dev12"
   },
   "openapi": "3.1.0",
   "paths": {

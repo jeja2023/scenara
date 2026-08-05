@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { ChevronDown, LogOut, Menu, RefreshCw, Settings, X } from "@lucide/vue";
-import { computed, nextTick, reactive, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  watch,
+} from "vue";
 import { useRoute, useRouter } from "vue-router";
 
 import { signOut } from "./auth";
@@ -109,6 +117,18 @@ function logout(): void {
   settingsOpen.value = false;
   void router.replace({ name: "login" });
 }
+
+function handleAuthExpired(): void {
+  signOut();
+  if (route.name !== "login") void router.replace({ name: "login" });
+}
+
+onMounted(() =>
+  window.addEventListener("scenara:auth-expired", handleAuthExpired),
+);
+onBeforeUnmount(() =>
+  window.removeEventListener("scenara:auth-expired", handleAuthExpired),
+);
 
 watch(
   isAuthRoute,

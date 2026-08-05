@@ -49,7 +49,7 @@ export function loadConnection(): ConnectionSettings {
 
 export function saveConnection(
   value: ConnectionSettings,
-  options: { persistAuth?: boolean } = {},
+  options: { persistAuth?: boolean } = { persistAuth: false },
 ): void {
   const context: Omit<ConnectionSettings, "token"> = {
     apiBase: value.apiBase,
@@ -66,6 +66,13 @@ export function saveConnection(
       options.persistAuth === false ? SESSION_TOKEN_KEY : PERSISTENT_TOKEN_KEY,
       value.token,
     );
+  }
+}
+
+function notifyAuthExpired(): void {
+  clearConnectionToken();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("scenara:auth-expired"));
   }
 }
 
@@ -185,6 +192,7 @@ export async function login(
     Envelope<LoginSession> | ApiErrorBody;
   if (!response.ok) {
     const error = (body as ApiErrorBody).error;
+    if (response.status === 401) notifyAuthExpired();
     throw new ApiError(
       response.status,
       error?.code ?? "HTTP_ERROR",
@@ -249,6 +257,7 @@ export async function apiForm<T>(path: string, form: FormData): Promise<T> {
 export async function apiBlob(path: string): Promise<Blob> {
   const response = await request(path, { headers: { Accept: "image/*" } });
   if (!response.ok) {
+    if (response.status === 401) notifyAuthExpired();
     throw await responseError(response);
   }
   return await response.blob();
@@ -285,7 +294,10 @@ export async function apiStream(
     headers: { Accept: "text/event-stream" },
     signal,
   });
-  if (!response.ok) throw await responseError(response);
+  if (!response.ok) {
+    if (response.status === 401) notifyAuthExpired();
+    throw await responseError(response);
+  }
   return response;
 }
 

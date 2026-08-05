@@ -25,12 +25,14 @@ WORKDIR /opt/scenara
 COPY requirements/production.lock requirements/production.lock
 RUN python3 -m pip install --break-system-packages --require-hashes -r requirements/production.lock
 
-COPY . .
-COPY --from=console-builder /build/frontend/console/dist frontend/console/dist
 RUN useradd --create-home --uid 10001 scenara \
     && mkdir -p /var/lib/scenara \
     && chown -R scenara:scenara /opt/scenara /var/lib/scenara
 
+COPY --chown=scenara:scenara . .
+COPY --from=console-builder --chown=scenara:scenara /build/frontend/console/dist frontend/console/dist
+
 USER scenara
 EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 CMD curl -fsS http://localhost:8000/readyz || exit 1
 CMD ["python3", "-m", "uvicorn", "scenara.server:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]

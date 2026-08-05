@@ -123,17 +123,16 @@ async def require_allowed(
     resource: str,
     attributes: dict[str, Any] | None = None,
 ) -> PolicyDecision:
-    if context.scopes:
-        required = {
-            "*",
-            f"{resource}:*",
-            f"{resource}:{action}",
-        }
-        if not (required & context.scopes):
-            raise PolicyDenied(f"scope denied: {resource}:{action}")
-        product_id = RESOURCE_PRODUCTS.get(resource)
-        if product_id is not None and product_id not in context.product_ids:
-            raise PolicyDenied(f"product denied: {product_id}")
+    required = {
+        "*",
+        f"{resource}:*",
+        f"{resource}:{action}",
+    }
+    if not (required & context.scopes):
+        raise PolicyDenied(f"scope denied: {resource}:{action}")
+    product_id = RESOURCE_PRODUCTS.get(resource)
+    if product_id is not None and "*" not in context.product_ids and product_id not in context.product_ids:
+        raise PolicyDenied(f"product denied: {product_id}")
     decision = await provider.authorize(context, action, resource, attributes)
     if not decision.allowed:
         raise PolicyDenied(decision.reason)

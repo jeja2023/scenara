@@ -17,12 +17,19 @@ x-scenara-environment: &scenara-environment
   SCENARA_PRODUCTION_MODELS_REQUIRED: "true"
   SCENARA_OCR_ENGINE_FACTORY: ${SCENARA_OCR_ENGINE_FACTORY:?set SCENARA_OCR_ENGINE_FACTORY}
   SCENARA_SECRET_ENCRYPTION_KEY: ${SCENARA_SECRET_ENCRYPTION_KEY:?set SCENARA_SECRET_ENCRYPTION_KEY}
+  SCENARA_ENTERPRISE_POLICY_REQUIRED: "true"
+  SCENARA_ENTERPRISE_LICENSE_PATH: /run/secrets/scenara_enterprise_license
+  SCENARA_ENTERPRISE_PUBLIC_KEY_PATH: /run/secrets/scenara_enterprise_public_key
   PYTHONPATH: /opt/scenara/models
   SCENARA_RAW_MEDIA_RETENTION_DAYS: ${SCENARA_RAW_MEDIA_RETENTION_DAYS:-7}
   SCENARA_PREVIEW_RETENTION_DAYS: ${SCENARA_PREVIEW_RETENTION_DAYS:-30}
   SCENARA_STRUCTURED_RESULT_RETENTION_DAYS: ${SCENARA_STRUCTURED_RESULT_RETENTION_DAYS:-180}
   SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES: ${SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES:-false}
   SCENARA_ALLOW_PRIVATE_WEBHOOK_TARGETS: ${SCENARA_ALLOW_PRIVATE_WEBHOOK_TARGETS:-false}
+
+x-scenara-enterprise-secrets: &scenara-enterprise-secrets
+  - scenara_enterprise_license
+  - scenara_enterprise_public_key
 
 services:
   postgres:
@@ -98,7 +105,7 @@ services:
     restart: "no"
 
   api:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.11}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.12}
     build:
       context: ..
     environment: *scenara-environment
@@ -113,6 +120,7 @@ services:
       - "8000:8000"
     volumes:
       - ../models:/opt/scenara/models:ro
+    secrets: *scenara-enterprise-secrets
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/readyz"]
       interval: 10s
@@ -121,7 +129,7 @@ services:
     restart: unless-stopped
 
   batch-worker:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.11}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.12}
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "batch-gpu-1", "--lane", "batch"]
@@ -131,6 +139,7 @@ services:
         condition: service_healthy
     volumes:
       - ../models:/opt/scenara/models:ro
+    secrets: *scenara-enterprise-secrets
     deploy:
       resources:
         reservations:
@@ -141,7 +150,7 @@ services:
     restart: unless-stopped
 
   stream-worker:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.11}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.12}
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "stream-gpu-1", "--lane", "stream"]
@@ -151,6 +160,7 @@ services:
         condition: service_healthy
     volumes:
       - ../models:/opt/scenara/models:ro
+    secrets: *scenara-enterprise-secrets
     deploy:
       resources:
         reservations:
@@ -161,7 +171,7 @@ services:
     restart: unless-stopped
 
   scheduler:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.11}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.12}
     build:
       context: ..
     command: ["python3", "-m", "scenara.scheduler", "--interval-seconds", "60"]
@@ -171,9 +181,16 @@ services:
         condition: service_healthy
     volumes:
       - ../models:/opt/scenara/models:ro
+    secrets: *scenara-enterprise-secrets
     restart: unless-stopped
 
 volumes:
   postgres-data:
   redis-data:
   minio-data:
+
+secrets:
+  scenara_enterprise_license:
+    file: ${SCENARA_ENTERPRISE_LICENSE_FILE:-./.env.production.example}
+  scenara_enterprise_public_key:
+    file: ${SCENARA_ENTERPRISE_PUBLIC_KEY_FILE:-./.env.production.example}

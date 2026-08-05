@@ -22,15 +22,18 @@ import { useRoute, useRouter } from "vue-router";
 import {
   ApiError,
   api,
-  apiBlob,
   apiStream,
-  blobToDataUrl,
   idempotencyKey,
   streamJsonEvents,
   userFacingError,
 } from "../api";
 import FeatureCropGallery from "../components/FeatureCropGallery.vue";
 import GenericDomainResult from "../components/GenericDomainResult.vue";
+import {
+  useDomainCatalog,
+  type MediaMode,
+} from "../composables/useDomainCatalog";
+import { useMediaPreview } from "../composables/useMediaPreview";
 import {
   labelDomain,
   labelMediaKind,
@@ -43,12 +46,8 @@ import {
 } from "../labels";
 import type {
   Domain,
-  DomainManifest,
   MediaAsset,
-  MediaKind,
   MediaSource,
-  Pipeline,
-  PipelineParameterDefinition,
   ResultEnvelope,
   ResultPage,
   Run,
@@ -57,7 +56,6 @@ import type {
   OcrBlock,
 } from "../types";
 
-type MediaMode = "image" | "video" | "document" | "stream";
 type InputOrigin = "library" | "upload";
 type SampleStrategy = "interval" | "keyframe" | "scene_change" | "uniform";
 
@@ -100,19 +98,12 @@ const domain = ref<Domain>(resolveInitialDomain());
 const mode = ref<MediaMode>(resolveInitialMode());
 const inputOrigin = ref<InputOrigin>("upload");
 const file = ref<File | null>(null);
-const domainManifests = ref<DomainManifest[]>([]);
 const domainSearch = ref("");
 const assets = ref<MediaAsset[]>([]);
 const assetId = ref("");
-const pipelines = ref<Pipeline[]>([]);
 const pipelineId = ref("");
 const pipelineParameters = ref<Record<string, unknown>>({});
 const pipelineParameterDefaults = ref<Record<string, unknown>>({});
-const mediaUrl = ref("");
-const serverPreviewUrl = ref("");
-const streamPreviewUrl = ref("");
-const fileDataUrl = ref("");
-const videoPlaybackFailed = ref(false);
 const videoElement = ref<HTMLVideoElement | null>(null);
 const overlayCanvas = ref<HTMLCanvasElement | null>(null);
 const sources = ref<MediaSource[]>([]);
@@ -151,78 +142,50 @@ let resultLoadSequence = 0;
 let sseAbort: AbortController | null = null;
 const POLL_NETWORK_RETRY_DELAYS_MS = [250, 500, 1000, 2000] as const;
 
-const domainPipelines = computed(() =>
-  pipelines.value.filter(
-    (item) => item.domain === domain.value && item.status === "active",
-  ),
-);
-const availableDomains = computed(() => {
-  const known = new Map(
-    domainManifests.value.map((item) => [item.domain_id, item]),
-  );
-  for (const item of pipelines.value) {
-    if (!known.has(item.domain)) {
-      known.set(item.domain, {
-        domain_id: item.domain,
-        display_name: labelDomain(item.domain),
-        schema_version: "-",
-        console_route: `/parse?domain=${encodeURIComponent(item.domain)}`,
-        capabilities: [],
-      });
-    }
-  }
-  return [...known.values()].sort(
-    (left, right) =>
-      (left.navigation_order ?? 100) - (right.navigation_order ?? 100) ||
-      left.display_name.localeCompare(right.display_name),
-  );
+const {
+  domainPipelines,
+  availableDomains,
+  filteredDomains,
+  selectedDomainManifest,
+  supportedMediaKinds,
+  selectedPipeline,
+  parameterEntries,
+  pipeline,
+  filteredAssets,
+  selectedAsset,
+  selectedSource,
+  refreshSources,
+  refreshWorkspaceResources,
+  syncPipelineSelection,
+  syncPipelineParameterDefaults,
+  ensureSupportedMode,
+} = useDomainCatalog({
+  domain,
+  mode,
+  domainSearch,
+  assetId,
+  sourceId,
+  pipelineId,
+  pipelineParameters,
+  pipelineParameterDefaults,
+  assets,
+  sources,
+  loadingSources,
+  error,
+  onModeChange: selectMode,
 });
-const filteredDomains = computed(() => {
-  const query = domainSearch.value.trim().toLowerCase();
-  if (!query) return availableDomains.value;
-  return availableDomains.value.filter((item) =>
-    `${item.display_name} ${item.domain_id}`.toLowerCase().includes(query),
-  );
-});
-const selectedDomainManifest = computed(
-  () =>
-    availableDomains.value.find((item) => item.domain_id === domain.value) ??
-    null,
-);
-const supportedMediaKinds = computed<MediaKind[]>(() =>
-  selectedDomainManifest.value?.supported_media_kinds?.length
-    ? selectedDomainManifest.value.supported_media_kinds
-    : ["image", "video", "document", "stream"],
-);
-const selectedPipeline = computed(
-  () =>
-    domainPipelines.value.find(
-      (item) => item.pipeline_id === pipelineId.value,
-    ) ??
-    domainPipelines.value[0] ??
-    null,
-);
-const parameterEntries = computed(
-  () =>
-    Object.entries(selectedPipeline.value?.parameter_schema ?? {}).filter(
-      ([, definition]) =>
-        !definition.media_kinds?.length ||
-        definition.media_kinds.includes(mode.value),
-    ) as Array<[string, PipelineParameterDefinition]>,
-);
-const pipeline = computed(
-  () =>
-    selectedPipeline.value?.pipeline_id ||
-    pipelineId.value ||
-    selectedDomainManifest.value?.default_pipeline_id ||
-    "",
-);
-const filteredAssets = computed(() =>
-  assets.value.filter((item) => item.kind === mode.value),
-);
-const selectedAsset = computed(
-  () => assets.value.find((item) => item.asset_id === assetId.value) ?? null,
-);
+
+const {
+  mediaUrl,
+  serverPreviewUrl,
+  streamPreviewUrl,
+  videoPlaybackFailed,
+  clearMediaUrl,
+  handleImageError,
+  handleVideoError,
+  loadServerPreview,
+  loadStreamPreview,
+} = useMediaPreview(file);
 
 function optionalNumber(value: unknown): number | null {
   if (value === null || value === undefined || value === "") return null;
@@ -230,9 +193,6 @@ function optionalNumber(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-const selectedSource = computed(
-  () => sources.value.find((item) => item.source_id === sourceId.value) ?? null,
-);
 const samplingValid = computed(() => {
   const endMs = optionalNumber(sampleEndMs.value);
   const maxEdge = optionalNumber(frameMaxEdge.value);
@@ -362,21 +322,6 @@ const canvasMediaUrl = computed(
   () => displayedMediaUrl.value || streamPreviewUrl.value,
 );
 
-function revokeObjectUrl(value: string): void {
-  if (value.startsWith("blob:")) URL.revokeObjectURL(value);
-}
-
-function clearMediaUrl(): void {
-  revokeObjectUrl(mediaUrl.value);
-  revokeObjectUrl(serverPreviewUrl.value);
-  revokeObjectUrl(streamPreviewUrl.value);
-  mediaUrl.value = "";
-  serverPreviewUrl.value = "";
-  streamPreviewUrl.value = "";
-  fileDataUrl.value = "";
-  videoPlaybackFailed.value = false;
-}
-
 function resetResult(): void {
   pollGeneration += 1;
   if (sseAbort) {
@@ -455,38 +400,6 @@ function selectDomain(value: Domain): void {
   navigateWorkspace(value, mode.value);
 }
 
-function syncPipelineSelection(preferred = pipelineId.value): void {
-  const preferredId =
-    preferred || selectedDomainManifest.value?.default_pipeline_id || "";
-  const match = domainPipelines.value.find(
-    (item) => item.pipeline_id === preferredId,
-  );
-  pipelineId.value =
-    match?.pipeline_id ?? domainPipelines.value[0]?.pipeline_id ?? "";
-  syncPipelineParameterDefaults();
-}
-
-function ensureSupportedMode(): void {
-  if (supportedMediaKinds.value.includes(mode.value)) return;
-  const next = supportedMediaKinds.value[0];
-  if (next) selectMode(next);
-}
-
-function syncPipelineParameterDefaults(): void {
-  const schema = selectedPipeline.value?.parameter_schema ?? {};
-  const next: Record<string, unknown> = {};
-  const defaults: Record<string, unknown> = {};
-  for (const [key, definition] of Object.entries(schema)) {
-    defaults[key] = definition.default;
-    next[key] =
-      pipelineParameters.value[key] !== undefined
-        ? pipelineParameters.value[key]
-        : definition.default;
-  }
-  pipelineParameters.value = next;
-  pipelineParameterDefaults.value = defaults;
-}
-
 function selectFile(event: Event): void {
   const selected = (event.target as HTMLInputElement).files?.[0] ?? null;
   inputOrigin.value = "upload";
@@ -504,71 +417,6 @@ function selectLibraryAsset(): void {
   if (assetId.value) void loadServerPreview(assetId.value);
 }
 
-async function handleImageError(): Promise<void> {
-  if (!file.value || fileDataUrl.value) return;
-  revokeObjectUrl(serverPreviewUrl.value);
-  serverPreviewUrl.value = "";
-  try {
-    fileDataUrl.value = await blobToDataUrl(file.value);
-    mediaUrl.value = fileDataUrl.value;
-  } catch {
-    // The parser still reports a useful validation error when the file cannot be decoded.
-  }
-}
-
-function handleVideoError(): void {
-  videoPlaybackFailed.value = true;
-}
-
-async function loadServerPreview(
-  assetId: string | null | undefined,
-): Promise<void> {
-  if (!assetId) return;
-  try {
-    const blob = await apiBlob(
-      `/api/v1/media/assets/${encodeURIComponent(assetId)}/preview`,
-    );
-    const dataUrl = await blobToDataUrl(blob);
-    revokeObjectUrl(serverPreviewUrl.value);
-    serverPreviewUrl.value = dataUrl;
-  } catch {
-    // Preview generation is best-effort; parsing and result rendering remain available.
-  }
-}
-
-async function loadStreamPreview(sourceIdValue: string): Promise<void> {
-  if (!sourceIdValue) {
-    revokeObjectUrl(streamPreviewUrl.value);
-    streamPreviewUrl.value = "";
-    return;
-  }
-  try {
-    const blob = await apiBlob(
-      `/api/v1/media/sources/${encodeURIComponent(sourceIdValue)}/preview`,
-    );
-    const dataUrl = await blobToDataUrl(blob);
-    revokeObjectUrl(streamPreviewUrl.value);
-    streamPreviewUrl.value = dataUrl;
-  } catch {
-    revokeObjectUrl(streamPreviewUrl.value);
-    streamPreviewUrl.value = "";
-  }
-}
-
-async function refreshSources(): Promise<void> {
-  loadingSources.value = true;
-  try {
-    const page = await api<{ items: MediaSource[] }>(
-      "/api/v1/media/sources?limit=200",
-    );
-    sources.value = Array.isArray(page?.items) ? page.items : [];
-  } catch (caught) {
-    error.value = userFacingError(caught, "视频流源加载失败，请稍后重试");
-  } finally {
-    loadingSources.value = false;
-  }
-}
-
 async function refreshHistory(): Promise<void> {
   if (!domain.value) return;
   loadingHistory.value = true;
@@ -581,34 +429,6 @@ async function refreshHistory(): Promise<void> {
     historyRuns.value = [];
   } finally {
     loadingHistory.value = false;
-  }
-}
-
-async function refreshWorkspaceResources(): Promise<void> {
-  loadingSources.value = true;
-  try {
-    const [assetPage, sourcePage, pipelineRows, manifestRows] =
-      await Promise.all([
-        api<{ items: MediaAsset[] }>("/api/v1/media/assets?limit=200"),
-        api<{ items: MediaSource[] }>("/api/v1/media/sources?limit=200"),
-        api<Pipeline[]>("/api/v1/pipelines"),
-        api<DomainManifest[]>("/api/v1/domains"),
-      ]);
-    assets.value = Array.isArray(assetPage?.items) ? assetPage.items : [];
-    sources.value = Array.isArray(sourcePage?.items) ? sourcePage.items : [];
-    pipelines.value = Array.isArray(pipelineRows) ? pipelineRows : [];
-    domainManifests.value = Array.isArray(manifestRows) ? manifestRows : [];
-    const currentDomain = availableDomains.value.find(
-      (item) => item.domain_id === domain.value,
-    );
-    if (!currentDomain)
-      domain.value = availableDomains.value[0]?.domain_id ?? domain.value;
-    syncPipelineSelection();
-    ensureSupportedMode();
-  } catch (caught) {
-    error.value = userFacingError(caught, "解析资源加载失败，请稍后重试");
-  } finally {
-    loadingSources.value = false;
   }
 }
 
@@ -657,16 +477,30 @@ async function loadResult(runId: string, ignoreMissing = false): Promise<void> {
   drawOverlay();
 }
 
-function subscribeEvents(runId: string): void {
+interface EventSubscription {
+  connected: Promise<boolean>;
+  completed: Promise<boolean>;
+}
+
+function subscribeEvents(runId: string): EventSubscription {
   if (sseAbort) sseAbort.abort();
   const controller = new AbortController();
   sseAbort = controller;
+  let resolveConnected!: (value: boolean) => void;
+  let resolveCompleted!: (value: boolean) => void;
+  const connected = new Promise<boolean>((resolve) => {
+    resolveConnected = resolve;
+  });
+  const completed = new Promise<boolean>((resolve) => {
+    resolveCompleted = resolve;
+  });
   void (async () => {
     try {
       const response = await apiStream(
         `/api/v1/runs/${encodeURIComponent(runId)}/events`,
         controller.signal,
       );
+      resolveConnected(true);
       for await (const event of streamJsonEvents<{
         event_type?: string;
         status?: Run["status"];
@@ -705,10 +539,14 @@ function subscribeEvents(runId: string): void {
           void loadResult(runId, true).catch(() => undefined);
         }
       }
+      resolveCompleted(true);
     } catch {
+      resolveConnected(false);
+      resolveCompleted(false);
       // 事件流断开时回退到轮询，不向用户报错
     }
   })();
+  return { connected, completed };
 }
 
 function followRun(initial: Run): void {
@@ -743,7 +581,11 @@ async function getRunWithNetworkRetry(
 async function pollRun(initial: Run): Promise<void> {
   const generation = ++pollGeneration;
   run.value = initial;
-  subscribeEvents(initial.run_id);
+  const subscription = subscribeEvents(initial.run_id);
+  if (await subscription.connected) {
+    await subscription.completed;
+  }
+  if (generation !== pollGeneration) return;
   while (
     generation === pollGeneration &&
     !["completed", "failed", "cancelled"].includes(run.value.status)

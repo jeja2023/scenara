@@ -5,10 +5,10 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until signed, reproducible evidence is committed.
 
-Current development version: `0.3.0-dev.11` (`0.3.0.dev11` for Python packages).
+Current development version: `0.3.0-dev.12` (`0.3.0.dev12` for Python packages).
 This version is an engineering qualification snapshot, not a `1.0.0` production release.
 
-The `0.3.0-dev.11` engineering baseline cumulatively adds domain-scoped Parse
+The `0.3.0-dev.12` engineering baseline cumulatively adds domain-scoped Parse
 workspaces, a first-class cross-domain Results center, Data Assets terminology,
 dataset version governance, tenant-scoped audit search/export, saved Search
 definitions, a tenant/project-scoped result-summary query path backed by
@@ -18,6 +18,11 @@ Chinese-only domain and capability catalog, and fully documented environment
 configuration with safe development and production guidance.
 It retains the `0.3.0-dev.5` migration, capacity, coverage, progressive media
 decoding, monotonic Run progress, and replaceable partial Result guarantees.
+The `0.3.0-dev.12` hardening also closes empty-scope/product authorization paths,
+enforces enterprise policy in production, adds indexed and expiring Session
+authentication, paginated/streaming audit access, bulk Result reads, SSE
+fallback control, Console auth-expiry handling, composable/router extraction,
+and `runtime-state/logs/` governance.
 
 | Stage | Deliverable | Status | Evidence required |
 |---|---|---|---|
@@ -58,11 +63,11 @@ The `1.0` version must not be published while any box above is unchecked.
 
 ## Current local verification
 
-The following checks were executed on 2026-08-04 and are supporting implementation evidence only:
+The following checks were executed on 2026-08-05 and are supporting implementation evidence only:
 
 | Check | Result |
 |---|---|
-| `.venv\\Scripts\\python.exe -m pytest -q` | 176 passed, 8 integration tests skipped by default; username/password login, bootstrap admin validation, lifecycle approval, audit retention, billing, adapter probes, Agent records, control-plane, index rebuild, weighted Search, dataset, audit, saved-search and portrait image closure tests included |
+| `.venv\\Scripts\\python.exe -m pytest -q` | 180 passed, 8 integration tests skipped by default; username/password login, bootstrap admin validation, lifecycle approval, audit retention, billing, adapter probes, Agent records, control-plane, index rebuild, weighted Search, dataset, audit, saved-search, portrait image closure, authorization hardening and runtime-state layout tests included |
 | Real GOP keyframe cross-check | PyAV and Scenara both selected frames `0, 12, 24, 36, 48, 60, 72, 84, 96, 108`; normal decode no longer uses the FFmpeg raw-only keyframe flag |
 | Real-time video and stream browser qualification | HEVC file Run `run_915a658dcd69469a81877c21ee2f22ab` exposed 8/16/24-unit partial results before completing 32 units with 21 objects; HTTP MPEG-TS Run `run_2e3c39dd7f6b4c4aa65f27b3820a277c` exposed units 1-8 individually and completed with 7 objects; after an API container force-recreate, persisted Source `src_1cd455c67c7548cdad6aa9f35f1ed63a` successfully previewed and Run `run_9816db5634ec4b13a057e36566901224` exposed 4/8 units before completing with 9 objects; crop JPEGs, 1920x1080 full frames, highlights, and Results-page replay loaded successfully |
 | `SCENARA_RUN_INTEGRATION=1 python -m pytest -q -m integration tests/integration` | 8 tests collected for PostgreSQL/pgvector, Redis and MinIO; the dev.4 pagination and artifact additions require the CI real-service job or a local Compose qualification run |

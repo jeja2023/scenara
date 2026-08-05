@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from scenara.platform.control_plane import ControlPlaneStore
+from scenara.platform.control_plane_store import ControlPlaneStore
 
 
 class PostgresControlPlaneStore(ControlPlaneStore):
@@ -47,6 +47,27 @@ class PostgresControlPlaneStore(ControlPlaneStore):
             )
             rows = await cursor.fetchall()
         return [dict(row[0]) for row in rows]
+
+    async def get_by_token_sha256(self, token_sha256: str) -> dict[str, Any] | None:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT document FROM scenara_control_plane_records
+                   WHERE record_type = 'session' AND document->>'token_sha256' = %s
+                   LIMIT 1""",
+                (token_sha256,),
+            )
+            row = await cursor.fetchone()
+        return dict(row[0]) if row else None
+
+    async def delete_expired_sessions(self, now: float) -> int:
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """DELETE FROM scenara_control_plane_records
+                   WHERE record_type = 'session'
+                     AND (document->>'expires_at')::double precision <= %s""",
+                (now,),
+            )
+        return int(cursor.rowcount)
 
     async def put(self, kind: str, tenant_id: str, project_id: str, record_id: str, document: dict[str, Any]) -> None:
         from psycopg.types.json import Jsonb

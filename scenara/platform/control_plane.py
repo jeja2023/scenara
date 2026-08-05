@@ -9,68 +9,29 @@ the same service works with memory and PostgreSQL deployments.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import secrets
 import time
 from enum import StrEnum
-from typing import Any, Protocol, TypeVar
+from typing import Any, TypeVar
 from uuid import uuid4
 
 from pydantic import Field
 
 from scenara.platform.audit import AuditLogger
+from scenara.platform.control_plane_store import (
+    AuditRetentionStore,
+    ControlPlaneStore,
+    SessionAccessResolver,
+)
+from scenara.platform.control_plane_store import (
+    MemoryControlPlaneStore as MemoryControlPlaneStore,
+)
 from scenara.platform.index import IndexStore
 from scenara.platform.models import PrincipalContext, StrictModel
 from scenara.platform.policy import PolicyDenied, PolicyProvider, require_allowed
 
-
-class ControlPlaneStore(Protocol):
-    async def get(self, kind: str, tenant_id: str, project_id: str, record_id: str) -> dict[str, Any] | None: ...
-
-    async def list(self, kind: str, tenant_id: str, project_id: str) -> list[dict[str, Any]]: ...
-
-    async def put(
-        self, kind: str, tenant_id: str, project_id: str, record_id: str, document: dict[str, Any]
-    ) -> None: ...
-
-    async def delete(self, kind: str, tenant_id: str, project_id: str, record_id: str) -> None: ...
-
-
-class SessionAccessResolver(Protocol):
-    async def resolve_user_context(self, tenant_id: str, project_id: str, user_id: str) -> PrincipalContext | None: ...
-
-
-class AuditRetentionStore(Protocol):
-    async def delete_audit_events_before(self, tenant_id: str, project_id: str, before: float) -> int: ...
-
-
 RecordT = TypeVar("RecordT", bound=StrictModel)
-
-
-class MemoryControlPlaneStore:
-    def __init__(self) -> None:
-        self._records: dict[tuple[str, str, str, str], dict[str, Any]] = {}
-
-    async def get(self, kind: str, tenant_id: str, project_id: str, record_id: str) -> dict[str, Any] | None:
-        value = self._records.get((kind, tenant_id, project_id, record_id))
-        return dict(value) if value is not None else None
-
-    async def list(self, kind: str, tenant_id: str, project_id: str) -> list[dict[str, Any]]:
-        values = [
-            dict(value)
-            for (row_kind, row_tenant, row_project, _), value in self._records.items()
-            if row_kind == kind
-            and (tenant_id == "*" or row_tenant == tenant_id)
-            and (project_id == "*" or row_project == project_id)
-        ]
-        return sorted(
-            values, key=lambda item: (float(item.get("updated_at", 0)), str(item.get("record_id", ""))), reverse=True
-        )
-
-    async def put(self, kind: str, tenant_id: str, project_id: str, record_id: str, document: dict[str, Any]) -> None:
-        self._records[(kind, tenant_id, project_id, record_id)] = dict(document)
-
-    async def delete(self, kind: str, tenant_id: str, project_id: str, record_id: str) -> None:
-        self._records.pop((kind, tenant_id, project_id, record_id), None)
 
 
 class IdentityProviderKind(StrEnum):
@@ -1005,17 +966,18 @@ class ControlPlaneService:
         if not token:
             return None
         digest = _sha(token)
-        sessions = await self.store.list("session", "*", "*")
-        # PostgreSQL implementations may not support wildcard listing; the API
-        # resolves sessions within the selected tenant/project instead.
-        for document in sessions:
-            if (
-                document.get("token_sha256") != digest
-                or document.get("revoked_at") is not None
-                or float(document.get("expires_at", 0)) <= time.time()
-            ):
-                continue
-            now = time.time()
+        document = await self.store.get_by_token_sha256(digest)
+        if document is None or not hmac.compare_digest(str(document.get("token_sha256", "")), digest):
+            return None
+        now = time.time()
+        if document.get("revoked_at") is not None or float(document.get("expires_at", 0)) <= now:
+            return None
+        scopes = frozenset(document.get("scopes", []))
+        product_ids = frozenset(document.get("product_ids", []))
+        if not scopes:
+            return None
+        last_used_at = document.get("last_used_at")
+        if last_used_at is None or now - float(last_used_at) >= 60:
             document["last_used_at"] = now
             await self.store.put(
                 "session",
@@ -1024,14 +986,16 @@ class ControlPlaneService:
                 str(document["session_id"]),
                 document,
             )
-            return PrincipalContext(
-                tenant_id=str(document["tenant_id"]),
-                project_id=str(document["project_id"]),
-                principal_id=str(document["user_id"]),
-                scopes=frozenset(document.get("scopes", [])),
-                product_ids=frozenset(document.get("product_ids", [])),
-            )
-        return None
+        return PrincipalContext(
+            tenant_id=str(document["tenant_id"]),
+            project_id=str(document["project_id"]),
+            principal_id=str(document["user_id"]),
+            scopes=scopes,
+            product_ids=product_ids,
+        )
+
+    async def purge_expired_sessions(self, now: float | None = None) -> int:
+        return await self.store.delete_expired_sessions(time.time() if now is None else now)
 
     async def lifecycle(
         self, context: PrincipalContext, resource_type: str, resource_id: str, action: str, reason: str = ""
@@ -2096,7 +2060,7 @@ class ControlPlaneService:
         tool = await self._get("agent_tool", context.tenant_id, context.project_id, body.tool_id, AgentTool)
         if tool is None or not tool.enabled:
             raise ValueError("agent tool is unavailable")
-        if context.scopes and not tool.scopes.issubset(context.scopes):
+        if context.scopes and "*" not in context.scopes and not tool.scopes.issubset(context.scopes):
             raise PolicyDenied("agent tool scope exceeds the caller's granted scopes")
         status = AgentActionStatus.PENDING_APPROVAL if tool.requires_approval else AgentActionStatus.APPROVED
         now = time.time()
@@ -2150,7 +2114,7 @@ class ControlPlaneService:
         tool = await self._get("agent_tool", context.tenant_id, context.project_id, action.tool_id, AgentTool)
         if tool is None or not tool.enabled:
             raise ValueError("agent tool is unavailable")
-        if context.scopes and not tool.scopes.issubset(context.scopes):
+        if context.scopes and "*" not in context.scopes and not tool.scopes.issubset(context.scopes):
             raise PolicyDenied("agent tool scope exceeds the caller's granted scopes")
         input_hash = hashlib.sha256(str(sorted(action.input.items())).encode()).hexdigest()
         updated = action.model_copy(

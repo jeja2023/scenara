@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Any
 from uuid import uuid4
 
@@ -740,6 +741,18 @@ class PostgresStateStore:
         row = await self._get_document("scenara_runs", "run_id", tenant_id, project_id, run_id)
         return RunRecord.model_validate(row) if row else None
 
+    async def get_runs(self, tenant_id: str, project_id: str, run_ids: Sequence[str]) -> list[RunRecord]:
+        if not run_ids:
+            return []
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT document FROM scenara_runs
+                   WHERE tenant_id = %s AND project_id = %s AND run_id = ANY(%s)""",
+                (tenant_id, project_id, list(run_ids)),
+            )
+            rows = await cursor.fetchall()
+        return [RunRecord.model_validate(row[0]) for row in rows]
+
     async def list_runs(
         self,
         tenant_id: str,
@@ -1059,14 +1072,50 @@ class PostgresStateStore:
                 ),
             )
 
-    async def audit_events(self, tenant_id: str, project_id: str) -> list[AuditEvent]:
+    async def audit_events(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        action: str | None = None,
+        resource_type: str | None = None,
+        principal_id: str | None = None,
+        outcome: str | None = None,
+        created_after: float | None = None,
+        created_before: float | None = None,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> list[AuditEvent]:
+        clauses = ["tenant_id = %s", "project_id = %s"]
+        params: list[object] = [tenant_id, project_id]
+        for column, value in (
+            ("action", action),
+            ("resource_type", resource_type),
+            ("principal_id", principal_id),
+            ("outcome", outcome),
+        ):
+            if value is not None:
+                clauses.append(f"{column} = %s")
+                params.append(value)
+        if created_after is not None:
+            clauses.append("created_at >= to_timestamp(%s)")
+            params.append(created_after)
+        if created_before is not None:
+            clauses.append("created_at <= to_timestamp(%s)")
+            params.append(created_before)
+        params.extend([offset])
+        limit_sql = ""
+        if limit is not None:
+            limit_sql = " LIMIT %s"
+            params.append(limit)
         async with self._pool.connection() as conn:
             cursor = await conn.execute(
-                """SELECT audit_id, principal_id, action, resource_type, resource_id, outcome,
+                f"""SELECT audit_id, principal_id, action, resource_type, resource_id, outcome,
                           request_id, evidence, extract(epoch from created_at)
                    FROM scenara_audit_events
-                   WHERE tenant_id = %s AND project_id = %s ORDER BY audit_id DESC""",
-                (tenant_id, project_id),
+                   WHERE {' AND '.join(clauses)} ORDER BY audit_id DESC
+                   OFFSET %s{limit_sql}""",
+                tuple(params),
             )
             rows = await cursor.fetchall()
         return [
@@ -1085,6 +1134,43 @@ class PostgresStateStore:
             )
             for row in rows
         ]
+
+    async def count_audit_events(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        action: str | None = None,
+        resource_type: str | None = None,
+        principal_id: str | None = None,
+        outcome: str | None = None,
+        created_after: float | None = None,
+        created_before: float | None = None,
+    ) -> int:
+        clauses = ["tenant_id = %s", "project_id = %s"]
+        params: list[object] = [tenant_id, project_id]
+        for column, value in (
+            ("action", action),
+            ("resource_type", resource_type),
+            ("principal_id", principal_id),
+            ("outcome", outcome),
+        ):
+            if value is not None:
+                clauses.append(f"{column} = %s")
+                params.append(value)
+        if created_after is not None:
+            clauses.append("created_at >= to_timestamp(%s)")
+            params.append(created_after)
+        if created_before is not None:
+            clauses.append("created_at <= to_timestamp(%s)")
+            params.append(created_before)
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                f"SELECT count(*) FROM scenara_audit_events WHERE {' AND '.join(clauses)}",
+                tuple(params),
+            )
+            row = await cursor.fetchone()
+        return int(row[0]) if row else 0
 
     async def delete_audit_events_before(self, tenant_id: str, project_id: str, before: float) -> int:
         async with self._pool.connection() as conn, conn.transaction():

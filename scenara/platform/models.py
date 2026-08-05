@@ -63,8 +63,11 @@ class PrincipalContext(StrictModel):
     tenant_id: str
     project_id: str
     principal_id: str = "anonymous"
-    scopes: frozenset[str] = Field(default_factory=frozenset)
-    product_ids: frozenset[str] = Field(default_factory=frozenset)
+    # A context created by the local development boundary is unrestricted.
+    # Authenticated credentials always provide explicit, non-empty sets; an
+    # explicit empty set therefore means that the credential has no access.
+    scopes: frozenset[str] = Field(default_factory=lambda: frozenset({"*"}))
+    product_ids: frozenset[str] = Field(default_factory=lambda: frozenset({"*"}))
 
 
 class MediaTechnicalMetadata(StrictModel):

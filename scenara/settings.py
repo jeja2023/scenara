@@ -94,6 +94,8 @@ class Settings:
             errors.append("SCENARA_OCR_ENGINE_FACTORY is required for the approved private OCR adapter")
         if not self.secret_encryption_key:
             errors.append("SCENARA_SECRET_ENCRYPTION_KEY is required")
+        if not self.enterprise_policy_required:
+            errors.append("SCENARA_ENTERPRISE_POLICY_REQUIRED must be true")
         if self.enterprise_policy_required and (
             self.enterprise_license_path is None or self.enterprise_public_key_path is None
         ):

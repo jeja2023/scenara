@@ -37,6 +37,9 @@ from scenara.platform.policy import PolicyDenied, PolicyProvider, require_allowe
 from scenara.platform.store import StateConflict
 
 ADMIN_SCOPES = frozenset({"*", "iam:*", "platform:*"})
+ADMIN_PRODUCT_IDS = frozenset(
+    {"agent", "api", "console", "data", "edge", "flow", "index", "model", "parse", "sdk", "search"}
+)
 
 
 class AccessNotFound(RuntimeError):
@@ -327,6 +330,8 @@ class AccessService:
         entitlements = await self.repository.list_product_entitlements(record.tenant_id, record.project_id)
         active_product_ids = frozenset(item.product_id for item in entitlements if item.status.value == "active")
         product_ids = record.product_ids & service_account.product_ids & active_product_ids
+        if not scopes:
+            return None
         return PrincipalContext(
             tenant_id=record.tenant_id,
             project_id=record.project_id,
@@ -395,7 +400,7 @@ class AccessService:
                     role_id=role_id,
                     display_name="Console Administrator",
                     scopes=ADMIN_SCOPES,
-                    product_ids=frozenset(),
+                    product_ids=ADMIN_PRODUCT_IDS,
                     created_at=now,
                     updated_at=now,
                 )
@@ -798,6 +803,7 @@ def _scopes_within(requested: frozenset[str], granted: frozenset[str]) -> bool:
 
 
 __all__ = [
+    "ADMIN_PRODUCT_IDS",
     "ADMIN_SCOPES",
     "AccessNotFound",
     "AccessRepository",
