@@ -181,7 +181,7 @@ async def _run_model_bundle_direct(bundle: ModelBundle, input_array: Array) -> t
     queue_start = now()
     model_acquired = False
     gpu_acquired = False
-    # 标记该 Bundle 为使用中（in-use），以便在当前推理（该推理正在等待工作线程）
+    # 标记该 Bundle 为使用中，以便在当前推理（该推理正在等待工作线程）
     # 仍运行期间，LRU 淘汰机制不会释放其 ONNX 会话。
     bundle["in_use"] = bundle.get("in_use", 0) + 1
     try:

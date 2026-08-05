@@ -111,7 +111,7 @@ const sourceId = ref("");
 const sourceName = ref("");
 const sourceUrl = ref("");
 
-// Sampling params
+// 抽样参数
 const sampleIntervalMs = ref(1000);
 const maxUnits = ref(32);
 const sampleStrategy = ref<SampleStrategy>("interval");

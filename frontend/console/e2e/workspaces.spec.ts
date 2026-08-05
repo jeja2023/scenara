@@ -127,7 +127,7 @@ test.beforeEach(async ({ page }) => {
       data = { items: [], offset: 0, limit: 100, total: 0 };
     } else if (path === "/api/v1/system/status") {
       data = {
-        version: "0.3.0.dev12",
+        version: "0.3.0.dev13",
         profile: "development",
         state_backend: "memory",
         object_backend: "local",

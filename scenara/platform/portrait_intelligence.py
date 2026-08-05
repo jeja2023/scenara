@@ -39,7 +39,7 @@ from scenara.platform.models import (
     PortraitModuleMaturity,
 )
 
-# Canonical capability identifiers — must stay in sync with model-capabilities.yml keys.
+# 标准能力标识符，必须与 model-capabilities.yml 中的键保持同步。
 PORTRAIT_CAPABILITY_IDS: tuple[str, ...] = (
     "person_detection",
     "body_embedding",
@@ -103,7 +103,7 @@ def build_portrait_intelligence(
     portrait_installed = "portrait" in domains
 
     # -------------------------------------------------------------------
-    # Capability items
+    # 能力条目
     # -------------------------------------------------------------------
     capabilities = [
         _capability_item(
@@ -114,13 +114,13 @@ def build_portrait_intelligence(
     ]
 
     # -------------------------------------------------------------------
-    # Derived summary counts used to set module maturity
+    # 用于计算模块成熟度的汇总计数
     # -------------------------------------------------------------------
     ready_count = sum(1 for c in capabilities if c.readiness == PortraitCapabilityReadiness.READY)
     total_count = len(capabilities)
 
     # -------------------------------------------------------------------
-    # Six strategic modules
+    # 六个战略模块
     # -------------------------------------------------------------------
     modules = [
         PortraitModuleItem(
@@ -287,7 +287,7 @@ def build_portrait_intelligence(
     ]
 
     # -------------------------------------------------------------------
-    # Three strategic assets
+    # 三项战略资产
     # -------------------------------------------------------------------
     assets = [
         PortraitAssetItem(

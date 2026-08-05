@@ -1,6 +1,6 @@
 # Scenara 人像智能基础平台长期战略
 
-适用版本：`0.3.0-dev.12`。本文是景枢人像 AI 方向的长期技术战略，定义平台演进目标、六大核心模块、三项核心资产以及各阶段的门禁与现状差距。本文是战略意图文件，不是已发布能力清单。能力成熟度以 `model-capabilities.yml` 和 [实现矩阵](../release/IMPLEMENTATION_MATRIX.md) 为准。
+适用版本：`0.3.0-dev.13`。本文是景枢人像 AI 方向的长期技术战略，定义平台演进目标、六大核心模块、三项核心资产以及各阶段的门禁与现状差距。本文是战略意图文件，不是已发布能力清单。能力成熟度以 `model-capabilities.yml` 和 [实现矩阵](../release/IMPLEMENTATION_MATRIX.md) 为准。
 
 ---
 

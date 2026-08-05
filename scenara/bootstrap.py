@@ -111,8 +111,8 @@ class Runtime:
             try:
                 await self.control_plane.purge_expired_sessions(time.time())
             except Exception:
-                # Session cleanup is best effort; authentication must remain
-                # available if the control-plane database is briefly offline.
+                # 会话清理采用尽力而为策略；即使控制面数据库短暂离线，
+                # 认证功能也必须保持可用。
                 continue
 
     async def health_check(self) -> dict[str, str]:

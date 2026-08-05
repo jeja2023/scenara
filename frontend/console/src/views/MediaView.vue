@@ -58,7 +58,7 @@ function readBlobAsDataUrl(blob: Blob): Promise<string> {
       else reject(new Error("media preview did not produce a data URL"));
     };
     reader.onerror = () =>
-      reject(reader.error ?? new Error("media preview could not be read"));
+      reject(reader.error ?? new Error("无法读取媒体预览"));
     reader.readAsDataURL(blob);
   });
 }

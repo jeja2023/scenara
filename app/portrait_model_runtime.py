@@ -87,7 +87,7 @@ def _sync_body_flags_from_module() -> None:
 
 async def _prepare_runtime_dependencies() -> None:
     # 只有依赖注入需要互斥，它只是若干属性赋值。这里刻意不在后续 await 的推理期间持有
-    # 该锁，以便并发请求（以及 per-model/per-GPU 信号量）能真正重叠，而不是被一把全局锁串行化。
+    # 该锁，以便并发请求（以及按模型/按 GPU 的信号量）能真正重叠，而不是被一把全局锁串行化。
     async with _runtime_dependency_lock():
         _sync_runtime_module_dependencies()
 

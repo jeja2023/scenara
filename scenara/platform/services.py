@@ -1148,8 +1148,8 @@ class RunService:
                     )
                 )
             if sink is not None and not partial:
-                # Feature crops and unit frames are derived previews: they follow the
-                # preview retention window, not the longer structured-result window.
+                # 特征裁剪图和单元帧属于派生预览，遵循预览保留窗口，
+                # 而不是更长的结构化结果保留窗口。
                 for record in sink.retention_records(
                     created_at=run.created_at,
                     expires_at=run.created_at + self.preview_retention_days * 86_400,

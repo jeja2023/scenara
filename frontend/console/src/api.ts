@@ -273,10 +273,10 @@ export function blobToDataUrl(value: Blob): Promise<string> {
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === "string") resolve(reader.result);
-      else reject(new Error("binary response did not produce a data URL"));
+      else reject(new Error("二进制响应未生成 Data URL"));
     };
     reader.onerror = () =>
-      reject(reader.error ?? new Error("binary response could not be read"));
+      reject(reader.error ?? new Error("无法读取二进制响应"));
     reader.readAsDataURL(value);
   });
 }

@@ -170,7 +170,7 @@ export function useDomainCatalog(options: DomainCatalogOptions) {
     } catch (caught) {
       options.error.value = userFacingError(
         caught,
-        "瑙嗛娴佹簮鍔犺浇澶辫触锛岃绋嶅悗閲嶈瘯",
+        "视频流来源加载失败，请稍后重试",
       );
     } finally {
       options.loadingSources.value = false;
@@ -206,7 +206,7 @@ export function useDomainCatalog(options: DomainCatalogOptions) {
     } catch (caught) {
       options.error.value = userFacingError(
         caught,
-        "瑙ｆ瀽璧勬簮鍔犺浇澶辫触锛岃绋嶅悗閲嶈瘯",
+        "解析资源加载失败，请稍后重试",
       );
     } finally {
       options.loadingSources.value = false;

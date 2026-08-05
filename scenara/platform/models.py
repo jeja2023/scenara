@@ -63,9 +63,8 @@ class PrincipalContext(StrictModel):
     tenant_id: str
     project_id: str
     principal_id: str = "anonymous"
-    # A context created by the local development boundary is unrestricted.
-    # Authenticated credentials always provide explicit, non-empty sets; an
-    # explicit empty set therefore means that the credential has no access.
+    # 本地开发边界创建的上下文不受限制。
+    # 已认证凭据始终提供明确且非空的集合，因此显式空集合表示该凭据没有访问权限。
     scopes: frozenset[str] = Field(default_factory=lambda: frozenset({"*"}))
     product_ids: frozenset[str] = Field(default_factory=lambda: frozenset({"*"}))
 
@@ -432,8 +431,8 @@ class GenericDomainPayload(ExtensibleModel):
     schema_version: str = "1.0"
 
 
-# Keep first-party payloads strongly typed while allowing plugins to introduce
-# their own payload shape without changing the platform model union.
+# 保持一方负载的强类型，同时允许插件引入自己的负载结构，
+# 无需修改平台模型联合类型。
 DomainPayload = PortraitDomainPayload | OcrDomainPayload | GenericDomainPayload
 
 
@@ -999,7 +998,7 @@ class ApiErrorEnvelope(StrictModel):
 
 
 # ---------------------------------------------------------------------------
-# Portrait Intelligence Foundation Platform contract types
+# 人像智能基础平台契约类型
 # ---------------------------------------------------------------------------
 
 type PortraitModuleId = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.-]{1,63}$")]

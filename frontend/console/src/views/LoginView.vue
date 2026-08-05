@@ -78,7 +78,7 @@ onMounted(() => passwordInput.value?.focus());
       </div>
       <form class="login-form" aria-label="登录" @submit.prevent="submit">
         <header>
-          <p>Scenara Console</p>
+          <p>Scenara 控制台</p>
           <h2>登录控制台</h2>
           <span>使用你的 Scenara 账号登录。</span>
         </header>

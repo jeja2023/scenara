@@ -2,7 +2,7 @@
 
 Scenara 是面向企业私有化部署的视觉 AI 中枢平台。平台以版本化数据资产、Run、Pipeline 和 Result 契约接收图片、视频、PDF 与实时流，并通过可安装的 Domain 提供强类型视觉能力。
 
-当前产品阶段：`0.3.0-dev.12`（Python 包版本为 `0.3.0.dev12`）
+当前产品阶段：`0.3.0-dev.13`（Python 包版本为 `0.3.0.dev13`）
 
 - 正式领域：Portrait（迁移中）
 - 验证领域：OCR / Document
@@ -15,7 +15,7 @@ Scenara 是面向企业私有化部署的视觉 AI 中枢平台。平台以版�
 
 Scenara 作为平台母品牌，统一规划 Parse、Model、Data、Edge、Flow、Search、Agent、Console、API、SDK 与 Index。当前并非 11 套独立系统：Console、API 和 SDK 是共享入口，Index 是共享底座，产品模块继续复用同一平台内核、IAM、授权、审计和部署栈。
 
-当前版本已提供产品目录、仓库拓扑、正式跨仓库契约、Organization、Project、User、Role、Membership、Service Account、API Key 与 Product Entitlement，并支持平台根令牌、按项目绑定的服务账号 API Key 以及用户名密码登录。完整成熟度、依赖顺序与非目标见 [产品矩阵](docs/strategy/PRODUCT_MATRIX.md)，当前仓库与独立 Model/Data 仓库的分工见 [仓库拓扑](docs/strategy/REPOSITORY_TOPOLOGY.md)，四条可发布契约见 [契约包](contracts/repository/README.md)，认证和授权边界见 [访问底座](docs/strategy/ACCESS_FOUNDATION.md)，人像 AI 长期演进方向见 [人像智能基础平台战略](docs/strategy/PORTRAIT_INTELLIGENCE_STRATEGY.md)，升级影响见 [0.3.0-dev.12 开发版发布说明](docs/release/0.3.0-dev.12.md)。
+当前版本已提供产品目录、仓库拓扑、正式跨仓库契约、Organization、Project、User、Role、Membership、Service Account、API Key 与 Product Entitlement，并支持平台根令牌、按项目绑定的服务账号 API Key 以及用户名密码登录。完整成熟度、依赖顺序与非目标见 [产品矩阵](docs/strategy/PRODUCT_MATRIX.md)，当前仓库与独立 Model/Data 仓库的分工见 [仓库拓扑](docs/strategy/REPOSITORY_TOPOLOGY.md)，四条可发布契约见 [契约包](contracts/repository/README.md)，认证和授权边界见 [访问底座](docs/strategy/ACCESS_FOUNDATION.md)，人像 AI 长期演进方向见 [人像智能基础平台战略](docs/strategy/PORTRAIT_INTELLIGENCE_STRATEGY.md)，升级影响见 [0.3.0-dev.13 开发版发布说明](docs/release/0.3.0-dev.13.md)。
 
 解析控制台采用“解析 -> 领域”的工作区结构，人像和 OCR 文档分别进入独立领域页面；图片、视频、文档和视频流是页面内部的数据类型标签，例如 `parse/portrait/image` 与 `parse/ocr/document` 仍可作为深链路访问。每个领域工作区内完成上传、参数配置、运行进度、当前结果查看与历史恢复；“数据资产”和“运行”页面分别承担文件/视频流来源管理与运行生命周期管理，新增的“解析结果”页面负责跨领域、跨任务浏览和筛选结果。领域菜单由后端 `DomainManifest` 驱动，新领域接入时不需要重新拆分前端解析流程。
 
@@ -73,4 +73,4 @@ python -m uvicorn scenara.server:app --host 127.0.0.1 --port 8000 --env-file .en
 ## 授权
 
 源码公开不代表开源授权。除第三方组件另有声明外，本仓库使用 [Scenara Proprietary Source License](LICENSE)。
-Current release baseline: `0.3.0-dev.12` (`0.3.0.dev12` for Python packages).
+Current release baseline: `0.3.0-dev.13` (`0.3.0.dev13` for Python packages).

@@ -2050,9 +2050,8 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             await runtime.access.update_product_entitlement(context, product_id, body),
         )  # type: ignore[return-value]
 
-    # The following product modules share one control plane.  They are kept
-    # behind explicit scopes and all mutations emit the same audit records as
-    # the existing Parse/Model/Data resources.
+    # 以下产品模块共享同一控制面，通过明确的权限作用域进行保护；
+    # 所有变更都会像现有 Parse/Model/Data 资源一样写入审计记录。
     @app.post("/api/v1/platform/identity-providers", status_code=201, tags=["IAM"])
     async def create_identity_provider(
         body: CreateIdentityProviderRequest,

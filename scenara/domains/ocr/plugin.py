@@ -21,8 +21,8 @@ class OcrPlugin:
             "image_region",
             "table_region",
         ),
-        product_scope=("OCR document parsing",),
-        description="Extract text, layout, and reading order from visual media and documents.",
+        product_scope=("OCR 文档解析",),
+        description="从图片、视频和文档中提取文字、版面结构与阅读顺序。",
         default_pipeline_id="ocr.document",
         navigation_order=20,
     )

@@ -520,7 +520,7 @@ onMounted(refresh);
   font-size: 12px;
 }
 
-/* Portrait Intelligence panel */
+/* 人像智能面板 */
 .portrait-intelligence {
   margin-bottom: 16px;
 }

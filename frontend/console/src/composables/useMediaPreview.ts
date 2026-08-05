@@ -32,7 +32,7 @@ export function useMediaPreview(file: Ref<File | null>) {
       fileDataUrl.value = await blobToDataUrl(file.value);
       mediaUrl.value = fileDataUrl.value;
     } catch {
-      // The parser still reports a useful validation error when the file cannot be decoded.
+      // 即使文件无法解码，解析器仍会返回有用的校验错误。
     }
   }
 
@@ -52,7 +52,7 @@ export function useMediaPreview(file: Ref<File | null>) {
       revokeObjectUrl(serverPreviewUrl.value);
       serverPreviewUrl.value = dataUrl;
     } catch {
-      // Preview generation is best-effort; parsing and result rendering remain available.
+      // 预览生成属于尽力而为，解析和结果渲染仍可继续使用。
     }
   }
 

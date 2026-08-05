@@ -18,8 +18,8 @@ class PortraitPlugin:
         schema_version="1.0",
         console_route="/parse?domain=portrait",
         capabilities=tuple(sorted(PORTRAIT_CAPABILITIES)),
-        product_scope=("portrait analysis", "detected object feature crops"),
-        description="Detect people and analyze portrait-related visual features.",
+        product_scope=("人像分析", "检测对象特征裁剪图"),
+        description="检测人员并分析人像相关的视觉特征。",
         default_pipeline_id="portrait.person-detection",
         navigation_order=10,
     )

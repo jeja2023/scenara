@@ -1737,8 +1737,8 @@ class ControlPlaneService:
             if isinstance(output, dict):
                 current.context.update(output)
             if node.kind == FlowNodeKind.WEBHOOK:
-                # Network delivery is handled by the existing webhook subsystem;
-                # Flow records the durable intent and leaves delivery retryable.
+                # 网络投递由现有 Webhook 子系统处理；
+                # Flow 记录持久化意图并保留可重试的投递状态。
                 current.context.setdefault("webhooks", []).append(
                     {"node_id": node_id, "target": node.config.get("target"), "status": "queued"}
                 )

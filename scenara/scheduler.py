@@ -13,7 +13,7 @@ async def run_once() -> tuple[int, int, int, int]:
     await runtime.open()
     try:
         if not hasattr(runtime.state, "expired_object_keys"):
-            raise RuntimeError("the configured state backend does not support retention sweeps")
+            raise RuntimeError("当前状态后端不支持保留策略清理")
         scheduler = RetentionScheduler(runtime.state, runtime.objects)
         retained = await scheduler.sweep()
         expired_features = await runtime.features.delete_expired(time.time(), 1000)
@@ -33,12 +33,12 @@ async def run_forever(interval_seconds: int) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Scenara governance scheduler")
-    parser.add_argument("--once", action="store_true", help="run one governance sweep and exit")
+    parser = argparse.ArgumentParser(description="Scenara 治理调度器")
+    parser.add_argument("--once", action="store_true", help="执行一次治理清理后退出")
     parser.add_argument("--interval-seconds", type=int, default=60)
     args = parser.parse_args()
     if args.interval_seconds < 60:
-        parser.error("--interval-seconds must be at least 60")
+        parser.error("--interval-seconds 必须至少为 60 秒")
     asyncio.run(run_once() if args.once else run_forever(args.interval_seconds))
 
 

@@ -196,7 +196,7 @@ const productLabels: Record<string, string> = {
   parse: "Scenara Parse",
   model: "Scenara Model",
   data: "Scenara Data",
-  console: "Scenara Console",
+  console: "Scenara 控制台",
   api: "Scenara API",
   sdk: "Scenara SDK",
   index: "Scenara Index",

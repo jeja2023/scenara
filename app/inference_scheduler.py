@@ -83,7 +83,7 @@ class InferenceScheduler:
             observe("dynamic_batch_dropped_total")
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="dynamic batching queue is full",
+                detail="动态批处理队列已满",
             )
 
         loop = asyncio.get_running_loop()
@@ -135,7 +135,7 @@ class InferenceScheduler:
                 item.future.set_exception(
                     HTTPException(
                         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                        detail="dynamic batching queue timeout",
+                        detail="动态批处理队列等待超时",
                     )
                 )
                 continue
@@ -269,7 +269,7 @@ class InferenceScheduler:
         total = sum(sizes)
         for output in outputs:
             if output.ndim == 0 or output.shape[0] != total:
-                raise ValueError("batched output does not preserve the input batch dimension")
+                raise ValueError("批处理输出未保留输入批次维度")
         grouped: list[list[Array]] = [[] for _ in sizes]
         start = 0
         for index, size in enumerate(sizes):
