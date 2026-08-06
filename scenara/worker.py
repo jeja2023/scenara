@@ -3,9 +3,13 @@ from __future__ import annotations
 import argparse
 import asyncio
 import socket
+import sys
 
 from scenara.bootstrap import build_runtime
 from scenara.infrastructure.queue import RedisRunQueue
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 async def run_worker(consumer: str, lane: str) -> None:

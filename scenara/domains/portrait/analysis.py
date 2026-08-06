@@ -12,6 +12,7 @@ from scenara.platform.media_batch import DecodedMedia
 from scenara.platform.model_runtime import current_runtime_binding
 from scenara.platform.models import (
     BoundingBox,
+    MediaKind,
     MediaUnitResult,
     ModelProvenance,
     PipelineRef,
@@ -400,6 +401,8 @@ class PortraitFullAnalysisOperator:
                             target_object_id=unit_persons[0].object_id,
                         )
                     )
+            if not objects and decoded.kind in {MediaKind.VIDEO, MediaKind.STREAM}:
+                continue
             unit_results.append(
                 MediaUnitResult(
                     unit_id=unit.unit_id,

@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import sys
 import time
 
 from scenara.bootstrap import build_runtime
 from scenara.platform.retention import RetentionScheduler
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 
 async def run_once() -> tuple[int, int, int, int]:

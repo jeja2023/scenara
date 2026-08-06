@@ -11,8 +11,11 @@ from scenara.domains.portrait.analysis import (
     PORTRAIT_CAPABILITIES,
     LegacyPortraitAnalysisBackend,
     PortraitBackendOutput,
+    PortraitFullAnalysisOperator,
 )
-from scenara.platform.models import ModelProvenance
+from scenara.platform.media_batch import DecodedMedia, DecodedMediaUnit
+from scenara.platform.models import MediaKind, MediaTechnicalMetadata, ModelProvenance
+from scenara.platform.pipeline import ExecutionContext
 from scenara.server import create_app
 
 
@@ -82,6 +85,61 @@ def portrait_image() -> bytes:
     output = BytesIO()
     Image.new("RGB", (40, 30), "white").save(output, format="PNG")
     return output.getvalue()
+
+
+@pytest.mark.asyncio
+async def test_full_portrait_video_omits_units_without_objects() -> None:
+    class SparsePortraitBackend:
+        def production_capabilities(self) -> frozenset[str]:
+            return frozenset({"person_detection"})
+
+        async def analyze(self, images, filenames, capabilities):
+            del filenames
+            assert len(images) == 2
+            assert capabilities == frozenset({"person_detection"})
+            return PortraitBackendOutput(
+                units=[
+                    {},
+                    {"persons": [{"box": [2, 3, 20, 24], "score": 0.92}]},
+                ]
+            )
+
+    decoded = DecodedMedia(
+        kind=MediaKind.VIDEO,
+        units=[
+            DecodedMediaUnit(
+                unit_id=f"frame_{index}",
+                unit_type="frame",
+                index=index,
+                pts_ms=index * 1000,
+                image=Image.new("RGB", (40, 30), "white"),
+            )
+            for index in range(2)
+        ],
+        metadata=MediaTechnicalMetadata(format="mp4", sampled_units=2),
+    )
+    context = ExecutionContext(
+        run_id="run_sparse_video",
+        tenant_id="tenant",
+        project_id="project",
+        pipeline_id="portrait.analysis",
+        pipeline_version="0.4.0",
+        asset_id="asset",
+        source_id=None,
+        filename="video.mp4",
+        content_type="video/mp4",
+    )
+
+    output = await PortraitFullAnalysisOperator(SparsePortraitBackend()).execute(
+        context,
+        {"batch": decoded},
+        {"capabilities": ["person_detection"]},
+    )
+
+    result = output["result"]
+    assert result.media_metadata.sampled_units == 2
+    assert [unit.index for unit in result.units] == [1]
+    assert [unit.pts_ms for unit in result.units] == [1000]
 
 
 @pytest.mark.asyncio

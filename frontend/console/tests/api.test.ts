@@ -223,6 +223,12 @@ describe("console information architecture", () => {
     expect(labelWarning("gait_requires_at_least_8_frames")).toBe(
       "步态分析至少需要 8 帧画面",
     );
+    expect(labelWarning("media_termination:source_ended")).toBe(
+      "媒体源已正常读完，本次任务已完成全部可读取内容。",
+    );
+    expect(labelWarning("artifact_quota_reached")).toContain(
+      "特征图片数量已达到本次运行的上限",
+    );
     expect(labelVersion("0.3.0.dev6")).toBe("0.3.0 开发版 6");
     expect(userFacingError(new TypeError("Failed to fetch"))).toBe(
       "操作失败，请稍后重试",

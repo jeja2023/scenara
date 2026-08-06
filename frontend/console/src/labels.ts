@@ -713,6 +713,9 @@ export function labelWarning(value: string): string {
   if (value === "media_termination:max_units_reached") {
     return "已达到最大分析单元上限，本次任务已正常完成；如需继续处理，请提高“最大分析单元”或缩小采样间隔。";
   }
+  if (value === "media_termination:source_ended") {
+    return "媒体源已正常读完，本次任务已完成全部可读取内容。";
+  }
   if (value.startsWith("development_substitute:")) {
     return `使用开发替代能力：${labelCapability(value.slice("development_substitute:".length))}`;
   }

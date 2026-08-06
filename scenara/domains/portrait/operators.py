@@ -63,6 +63,7 @@ class PortraitPersonDetectionOperator:
             raise
         persons: list[VisionObject] = []
         units: list[MediaUnitResult] = []
+        processed_units = 0
         timing_totals: dict[str, float] = {}
         models = [
             ModelProvenance(
@@ -124,20 +125,21 @@ class PortraitPersonDetectionOperator:
                         if any(person.crop_artifact_id for person in unit_persons)
                         else None
                     )
-                    units.append(
-                        MediaUnitResult(
-                            unit_id=unit.unit_id,
-                            unit_type=unit.unit_type,
-                            index=unit.index,
-                            pts_ms=unit.pts_ms,
-                            page_number=unit.page_number,
-                            width=unit.width,
-                            height=unit.height,
-                            objects=unit_persons,
-                            frame_artifact_id=frame_artifact_id,
+                    if unit_persons or decoded.kind not in {MediaKind.VIDEO, MediaKind.STREAM}:
+                        units.append(
+                            MediaUnitResult(
+                                unit_id=unit.unit_id,
+                                unit_type=unit.unit_type,
+                                index=unit.index,
+                                pts_ms=unit.pts_ms,
+                                page_number=unit.page_number,
+                                width=unit.width,
+                                height=unit.height,
+                                objects=unit_persons,
+                                frame_artifact_id=frame_artifact_id,
+                            )
                         )
-                    )
-                processed_units = len(units)
+                processed_units += len(chunk)
                 progress = 0.03 + 0.94 * min(1.0, processed_units / max(1, expected_units))
                 if decoded.kind in {MediaKind.VIDEO, MediaKind.STREAM}:
                     await context.publish_partial_result(

@@ -40,7 +40,13 @@ async def test_person_detection_inference_is_bounded_to_operator_batch_size(
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         del bundle, key, filenames, parameters
         batch_sizes.append(len(images))
-        return ([{"persons": []} for _ in images], {"timing": {"inference_seconds": 0.25}})
+        frames = [
+            {"persons": [{"box": [1, 1, 8, 10], "score": 0.9}]}
+            if index == 0
+            else {"persons": []}
+            for index, _ in enumerate(images)
+        ]
+        return (frames, {"timing": {"inference_seconds": 0.25}})
 
     monkeypatch.setattr("app.portrait_model_runtime_capability.get_capability_runtime", fake_runtime)
     monkeypatch.setattr("app.inference_detection.infer_person_frames", fake_infer)
@@ -77,9 +83,17 @@ async def test_person_detection_inference_is_bounded_to_operator_batch_size(
 
     assert batch_sizes == [PERSON_DETECTION_BATCH_SIZE, PERSON_DETECTION_BATCH_SIZE, 1]
     assert output["result"].timings["inference_seconds"] == pytest.approx(0.75)
-    assert len(output["result"].units) == unit_count
-    assert partial_unit_counts == [PERSON_DETECTION_BATCH_SIZE, PERSON_DETECTION_BATCH_SIZE * 2, unit_count]
-    assert [payload["processed_units"] for _, payload in progress_updates] == partial_unit_counts
+    assert [unit.index for unit in output["result"].units] == [
+        0,
+        PERSON_DETECTION_BATCH_SIZE,
+        PERSON_DETECTION_BATCH_SIZE * 2,
+    ]
+    assert partial_unit_counts == [1, 2, 3]
+    assert [payload["processed_units"] for _, payload in progress_updates] == [
+        PERSON_DETECTION_BATCH_SIZE,
+        PERSON_DETECTION_BATCH_SIZE * 2,
+        unit_count,
+    ]
     assert [progress for progress, _ in progress_updates] == sorted(progress for progress, _ in progress_updates)
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hmac
 import re
+import sys
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
@@ -244,6 +245,10 @@ from scenara.platform.services import InvalidTransition, ResourceNotFound, sse_p
 from scenara.platform.store import StateConflict
 from scenara.platform.webhook_service import WebhookNotFound
 from scenara.settings import Settings
+
+if sys.platform == "win32":
+    # psycopg's async connection pool requires selector-based I/O on Windows.
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 CONTEXT_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
 CONSOLE_DIST = Path(__file__).resolve().parents[1] / "frontend" / "console" / "dist"
