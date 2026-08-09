@@ -50,6 +50,32 @@ class PostgresStateStore:
 
     async def open(self) -> None:
         await self._pool.open()
+        await self._apply_pending_migrations()
+
+    async def _apply_pending_migrations(self) -> None:
+        from pathlib import Path
+
+        migrations_dir = Path(__file__).resolve().parents[2] / "migrations"
+        if not migrations_dir.is_dir():
+            return
+        async with self._pool.connection() as conn:
+            await conn.execute(
+                """CREATE TABLE IF NOT EXISTS scenara_schema_migrations (
+                    version text PRIMARY KEY,
+                    applied_at timestamptz NOT NULL DEFAULT now()
+                )"""
+            )
+            cursor = await conn.execute("SELECT version FROM scenara_schema_migrations")
+            applied = {str(row[0]) for row in await cursor.fetchall()}
+            for sql_file in sorted(migrations_dir.glob("*.sql")):
+                version = sql_file.stem
+                if version not in applied:
+                    sql_content = sql_file.read_text(encoding="utf-8")
+                    await conn.execute(sql_content)
+                    await conn.execute(
+                        "INSERT INTO scenara_schema_migrations (version) VALUES (%s) ON CONFLICT DO NOTHING",
+                        (version,),
+                    )
 
     async def close(self) -> None:
         await self._pool.close()
