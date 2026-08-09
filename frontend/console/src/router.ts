@@ -4,6 +4,7 @@ import {
   Database,
   FileSearch,
   FileClock,
+  FileText,
   Images,
   LayoutDashboard,
   MessageSquareText,
@@ -39,10 +40,22 @@ const routes = [
     meta: { title: "总览", icon: LayoutDashboard, section: "工作台" },
   },
   {
-    path: "/parse",
-    name: "parse",
+    path: "/parse/portrait",
+    name: "portrait-parse",
     component: () => import("./views/ParseView.vue"),
-    meta: { title: "解析", icon: ScanSearch, section: "工作台" },
+    props: { initialDomain: "portrait" },
+    meta: { title: "人像解析", icon: ScanSearch, section: "工作台" },
+  },
+  {
+    path: "/parse/ocr",
+    name: "ocr-parse",
+    component: () => import("./views/ParseView.vue"),
+    props: { initialDomain: "ocr" },
+    meta: { title: "OCR 文档解析", icon: FileText, section: "工作台" },
+  },
+  {
+    path: "/parse",
+    redirect: "/parse/portrait",
   },
   {
     path: "/parse/:domain",

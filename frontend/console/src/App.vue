@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ChevronDown, LogOut, Menu, RefreshCw, Settings, X } from "@lucide/vue";
+import { LogOut, Menu, RefreshCw, Settings, X } from "@lucide/vue";
 import {
   computed,
   nextTick,
@@ -20,7 +20,6 @@ import {
   type ConnectionSettings,
 } from "./api";
 import brandMark from "./assets/scenara-mark.svg";
-import { labelDomain } from "./labels";
 import { routes } from "./router";
 import type { DomainManifest } from "./types";
 
@@ -44,37 +43,6 @@ const navigation = computed(() => {
   }
   return groups;
 });
-const parseRouteActive = computed(
-  () => route.path === "/parse" || route.path.startsWith("/parse/"),
-);
-const parseExpanded = ref(false);
-const parseDomains = computed(() =>
-  [...domainManifests.value].sort(
-    (left, right) =>
-      (left.navigation_order ?? 100) - (right.navigation_order ?? 100) ||
-      left.display_name.localeCompare(right.display_name),
-  ),
-);
-
-function domainPath(domain: DomainManifest): string {
-  return `/parse/${encodeURIComponent(domain.domain_id)}`;
-}
-
-function isDomainActive(domain: DomainManifest): boolean {
-  return String(route.params.domain || route.query.domain) === domain.domain_id;
-}
-
-function toggleParseNavigation(): void {
-  parseExpanded.value = !parseExpanded.value;
-}
-
-watch(
-  parseRouteActive,
-  (active) => {
-    parseExpanded.value = active;
-  },
-  { immediate: true },
-);
 
 async function loadDomainNavigation(): Promise<void> {
   try {
@@ -200,54 +168,15 @@ watch(
       <nav aria-label="主导航">
         <section v-for="[section, items] in navigation" :key="section">
           <p>{{ section }}</p>
-          <template v-for="item in items" :key="item.path">
-            <RouterLink
-              v-if="item.name !== 'parse'"
-              :to="item.path"
-              @click="mobileOpen = false"
-            >
-              <component :is="item.meta?.icon" :size="17" />
-              <span>{{ item.meta?.title }}</span>
-            </RouterLink>
-            <template v-else>
-              <button
-                type="button"
-                class="parse-nav-root"
-                :class="{ 'router-link-active': parseRouteActive }"
-                :aria-expanded="parseExpanded"
-                @click="toggleParseNavigation"
-              >
-                <component :is="item.meta?.icon" :size="17" />
-                <span>{{ item.meta?.title }}</span>
-                <ChevronDown
-                  :size="15"
-                  class="parse-nav-chevron"
-                  :class="{ expanded: parseExpanded }"
-                />
-              </button>
-              <div v-if="parseExpanded" class="parse-subnav">
-                <div
-                  v-for="domain in parseDomains"
-                  :key="domain.domain_id"
-                  class="parse-domain-group"
-                >
-                  <RouterLink
-                    :to="domainPath(domain)"
-                    class="parse-domain-link"
-                    :class="{ active: isDomainActive(domain) }"
-                    @click="mobileOpen = false"
-                  >
-                    <span>{{
-                      domain.display_name || labelDomain(domain.domain_id)
-                    }}</span>
-                  </RouterLink>
-                </div>
-                <span v-if="!parseDomains.length" class="parse-subnav-empty">
-                  暂无已安装领域
-                </span>
-              </div>
-            </template>
-          </template>
+          <RouterLink
+            v-for="item in items"
+            :key="item.path"
+            :to="item.path"
+            @click="mobileOpen = false"
+          >
+            <component :is="item.meta?.icon" :size="17" />
+            <span>{{ item.meta?.title }}</span>
+          </RouterLink>
         </section>
       </nav>
       <div class="sidebar-footer">

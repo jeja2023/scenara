@@ -302,7 +302,12 @@ const hasResult = computed(() => !!result.value);
 const currentDomainLabel = computed(
   () => selectedDomainManifest.value?.display_name || labelDomain(domain.value),
 );
-const isDomainScoped = computed(() => Boolean(route.params?.domain));
+const pageTitle = computed(() => {
+  if (domain.value === "portrait") return "人像解析工作区";
+  if (domain.value === "ocr") return "OCR 文档解析工作区";
+  return `${currentDomainLabel.value}解析工作区`;
+});
+const isDomainScoped = computed(() => Boolean(route.params?.domain || props.initialDomain || domain.value));
 const currentMediaLabel = computed(() => labelMediaKind(mode.value));
 const scopedHistoryRuns = computed(() =>
   historyRuns.value.filter((item) => {
@@ -1133,7 +1138,7 @@ onBeforeUnmount(() => {
   <section class="page parse-workbench">
     <div class="page-header">
       <div>
-        <h1>解析工作区</h1>
+        <h1>{{ pageTitle }}</h1>
         <p>
           {{ selectedDomainManifest?.display_name || labelDomain(domain) }} ·
           {{ labelPipeline(pipeline) }} ·

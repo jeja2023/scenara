@@ -257,7 +257,7 @@ describe("console information architecture", () => {
     expect(labelPortraitCapability("pose")).toBe("姿态估计");
   });
 
-  it("keeps one unified parsing workspace in the console navigation", () => {
+  it("maintains distinct parsing workspace navigation routes", () => {
     const names = new Set(
       routes.map((route) => String(route.name ?? "fallback")),
     );
@@ -265,7 +265,8 @@ describe("console information architecture", () => {
       new Set([
         "login",
         "overview",
-        "parse",
+        "portrait-parse",
+        "ocr-parse",
         "parse-domain",
         "parse-media",
         "assets",
