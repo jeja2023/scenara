@@ -62,13 +62,15 @@ class MemoryStateStore:
             key = (pipeline.pipeline_id, pipeline.version)
             existing = self._pipelines.get(key)
             if existing is not None and existing.definition_sha256 != pipeline.definition_sha256:
+                if pipeline.status.value == "active":
+                    self._pipelines[key] = pipeline.model_copy(deep=True)
+                    return
                 raise StateConflict("pipeline version definition is immutable")
             if existing is None:
-                if pipeline.status.value == "active" and any(
-                    item.pipeline_id == pipeline.pipeline_id and item.status.value == "active"
-                    for item in self._pipelines.values()
-                ):
-                    raise StateConflict("pipeline already has an active version")
+                if pipeline.status.value == "active":
+                    for old_key, old_item in list(self._pipelines.items()):
+                        if old_key[0] == pipeline.pipeline_id and old_item.status.value == "active":
+                            self._pipelines[old_key] = old_item.model_copy(update={"status": PipelineStatus.RETIRED})
                 self._pipelines[key] = pipeline.model_copy(deep=True)
 
     async def get_pipeline_definition(self, pipeline_id: str, version: str) -> PipelineDefinition | None:

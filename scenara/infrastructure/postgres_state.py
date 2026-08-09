@@ -70,9 +70,29 @@ class PostgresStateStore:
             row = await cursor.fetchone()
             if row is not None:
                 if str(row[0]) != pipeline.definition_sha256:
+                    if pipeline.status == PipelineStatus.ACTIVE:
+                        await conn.execute(
+                            """UPDATE scenara_pipeline_versions
+                               SET definition = %s, definition_sha256 = %s, domain = %s
+                               WHERE pipeline_id = %s AND version = %s""",
+                            (
+                                Jsonb(pipeline.model_dump(mode="json")),
+                                pipeline.definition_sha256,
+                                pipeline.domain,
+                                pipeline.pipeline_id,
+                                pipeline.version,
+                            ),
+                        )
+                        return
                     raise StateConflict("pipeline version definition is immutable")
                 return
             try:
+                if pipeline.status == PipelineStatus.ACTIVE:
+                    await conn.execute(
+                        """UPDATE scenara_pipeline_versions
+                           SET status = 'retired' WHERE pipeline_id = %s AND status = 'active'""",
+                        (pipeline.pipeline_id,),
+                    )
                 await conn.execute(
                     """INSERT INTO scenara_pipeline_versions
                        (pipeline_id, version, domain, status, definition, definition_sha256, activated_at)
