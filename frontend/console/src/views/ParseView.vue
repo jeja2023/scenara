@@ -87,11 +87,9 @@ function resolveInitialDomain(): Domain {
 function resolveInitialMode(): MediaMode {
   const routeMode = queryValue(route.params?.mediaKind);
   const queryMode = queryValue(route.query.mediaKind);
-  return isMediaMode(routeMode)
-    ? routeMode
-    : isMediaMode(queryMode)
-      ? queryMode
-      : "image";
+  if (isMediaMode(routeMode)) return routeMode;
+  if (isMediaMode(queryMode)) return queryMode;
+  return "image";
 }
 
 const domain = ref<Domain>(resolveInitialDomain());

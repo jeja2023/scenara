@@ -265,12 +265,8 @@ async def test_pipeline_and_model_catalog_endpoints_use_state_store(client) -> N
     domain_by_id = {item["domain_id"]: item for item in domains.json()["data"]}
     assert domain_by_id["ocr"]["console_route"] == "/parse?domain=ocr"
     assert domain_by_id["portrait"]["default_pipeline_id"] == "portrait.person-detection"
-    assert set(domain_by_id["ocr"]["supported_media_kinds"]) == {
-        "image",
-        "video",
-        "document",
-        "stream",
-    }
+    assert set(domain_by_id["ocr"]["supported_media_kinds"]) == {"document", "image", "video", "stream"}
+    assert set(domain_by_id["portrait"]["supported_media_kinds"]) == {"image", "video", "stream"}
     pipelines = await api.get("/api/v1/pipelines")
     assert pipelines.status_code == 200
     assert {item["pipeline_id"] for item in pipelines.json()["data"]} == {

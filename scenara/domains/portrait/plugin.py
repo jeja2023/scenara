@@ -20,6 +20,7 @@ class PortraitPlugin:
         capabilities=tuple(sorted(PORTRAIT_CAPABILITIES)),
         product_scope=("人像分析", "检测对象特征裁剪图"),
         description="检测人员并分析人像相关的视觉特征。",
+        supported_media_kinds=("image", "video", "stream"),
         default_pipeline_id="portrait.person-detection",
         navigation_order=10,
     )

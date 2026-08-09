@@ -22,7 +22,8 @@ class OcrPlugin:
             "table_region",
         ),
         product_scope=("OCR 文档解析",),
-        description="从图片、视频和文档中提取文字、版面结构与阅读顺序。",
+        description="从文档、图片、视频和网络流中提取文字、版面结构与阅读顺序。",
+        supported_media_kinds=("document", "image", "video", "stream"),
         default_pipeline_id="ocr.document",
         navigation_order=20,
     )
