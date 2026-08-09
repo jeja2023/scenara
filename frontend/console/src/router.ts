@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   MessageSquareText,
   PlaySquare,
+  Route,
   Search,
   ScanSearch,
   ScanFace,
@@ -112,6 +113,12 @@ const routes = [
     name: "portrait-compare",
     component: () => import("./views/PortraitCompareView.vue"),
     meta: { title: "人像比对", icon: ScanFace, section: "检索" },
+  },
+  {
+    path: "/search/trajectories",
+    name: "trajectories",
+    component: () => import("./views/TrajectoryView.vue"),
+    meta: { title: "长期轨迹", icon: Route, section: "检索" },
   },
   {
     path: "/capabilities",

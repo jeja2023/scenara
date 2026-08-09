@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "a30b5a9c103a32819f501c58412aeb048748b0b6246e4c1023c4f2382ba89796" /** gitleaks:allow - public contract digest */;
+export declare const OPENAPI_SHA256 = "a4f9d64444e23d0080421deb5276a800a77f94689d12595911190005621b7ec7" /** gitleaks:allow - public contract digest */;
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
@@ -183,6 +183,11 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_CameraRecord_ = {
+        data: CameraRecord;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_ComplianceEvidence_ = {
         data: ComplianceEvidence;
         request_id: string;
@@ -268,6 +273,11 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_IdentityPage_ = {
+        data: IdentityPage;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_IdentityProvider_ = {
         data: IdentityProvider;
         request_id: string;
@@ -290,6 +300,11 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_IndexRebuildJob_ = {
         data: IndexRebuildJob;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_LongTermIdentity_ = {
+        data: LongTermIdentity;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -523,6 +538,11 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_SegmentPage_ = {
+        data: SegmentPage;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_ServiceAccount_ = {
         data: ServiceAccount;
         request_id: string;
@@ -619,6 +639,16 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_list_BillingUsage__ = {
         data: Array<BillingUsage>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_CameraRecord__ = {
+        data: Array<CameraRecord>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_list_CameraTransition__ = {
+        data: Array<CameraTransition>;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -777,6 +807,11 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_list_TimelineEntry__ = {
+        data: Array<TimelineEntry>;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_list_UserAccount__ = {
         data: Array<UserAccount>;
         request_id: string;
@@ -925,6 +960,7 @@ export declare namespace OpenApi {
         pipeline_version?: (string) | (null);
     };
     type Body_parse_video_api_v1_parse_video_post = {
+        camera_id?: (string) | (null);
         domain?: DomainId;
         file: string;
         frame_max_edge?: (number) | (null);
@@ -932,6 +968,7 @@ export declare namespace OpenApi {
         page_scale?: number;
         pipeline_id?: (string) | (null);
         pipeline_version?: (string) | (null);
+        recording_started_at?: (number) | (null);
         sample_end_ms?: (number) | (null);
         sample_interval_ms?: number;
         sample_start_ms?: number;
@@ -958,6 +995,30 @@ export declare namespace OpenApi {
         width: number;
         x: number;
         y: number;
+    };
+    type CameraRecord = {
+        auto_registered?: boolean;
+        camera_id: string;
+        created_at?: number;
+        display_name?: string;
+        location?: string;
+        metadata?: {
+            [key: string]: unknown;
+        };
+        project_id: string;
+        tenant_id: string;
+        updated_at?: number;
+    };
+    type CameraTransition = {
+        from_camera_id: string;
+        max_seconds?: (number) | (null);
+        min_seconds?: number;
+        to_camera_id: string;
+    };
+    type CameraTransitionEntry = {
+        max_seconds?: (number) | (null);
+        min_seconds?: number;
+        to_camera_id: string;
     };
     type ComplianceEvidence = {
         created_at: number;
@@ -1530,6 +1591,12 @@ export declare namespace OpenApi {
         schema_version?: "1.0";
         tenant_id: string;
     };
+    type IdentityPage = {
+        items: Array<LongTermIdentity>;
+        limit: number;
+        offset: number;
+        total: number;
+    };
     type IdentityProvider = {
         client_id: string;
         created_at: number;
@@ -1668,6 +1735,27 @@ export declare namespace OpenApi {
         ttl_seconds?: number;
         username: AccessId;
     };
+    type LongTermIdentity = {
+        camera_ids?: Array<string>;
+        created_at?: number;
+        display_name?: string;
+        feature_space_ids?: {
+            [key: string]: string;
+        };
+        first_seen_at: number;
+        identity_id: string;
+        last_camera_id?: string;
+        last_seen_at: number;
+        metadata?: {
+            [key: string]: unknown;
+        };
+        modalities?: Array<string>;
+        project_id: string;
+        segment_count?: number;
+        status?: "auto" | "confirmed" | "rejected";
+        tenant_id: string;
+        updated_at?: number;
+    };
     type MediaAsset = {
         asset_id: string;
         content_type: string;
@@ -1761,6 +1849,10 @@ export declare namespace OpenApi {
         role_ids: Array<AccessId>;
         tenant_id: AccessId;
         updated_at: number;
+    };
+    type MergeIdentitiesRequest = {
+        source_identity_ids: Array<string>;
+        target_identity_id: string;
     };
     type MeterEvent = {
         account_id: string;
@@ -2209,6 +2301,14 @@ export declare namespace OpenApi {
         requires_approval?: boolean;
         scopes?: Array<string>;
     };
+    type RegisterCameraRequest = {
+        camera_id: string;
+        display_name?: string;
+        location?: string;
+        metadata?: {
+            [key: string]: unknown;
+        };
+    };
     type RegisterEdgeDeviceRequest = {
         capabilities?: Array<string>;
         metadata?: {
@@ -2543,6 +2643,12 @@ export declare namespace OpenApi {
         tenant_id: string;
         user_id: string;
     };
+    type SegmentPage = {
+        items: Array<TrajectorySegment>;
+        limit: number;
+        offset: number;
+        total: number;
+    };
     type ServiceAccount = {
         created_at: number;
         disabled?: boolean;
@@ -2563,6 +2669,9 @@ export declare namespace OpenApi {
         export_approval_required?: boolean;
         retention_days: number;
     };
+    type SetCameraTransitionsRequest = {
+        transitions?: Array<CameraTransitionEntry>;
+    };
     type SlaSnapshot = {
         breaches: Array<string>;
         measured_at: number;
@@ -2574,6 +2683,10 @@ export declare namespace OpenApi {
         };
     };
     type SourceKind = "stream";
+    type SplitIdentityRequest = {
+        display_name?: string;
+        segment_ids: Array<string>;
+    };
     type SupportCase = {
         case_id: string;
         created_at: number;
@@ -2596,12 +2709,60 @@ export declare namespace OpenApi {
         state_backend: string;
         version: string;
     };
+    type TimelineEntry = {
+        camera_id: string;
+        camera_name?: string;
+        duration_seconds: number;
+        first_seen_at: number;
+        last_seen_at: number;
+        match_method: "new_identity" | "reid" | "manual";
+        match_score: number;
+        run_id: string;
+        segment_id: string;
+        transition_seconds?: (number) | (null);
+    };
+    type TrajectorySegment = {
+        asset_id?: string;
+        camera_id?: string;
+        created_at?: number;
+        feature_ids?: {
+            [key: string]: string;
+        };
+        first_pts_ms?: (number) | (null);
+        first_seen_at: number;
+        frame_count?: number;
+        identity_id: string;
+        last_pts_ms?: (number) | (null);
+        last_seen_at: number;
+        match_method?: "new_identity" | "reid" | "manual";
+        match_score?: number;
+        match_scores?: {
+            [key: string]: number;
+        };
+        metadata?: {
+            [key: string]: unknown;
+        };
+        project_id: string;
+        run_id: string;
+        segment_id: string;
+        source_id?: string;
+        tenant_id: string;
+        track_id?: string;
+        track_quality?: number;
+    };
     type TransitionDatasetVersionRequest = {
         status: DatasetVersionStatus;
     };
     type TransitionModelReleaseRequest = {
         reason: string;
         status: ModelReleaseStatus;
+    };
+    type UpdateCameraRequest = {
+        display_name?: (string) | (null);
+        location?: (string) | (null);
+        metadata?: ({
+            [key: string]: unknown;
+        }) | (null);
     };
     type UpdateDatasetRequest = {
         description?: (string) | (null);
@@ -2610,6 +2771,13 @@ export declare namespace OpenApi {
         }) | (null);
         name?: (string) | (null);
         status?: (DatasetStatus) | (null);
+    };
+    type UpdateIdentityRequest = {
+        display_name?: (string) | (null);
+        metadata?: ({
+            [key: string]: unknown;
+        }) | (null);
+        status?: ("auto" | "confirmed" | "rejected") | (null);
     };
     type UpdateProductEntitlementRequest = {
         source?: "manual" | "enterprise_license" | "system";

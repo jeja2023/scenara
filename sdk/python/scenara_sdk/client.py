@@ -71,7 +71,7 @@ class ScenaraClient:
         headers = {
             "X-Tenant-Id": tenant_id,
             "X-Project-Id": project_id,
-            "User-Agent": "scenara-sdk-python/0.3.0.dev14",
+            "User-Agent": "scenara-sdk-python/0.3.0.dev15",
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -223,6 +223,8 @@ class ScenaraClient:
         scene_change_threshold: float = 0.35,
         frame_max_edge: int | None = None,
         page_scale: float = 1.5,
+        camera_id: str | None = None,
+        recording_started_at: float | None = None,
         wait_ms: int = 0,
         idempotency_key: str | None = None,
     ) -> ParseVideoResponse:
@@ -246,6 +248,10 @@ class ScenaraClient:
             data["sample_end_ms"] = sample_end_ms
         if frame_max_edge is not None:
             data["frame_max_edge"] = frame_max_edge
+        if camera_id is not None:
+            data["camera_id"] = camera_id
+        if recording_started_at is not None:
+            data["recording_started_at"] = recording_started_at
         with source.open("rb") as handle:
             return cast(
                 ParseVideoResponse,
@@ -845,6 +851,160 @@ class ScenaraClient:
         return cast(
             dict[str, Any],
             self._request("POST", "/api/v1/portrait/compare", json=comparison),
+        )
+
+    def list_long_term_identities(
+        self,
+        *,
+        status: str | None = None,
+        camera_id: str | None = None,
+        since: float | None = None,
+        until: float | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        params: dict[str, Any] = {"offset": offset, "limit": limit}
+        for key, value in (
+            ("status", status),
+            ("camera_id", camera_id),
+            ("since", since),
+            ("until", until),
+        ):
+            if value is not None:
+                params[key] = value
+        return cast(
+            dict[str, Any],
+            self._request("GET", "/api/v1/portrait/trajectories/identities", params=params),
+        )
+
+    def get_long_term_identity(self, identity_id: str) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self._request("GET", f"/api/v1/portrait/trajectories/identities/{identity_id}"),
+        )
+
+    def update_long_term_identity(self, identity_id: str, changes: dict[str, Any]) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self._request(
+                "PATCH",
+                f"/api/v1/portrait/trajectories/identities/{identity_id}",
+                json=changes,
+            ),
+        )
+
+    def delete_long_term_identity(self, identity_id: str) -> None:
+        self._request("DELETE", f"/api/v1/portrait/trajectories/identities/{identity_id}")
+
+    def list_long_term_identity_segments(
+        self,
+        identity_id: str,
+        *,
+        camera_id: str | None = None,
+        since: float | None = None,
+        until: float | None = None,
+        offset: int = 0,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        params: dict[str, Any] = {"offset": offset, "limit": limit}
+        for key, value in (("camera_id", camera_id), ("since", since), ("until", until)):
+            if value is not None:
+                params[key] = value
+        return cast(
+            dict[str, Any],
+            self._request(
+                "GET",
+                f"/api/v1/portrait/trajectories/identities/{identity_id}/segments",
+                params=params,
+            ),
+        )
+
+    def get_long_term_identity_timeline(self, identity_id: str) -> list[dict[str, Any]]:
+        return cast(
+            list[dict[str, Any]],
+            self._request(
+                "GET",
+                f"/api/v1/portrait/trajectories/identities/{identity_id}/timeline",
+            ),
+        )
+
+    def merge_long_term_identities(
+        self, target_identity_id: str, source_identity_ids: list[str]
+    ) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self._request(
+                "POST",
+                "/api/v1/portrait/trajectories/identities/merge",
+                json={
+                    "target_identity_id": target_identity_id,
+                    "source_identity_ids": source_identity_ids,
+                },
+            ),
+        )
+
+    def split_long_term_identity(
+        self, identity_id: str, segment_ids: list[str], *, display_name: str = ""
+    ) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self._request(
+                "POST",
+                f"/api/v1/portrait/trajectories/identities/{identity_id}/split",
+                json={"segment_ids": segment_ids, "display_name": display_name},
+            ),
+        )
+
+    def register_portrait_camera(
+        self,
+        camera_id: str,
+        *,
+        display_name: str = "",
+        location: str = "",
+        metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self._request(
+                "POST",
+                "/api/v1/portrait/cameras",
+                json={
+                    "camera_id": camera_id,
+                    "display_name": display_name,
+                    "location": location,
+                    "metadata": metadata or {},
+                },
+            ),
+        )
+
+    def list_portrait_cameras(self) -> list[dict[str, Any]]:
+        return cast(list[dict[str, Any]], self._request("GET", "/api/v1/portrait/cameras"))
+
+    def update_portrait_camera(self, camera_id: str, changes: dict[str, Any]) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self._request("PATCH", f"/api/v1/portrait/cameras/{camera_id}", json=changes),
+        )
+
+    def delete_portrait_camera(self, camera_id: str) -> None:
+        self._request("DELETE", f"/api/v1/portrait/cameras/{camera_id}")
+
+    def list_portrait_camera_transitions(self, camera_id: str) -> list[dict[str, Any]]:
+        return cast(
+            list[dict[str, Any]],
+            self._request("GET", f"/api/v1/portrait/cameras/{camera_id}/transitions"),
+        )
+
+    def set_portrait_camera_transitions(
+        self, camera_id: str, transitions: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        return cast(
+            list[dict[str, Any]],
+            self._request(
+                "PUT",
+                f"/api/v1/portrait/cameras/{camera_id}/transitions",
+                json={"transitions": transitions},
+            ),
         )
 
     def enroll_portrait_identity_image(

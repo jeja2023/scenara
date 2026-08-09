@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import time
+from collections.abc import Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from typing import Any, Protocol
@@ -76,6 +77,16 @@ class ActiveModelResolver(Protocol):
     ) -> dict[str, RuntimeModelBinding]: ...
 
 
+class RunResultRegistrar(Protocol):
+    """在结果落库前对其做领域侧登记与回填。
+
+    平台内核只认这个窄协议，具体领域实现由 bootstrap 注入，
+    避免内核依赖任何领域模块。
+    """
+
+    async def register_run_result(self, run: RunRecord, result: ResultEnvelope) -> None: ...
+
+
 @dataclass(frozen=True, slots=True)
 class CreateRunOutcome:
     run: RunRecord
@@ -110,6 +121,7 @@ class RunService:
         run_artifact_crop_max_edge: int = 256,
         run_artifact_frame_max_edge: int = 1920,
         indexes: IndexStore | None = None,
+        registrars: Sequence[RunResultRegistrar] = (),
     ) -> None:
         self.state = state
         self.objects = objects
@@ -135,6 +147,7 @@ class RunService:
         self.run_artifact_crop_max_edge = run_artifact_crop_max_edge
         self.run_artifact_frame_max_edge = run_artifact_frame_max_edge
         self.indexes = indexes
+        self.registrars = tuple(registrars)
         self.queue.set_handler(self.execute_run)
 
     async def create_asset(
@@ -983,6 +996,12 @@ class RunService:
                     },
                     deep=True,
                 )
+            for registrar in self.registrars:
+                try:
+                    await registrar.register_run_result(run, result)
+                except Exception:
+                    # 登记是结果的增益信息，失败不应让整个 run 失败。
+                    logger.exception("run result registrar failed for run %s", run.run_id)
             await self._store_result(run, result, sink)
             latest = await self.state.get_run(run.tenant_id, run.project_id, run.run_id)
             if latest is None:
@@ -1199,7 +1218,7 @@ class RunService:
             return {
                 str(key): nested
                 for key, nested in value.items()
-                if str(key) not in {"embedding", "_tracking_embedding", "vector", "crop"}
+                if str(key) not in {"embedding", "_tracking_embedding", "_face_embedding", "vector", "crop"}
                 and isinstance(nested, (str, int, float, bool, list, dict, type(None)))
             }
 

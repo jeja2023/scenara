@@ -75,6 +75,19 @@ class FeatureStore(Protocol):
 
     async def delete_subject(self, tenant_id: str, project_id: str, subject_type: str, subject_id: str) -> int: ...
 
+    async def get_feature(self, tenant_id: str, project_id: str, feature_id: str) -> FeatureRecord | None: ...
+
+    async def list_subject_features(
+        self,
+        tenant_id: str,
+        project_id: str,
+        feature_space_id: str,
+        subject_type: str,
+        subject_id: str,
+    ) -> list[FeatureRecord]: ...
+
+    async def delete_feature(self, tenant_id: str, project_id: str, feature_id: str) -> bool: ...
+
     async def delete_expired(self, before: float, limit: int) -> int: ...
 
 
@@ -213,6 +226,31 @@ class MemoryFeatureStore:
         for key in keys:
             del self._features[key]
         return len(keys)
+
+    async def get_feature(self, tenant_id: str, project_id: str, feature_id: str) -> FeatureRecord | None:
+        value = self._features.get((tenant_id, project_id, feature_id))
+        return value.model_copy(deep=True) if value else None
+
+    async def list_subject_features(
+        self,
+        tenant_id: str,
+        project_id: str,
+        feature_space_id: str,
+        subject_type: str,
+        subject_id: str,
+    ) -> list[FeatureRecord]:
+        rows = [
+            item.model_copy(deep=True)
+            for key, item in self._features.items()
+            if key[:2] == (tenant_id, project_id)
+            and item.feature_space_id == feature_space_id
+            and item.subject_type == subject_type
+            and item.subject_id == subject_id
+        ]
+        return sorted(rows, key=lambda item: (item.created_at, item.feature_id))
+
+    async def delete_feature(self, tenant_id: str, project_id: str, feature_id: str) -> bool:
+        return self._features.pop((tenant_id, project_id, feature_id), None) is not None
 
 
 __all__ = [

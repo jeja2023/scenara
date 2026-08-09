@@ -514,6 +514,8 @@ class ResultEnvelope(StrictModel):
     provenance: ProvenanceEvidence = Field(default_factory=ProvenanceEvidence)
     created_at: float
     _index_vectors: list[ResultIndexVector] = PrivateAttr(default_factory=list)
+    # Private handoff used by the trajectory registrar; never serialized.
+    _trajectory_tracks: list[dict[str, Any]] = PrivateAttr(default_factory=list)
 
     @model_validator(mode="after")
     def validate_domain_payload(self) -> ResultEnvelope:

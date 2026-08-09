@@ -36,6 +36,23 @@ from scenara.domains.portrait.service import (
     PortraitSearchRequest,
     PortraitSearchResponse,
 )
+from scenara.domains.portrait.trajectory import (
+    CameraRecord,
+    CameraTransition,
+    IdentityPage,
+    LongTermIdentity,
+    MergeIdentitiesRequest,
+    RegisterCameraRequest,
+    SegmentPage,
+    SetCameraTransitionsRequest,
+    SplitIdentityRequest,
+    TimelineEntry,
+    TrajectoryConflict,
+    TrajectoryNotFound,
+    TrajectoryStatus,
+    UpdateCameraRequest,
+    UpdateIdentityRequest,
+)
 from scenara.enterprise.service import (
     ComplianceEvidence,
     CreateComplianceEvidenceRequest,
@@ -450,6 +467,14 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     @app.exception_handler(PortraitEncodingError)
     async def portrait_encoding_error(request: Request, exc: PortraitEncodingError) -> JSONResponse:
         return error_response(request, 422, "PORTRAIT_ENCODING_ERROR", str(exc))
+
+    @app.exception_handler(TrajectoryNotFound)
+    async def trajectory_not_found(request: Request, exc: TrajectoryNotFound) -> JSONResponse:
+        return error_response(request, 404, "TRAJECTORY_NOT_FOUND", str(exc))
+
+    @app.exception_handler(TrajectoryConflict)
+    async def trajectory_conflict(request: Request, exc: TrajectoryConflict) -> JSONResponse:
+        return error_response(request, 409, "TRAJECTORY_CONFLICT", str(exc))
 
     @app.exception_handler(DatasetNotFound)
     async def dataset_not_found(request: Request, exc: DatasetNotFound) -> JSONResponse:
@@ -947,6 +972,8 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         scene_change_threshold: Annotated[float, Form(ge=0.01, le=1.0)] = 0.35,
         frame_max_edge: Annotated[int | None, Form(ge=64, le=8192)] = None,
         page_scale: Annotated[float, Form(ge=0.5, le=4.0)] = 1.5,
+        camera_id: Annotated[str | None, Form(max_length=128)] = None,
+        recording_started_at: Annotated[float | None, Form(ge=0)] = None,
         wait_ms: Annotated[int, Form(ge=0, le=30_000)] = 0,
         idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
         context: PrincipalContext = Depends(principal_context),
@@ -975,6 +1002,10 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             params["frame_max_edge"] = frame_max_edge
         if page_scale != 1.5:
             params["page_scale"] = page_scale
+        if camera_id:
+            params["camera_id"] = camera_id
+        if recording_started_at is not None:
+            params["recording_started_at"] = recording_started_at
         outcome = await runtime.runs.create_run(
             context,
             CreateRunRequest(
@@ -1094,6 +1125,161 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     ) -> Response:
         await runtime.portrait.delete_identity(context, identity_id)
         return Response(status_code=204)
+
+    @app.get("/api/v1/portrait/trajectories/identities", tags=["Portrait Intelligence"])
+    async def list_long_term_portrait_identities(
+        request: Request,
+        status: Annotated[TrajectoryStatus | None, Query()] = None,
+        camera_id: Annotated[str | None, Query(max_length=128)] = None,
+        since: Annotated[float | None, Query(ge=0)] = None,
+        until: Annotated[float | None, Query(ge=0)] = None,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=200)] = 50,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[IdentityPage]:
+        page = await runtime.trajectory.list_identities(
+            context,
+            status=status,
+            camera_id=camera_id,
+            since=since,
+            until=until,
+            offset=offset,
+            limit=limit,
+        )
+        return _envelope(request, page)  # type: ignore[return-value]
+
+    @app.get("/api/v1/portrait/trajectories/identities/{identity_id}", tags=["Portrait Intelligence"])
+    async def get_long_term_portrait_identity(
+        identity_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[LongTermIdentity]:
+        return _envelope(request, await runtime.trajectory.get_identity(context, identity_id))  # type: ignore[return-value]
+
+    @app.patch("/api/v1/portrait/trajectories/identities/{identity_id}", tags=["Portrait Intelligence"])
+    async def update_long_term_portrait_identity(
+        identity_id: str,
+        body: UpdateIdentityRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[LongTermIdentity]:
+        identity = await runtime.trajectory.update_identity(context, identity_id, body)
+        return _envelope(request, identity)  # type: ignore[return-value]
+
+    @app.delete(
+        "/api/v1/portrait/trajectories/identities/{identity_id}",
+        status_code=204,
+        tags=["Portrait Intelligence"],
+    )
+    async def delete_long_term_portrait_identity(
+        identity_id: str,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> Response:
+        await runtime.trajectory.delete_identity(context, identity_id)
+        return Response(status_code=204)
+
+    @app.get("/api/v1/portrait/trajectories/identities/{identity_id}/segments", tags=["Portrait Intelligence"])
+    async def list_long_term_portrait_segments(
+        identity_id: str,
+        request: Request,
+        camera_id: Annotated[str | None, Query(max_length=128)] = None,
+        since: Annotated[float | None, Query(ge=0)] = None,
+        until: Annotated[float | None, Query(ge=0)] = None,
+        offset: Annotated[int, Query(ge=0)] = 0,
+        limit: Annotated[int, Query(ge=1, le=500)] = 100,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[SegmentPage]:
+        page = await runtime.trajectory.list_segments(
+            context,
+            identity_id,
+            camera_id=camera_id,
+            since=since,
+            until=until,
+            offset=offset,
+            limit=limit,
+        )
+        return _envelope(request, page)  # type: ignore[return-value]
+
+    @app.get("/api/v1/portrait/trajectories/identities/{identity_id}/timeline", tags=["Portrait Intelligence"])
+    async def get_long_term_portrait_timeline(
+        identity_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[list[TimelineEntry]]:
+        return _envelope(request, await runtime.trajectory.timeline(context, identity_id))  # type: ignore[return-value]
+
+    @app.post("/api/v1/portrait/trajectories/identities/merge", tags=["Portrait Intelligence"])
+    async def merge_long_term_portrait_identities(
+        body: MergeIdentitiesRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[LongTermIdentity]:
+        return _envelope(request, await runtime.trajectory.merge_identities(context, body))  # type: ignore[return-value]
+
+    @app.post(
+        "/api/v1/portrait/trajectories/identities/{identity_id}/split",
+        status_code=201,
+        tags=["Portrait Intelligence"],
+    )
+    async def split_long_term_portrait_identity(
+        identity_id: str,
+        body: SplitIdentityRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[LongTermIdentity]:
+        identity = await runtime.trajectory.split_identity(context, identity_id, body)
+        return _envelope(request, identity)  # type: ignore[return-value]
+
+    @app.post("/api/v1/portrait/cameras", status_code=201, tags=["Portrait Intelligence"])
+    async def register_portrait_camera(
+        body: RegisterCameraRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[CameraRecord]:
+        return _envelope(request, await runtime.trajectory.register_camera(context, body))  # type: ignore[return-value]
+
+    @app.get("/api/v1/portrait/cameras", tags=["Portrait Intelligence"])
+    async def list_portrait_cameras(
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[list[CameraRecord]]:
+        return _envelope(request, await runtime.trajectory.list_cameras(context))  # type: ignore[return-value]
+
+    @app.patch("/api/v1/portrait/cameras/{camera_id}", tags=["Portrait Intelligence"])
+    async def update_portrait_camera(
+        camera_id: str,
+        body: UpdateCameraRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[CameraRecord]:
+        return _envelope(request, await runtime.trajectory.update_camera(context, camera_id, body))  # type: ignore[return-value]
+
+    @app.delete("/api/v1/portrait/cameras/{camera_id}", status_code=204, tags=["Portrait Intelligence"])
+    async def delete_portrait_camera(
+        camera_id: str,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> Response:
+        await runtime.trajectory.delete_camera(context, camera_id)
+        return Response(status_code=204)
+
+    @app.get("/api/v1/portrait/cameras/{camera_id}/transitions", tags=["Portrait Intelligence"])
+    async def list_portrait_camera_transitions(
+        camera_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[list[CameraTransition]]:
+        transitions = await runtime.trajectory.list_camera_transitions(context, camera_id)
+        return _envelope(request, transitions)  # type: ignore[return-value]
+
+    @app.put("/api/v1/portrait/cameras/{camera_id}/transitions", tags=["Portrait Intelligence"])
+    async def set_portrait_camera_transitions(
+        camera_id: str,
+        body: SetCameraTransitionsRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[list[CameraTransition]]:
+        transitions = await runtime.trajectory.set_camera_transitions(context, camera_id, body)
+        return _envelope(request, transitions)  # type: ignore[return-value]
 
     @app.post(
         "/api/v1/portrait/identities/{identity_id}/enrollments",

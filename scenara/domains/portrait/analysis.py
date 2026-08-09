@@ -48,6 +48,7 @@ PORTRAIT_CAPABILITIES = frozenset(
 class PortraitBackendOutput:
     units: list[dict[str, Any]]
     tracks: list[dict[str, Any]] = field(default_factory=list)
+    trajectory_tracks: list[dict[str, Any]] = field(default_factory=list)
     models: list[ModelProvenance] = field(default_factory=list)
     timings: dict[str, float] = field(default_factory=dict)
     warnings: list[str] = field(default_factory=list)
@@ -72,23 +73,78 @@ def _box(value: object) -> BoundingBox | None:
     return BoundingBox(x=x1, y=y1, width=max(0.0, x2 - x1), height=max(0.0, y2 - y1))
 
 
+_SENSITIVE_KEYS = frozenset({"crop", "embedding", "_tracking_embedding", "_face_embedding"})
+
+
 def _safe_attributes(value: dict[str, Any]) -> dict[str, Any]:
     def sanitize(item: Any) -> Any:
         if isinstance(item, dict):
             return {
                 key: sanitize(nested)
                 for key, nested in item.items()
-                if key not in {"crop", "embedding", "_tracking_embedding"}
+                if key not in _SENSITIVE_KEYS
             }
         if isinstance(item, list):
             return [sanitize(nested) for nested in item]
         return item
 
-    return {
-        key: sanitize(item)
-        for key, item in value.items()
-        if key not in {"box", "crop", "embedding", "_tracking_embedding"}
-    }
+    return {key: sanitize(item) for key, item in value.items() if key not in _SENSITIVE_KEYS | {"box"}}
+
+
+def _box_center(box: list[float]) -> tuple[float, float]:
+    return ((float(box[0]) + float(box[2])) / 2.0, (float(box[1]) + float(box[3])) / 2.0)
+
+
+def _contains(person_box: list[float], face_box: list[float]) -> float:
+    """人脸中心落在人体框内的贴合度，用于把人脸归属到正确的人。"""
+
+    if len(person_box) < 4 or len(face_box) < 4:
+        return 0.0
+    center_x, center_y = _box_center(face_box)
+    left, top, right, bottom = (float(person_box[index]) for index in range(4))
+    if not (left <= center_x <= right and top <= center_y <= bottom):
+        return 0.0
+    width = max(1e-6, right - left)
+    height = max(1e-6, bottom - top)
+    # 越靠近人体框上部、越居中，越可能是这个人的脸。
+    horizontal = 1.0 - abs(center_x - (left + right) / 2.0) / (width / 2.0)
+    vertical = 1.0 - (center_y - top) / height
+    return max(0.0, min(1.0, 0.5 * horizontal + 0.5 * vertical))
+
+
+def _assign_face_embeddings(persons: list[dict[str, Any]], faces: list[dict[str, Any]]) -> None:
+    """把每张人脸的向量挂到最贴合的人体检测上，供跟踪层聚合人脸模板。
+
+    多人同框时按贴合度做一对一贪心分配，避免所有人脸都落到第一个人身上。
+    """
+
+    candidates: list[tuple[float, int, int]] = []
+    for face_index, face in enumerate(faces):
+        if not isinstance(face, dict):
+            continue
+        embedding = face.get("embedding")
+        if not isinstance(embedding, list) or not embedding:
+            continue
+        face_box = face.get("box")
+        if not isinstance(face_box, list):
+            continue
+        for person_index, person in enumerate(persons):
+            person_box = person.get("box")
+            if not isinstance(person_box, list):
+                continue
+            score = _contains(person_box, face_box)
+            if score > 0.0:
+                candidates.append((score, face_index, person_index))
+
+    candidates.sort(key=lambda item: (-item[0], item[1], item[2]))
+    used_faces: set[int] = set()
+    used_persons: set[int] = set()
+    for _, face_index, person_index in candidates:
+        if face_index in used_faces or person_index in used_persons:
+            continue
+        used_faces.add(face_index)
+        used_persons.add(person_index)
+        persons[person_index]["_face_embedding"] = [float(value) for value in faces[face_index]["embedding"]]
 
 
 class LegacyPortraitAnalysisBackend:
@@ -129,6 +185,7 @@ class LegacyPortraitAnalysisBackend:
         from app.portrait_model_runtime import (
             infer_appearance_record_for_image,
             infer_body_record_for_image,
+            infer_body_records_for_persons,
             infer_face_records_for_image,
             infer_gait_embedding_for_images,
             infer_pose_record_for_image,
@@ -148,8 +205,19 @@ class LegacyPortraitAnalysisBackend:
             else:
                 persons = []
             if "body_reid" in capabilities and persons:
-                body = await infer_body_record_for_image(image, include_embedding=True)
-                persons[0].update({f"body_{key}": item for key, item in _safe_attributes(body).items()})
+                # Preserve the established first-person body record contract and
+                # add crop-specific samples for every additional detection.
+                body_records = [await infer_body_record_for_image(image, include_embedding=True)]
+                if len(persons) > 1:
+                    body_records.extend(
+                        await infer_body_records_for_persons(image, persons[1:], include_embedding=True)
+                    )
+                for person, body in zip(persons, body_records, strict=False):
+                    safe_body = _safe_attributes(body)
+                    person.update({f"body_{key}": item for key, item in safe_body.items()})
+                    embedding = body.get("embedding") if isinstance(body, dict) else None
+                    if isinstance(embedding, list) and embedding:
+                        person["_tracking_embedding"] = embedding
             faces = (
                 await infer_face_records_for_image(image, include_embeddings="face_embedding" in capabilities)
                 if "face_detection" in capabilities
@@ -165,6 +233,7 @@ class LegacyPortraitAnalysisBackend:
                 persons[0]["pose"] = _safe_attributes(pose)
             if appearance and persons:
                 persons[0]["appearance"] = _safe_attributes(appearance)
+            _assign_face_embeddings(persons, faces)
             if "quality_fusion" in capabilities:
                 for person in persons:
                     detection_score = float(person.get("score", 0.0))
@@ -186,9 +255,11 @@ class LegacyPortraitAnalysisBackend:
             )
 
         tracks: list[dict[str, Any]] = []
+        trajectory_tracks: list[dict[str, Any]] = []
         if "tracking" in capabilities and len(frames) > 1:
-            tracking = associate_person_tracks(frames, include_template_embeddings=False)
-            tracks = list(tracking.get("tracks", []))
+            tracking = associate_person_tracks(frames, include_template_embeddings=True)
+            trajectory_tracks = list(tracking.get("tracks", []))
+            tracks = [_safe_attributes(track) for track in trajectory_tracks]
         warnings: list[str] = []
         if "gait" in capabilities:
             if len(images) < 8:
@@ -220,6 +291,7 @@ class LegacyPortraitAnalysisBackend:
         return PortraitBackendOutput(
             units=rows,
             tracks=tracks,
+            trajectory_tracks=trajectory_tracks,
             models=models,
             timings={"portrait_analysis_seconds": time.perf_counter() - started},
             warnings=warnings,
@@ -274,6 +346,29 @@ class LegacyPortraitAnalysisBackend:
                 }
             )
         return silhouettes
+
+
+def _with_presentation_times(tracks: list[dict[str, Any]], units: list[Any]) -> list[dict[str, Any]]:
+    """给 tracklet 附上真实的帧时间戳。
+
+    ``frame_index`` 是解码单元在批次中的序号，与 ``decoded.units`` 一一对应，
+    据此把帧序号翻译成媒体内的毫秒偏移，长期轨迹才能还原真实时间线而不是入库时刻。
+    """
+
+    pts_by_index = {
+        index: unit.pts_ms for index, unit in enumerate(units) if getattr(unit, "pts_ms", None) is not None
+    }
+    enriched: list[dict[str, Any]] = []
+    for track in tracks:
+        item = dict(track)
+        first = pts_by_index.get(int(item.get("first_frame_index", 0) or 0))
+        last = pts_by_index.get(int(item.get("last_frame_index", 0) or 0))
+        if first is not None:
+            item["first_pts_ms"] = first
+        if last is not None:
+            item["last_pts_ms"] = last
+        enriched.append(item)
+    return enriched
 
 
 class PortraitFullAnalysisOperator:
@@ -448,6 +543,7 @@ class PortraitFullAnalysisOperator:
             created_at=time.time(),
         )
         result._index_vectors = index_vectors
+        result._trajectory_tracks = _with_presentation_times(output.trajectory_tracks, decoded.units)
         return {"result": result}
 
 

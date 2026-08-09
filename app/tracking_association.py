@@ -13,6 +13,7 @@ from app.portrait_tracking_metrics import (
 )
 from app.tracking_state import (
     TrackState,
+    face_embedding,
     first_frame_index,
     first_observation,
     last_frame_index,
@@ -66,6 +67,7 @@ def merge_track_state(primary: TrackState, secondary: TrackState) -> None:
     primary.observations.sort(key=lambda item: item["frame_index"])
     primary.interpolated.extend(secondary.interpolated)
     primary.embedding_samples.extend(secondary.embedding_samples)
+    primary.face_embedding_samples.extend(secondary.face_embedding_samples)
     primary.association_decisions.extend(secondary.association_decisions)
     latest = last_observation(primary)
     if latest is not None:
@@ -514,6 +516,7 @@ def associate_person_tracks(
                 continue
             initial_embedding = person_embedding(person)
             initial_sample = make_embedding_sample(frame_index, person, initial_embedding)
+            initial_face_sample = make_embedding_sample(frame_index, person, face_embedding(person))
             track = TrackState(
                 track_id=f"trk_{next_track_number:04d}",
                 last_frame_index=frame_index,
@@ -524,6 +527,7 @@ def associate_person_tracks(
                 frame_indexes=[frame_index],
                 observations=[make_observation(frame_index, person)],
                 embedding_samples=[initial_sample] if initial_sample is not None else [],
+                face_embedding_samples=[initial_face_sample] if initial_face_sample is not None else [],
             )
             next_track_number += 1
             active_tracks.append(track)
@@ -553,6 +557,7 @@ def associate_person_tracks(
         for person in frame.get("persons", []):
             if isinstance(person, dict):
                 person.pop("_tracking_embedding", None)
+                person.pop("_face_embedding", None)
     return {
         "algorithm": "quality_aware_byte_iou_appearance",
         "association_solver": "global_optimal_assignment",

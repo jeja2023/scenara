@@ -12,6 +12,13 @@ def _bool(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _ratio(name: str, default: float, *, minimum: float = 0.0, maximum: float = 1.0) -> float:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    return max(minimum, min(maximum, float(raw)))
+
+
 def _optional_path(name: str) -> Path | None:
     raw = os.getenv(name, "").strip()
     return Path(raw).resolve() if raw else None
@@ -59,6 +66,13 @@ class Settings:
     run_artifact_max_frames: int
     run_artifact_crop_max_edge: int
     run_artifact_frame_max_edge: int
+    trajectory_enabled: bool
+    trajectory_body_threshold: float
+    trajectory_face_threshold: float
+    trajectory_min_track_quality: float
+    trajectory_min_frame_count: int
+    trajectory_max_templates: int
+    trajectory_default_transition_seconds: float
 
     @property
     def production(self) -> bool:
@@ -158,6 +172,15 @@ def load_settings() -> Settings:
         structured_result_retention_days=max(
             1,
             min(3650, int(os.getenv("SCENARA_STRUCTURED_RESULT_RETENTION_DAYS", "180"))),
+        ),
+        trajectory_enabled=_bool("SCENARA_TRAJECTORY_ENABLED", True),
+        trajectory_body_threshold=_ratio("SCENARA_TRAJECTORY_BODY_THRESHOLD", 0.72, minimum=-1.0),
+        trajectory_face_threshold=_ratio("SCENARA_TRAJECTORY_FACE_THRESHOLD", 0.80, minimum=-1.0),
+        trajectory_min_track_quality=_ratio("SCENARA_TRAJECTORY_MIN_TRACK_QUALITY", 0.35),
+        trajectory_min_frame_count=max(1, min(10_000, int(os.getenv("SCENARA_TRAJECTORY_MIN_FRAME_COUNT", "2")))),
+        trajectory_max_templates=max(1, min(1_000, int(os.getenv("SCENARA_TRAJECTORY_MAX_TEMPLATES", "32")))),
+        trajectory_default_transition_seconds=_ratio(
+            "SCENARA_TRAJECTORY_DEFAULT_TRANSITION_SECONDS", 0.0, maximum=86_400.0
         ),
     )
     settings.validate()

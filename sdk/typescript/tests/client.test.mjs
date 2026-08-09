@@ -33,6 +33,8 @@ test("media shortcuts serialize the complete public parsing contract", async () 
     sceneChangeThreshold: 0.2,
     frameMaxEdge: 1_280,
     pageScale: 2,
+    cameraId: "camera-a",
+    recordingStartedAt: 1_700_000_000.25,
     waitMs: 1_000,
     idempotencyKey: "video-key",
   });
@@ -75,6 +77,8 @@ test("media shortcuts serialize the complete public parsing contract", async () 
       scene_change_threshold: "0.2",
       frame_max_edge: "1280",
       page_scale: "2",
+      camera_id: "camera-a",
+      recording_started_at: "1700000000.25",
       wait_ms: "1000",
     },
   );

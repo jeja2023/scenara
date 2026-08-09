@@ -272,6 +272,7 @@ describe("console information architecture", () => {
         "datasets",
         "results",
         "search",
+        "trajectories",
         "portrait-compare",
         "runs",
         "capabilities",

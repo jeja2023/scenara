@@ -18,6 +18,15 @@ from app.portrait_tracking_metrics import (
 from app.vector_math import l2_normalize_vector
 
 
+def face_embedding(person: dict[str, Any]) -> list[float] | None:
+    """读取分析层挂到人体检测上的人脸向量。"""
+
+    value = person.get("_face_embedding") if isinstance(person, dict) else None
+    if isinstance(value, list) and value:
+        return [float(item) for item in value]
+    return None
+
+
 def first_frame_index(track: TrackState) -> int:
     return min(track.frame_indexes) if track.frame_indexes else track.last_frame_index
 
@@ -40,6 +49,7 @@ class TrackState:
     observations: list[dict[str, Any]] = field(default_factory=list)
     interpolated: list[dict[str, Any]] = field(default_factory=list)
     embedding_samples: list[dict[str, Any]] = field(default_factory=list)
+    face_embedding_samples: list[dict[str, Any]] = field(default_factory=list)
     association_decisions: list[dict[str, Any]] = field(default_factory=list)
 
     def update(
@@ -81,6 +91,9 @@ class TrackState:
                 self.smoothed_embedding = [
                     round(float(value), 8) for value in l2_normalize_vector(previous * 0.85 + current * 0.15)
                 ]
+        face_sample = make_embedding_sample(frame_index, person, face_embedding(person))
+        if face_sample is not None:
+            self.face_embedding_samples.append(face_sample)
 
     def public_dict(self, *, include_template_embedding: bool = False) -> dict[str, Any]:
         ordered = sorted(self.frame_indexes)
@@ -102,6 +115,9 @@ class TrackState:
             "tracklet_quality_score": tracklet_quality_score(average_confidence, average_quality, stability, len(gaps)),
             "association_quality": association_quality_summary(self.association_decisions),
             "template": aggregate_track_template(self.embedding_samples, include_embedding=include_template_embedding),
+            "face_template": aggregate_track_template(
+                self.face_embedding_samples, include_embedding=include_template_embedding
+            ),
             "interpolated": self.interpolated[:20],
         }
 

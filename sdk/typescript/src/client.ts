@@ -90,6 +90,8 @@ export interface ParseVideoInput extends ParseFileInput {
   sceneChangeThreshold?: number;
   frameMaxEdge?: number;
   pageScale?: number;
+  cameraId?: string;
+  recordingStartedAt?: number;
   waitMs?: number;
 }
 
@@ -241,6 +243,9 @@ export class ScenaraClient {
     form.append("scene_change_threshold", String(input.sceneChangeThreshold ?? 0.35));
     if (input.frameMaxEdge !== undefined) form.append("frame_max_edge", String(input.frameMaxEdge));
     form.append("page_scale", String(input.pageScale ?? 1.5));
+    if (input.cameraId) form.append("camera_id", input.cameraId);
+    if (input.recordingStartedAt !== undefined)
+      form.append("recording_started_at", String(input.recordingStartedAt));
     form.append("wait_ms", String(input.waitMs ?? 0));
     return this.transport<ParseVideoResponse>("POST", "/api/v1/parse/video", {
       body: form,

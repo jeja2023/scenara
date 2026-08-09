@@ -456,6 +456,8 @@ def test_python_sdk_media_file_and_stream_shortcuts(tmp_path: Path) -> None:
             scene_change_threshold=0.2,
             frame_max_edge=1_280,
             page_scale=2.0,
+            camera_id="camera-a",
+            recording_started_at=1_700_000_000.25,
             wait_ms=2_000,
             idempotency_key="video-idempotency",
         )["asset"]["asset_id"] == "asset-video"
@@ -493,6 +495,8 @@ def test_python_sdk_media_file_and_stream_shortcuts(tmp_path: Path) -> None:
         b'scene_change_threshold',
         b'frame_max_edge',
         b'page_scale',
+        b'camera_id',
+        b'recording_started_at',
     ):
         assert b'name="' + field + b'"' in video_request.content
     assert b'name="pipeline_version"' not in video_request.content

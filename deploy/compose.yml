@@ -26,6 +26,13 @@ x-scenara-environment: &scenara-environment
   SCENARA_STRUCTURED_RESULT_RETENTION_DAYS: ${SCENARA_STRUCTURED_RESULT_RETENTION_DAYS:-180}
   SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES: ${SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES:-false}
   SCENARA_ALLOW_PRIVATE_WEBHOOK_TARGETS: ${SCENARA_ALLOW_PRIVATE_WEBHOOK_TARGETS:-false}
+  SCENARA_TRAJECTORY_ENABLED: ${SCENARA_TRAJECTORY_ENABLED:-true}
+  SCENARA_TRAJECTORY_BODY_THRESHOLD: ${SCENARA_TRAJECTORY_BODY_THRESHOLD:-0.72}
+  SCENARA_TRAJECTORY_FACE_THRESHOLD: ${SCENARA_TRAJECTORY_FACE_THRESHOLD:-0.80}
+  SCENARA_TRAJECTORY_MIN_TRACK_QUALITY: ${SCENARA_TRAJECTORY_MIN_TRACK_QUALITY:-0.35}
+  SCENARA_TRAJECTORY_MIN_FRAME_COUNT: ${SCENARA_TRAJECTORY_MIN_FRAME_COUNT:-2}
+  SCENARA_TRAJECTORY_MAX_TEMPLATES: ${SCENARA_TRAJECTORY_MAX_TEMPLATES:-32}
+  SCENARA_TRAJECTORY_DEFAULT_TRANSITION_SECONDS: ${SCENARA_TRAJECTORY_DEFAULT_TRANSITION_SECONDS:-0}
 
 x-scenara-enterprise-secrets: &scenara-enterprise-secrets
   - scenara_enterprise_license
@@ -105,7 +112,7 @@ services:
     restart: "no"
 
   api:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.14}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.15}
     build:
       context: ..
     environment: *scenara-environment
@@ -129,7 +136,7 @@ services:
     restart: unless-stopped
 
   batch-worker:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.14}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.15}
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "batch-gpu-1", "--lane", "batch"]
@@ -150,7 +157,7 @@ services:
     restart: unless-stopped
 
   stream-worker:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.14}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.15}
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "stream-gpu-1", "--lane", "stream"]
@@ -171,7 +178,7 @@ services:
     restart: unless-stopped
 
   scheduler:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.14}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.15}
     build:
       context: ..
     command: ["python3", "-m", "scenara.scheduler", "--interval-seconds", "60"]

@@ -247,14 +247,20 @@ def build_portrait_intelligence(
                 "Multi-dimensional feature spaces isolated by domain, modality, model, version",
                 "Tenant-scoped IndexStore and portrait result search",
                 "Cluster, association, and event records with audit trail",
+                "Cross-camera Re-ID trajectory service with face + body fusion",
+                "Long-term identity timeline correlation with camera topology constraints",
+                "Human adjudication: confirm, reject, rename, merge, split, biometric deletion",
             ],
             not_in_scope_yet=[
                 "Qdrant infrastructure implementation under scenara/infrastructure/ FeatureStore protocol",
                 "Milvus backend for large-scale or multi-modal hybrid search",
-                "Cross-camera Re-ID clustering service",
-                "Portrait identity graph and timeline correlation",
+                "Unsupervised gallery-wide clustering beyond per-run trajectory association",
+                "Gait and appearance modalities in the trajectory fusion score",
             ],
-            next_gate="Implement Qdrant under scenara/infrastructure/ using the FeatureStore protocol.",
+            next_gate=(
+                "Implement Qdrant under scenara/infrastructure/ using the FeatureStore protocol, "
+                "then extend trajectory fusion beyond face and body modalities."
+            ),
         ),
         PortraitModuleItem(
             module_id="mlops",
@@ -321,15 +327,16 @@ def build_portrait_intelligence(
         PortraitAssetItem(
             asset_id="intelligence_engine",
             name="Portrait Intelligence Engine",
-            maturity=PortraitModuleMaturity.SEED,
+            maturity=PortraitModuleMaturity.PARTIAL,
             summary=(
                 "Fuses retrieval, clustering, knowledge graph, event analysis, and "
                 "continual learning into a self-improving platform capability."
             ),
             depends_on_modules=["algorithms", "vector_retrieval", "mlops"],
             next_gate=(
-                "Migrate Qdrant to the FeatureStore protocol and ship multi-modal "
-                "fusion search (face + body) as the first Intelligence Engine capability."
+                "Multi-modal fusion (face + body) shipped in the cross-camera trajectory "
+                "service; next migrate Qdrant to the FeatureStore protocol and extend "
+                "fusion to gait and appearance."
             ),
         ),
     ]

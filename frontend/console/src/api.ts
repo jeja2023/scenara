@@ -124,6 +124,8 @@ function localizedHttpError(status: number, code: string): string {
     PORTRAIT_ENCODING_ERROR: "图片无法提取有效人像特征，请更换清晰图片",
     PORTRAIT_NOT_FOUND: "未找到指定的人像数据",
     STATE_CONFLICT: "数据状态已变化，请刷新后重试",
+    TRAJECTORY_CONFLICT: "轨迹身份状态冲突，请刷新后重试",
+    TRAJECTORY_NOT_FOUND: "未找到指定的轨迹身份或摄像头",
     VALIDATION_ERROR: "提交内容未通过校验，请检查必填项和格式",
     WEBHOOK_NOT_FOUND: "未找到指定的事件回调订阅",
   };

@@ -113,6 +113,84 @@ export interface DatasetVersion {
   updated_at: number;
 }
 
+export type TrajectoryStatus = "auto" | "confirmed" | "rejected";
+
+export type TrajectoryMatchMethod = "new_identity" | "reid" | "manual";
+
+export interface CameraTransition {
+  from_camera_id: string;
+  to_camera_id: string;
+  min_seconds: number;
+  max_seconds: number | null;
+}
+
+export interface CameraRecord {
+  camera_id: string;
+  tenant_id: string;
+  project_id: string;
+  display_name: string;
+  location: string;
+  auto_registered: boolean;
+  metadata: Record<string, unknown>;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface LongTermIdentity {
+  identity_id: string;
+  tenant_id: string;
+  project_id: string;
+  display_name: string;
+  status: TrajectoryStatus;
+  modalities: string[];
+  feature_space_ids: Record<string, string>;
+  camera_ids: string[];
+  segment_count: number;
+  first_seen_at: number;
+  last_seen_at: number;
+  last_camera_id: string;
+  metadata: Record<string, unknown>;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface TrajectorySegment {
+  segment_id: string;
+  identity_id: string;
+  tenant_id: string;
+  project_id: string;
+  run_id: string;
+  source_id: string;
+  asset_id: string;
+  camera_id: string;
+  track_id: string;
+  frame_count: number;
+  track_quality: number;
+  first_seen_at: number;
+  last_seen_at: number;
+  first_pts_ms: number | null;
+  last_pts_ms: number | null;
+  match_method: TrajectoryMatchMethod;
+  match_score: number;
+  match_scores: Record<string, number>;
+  feature_ids: Record<string, string>;
+  metadata: Record<string, unknown>;
+  created_at: number;
+}
+
+export interface TimelineEntry {
+  segment_id: string;
+  camera_id: string;
+  camera_name: string;
+  run_id: string;
+  first_seen_at: number;
+  last_seen_at: number;
+  duration_seconds: number;
+  match_method: TrajectoryMatchMethod;
+  match_score: number;
+  transition_seconds: number | null;
+}
+
 export interface AuditEvent {
   event_id: string;
   tenant_id: string;

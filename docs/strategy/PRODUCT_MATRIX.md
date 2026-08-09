@@ -1,6 +1,6 @@
 # Scenara 产品矩阵
 
-适用版本：`0.3.0-dev.14`。本文是产品边界和演进顺序的权威说明，不是所有产品均已发布的销售清单。
+适用版本：`0.3.0-dev.15`。本文是产品边界和演进顺序的权威说明，不是所有产品均已发布的销售清单。
 
 Scenara 是平台母品牌。长期产品矩阵采用三层边界：产品模块、共享入口和底层 AI 数据底座。`Console`、`API`、`SDK` 不作为重复建设的业务产品，而作为所有产品模块共享的控制面和开发者入口。
 
@@ -44,7 +44,7 @@ Scenara 是平台母品牌。长期产品矩阵采用三层边界：产品模块
 详细仓库职责见 [`REPOSITORY_TOPOLOGY.md`](./REPOSITORY_TOPOLOGY.md)，认证与安全边界见 [`ACCESS_FOUNDATION.md`](./ACCESS_FOUNDATION.md)。
 
 Parse、Model、Data 三个模块在人像方向的长期演进目标、六大能力模块与三项核心资产见 [`PORTRAIT_INTELLIGENCE_STRATEGY.md`](./PORTRAIT_INTELLIGENCE_STRATEGY.md)，其成熟度与能力就绪度通过 `GET /api/v1/platform/portrait-intelligence` 暴露。该契约是产品矩阵在人像领域的纵向深化，不新增产品条目。
-适用版本：`0.3.0-dev.14`。当前基线已将 Index 从“特征存储种子”提升为可执行的索引契约，并交付 Search 的文本、人像结果检索、保存检索、加权排序 profile、重建任务和来源回溯闭环；生产 ANN、语义重排和跨租户联邦仍需后续门禁。
+适用版本：`0.3.0-dev.15`。当前基线已将 Index 从“特征存储种子”提升为可执行的索引契约，并交付 Search 的文本、人像结果检索、保存检索、加权排序 profile、重建任务和来源回溯闭环；生产 ANN、语义重排和跨租户联邦仍需后续门禁。
 
 ## P0-P2 non-model completion
 

@@ -16,6 +16,9 @@ Scenara domain plugin and the public Media/Run/Result contracts.
 | Gait | reimplemented | sequence-only contract enforces at least eight frames and records model provenance |
 | Gallery identity and search | reimplemented | tenant identity/enrollment/search APIs, feature-space isolation, and biometric deletion test |
 | Long-video tracking | reimplemented | batch media units, track contract, result sharding, and dedicated worker lane |
+| In-video person tracklets | reimplemented | two-stage association, global assignment, fragment reconnection with time-compatibility, tracklet quality scoring, and handoff into long-term identity registration |
+| Cross-camera long-term trajectory | reimplemented | face + body fusion, camera topology and mutual-exclusion constraints, real media timeline, capped template galleries, human adjudication (confirm/reject/rename/merge/split/delete), and cross-video identity persistence/query closure |
+| Camera registry and topology | reimplemented | tenant-scoped camera records, automatic source-camera registration, and minimum/maximum transition times enforced during Re-ID |
 | Real-time stream processing | reimplemented | encrypted credentials, bounded decode, stream queue lane, and termination reason contract |
 | Legacy `/v1` API compatibility | explicitly retired | new API is `/api/v1` |
 | Legacy database and development data | explicitly retired | clean migration revision |

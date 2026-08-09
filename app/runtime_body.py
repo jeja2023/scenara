@@ -242,12 +242,35 @@ async def infer_body_record_for_image(
     return record
 
 
+async def infer_body_records_for_persons(
+    image: Image.Image, persons: list[dict[str, Any]], *, include_embedding: bool = True
+) -> list[dict[str, Any]]:
+    """Extract one ReID sample for every detected person crop."""
+    records: list[dict[str, Any]] = []
+    for person in persons:
+        box = person.get("box") if isinstance(person, dict) else None
+        if not isinstance(box, list) or len(box) < 4:
+            records.append({})
+            continue
+        normalized_box = [float(value) for value in box[:4]]
+        crop = crop_person(image, normalized_box)
+        if crop is None:
+            records.append({})
+            continue
+        record = await infer_body_record_for_image(crop, include_embedding=include_embedding)
+        record["box"] = normalized_box
+        record["crop_quality"] = person_crop_quality(image, normalized_box)
+        records.append(record)
+    return records
+
+
 __all__ = [
     "best_person_detection",
     "detect_body_embedding_crop",
     "fallback_body_embedding_record",
     "get_capability_runtime",
     "infer_body_record_for_image",
+    "infer_body_records_for_persons",
     "infer_person_frames",
     "infer_reid_images",
     "run_reid_body_embedding",

@@ -111,7 +111,9 @@ class PortraitPlugin:
                 output="analyze.result",
                 allowed_parameters={
                     "capabilities",
+                    "camera_id",
                     "max_units",
+                    "recording_started_at",
                     "sample_interval_ms",
                     "max_reconnect_attempts",
                     "connect_timeout_ms",
@@ -122,6 +124,23 @@ class PortraitPlugin:
                     "scene_change_threshold",
                     "frame_max_edge",
                     "page_scale",
+                },
+                parameter_schema={
+                    "camera_id": PipelineParameterDefinition(
+                        label="摄像头 ID",
+                        control="text",
+                        placeholder="例如 camera-lobby-01",
+                        advanced=True,
+                        media_kinds={"video", "stream"},
+                    ),
+                    "recording_started_at": PipelineParameterDefinition(
+                        label="拍摄开始时间（Unix 秒）",
+                        control="number",
+                        minimum=0,
+                        step=0.001,
+                        advanced=True,
+                        media_kinds={"video"},
+                    ),
                 },
                 pausable=True,
             ),

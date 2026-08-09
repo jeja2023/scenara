@@ -35,6 +35,8 @@ export interface ParseVideoInput extends ParseFileInput {
     sceneChangeThreshold?: number;
     frameMaxEdge?: number;
     pageScale?: number;
+    cameraId?: string;
+    recordingStartedAt?: number;
     waitMs?: number;
 }
 export interface ParseDocumentInput extends ParseFileInput {

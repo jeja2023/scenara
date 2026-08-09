@@ -19,6 +19,20 @@ def _vector(values: list[float]) -> Any:
     return Vector(values)
 
 
+def _feature_record(tenant_id: str, project_id: str, row: Any) -> FeatureRecord:
+    return FeatureRecord(
+        feature_id=row[0],
+        tenant_id=tenant_id,
+        project_id=project_id,
+        feature_space_id=row[1],
+        subject_type=row[2],
+        subject_id=row[3],
+        embedding=[float(value) for value in row[4]],
+        created_at=row[5],
+        expires_at=row[6],
+    )
+
+
 class PostgresFeatureStore:
     def __init__(self, pool: Any) -> None:
         self._pool = pool
@@ -147,6 +161,50 @@ class PostgresFeatureStore:
                 (tenant_id, project_id, subject_type, subject_id),
             )
         return int(cursor.rowcount)
+
+    async def get_feature(self, tenant_id: str, project_id: str, feature_id: str) -> FeatureRecord | None:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT feature_id, feature_space_id, subject_type, subject_id, embedding,
+                          extract(epoch from created_at), extract(epoch from expires_at)
+                   FROM scenara_features
+                   WHERE tenant_id = %s AND project_id = %s AND feature_id = %s""",
+                (tenant_id, project_id, feature_id),
+            )
+            row = await cursor.fetchone()
+        if row is None:
+            return None
+        return _feature_record(tenant_id, project_id, row)
+
+    async def list_subject_features(
+        self,
+        tenant_id: str,
+        project_id: str,
+        feature_space_id: str,
+        subject_type: str,
+        subject_id: str,
+    ) -> list[FeatureRecord]:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT feature_id, feature_space_id, subject_type, subject_id, embedding,
+                          extract(epoch from created_at), extract(epoch from expires_at)
+                   FROM scenara_features
+                   WHERE tenant_id = %s AND project_id = %s AND feature_space_id = %s
+                     AND subject_type = %s AND subject_id = %s
+                   ORDER BY created_at, feature_id""",
+                (tenant_id, project_id, feature_space_id, subject_type, subject_id),
+            )
+            rows = await cursor.fetchall()
+        return [_feature_record(tenant_id, project_id, row) for row in rows]
+
+    async def delete_feature(self, tenant_id: str, project_id: str, feature_id: str) -> bool:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """DELETE FROM scenara_features
+                   WHERE tenant_id = %s AND project_id = %s AND feature_id = %s""",
+                (tenant_id, project_id, feature_id),
+            )
+        return int(cursor.rowcount) == 1
 
     async def delete_expired(self, before: float, limit: int) -> int:
         if not 1 <= limit <= 10_000:

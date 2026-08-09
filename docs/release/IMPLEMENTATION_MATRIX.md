@@ -5,10 +5,10 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until signed, reproducible evidence is committed.
 
-Current development version: `0.3.0-dev.14` (`0.3.0.dev14` for Python packages).
+Current development version: `0.3.0-dev.15` (`0.3.0.dev15` for Python packages).
 This version is an engineering qualification snapshot, not a `1.0.0` production release.
 
-The `0.3.0-dev.14` engineering baseline cumulatively adds domain-scoped Parse
+The `0.3.0-dev.15` engineering baseline cumulatively adds domain-scoped Parse
 workspaces, a first-class cross-domain Results center, Data Assets terminology,
 dataset version governance, tenant-scoped audit search/export, saved Search
 definitions, a tenant/project-scoped result-summary query path backed by
@@ -18,13 +18,17 @@ Chinese-only domain and capability catalog, and fully documented environment
 configuration with safe development and production guidance.
 It retains the `0.3.0-dev.5` migration, capacity, coverage, progressive media
 decoding, monotonic Run progress, and replaceable partial Result guarantees.
-The `0.3.0-dev.14` hardening also closes empty-scope/product authorization paths,
+The `0.3.0-dev.15` hardening also closes empty-scope/product authorization paths,
 enforces enterprise policy in production, adds indexed and expiring Session
 authentication, paginated/streaming audit access, bulk Result reads, SSE
 fallback control, Console auth-expiry handling, composable/router extraction,
 and `runtime-state/logs/` governance. Portrait video and stream results omit
 zero-object units while retaining analyzed sample counts and original hit
 timestamps; normal finite-media EOF is reported as successful source completion.
+It also completes the cross-video pedestrian Re-ID loop: in-video tracklets,
+long-term identity registration across Runs and cameras, camera topology and
+transition constraints, adjudication actions, public identity queries, and
+real two-video end-to-end coverage.
 
 | Stage | Deliverable | Status | Evidence required |
 |---|---|---|---|
@@ -32,6 +36,7 @@ timestamps; normal finite-media EOF is reported as successful source completion.
 | 0.2 | Portrait and OCR vertical Media/Run/Operator/Pipeline/Result paths | complete | deterministic domain contract tests |
 | 0.3 | Image, video, PDF, stream, scheduling, checkpoint, SSE, webhook, feature store, retention, result shards | locally qualified; release sign-off pending | local Docker integration suite passes; signed real-service integration report required |
 | 0.4 | Detection, ReID, face, pose, parsing, apparel, segmentation, gait, quality fusion | implemented; model qualification pending | licensed model packages and fixed Portrait evaluation report required |
+| 0.4a | In-video tracklets plus cross-camera long-term trajectory: multi-modal fusion, camera topology and mutual-exclusion constraints, real media timeline, capped template galleries, human adjudication, and cross-video identity persistence | implemented; model qualification pending | trajectory domain tests, PostgreSQL migration, camera-registry API, console adjudication route, SDK and OpenAPI drift checks, and real two-video E2E coverage |
 | 0.5 | OCR detection/recognition, reading order, title, paragraph, image, table layout | implemented; model qualification pending | fixed Chinese/rotated/PDF/layout evaluation report required |
 | 0.6 | License, entitlements, quota, metering, SLA, incident, support, compliance evidence via policy provider | complete | signed-license, fail-closed quota, incident, support, and evidence tests |
 | 0.7 | Overview, product catalog, media, runs, results, Portrait, OCR, pipeline, models, access, operations, enterprise and feedback console; Chinese-first UI contract; Python and generated TS SDKs | complete | 12-route desktop/mobile browser checks, visible-English leakage scan, frontend tests, static `/console/` delivery, SDK and OpenAPI drift tests |
@@ -65,14 +70,14 @@ The `1.0` version must not be published while any box above is unchecked.
 
 ## Current local verification
 
-The following checks were executed on 2026-08-05 and are supporting implementation evidence only:
+The latest checks were executed on 2026-08-08; earlier browser and decode checks below remain supporting implementation evidence only:
 
 | Check | Result |
 |---|---|
-| `.venv\\Scripts\\python.exe -m pytest -q` | 180 passed, 8 integration tests skipped by default; username/password login, bootstrap admin validation, lifecycle approval, audit retention, billing, adapter probes, Agent records, control-plane, index rebuild, weighted Search, dataset, audit, saved-search, portrait image closure, authorization hardening and runtime-state layout tests included |
+| `.venv\\Scripts\\python.exe -m pytest -q` | 216 passed in 57.37s with Docker-backed integration services enabled; includes two-video trajectory ReID and `/api/v1/parse/video` shortcut coverage |
 | Real GOP keyframe cross-check | PyAV and Scenara both selected frames `0, 12, 24, 36, 48, 60, 72, 84, 96, 108`; normal decode no longer uses the FFmpeg raw-only keyframe flag |
 | Real-time video and stream browser qualification | HEVC file Run `run_915a658dcd69469a81877c21ee2f22ab` exposed 8/16/24-unit partial results before completing 32 units with 21 objects; HTTP MPEG-TS Run `run_2e3c39dd7f6b4c4aa65f27b3820a277c` exposed units 1-8 individually and completed with 7 objects; after an API container force-recreate, persisted Source `src_1cd455c67c7548cdad6aa9f35f1ed63a` successfully previewed and Run `run_9816db5634ec4b13a057e36566901224` exposed 4/8 units before completing with 9 objects; crop JPEGs, 1920x1080 full frames, highlights, and Results-page replay loaded successfully |
-| `SCENARA_RUN_INTEGRATION=1 python -m pytest -q -m integration tests/integration` | 8 tests collected for PostgreSQL/pgvector, Redis and MinIO; the dev.4 pagination and artifact additions require the CI real-service job or a local Compose qualification run |
+| `SCENARA_RUN_INTEGRATION=1 python -m pytest -q -m integration tests/integration -rs` | 8 passed in 3.64s against Docker-backed PostgreSQL, Redis and MinIO |
 | `scripts/local_backup_restore_drill.ps1` | passed; PostgreSQL and MinIO markers restored and verified |
 | `pnpm run check` | passed; Prettier, warning-free console lint, 19 console tests, typecheck, build and TypeScript SDK runtime/contract check |
 | `npm run console:e2e` | 48 passed across desktop Chrome and Pixel 7 viewports; login redirect, username/password login, all workspaces plus complete image/video/PDF/stream controls, governance workflows and cancellation tracking checked for page errors and horizontal overflow |

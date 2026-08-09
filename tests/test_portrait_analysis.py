@@ -74,7 +74,8 @@ class CompletePortraitBackend:
 def contains_embedding(value: object) -> bool:
     if isinstance(value, dict):
         return any(
-            key in {"embedding", "_tracking_embedding"} or contains_embedding(item) for key, item in value.items()
+            key in {"embedding", "_tracking_embedding", "_face_embedding"} or contains_embedding(item)
+            for key, item in value.items()
         )
     if isinstance(value, list):
         return any(contains_embedding(item) for item in value)

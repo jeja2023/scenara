@@ -1,8 +1,8 @@
 # Scenara 景枢
 
-Scenara 是面向企业私有化部署的视觉 AI 中枢平台。平台以版本化数据资产、Run、Pipeline 和 Result 契约接收图片、视频、PDF 与实时流，并通过可安装的 Domain 提供强类型视觉能力。
+Scenara 是面向企业私有化部署的视觉 AI 中枢平台。平台以版本化数据资产、Run、Pipeline 和 Result 契约接收图片、视频、PDF 与实时流，并通过可安装的 Domain 提供强类型视觉能力。当前版本已把同一人的视频内连续出现、跨视频/跨摄像头长期轨迹、人工确认与长期身份查询串成闭环。
 
-当前产品阶段：`0.3.0-dev.14`（Python 包版本为 `0.3.0.dev14`）
+当前产品阶段：`0.3.0-dev.15`（Python 包版本为 `0.3.0.dev15`）
 
 - 正式领域：Portrait（迁移中）
 - 验证领域：OCR / Document
@@ -15,7 +15,7 @@ Scenara 是面向企业私有化部署的视觉 AI 中枢平台。平台以版�
 
 Scenara 作为平台母品牌，统一规划 Parse、Model、Data、Edge、Flow、Search、Agent、Console、API、SDK 与 Index。当前并非 11 套独立系统：Console、API 和 SDK 是共享入口，Index 是共享底座，产品模块继续复用同一平台内核、IAM、授权、审计和部署栈。
 
-当前版本已提供产品目录、仓库拓扑、正式跨仓库契约、Organization、Project、User、Role、Membership、Service Account、API Key 与 Product Entitlement，并支持平台根令牌、按项目绑定的服务账号 API Key 以及用户名密码登录。完整成熟度、依赖顺序与非目标见 [产品矩阵](docs/strategy/PRODUCT_MATRIX.md)，当前仓库与独立 Model/Data 仓库的分工见 [仓库拓扑](docs/strategy/REPOSITORY_TOPOLOGY.md)，四条可发布契约见 [契约包](contracts/repository/README.md)，认证和授权边界见 [访问底座](docs/strategy/ACCESS_FOUNDATION.md)，人像 AI 长期演进方向见 [人像智能基础平台战略](docs/strategy/PORTRAIT_INTELLIGENCE_STRATEGY.md)，升级影响见 [0.3.0-dev.14 开发版发布说明](docs/release/0.3.0-dev.14.md)。
+当前版本已提供产品目录、仓库拓扑、正式跨仓库契约、Organization、Project、User、Role、Membership、Service Account、API Key 与 Product Entitlement，并支持平台根令牌、按项目绑定的服务账号 API Key 以及用户名密码登录。完整成熟度、依赖顺序与非目标见 [产品矩阵](docs/strategy/PRODUCT_MATRIX.md)，当前仓库与独立 Model/Data 仓库的分工见 [仓库拓扑](docs/strategy/REPOSITORY_TOPOLOGY.md)，四条可发布契约见 [契约包](contracts/repository/README.md)，认证和授权边界见 [访问底座](docs/strategy/ACCESS_FOUNDATION.md)，人像 AI 长期演进方向见 [人像智能基础平台战略](docs/strategy/PORTRAIT_INTELLIGENCE_STRATEGY.md)，升级影响见 [0.3.0-dev.15 开发版发布说明](docs/release/0.3.0-dev.15.md)。
 
 解析控制台采用“解析 -> 领域”的工作区结构，人像和 OCR 文档分别进入独立领域页面；图片、视频、文档和视频流是页面内部的数据类型标签，例如 `parse/portrait/image` 与 `parse/ocr/document` 仍可作为深链路访问。每个领域工作区内完成上传、参数配置、运行进度、当前结果查看与历史恢复；“数据资产”和“运行”页面分别承担文件/视频流来源管理与运行生命周期管理，新增的“解析结果”页面负责跨领域、跨任务浏览和筛选结果。领域菜单由后端 `DomainManifest` 驱动，新领域接入时不需要重新拆分前端解析流程。
 
@@ -44,10 +44,20 @@ flowchart LR
 
 ```powershell
 python -m pip install -r requirements/dev.txt
-Copy-Item .env.example .env
-python scripts/prepare_runtime_state.py
-python -m uvicorn scenara.server:app --host 127.0.0.1 --port 8000 --env-file .env
+python start.py
 ```
+
+`start.py` 是本地开发一键启动器：缺少 `.env` 时从 `.env.example` 创建，准备 `runtime-state/`，再使用当前 Python 解释器启动 API。新创建的 `.env` 默认使用内存状态、内联队列和本地对象存储，不需要额外启动 PostgreSQL、Redis 或 MinIO；已有 `.env` 会按其中配置启动，不会被覆盖。已有 `.env` 使用本机 Redis 且端口尚未监听时，启动器会自动查找 `runtime-state/redis-*` 中的 Redis 并随 API 启停。
+
+如果现有 `.env` 配置了 PostgreSQL、Redis 或 S3，但本机暂时没有这些服务，可以使用 `python start.py --local` 临时覆盖为内存、本地对象存储和内联队列；该选项不会修改 `.env`。
+
+需要同时运行 Console Vite 开发服务器时，在仓库根目录执行：
+
+```powershell
+python start.py --with-console --reload
+```
+
+API 默认位于 `http://127.0.0.1:8000`，Console 开发服务器位于 `http://127.0.0.1:5173/console/`；不带 `--with-console` 时，已构建的 Console 仍可从 API 的 `/console/` 路径访问。按 `Ctrl+C` 会同时停止 API 和 Console 子进程。使用 `python start.py --help` 查看环境文件、端口和自动重载选项。
 
 本地运行时的持久化状态和 rollout 审计默认写入 `runtime-state/`，可保留的日志文件放在
 `runtime-state/logs/`；生产部署继续将应用日志输出到 stdout，由容器运行时统一采集。
@@ -73,4 +83,4 @@ python -m uvicorn scenara.server:app --host 127.0.0.1 --port 8000 --env-file .en
 ## 授权
 
 源码公开不代表开源授权。除第三方组件另有声明外，本仓库使用 [Scenara Proprietary Source License](LICENSE)。
-Current release baseline: `0.3.0-dev.14` (`0.3.0.dev14` for Python packages).
+Current release baseline: `0.3.0-dev.15` (`0.3.0.dev15` for Python packages).

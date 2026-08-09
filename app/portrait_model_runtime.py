@@ -201,6 +201,16 @@ async def infer_body_record_for_image(
         await _commit_body_runtime_flags()
 
 
+async def infer_body_records_for_persons(
+    image: Image.Image, persons: list[dict[str, Any]], *, include_embedding: bool = True
+) -> list[dict[str, Any]]:
+    await _prepare_runtime_dependencies()
+    try:
+        return await runtime_body.infer_body_records_for_persons(image, persons, include_embedding=include_embedding)
+    finally:
+        await _commit_body_runtime_flags()
+
+
 async def run_rtmpose(image: Image.Image) -> dict[str, Any] | None:
     await _prepare_runtime_dependencies()
     return await runtime_pose.run_rtmpose(image)
@@ -259,6 +269,7 @@ __all__ = [
     "infer_appearance_record_for_image",
     "infer_best_face_embedding_for_image",
     "infer_body_record_for_image",
+    "infer_body_records_for_persons",
     "infer_face_records_for_image",
     "infer_gait_embedding_for_images",
     "infer_person_frames",

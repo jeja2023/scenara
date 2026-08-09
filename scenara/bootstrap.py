@@ -12,6 +12,12 @@ from scenara.domains.portrait import PortraitPlugin
 from scenara.domains.portrait.analysis import PortraitAnalysisBackend
 from scenara.domains.portrait.encoder import RuntimePortraitImageEncoder
 from scenara.domains.portrait.service import MemoryPortraitRepository, PortraitRepository, PortraitService
+from scenara.domains.portrait.trajectory import (
+    MemoryTrajectoryRepository,
+    TrajectoryRegistrar,
+    TrajectoryRepository,
+    TrajectoryService,
+)
 from scenara.enterprise.license import EnterprisePolicyProvider, load_verified_license
 from scenara.enterprise.service import (
     EnterpriseRepository,
@@ -28,6 +34,7 @@ from scenara.infrastructure.postgres_feedback import PostgresFeedbackRepository
 from scenara.infrastructure.postgres_index import PostgresIndexStore
 from scenara.infrastructure.postgres_portrait import PostgresPortraitRepository
 from scenara.infrastructure.postgres_state import PostgresStateStore
+from scenara.infrastructure.postgres_trajectory import PostgresTrajectoryRepository
 from scenara.infrastructure.queue import InlineRunQueue, RedisRunQueue
 from scenara.platform.access import AccessRepository, AccessService, MemoryAccessRepository
 from scenara.platform.audit import AuditLogger
@@ -72,6 +79,7 @@ class Runtime:
     webhooks: WebhookService
     feedback: FeedbackService
     portrait: PortraitService
+    trajectory: TrajectoryService
     search: SearchService
     datasets: DatasetService
     control_plane: ControlPlaneService
@@ -142,6 +150,7 @@ def build_runtime(
         enterprise_repository: EnterpriseRepository = PostgresEnterpriseRepository(postgres_state.pool)
         feedback_repository: FeedbackRepository = PostgresFeedbackRepository(postgres_state.pool)
         control_plane_store = PostgresControlPlaneStore(postgres_state.pool)
+        trajectory_repository: TrajectoryRepository = PostgresTrajectoryRepository(postgres_state.pool)
     elif settings.state_backend == "memory":
         state = MemoryStateStore()
         access_repository = MemoryAccessRepository()
@@ -151,6 +160,7 @@ def build_runtime(
         enterprise_repository = MemoryEnterpriseRepository()
         feedback_repository = MemoryFeedbackRepository()
         control_plane_store = MemoryControlPlaneStore()
+        trajectory_repository = MemoryTrajectoryRepository()
     else:
         raise RuntimeError(f"unsupported state backend: {settings.state_backend}")
 
@@ -207,6 +217,18 @@ def build_runtime(
         indexes=indexes,
         encoder=portrait_encoder,
     )
+    trajectory = TrajectoryService(
+        trajectory_repository,
+        features,
+        policy,
+        audit,
+        body_threshold=settings.trajectory_body_threshold,
+        face_threshold=settings.trajectory_face_threshold,
+        min_track_quality=settings.trajectory_min_track_quality,
+        min_frame_count=settings.trajectory_min_frame_count,
+        max_templates=settings.trajectory_max_templates,
+        default_transition_seconds=settings.trajectory_default_transition_seconds,
+    )
     search = SearchService(
         indexes=indexes,
         state=state,
@@ -258,6 +280,7 @@ def build_runtime(
         run_artifact_crop_max_edge=settings.run_artifact_crop_max_edge,
         run_artifact_frame_max_edge=settings.run_artifact_frame_max_edge,
         indexes=indexes,
+        registrars=([TrajectoryRegistrar(trajectory)] if settings.trajectory_enabled else []),
     )
     access = AccessService(access_repository, audit, policy)
     control_plane = ControlPlaneService(
@@ -282,6 +305,7 @@ def build_runtime(
         audit=audit,
         policy=policy,
         portrait=portrait,
+        trajectory=trajectory,
         search=search,
         datasets=datasets,
         control_plane=control_plane,
