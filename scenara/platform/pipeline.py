@@ -164,6 +164,7 @@ class PipelineParameterDefinition(BaseModel):
     placeholder: str | None = None
     advanced: bool = False
     media_kinds: set[str] = Field(default_factory=set)
+    description: str | None = None
 
 
 class PipelineDefinition(BaseModel):
