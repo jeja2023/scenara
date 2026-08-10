@@ -90,9 +90,11 @@ useRefresh(refresh);
                 >
               </td>
             </tr>
+            <tr v-if="!models.length">
+              <td colspan="7" class="empty">没有已登记模型</td>
+            </tr>
           </tbody>
         </table>
-        <div v-if="!models.length" class="empty">没有已登记模型</div>
       </div>
     </section>
   </section>

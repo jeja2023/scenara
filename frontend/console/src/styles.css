@@ -630,11 +630,34 @@ textarea {
   font-size: 12px;
   transition: all 120ms ease;
 }
+.segmented button:not(.active):hover {
+  color: var(--graphite);
+  background: rgba(255, 255, 255, 0.55);
+}
 .segmented button.active {
   background: #fff;
   color: var(--graphite);
   box-shadow: 0 1px 3px #17211f1a;
   font-weight: 700;
+}
+.table-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5d1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a2b2ac;
 }
 .modal {
   position: fixed;

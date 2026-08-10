@@ -70,9 +70,11 @@ useRefresh(refresh);
               </td>
               <td>{{ row.pausable ? "支持" : "不支持" }}</td>
             </tr>
+            <tr v-if="!rows.length">
+              <td colspan="7" class="empty">暂无流水线</td>
+            </tr>
           </tbody>
         </table>
-        <div v-if="!rows.length" class="empty">暂无流水线</div>
       </div>
     </section>
   </section>

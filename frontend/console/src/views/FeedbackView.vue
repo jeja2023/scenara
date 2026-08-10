@@ -421,9 +421,11 @@ useRefresh(refresh);
                   </div>
                 </td>
               </tr>
+              <tr v-if="!feedback.length">
+                <td colspan="9" class="empty">暂无反馈</td>
+              </tr>
             </tbody>
           </table>
-          <div v-if="!feedback.length" class="empty">暂无反馈</div>
         </div>
       </section>
     </template>
