@@ -28,7 +28,7 @@ onMounted(refresh);
   <section class="page">
     <div class="page-header">
       <div>
-        <h1>模型</h1>
+        <h1>模型管理</h1>
         <p>已验证并登记的模型包与领域能力。</p>
       </div>
       <button class="button secondary" :disabled="loading" @click="refresh">

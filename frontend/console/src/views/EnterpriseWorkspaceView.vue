@@ -135,7 +135,7 @@ onMounted(refresh);
   <section class="page">
     <div class="page-header">
       <div>
-        <h1>企业工作区</h1>
+        <h1>企业专区</h1>
         <p>许可证、权益、配额、服务等级协议、事件、支持与合规证据。</p>
       </div>
       <button class="button secondary" :disabled="loading" @click="refresh">

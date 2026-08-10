@@ -481,7 +481,7 @@ onMounted(refresh);
   <section class="page">
     <div class="page-header">
       <div>
-        <h1>接入</h1>
+        <h1>接入与权限</h1>
         <p>身份、权限、产品授权与事件通道。</p>
       </div>
       <button class="button secondary" :disabled="loading" @click="refresh">

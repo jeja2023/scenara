@@ -28,7 +28,7 @@ onMounted(refresh);
   <section class="page">
     <div class="page-header">
       <div>
-        <h1>运维</h1>
+        <h1>系统运维</h1>
         <p>运行后端与生产门禁状态。</p>
       </div>
       <button class="button secondary" @click="refresh">刷新</button>
@@ -56,27 +56,75 @@ onMounted(refresh);
       </div>
     </div>
     <section class="panel">
-      <div class="panel-header"><h2>门禁</h2></div>
-      <div class="panel-body checks">
-        <div>
-          <span>接口认证</span
-          ><strong :class="status?.auth_required ? 'ok' : 'warn'">{{
-            status?.auth_required ? "开启" : "开发关闭"
-          }}</strong>
-        </div>
-        <div>
-          <span>生产模型强制</span
-          ><strong
-            :class="status?.production_models_required ? 'ok' : 'warn'"
-            >{{
-              status?.production_models_required ? "开启" : "开发关闭"
-            }}</strong
-          >
-        </div>
-        <div>
-          <span>审计持久化</span><strong class="warn">数据结构已建立</strong>
-        </div>
-        <div><span>备份恢复证据</span><strong class="warn">待验证</strong></div>
+      <div class="panel-header"><h2>门禁状态与校验</h2></div>
+      <div class="table-scroll">
+        <table class="data-table bordered-table">
+          <thead>
+            <tr>
+              <th style="width: 50px">序号</th>
+              <th>检查项</th>
+              <th>分类</th>
+              <th>校验说明</th>
+              <th>当前状态</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="muted">1</td>
+              <td><strong>接口认证</strong></td>
+              <td><span class="badge">访问控制</span></td>
+              <td class="muted">
+                强校验 HTTP 接口访问令牌与会话认证凭据
+              </td>
+              <td>
+                <span
+                  class="badge"
+                  :class="status?.auth_required ? 'active' : 'paused'"
+                  >{{ status?.auth_required ? "开启" : "开发关闭" }}</span
+                >
+              </td>
+            </tr>
+            <tr>
+              <td class="muted">2</td>
+              <td><strong>生产模型强制</strong></td>
+              <td><span class="badge">算法合规</span></td>
+              <td class="muted">
+                生产环境离线部署强制校验模型包文件与签名完整性
+              </td>
+              <td>
+                <span
+                  class="badge"
+                  :class="
+                    status?.production_models_required ? 'active' : 'paused'
+                  "
+                  >{{
+                    status?.production_models_required ? "开启" : "开发关闭"
+                  }}</span
+                >
+              </td>
+            </tr>
+            <tr>
+              <td class="muted">3</td>
+              <td><strong>审计持久化</strong></td>
+              <td><span class="badge">合规审计</span></td>
+              <td class="muted">
+                存储底层具备完整安全审计事件与数据控制面结构表
+              </td>
+              <td>
+                <span class="badge completed">数据结构已建立</span>
+              </td>
+            </tr>
+            <tr>
+              <td class="muted">4</td>
+              <td><strong>备份恢复证据</strong></td>
+              <td><span class="badge">容灾可靠性</span></td>
+              <td class="muted">定期验证完整备份恢复与 RPO/RTO 演练签名报告</td>
+              <td>
+                <span class="badge paused">待验证</span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
   </section>

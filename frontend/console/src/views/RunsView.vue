@@ -140,7 +140,7 @@ onBeforeUnmount(() => {
   <section class="page">
     <div class="page-header">
       <div>
-        <h1>运行</h1>
+        <h1>运行历史</h1>
         <p>查看历史任务并返回解析工作区继续观察或处理。</p>
       </div>
       <div class="toolbar">

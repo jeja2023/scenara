@@ -304,7 +304,7 @@ function scoreLabel(hit: SearchHit): string {
     <div class="page-header">
       <div>
         <span class="eyebrow">统一检索</span>
-        <h1>检索</h1>
+        <h1>综合检索</h1>
         <p>
           从已解析的图片、视频、视频流和文档中查找内容，结果直接回到解析结果中心。
         </p>
