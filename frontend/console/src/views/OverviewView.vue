@@ -141,7 +141,17 @@ useRefresh(refresh);
 </script>
 
 <template>
-  <section class="page">
+  <section class="page overview-page">
+    <div class="overview-hero">
+      <div class="hero-title">
+        <h1>工作台总览</h1>
+        <p>聚合全局核心指标与各领域最新运行动态。</p>
+      </div>
+      <RouterLink class="button primary overview-action" to="/parse">
+        <Play :size="16" />新建解析
+      </RouterLink>
+    </div>
+
     <p v-if="error" class="callout error">{{ error }}</p>
 
     <div class="stats">
@@ -182,12 +192,7 @@ useRefresh(refresh);
     <section class="panel product-matrix">
       <div class="panel-header">
         <h2>Scenara 产品矩阵</h2>
-        <div class="header-actions">
-          <span class="badge">{{ products.length }} 项</span>
-          <RouterLink class="button primary" to="/parse">
-            <Play :size="16" />新建解析
-          </RouterLink>
-        </div>
+        <span class="badge">{{ products.length }} 项</span>
       </div>
       <div class="product-grid">
         <article
@@ -533,6 +538,30 @@ useRefresh(refresh);
 </template>
 
 <style scoped>
+.overview-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 4px;
+}
+.hero-title h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--graphite);
+  line-height: 1.25;
+}
+.hero-title p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.overview-action {
+  text-decoration: none !important;
+  flex-shrink: 0;
+}
 .product-matrix {
   margin-bottom: 20px;
 }
