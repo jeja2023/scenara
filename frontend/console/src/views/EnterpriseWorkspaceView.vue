@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Plus, RefreshCw } from "@lucide/vue";
+import { Plus } from "@lucide/vue";
 import { onMounted, reactive, ref } from "vue";
+import { useRefresh } from "../composables/useRefresh";
 
 import { ApiError, api, userFacingError } from "../api";
 import {
@@ -129,19 +130,11 @@ async function createEvidence(): Promise<void> {
 }
 
 onMounted(refresh);
+useRefresh(refresh);
 </script>
 
 <template>
   <section class="page">
-    <div class="page-header">
-      <div>
-        <h1>企业专区</h1>
-        <p>许可证、权益、配额、服务等级协议、事件、支持与合规证据。</p>
-      </div>
-      <button class="button secondary" :disabled="loading" @click="refresh">
-        <RefreshCw :size="16" />刷新
-      </button>
-    </div>
     <p v-if="unavailable" class="callout">此部署未安装企业模块。</p>
     <p v-if="error" class="callout error">{{ error }}</p>
 

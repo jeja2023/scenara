@@ -20,6 +20,11 @@ import {
   type ConnectionSettings,
 } from "./api";
 import brandMark from "./assets/scenara-mark.svg";
+import {
+  labelDomain,
+  labelDomainDescription,
+  labelDomainDisplayName,
+} from "./labels";
 import { routes } from "./router";
 import type { DomainManifest } from "./types";
 
@@ -120,6 +125,69 @@ watch(
   },
   { immediate: true },
 );
+const isRefreshing = ref(false);
+
+function triggerRefresh(): void {
+  if (isRefreshing.value) return;
+  isRefreshing.value = true;
+  window.dispatchEvent(new CustomEvent("scenara:refresh"));
+  setTimeout(() => {
+    isRefreshing.value = false;
+  }, 600);
+}
+
+const pageTitle = computed(() => {
+  const currentDomain = (
+    route.params.domain ||
+    route.query.domain ||
+    (route.name === "portrait-parse"
+      ? "portrait"
+      : route.name === "ocr-parse"
+        ? "ocr"
+        : "")
+  ) as string;
+
+  if (route.path.startsWith("/parse") && currentDomain) {
+    if (currentDomain === "portrait") return "人像解析";
+    if (currentDomain === "ocr") return "OCR 文档解析";
+    const manifest = domainManifests.value.find(
+      (d) => d.domain_id === currentDomain,
+    );
+    const domainName = manifest
+      ? labelDomainDisplayName(manifest.domain_id, manifest.display_name)
+      : labelDomain(currentDomain);
+    return domainName.endsWith("解析") ? domainName : `${domainName}解析`;
+  }
+
+  return (route.meta?.title as string) ?? "";
+});
+
+const pageDescription = computed(() => {
+  const currentDomain = (
+    route.params.domain ||
+    route.query.domain ||
+    (route.name === "portrait-parse"
+      ? "portrait"
+      : route.name === "ocr-parse"
+        ? "ocr"
+        : "")
+  ) as string;
+
+  if (route.path.startsWith("/parse") && currentDomain) {
+    if (currentDomain === "portrait")
+      return "检测人员并分析人像相关的视觉特征。";
+    if (currentDomain === "ocr")
+      return "识别并分析文档中的文字、结构和关键信息。";
+    const manifest = domainManifests.value.find(
+      (d) => d.domain_id === currentDomain,
+    );
+    if (manifest) {
+      return labelDomainDescription(manifest.domain_id, manifest.description);
+    }
+  }
+
+  return (route.meta?.description as string) ?? "";
+});
 </script>
 
 <template>
@@ -139,9 +207,24 @@ watch(
       <div class="topbar-context">
         <span class="context-product">视觉 AI 中枢平台</span>
         <span class="context-separator"></span>
-        <strong>{{ route.meta.title }}</strong>
+        <strong class="context-title">{{ pageTitle }}</strong>
+        <span
+          v-if="pageDescription"
+          class="context-description"
+          :title="pageDescription"
+        >
+          {{ pageDescription }}
+        </span>
       </div>
       <div class="topbar-actions">
+        <button
+          class="icon-button"
+          title="刷新"
+          :disabled="isRefreshing"
+          @click="triggerRefresh"
+        >
+          <RefreshCw :size="18" :class="{ spin: isRefreshing }" />
+        </button>
         <button
           class="connection"
           :class="connectionState"

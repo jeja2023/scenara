@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Activity, AlertCircle, Boxes, Play, RefreshCw } from "@lucide/vue";
+import { Activity, AlertCircle, Boxes, Play } from "@lucide/vue";
 import { computed, onMounted, ref } from "vue";
+import { useRefresh } from "../composables/useRefresh";
 import { api, userFacingError } from "../api";
 import {
   labelCapability,
@@ -136,22 +137,16 @@ function domainLabel(value: string): string {
 }
 
 onMounted(refresh);
+useRefresh(refresh);
 </script>
 
 <template>
   <section class="page">
     <div class="page-header">
-      <div>
-        <h1>总览</h1>
-        <p>最近运行、启用领域与 Scenara 产品矩阵状态。</p>
-      </div>
       <div class="toolbar">
         <RouterLink class="button primary" to="/parse">
           <Play :size="16" />新建解析
         </RouterLink>
-        <button class="button secondary" :disabled="loading" @click="refresh">
-          <RefreshCw :size="16" />刷新
-        </button>
       </div>
     </div>
 

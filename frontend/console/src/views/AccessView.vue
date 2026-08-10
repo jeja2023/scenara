@@ -5,12 +5,12 @@ import {
   Clipboard,
   KeyRound,
   Plus,
-  RefreshCw,
   ShieldOff,
   Trash2,
   X,
 } from "@lucide/vue";
 import { computed, onMounted, reactive, ref } from "vue";
+import { useRefresh } from "../composables/useRefresh";
 import {
   api,
   loadConnection,
@@ -475,20 +475,11 @@ async function copyIssuedKey(): Promise<void> {
 }
 
 onMounted(refresh);
+useRefresh(refresh);
 </script>
 
 <template>
   <section class="page">
-    <div class="page-header">
-      <div>
-        <h1>接入与权限</h1>
-        <p>身份、权限、产品授权与事件通道。</p>
-      </div>
-      <button class="button secondary" :disabled="loading" @click="refresh">
-        <RefreshCw :size="16" />刷新
-      </button>
-    </div>
-
     <p v-if="error" class="callout error">{{ error }}</p>
 
     <div class="access-tabs" role="tablist" aria-label="接入管理视图">

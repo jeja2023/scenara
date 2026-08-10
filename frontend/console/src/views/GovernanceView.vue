@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Check, RefreshCw, ShieldCheck } from "@lucide/vue";
+import { Check, ShieldCheck } from "@lucide/vue";
 import { onMounted, reactive, ref } from "vue";
+import { useRefresh } from "../composables/useRefresh";
 
 import { api, userFacingError } from "../api";
 
@@ -177,19 +178,11 @@ async function probe(
 }
 
 onMounted(refresh);
+useRefresh(refresh);
 </script>
 
 <template>
   <section class="page">
-    <div class="page-header">
-      <div>
-        <h1>平台治理</h1>
-        <p>项目生命周期、审计保留、计量席位和适配器健康状态</p>
-      </div>
-      <button class="button secondary" :disabled="loading" @click="refresh">
-        <RefreshCw :size="16" />刷新
-      </button>
-    </div>
     <p v-if="error" class="callout error">{{ error }}</p>
     <div class="governance-grid">
       <section class="panel">

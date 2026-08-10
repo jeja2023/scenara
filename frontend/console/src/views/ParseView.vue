@@ -18,7 +18,7 @@ import {
   Video,
 } from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import {
   ApiError,
   api,
@@ -34,9 +34,9 @@ import {
   type MediaMode,
 } from "../composables/useDomainCatalog";
 import { useMediaPreview } from "../composables/useMediaPreview";
+import { useRefresh } from "../composables/useRefresh";
 import {
   labelDomain,
-  labelDomainDescription,
   labelMediaKind,
   labelPipeline,
   labelRunError,
@@ -300,11 +300,6 @@ const hasResult = computed(() => !!result.value);
 const currentDomainLabel = computed(
   () => selectedDomainManifest.value?.display_name || labelDomain(domain.value),
 );
-const pageTitle = computed(() => {
-  if (domain.value === "portrait") return "人像解析工作区";
-  if (domain.value === "ocr") return "OCR 文档解析工作区";
-  return `${currentDomainLabel.value}解析工作区`;
-});
 const isDomainScoped = computed(() =>
   Boolean(route.params?.domain || props.initialDomain || domain.value),
 );
@@ -1124,6 +1119,7 @@ onMounted(async () => {
   await restoreRouteSelection();
   await refreshHistory();
 });
+useRefresh(refreshWorkspaceResources);
 onBeforeUnmount(() => {
   pollGeneration += 1;
   if (sseAbort) {
@@ -1136,15 +1132,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="page parse-workbench">
-    <div class="page-header">
-      <div>
-        <h1>{{ pageTitle }}</h1>
-        <p>
-          {{
-            labelDomainDescription(domain, selectedDomainManifest?.description)
-          }}
-        </p>
-      </div>
+    <div v-if="hasResult || (run && !isTerminal)" class="page-header">
       <div class="toolbar">
         <button
           v-if="hasResult"
@@ -1185,13 +1173,6 @@ onBeforeUnmount(() => {
           @click="transitionRun('cancel')"
         >
           <Square :size="15" />取消运行
-        </button>
-        <button
-          class="button primary"
-          :disabled="!inputReady || loading"
-          @click="execute"
-        >
-          <Play :size="16" />{{ loading ? "运行中" : "开始解析" }}
         </button>
       </div>
     </div>
@@ -1240,6 +1221,44 @@ onBeforeUnmount(() => {
           </select>
         </div>
       </div>
+      <div class="segmented media-modes" role="tablist" aria-label="数据类型">
+        <button
+          v-if="supportedMediaKinds.includes('image')"
+          :class="{ active: mode === 'image' }"
+          role="tab"
+          :aria-selected="mode === 'image'"
+          @click="selectMode('image')"
+        >
+          <FileImage :size="16" />图片
+        </button>
+        <button
+          v-if="supportedMediaKinds.includes('video')"
+          :class="{ active: mode === 'video' }"
+          role="tab"
+          :aria-selected="mode === 'video'"
+          @click="selectMode('video')"
+        >
+          <Video :size="16" />视频
+        </button>
+        <button
+          v-if="supportedMediaKinds.includes('document')"
+          :class="{ active: mode === 'document' }"
+          role="tab"
+          :aria-selected="mode === 'document'"
+          @click="selectMode('document')"
+        >
+          <FileText :size="16" />文档
+        </button>
+        <button
+          v-if="supportedMediaKinds.includes('stream')"
+          :class="{ active: mode === 'stream' }"
+          role="tab"
+          :aria-selected="mode === 'stream'"
+          @click="selectMode('stream')"
+        >
+          <Radio :size="16" />视频流
+        </button>
+      </div>
       <label class="pipeline-picker">
         <span class="control-label">流水线</span>
         <select
@@ -1260,6 +1279,13 @@ onBeforeUnmount(() => {
         </select>
       </label>
       <nav class="parse-context-nav" aria-label="解析工作区操作">
+        <button
+          class="button primary"
+          :disabled="!inputReady || loading"
+          @click="execute"
+        >
+          <Play :size="16" />{{ loading ? "运行中" : "开始解析" }}
+        </button>
         <RouterLink
           class="parse-history-link"
           :to="{ path: '/runs', query: { domain } }"
@@ -1270,45 +1296,6 @@ onBeforeUnmount(() => {
           查看结构化结果
         </RouterLink>
       </nav>
-    </div>
-
-    <div class="segmented media-modes" role="tablist" aria-label="数据类型">
-      <button
-        v-if="supportedMediaKinds.includes('image')"
-        :class="{ active: mode === 'image' }"
-        role="tab"
-        :aria-selected="mode === 'image'"
-        @click="selectMode('image')"
-      >
-        <FileImage :size="16" />图片
-      </button>
-      <button
-        v-if="supportedMediaKinds.includes('video')"
-        :class="{ active: mode === 'video' }"
-        role="tab"
-        :aria-selected="mode === 'video'"
-        @click="selectMode('video')"
-      >
-        <Video :size="16" />视频
-      </button>
-      <button
-        v-if="supportedMediaKinds.includes('document')"
-        :class="{ active: mode === 'document' }"
-        role="tab"
-        :aria-selected="mode === 'document'"
-        @click="selectMode('document')"
-      >
-        <FileText :size="16" />文档
-      </button>
-      <button
-        v-if="supportedMediaKinds.includes('stream')"
-        :class="{ active: mode === 'stream' }"
-        role="tab"
-        :aria-selected="mode === 'stream'"
-        @click="selectMode('stream')"
-      >
-        <Radio :size="16" />视频流
-      </button>
     </div>
 
     <p v-if="error" class="callout error">{{ error }}</p>
@@ -1957,11 +1944,15 @@ onBeforeUnmount(() => {
   margin-left: auto;
 }
 .parse-context-nav a {
-  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 5px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 650;
   text-decoration: none;
   background: var(--surface);
   transition: all 150ms ease;
@@ -1974,12 +1965,12 @@ onBeforeUnmount(() => {
 }
 .workbench-config {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: 18px;
   padding: 12px 0;
-  border-block: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
 }
-.workbench-config > div,
+.workbench-config > div:not(.media-modes),
 .pipeline-picker,
 .input-origin {
   display: grid;
@@ -2006,8 +1997,11 @@ onBeforeUnmount(() => {
   max-width: 460px;
 }
 .media-modes {
+  display: inline-flex;
+  align-items: center;
+  flex-direction: row;
   width: fit-content;
-  margin-bottom: 14px;
+  margin-bottom: 0;
 }
 .media-modes button {
   display: inline-flex;

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
-import { Check, Database, Plus, RefreshCw, UploadCloud } from "@lucide/vue";
+import { useRefresh } from "../composables/useRefresh";
+import { Check, Database, Plus, UploadCloud } from "@lucide/vue";
 import { api, userFacingError } from "../api";
 import type { DatasetRecord, DatasetVersion, MediaAsset } from "../types";
 
@@ -184,20 +185,11 @@ function statusLabel(status: string): string {
 }
 
 onMounted(refresh);
+useRefresh(refresh);
 </script>
 
 <template>
   <section class="page">
-    <div class="page-header">
-      <div>
-        <p class="eyebrow">数据治理</p>
-        <h1>数据集</h1>
-        <p>以可追溯的版本承载解析资产、质量评分和交付清单。</p>
-      </div>
-      <button class="button secondary" :disabled="loading" @click="refresh">
-        <RefreshCw :size="16" />刷新
-      </button>
-    </div>
     <p v-if="error" class="callout error">{{ error }}</p>
     <p v-if="message" class="callout success">{{ message }}</p>
     <div class="governance-grid">

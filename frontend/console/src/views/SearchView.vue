@@ -4,7 +4,6 @@ import {
   Bookmark,
   FileSearch,
   FileText,
-  RefreshCw,
   ScanFace,
   Search as SearchIcon,
   Trash2,
@@ -13,6 +12,7 @@ import {
   Video,
 } from "@lucide/vue";
 import { computed, ref } from "vue";
+import { useRefresh } from "../composables/useRefresh";
 import { useRouter } from "vue-router";
 
 import { api, apiBlob, apiForm, blobToDataUrl, userFacingError } from "../api";
@@ -297,23 +297,12 @@ function scoreLabel(hit: SearchHit): string {
   if (hit.score == null) return "文本命中";
   return `相似度 ${hit.score.toFixed(4)}`;
 }
+
+useRefresh(runSearch);
 </script>
 
 <template>
   <section class="page search-page">
-    <div class="page-header">
-      <div>
-        <span class="eyebrow">统一检索</span>
-        <h1>综合检索</h1>
-        <p>
-          从已解析的图片、视频、视频流和文档中查找内容，结果直接回到解析结果中心。
-        </p>
-      </div>
-      <button class="button secondary" :disabled="loading" @click="runSearch">
-        <RefreshCw :size="16" :class="{ spin: loading }" />刷新结果
-      </button>
-    </div>
-
     <p v-if="error" class="notice error">{{ error }}</p>
 
     <section class="panel search-controls">

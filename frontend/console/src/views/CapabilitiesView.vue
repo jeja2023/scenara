@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ArrowRight, RefreshCw, ScanSearch } from "@lucide/vue";
+import { ArrowRight, ScanSearch } from "@lucide/vue";
 import { computed, onMounted, ref } from "vue";
+import { useRefresh } from "../composables/useRefresh";
 import { RouterLink } from "vue-router";
 import { api, userFacingError } from "../api";
 import {
@@ -61,30 +62,24 @@ function domainSummary(domain: DomainManifest): string {
 }
 
 onMounted(refresh);
+useRefresh(refresh);
 </script>
 
 <template>
   <section class="page capabilities-page">
     <div class="page-header">
-      <div>
-        <h1>领域与能力</h1>
-        <p>查看已安装领域、支持的数据类型和可用解析流水线。</p>
-        <div
-          v-if="!loading"
-          class="capability-summary"
-          aria-label="领域能力概况"
+      <div
+        v-if="!loading"
+        class="capability-summary"
+        aria-label="领域能力概况"
+      >
+        <span
+          >已安装领域 <strong>{{ orderedDomains.length }}</strong> 个</span
         >
-          <span
-            >已安装领域 <strong>{{ orderedDomains.length }}</strong> 个</span
-          >
-          <span
-            >可用流水线 <strong>{{ pipelines.length }}</strong> 条</span
-          >
-        </div>
+        <span
+          >可用流水线 <strong>{{ pipelines.length }}</strong> 条</span
+        >
       </div>
-      <button class="button secondary" :disabled="loading" @click="refresh">
-        <RefreshCw :size="16" :class="{ spin: loading }" />刷新
-      </button>
     </div>
     <p v-if="error" class="callout error">{{ error }}</p>
 

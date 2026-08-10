@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ArrowRight, RefreshCw } from "@lucide/vue";
+import { ArrowRight } from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { useRefresh } from "../composables/useRefresh";
 import { useRoute, useRouter } from "vue-router";
 import { api, userFacingError } from "../api";
 import {
@@ -33,7 +34,9 @@ const status = ref<RunStatus | "">(
     ? (routeStatus as RunStatus)
     : "",
 );
-const domain = ref<"" | Domain>("");
+const routeDomain =
+  typeof route.query.domain === "string" ? (route.query.domain as Domain) : "";
+const domain = ref<"" | Domain>(routeDomain);
 const loading = ref(false);
 const error = ref("");
 const autoRefresh = ref(true);
@@ -131,6 +134,7 @@ onMounted(async () => {
   await refresh();
   scheduleRefresh();
 });
+useRefresh(refresh);
 onBeforeUnmount(() => {
   if (timer !== null) window.clearTimeout(timer);
 });
@@ -139,17 +143,10 @@ onBeforeUnmount(() => {
 <template>
   <section class="page">
     <div class="page-header">
-      <div>
-        <h1>运行历史</h1>
-        <p>查看历史任务并返回解析工作区继续观察或处理。</p>
-      </div>
       <div class="toolbar">
         <label class="auto-refresh"
           ><input v-model="autoRefresh" type="checkbox" />自动刷新</label
         >
-        <button class="button secondary" :disabled="loading" @click="refresh">
-          <RefreshCw :size="16" :class="{ spin: loading }" />刷新
-        </button>
       </div>
     </div>
 

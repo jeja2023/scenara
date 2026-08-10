@@ -4,13 +4,13 @@ import {
   FileSearch,
   FileText,
   Filter,
-  RefreshCw,
   Search,
   UserRound,
   Video,
   X,
 } from "@lucide/vue";
 import { computed, onMounted, ref } from "vue";
+import { useRefresh } from "../composables/useRefresh";
 import { useRoute, useRouter } from "vue-router";
 
 import { api, userFacingError } from "../api";
@@ -168,20 +168,13 @@ function clearFilters(): void {
 }
 
 onMounted(refresh);
+useRefresh(refresh);
 </script>
 
 <template>
   <section class="page results-page">
     <div class="page-header results-header">
-      <div>
-        <span class="eyebrow">结果中心</span>
-        <h1>解析结果</h1>
-        <p>跨人像、OCR 文档和全部数据资产查看已产生的解析结果。</p>
-      </div>
       <div class="toolbar">
-        <button class="button secondary" :disabled="loading" @click="refresh">
-          <RefreshCw :size="16" :class="{ spin: loading }" />刷新
-        </button>
         <button class="button primary" @click="router.push('/parse')">
           <FileSearch :size="16" />新建解析
         </button>

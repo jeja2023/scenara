@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Download, RefreshCw, Search } from "@lucide/vue";
+import { Download, Search } from "@lucide/vue";
 import { onMounted, reactive, ref } from "vue";
+import { useRefresh } from "../composables/useRefresh";
 import { api, apiBlob, userFacingError } from "../api";
 import type { AuditEvent } from "../types";
 
@@ -59,22 +60,17 @@ function formatTime(timestamp: number): string {
 }
 
 onMounted(refresh);
+useRefresh(refresh);
 </script>
 
 <template>
   <section class="page">
     <div class="page-header">
-      <div>
-        <p class="eyebrow">治理与合规</p>
-        <h1>审计中心</h1>
-        <p>统一查看解析、数据、检索和权限操作，支持筛选与留档。</p>
-      </div>
-      <div class="header-actions">
-        <button class="button secondary" :disabled="loading" @click="refresh">
-          <RefreshCw :size="16" />刷新</button
-        ><button class="button secondary" @click="exportAudit('csv')">
-          <Download :size="16" />导出 CSV</button
-        ><button class="button secondary" @click="exportAudit('json')">
+      <div class="toolbar">
+        <button class="button secondary" @click="exportAudit('csv')">
+          <Download :size="16" />导出 CSV
+        </button>
+        <button class="button secondary" @click="exportAudit('json')">
           <Download :size="16" />导出 JSON
         </button>
       </div>

@@ -2,12 +2,12 @@
 import {
   CheckCircle2,
   FileImage,
-  RefreshCw,
   ScanFace,
   Upload,
   XCircle,
 } from "@lucide/vue";
 import { computed, onMounted, reactive, ref } from "vue";
+import { useRefresh } from "../composables/useRefresh";
 
 import { api, apiBlob, apiForm, blobToDataUrl, userFacingError } from "../api";
 import type { MediaAsset } from "../types";
@@ -213,17 +213,12 @@ async function compare(): Promise<void> {
 }
 
 onMounted(() => void refreshAssets());
+useRefresh(refreshAssets);
 </script>
 
 <template>
   <section class="page portrait-compare-page">
     <div class="page-header">
-      <div>
-        <h1>人像比对</h1>
-        <p>
-          以统一的人像特征契约比较两张图片，保留输入来源、模型版本和判定阈值。
-        </p>
-      </div>
       <div class="toolbar">
         <label class="threshold-control">
           <span>判定阈值</span>
@@ -235,13 +230,6 @@ onMounted(() => void refreshAssets());
             step="0.01"
           />
         </label>
-        <button
-          class="button secondary"
-          :disabled="loading"
-          @click="refreshAssets"
-        >
-          <RefreshCw :size="16" :class="{ spin: loading }" />刷新资产
-        </button>
       </div>
     </div>
 

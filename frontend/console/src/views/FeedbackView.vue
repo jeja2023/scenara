@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { Check, History, Plus, RefreshCw, RotateCcw, X } from "@lucide/vue";
+import { Check, History, Plus, RotateCcw, X } from "@lucide/vue";
 import { computed, onMounted, reactive, ref } from "vue";
+import { useRefresh } from "../composables/useRefresh";
 
 import { api, userFacingError } from "../api";
 import {
@@ -267,19 +268,11 @@ async function rollback(item: ModelRelease): Promise<void> {
 }
 
 onMounted(refresh);
+useRefresh(refresh);
 </script>
 
 <template>
   <section class="page">
-    <div class="page-header">
-      <div>
-        <h1>反馈与发布</h1>
-        <p>审核纠错反馈、导出合规难例并管理模型发布。</p>
-      </div>
-      <button class="button secondary" :disabled="loading" @click="refresh">
-        <RefreshCw :size="16" />刷新
-      </button>
-    </div>
     <p v-if="error" class="callout error">{{ error }}</p>
     <div class="segmented" role="tablist" aria-label="反馈与发布视图">
       <button :class="{ active: tab === 'feedback' }" @click="tab = 'feedback'">

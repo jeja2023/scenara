@@ -70,17 +70,33 @@ textarea:focus-visible {
 .topbar-context {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
   font-size: 14px;
+  overflow: hidden;
 }
 .context-product {
   color: var(--muted);
+  flex-shrink: 0;
 }
 .context-separator {
   width: 1px;
   height: 18px;
   background: var(--line);
+  flex-shrink: 0;
+}
+.context-title {
+  font-weight: 700;
+  color: var(--graphite);
+  flex-shrink: 0;
+}
+.context-description {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .topbar-actions {
   display: flex;
@@ -280,6 +296,17 @@ textarea:focus-visible {
   border-color: #9eaaa6;
   background: #f5f7f6;
 }
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
 .connection {
   height: 30px;
   display: inline-flex;
@@ -311,8 +338,8 @@ textarea:focus-visible {
 }
 .page-header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: flex-end;
   gap: 18px;
   margin-bottom: 20px;
 }
@@ -329,8 +356,10 @@ textarea:focus-visible {
 .toolbar {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   flex-wrap: wrap;
   gap: 8px;
+  margin-left: auto;
 }
 .button {
   min-height: 34px;
@@ -433,39 +462,35 @@ textarea:focus-visible {
   gap: 16px;
   align-items: start;
 }
+table,
 .data-table {
   width: 100%;
   border-collapse: collapse;
+  border: 1px solid var(--line);
   font-size: 12px;
 }
+table th,
+table td,
+.data-table th,
+.data-table td {
+  border: 1px solid var(--line);
+}
+table th,
 .data-table th {
   height: 38px;
   padding: 0 12px;
   text-align: left;
   color: var(--muted);
   background: #f7f8f8;
-  border-bottom: 1px solid var(--line);
   font-weight: 650;
 }
+table td,
 .data-table td {
   min-height: 46px;
   padding: 10px 12px;
-  border-bottom: 1px solid #e8ecea;
   vertical-align: middle;
 }
-.data-table tr:last-child td {
-  border-bottom: 0;
-}
-.data-table.bordered-table {
-  border: 1px solid var(--line);
-}
-.data-table.bordered-table th,
-.data-table.bordered-table td {
-  border: 1px solid var(--line);
-}
-.data-table.bordered-table tr:last-child td {
-  border-bottom: 1px solid var(--line);
-}
+table tbody tr:hover,
 .data-table tbody tr:hover {
   background: #fafbfa;
 }

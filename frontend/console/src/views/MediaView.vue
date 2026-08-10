@@ -5,13 +5,13 @@ import {
   ChevronRight,
   Eye,
   Play,
-  RefreshCw,
   Trash2,
   Upload,
   Video,
   X,
 } from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { useRefresh } from "../composables/useRefresh";
 import { useRouter } from "vue-router";
 import { api, apiBlob, userFacingError } from "../api";
 import { labelMediaKind } from "../labels";
@@ -292,15 +292,12 @@ function probeText(sourceId: string): string {
 
 onMounted(refresh);
 onBeforeUnmount(closePreview);
+useRefresh(refresh);
 </script>
 
 <template>
   <section class="page">
     <div class="page-header">
-      <div>
-        <h1>数据资产</h1>
-        <p>统一管理可重复使用的图片、视频、文档文件与视频流来源。</p>
-      </div>
       <div class="toolbar">
         <button
           v-if="selectedForDelete.size"
@@ -318,9 +315,6 @@ onBeforeUnmount(closePreview);
             :disabled="uploading"
             @change="upload"
         /></label>
-        <button class="button secondary" :disabled="loading" @click="refresh">
-          <RefreshCw :size="16" :class="{ spin: loading }" />刷新
-        </button>
       </div>
     </div>
     <p v-if="error" class="callout error">{{ error }}</p>

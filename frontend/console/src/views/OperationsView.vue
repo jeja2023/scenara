@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
+import { useRefresh } from "../composables/useRefresh";
 import { api, userFacingError } from "../api";
 import { labelRuntime, labelVersion } from "../labels";
 
@@ -13,26 +14,24 @@ interface Status {
   auth_required: boolean;
 }
 const status = ref<Status | null>(null);
+const loading = ref(false);
 const error = ref("");
 async function refresh(): Promise<void> {
+  loading.value = true;
   try {
     status.value = await api<Status>("/api/v1/system/status");
   } catch (caught) {
     error.value = userFacingError(caught, "运行状态加载失败，请稍后重试");
+  } finally {
+    loading.value = false;
   }
 }
 onMounted(refresh);
+useRefresh(refresh);
 </script>
 
 <template>
   <section class="page">
-    <div class="page-header">
-      <div>
-        <h1>系统运维</h1>
-        <p>运行后端与生产门禁状态。</p>
-      </div>
-      <button class="button secondary" @click="refresh">刷新</button>
-    </div>
     <p v-if="error" class="callout error">{{ error }}</p>
     <div v-if="status" class="stats">
       <div class="stat teal">

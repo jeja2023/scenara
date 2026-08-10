@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { RefreshCw } from "@lucide/vue";
 import { onMounted, ref } from "vue";
+import { useRefresh } from "../composables/useRefresh";
 import { api, userFacingError } from "../api";
 import { labelCapability } from "../labels";
 import type { ModelPackage } from "../types";
@@ -22,19 +22,11 @@ async function refresh(): Promise<void> {
 }
 
 onMounted(refresh);
+useRefresh(refresh);
 </script>
 
 <template>
   <section class="page">
-    <div class="page-header">
-      <div>
-        <h1>模型管理</h1>
-        <p>已验证并登记的模型包与领域能力。</p>
-      </div>
-      <button class="button secondary" :disabled="loading" @click="refresh">
-        <RefreshCw :size="16" />刷新
-      </button>
-    </div>
     <p v-if="error" class="callout error">{{ error }}</p>
     <div class="stats model-stats">
       <div class="stat teal">
