@@ -142,14 +142,6 @@ useRefresh(refresh);
 
 <template>
   <section class="page">
-    <div class="page-header">
-      <div class="toolbar">
-        <RouterLink class="button primary" to="/parse">
-          <Play :size="16" />新建解析
-        </RouterLink>
-      </div>
-    </div>
-
     <p v-if="error" class="callout error">{{ error }}</p>
 
     <div class="stats">
@@ -190,7 +182,12 @@ useRefresh(refresh);
     <section class="panel product-matrix">
       <div class="panel-header">
         <h2>Scenara 产品矩阵</h2>
-        <span class="badge">{{ products.length }} 项</span>
+        <div class="header-actions">
+          <span class="badge">{{ products.length }} 项</span>
+          <RouterLink class="button primary" to="/parse">
+            <Play :size="16" />新建解析
+          </RouterLink>
+        </div>
       </div>
       <div class="product-grid">
         <article

@@ -306,99 +306,107 @@ useRefresh(runSearch);
     <p v-if="error" class="callout error">{{ error }}</p>
 
     <section class="panel search-controls">
-      <div class="mode-tabs" role="tablist" aria-label="检索方式">
-        <button :class="{ active: mode === 'text' }" @click="setMode('text')">
-          <SearchIcon :size="16" />文搜图 / 文搜视频
-        </button>
-        <button
-          :class="{ active: mode === 'portrait' }"
-          @click="setMode('portrait')"
-        >
-          <ScanFace :size="16" />人搜图
-        </button>
-      </div>
-      <div v-if="mode === 'text'" class="text-query-row">
-        <SearchIcon :size="17" />
-        <input
-          v-model.trim="query"
-          type="search"
-          placeholder="输入文字，例如：红色车辆、合同编号、人员姓名"
-          @keyup.enter="runSearch"
-        />
-      </div>
-      <div v-else class="portrait-query-row">
-        <div class="query-preview">
-          <img v-if="preview" :src="preview" alt="查询图片预览" />
-          <ScanFace v-else :size="28" />
+      <div class="panel-header">
+        <div>
+          <h2><SearchIcon :size="17" />智能多模态检索</h2>
+          <p>支持文字检索图像/视频，或选择人像特征检索相似目标。</p>
         </div>
-        <label class="button secondary upload-button"
-          ><Upload :size="16" />选择查询图片<input
-            type="file"
-            accept="image/*"
-            @change="setFile"
-        /></label>
-        <button
-          v-if="file || assetId"
-          class="button secondary"
-          @click="clearFile"
-        >
-          清除图片
-        </button>
-        <select
-          :value="assetId"
-          aria-label="从图片资产选择查询图片"
-          @change="setAsset(($event.target as HTMLSelectElement).value)"
-        >
-          <option value="">从图片资产选择</option>
-          <option
-            v-for="asset in imageAssets"
-            :key="asset.asset_id"
-            :value="asset.asset_id"
-          >
-            {{ asset.filename || asset.asset_id }}
-          </option>
-        </select>
-        <label class="threshold"
-          ><span>相似度阈值</span
-          ><input
-            v-model="threshold"
-            type="number"
-            min="-1"
-            max="1"
-            step="0.01"
-        /></label>
       </div>
-      <div class="filter-row">
-        <span>限定数据类型</span>
-        <button
-          v-for="kind in [
-            'image',
-            'video',
-            'document',
-            'stream',
-          ] as MediaKind[]"
-          :key="kind"
-          class="filter-chip"
-          :class="{ active: mediaKinds.includes(kind) }"
-          @click="toggleMediaKind(kind)"
-        >
-          {{
-            kind === "image"
-              ? "图片"
-              : kind === "video"
-                ? "视频"
-                : kind === "document"
-                  ? "文档"
-                  : "视频流"
-          }}
-        </button>
-        <button
-          class="button primary search-submit"
-          :disabled="loading || !hasQuery"
-          @click="runSearch"
-        >
-          <SearchIcon :size="16" />开始检索
-        </button>
+      <div class="panel-body">
+        <div class="mode-tabs" role="tablist" aria-label="检索方式">
+          <button :class="{ active: mode === 'text' }" @click="setMode('text')">
+            <SearchIcon :size="16" />文搜图 / 文搜视频
+          </button>
+          <button
+            :class="{ active: mode === 'portrait' }"
+            @click="setMode('portrait')"
+          >
+            <ScanFace :size="16" />人搜图
+          </button>
+        </div>
+        <div v-if="mode === 'text'" class="text-query-row">
+          <SearchIcon :size="17" />
+          <input
+            v-model.trim="query"
+            type="search"
+            placeholder="输入文字，例如：红色车辆、合同编号、人员姓名"
+            @keyup.enter="runSearch"
+          />
+        </div>
+        <div v-else class="portrait-query-row">
+          <div class="query-preview">
+            <img v-if="preview" :src="preview" alt="查询图片预览" />
+            <ScanFace v-else :size="28" />
+          </div>
+          <label class="button secondary upload-button"
+            ><Upload :size="16" />选择查询图片<input
+              type="file"
+              accept="image/*"
+              @change="setFile"
+          /></label>
+          <button
+            v-if="file || assetId"
+            class="button secondary"
+            @click="clearFile"
+          >
+            清除图片
+          </button>
+          <select
+            :value="assetId"
+            aria-label="从图片资产选择查询图片"
+            @change="setAsset(($event.target as HTMLSelectElement).value)"
+          >
+            <option value="">从图片资产选择</option>
+            <option
+              v-for="asset in imageAssets"
+              :key="asset.asset_id"
+              :value="asset.asset_id"
+            >
+              {{ asset.filename || asset.asset_id }}
+            </option>
+          </select>
+          <label class="threshold"
+            ><span>相似度阈值</span
+            ><input
+              v-model="threshold"
+              type="number"
+              min="-1"
+              max="1"
+              step="0.01"
+          /></label>
+        </div>
+        <div class="filter-row">
+          <span>限定数据类型</span>
+          <button
+            v-for="kind in [
+              'image',
+              'video',
+              'document',
+              'stream',
+            ] as MediaKind[]"
+            :key="kind"
+            class="filter-chip"
+            :class="{ active: mediaKinds.includes(kind) }"
+            @click="toggleMediaKind(kind)"
+          >
+            {{
+              kind === "image"
+                ? "图片"
+                : kind === "video"
+                  ? "视频"
+                  : kind === "document"
+                    ? "文档"
+                    : "视频流"
+            }}
+          </button>
+          <button
+            class="button primary search-submit"
+            :disabled="loading || !hasQuery"
+            @click="runSearch"
+          >
+            <SearchIcon :size="16" />开始检索
+          </button>
+        </div>
       </div>
     </section>
 
@@ -408,7 +416,7 @@ useRefresh(runSearch);
           <h2><Bookmark :size="17" />保存检索</h2>
           <p>把常用的文字或人像资产查询保存下来，下一次直接执行。</p>
         </div>
-        <span class="muted">{{ savedSearches.length }} 个</span>
+        <span class="badge">{{ savedSearches.length }} 个</span>
       </div>
       <div class="saved-create">
         <input
@@ -459,7 +467,7 @@ useRefresh(runSearch);
     <section class="panel result-panel">
       <div class="panel-header">
         <div>
-          <h2>检索结果</h2>
+          <h2><FileSearch :size="17" />检索结果</h2>
           <p v-if="response">
             {{ response.total }} 条命中 ·
             {{ response.searched_indexes.length }} 个索引

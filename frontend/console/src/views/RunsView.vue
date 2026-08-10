@@ -304,12 +304,23 @@ onBeforeUnmount(() => {
   gap: 5px;
   flex-wrap: nowrap;
 }
-.auto-refresh {
+.auto-refresh-label {
   display: inline-flex;
+  flex-direction: row;
   align-items: center;
-  gap: 6px;
-  font-size: 12px;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
   color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.auto-refresh-label input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--teal);
 }
 .small {
   font-size: 11px;
