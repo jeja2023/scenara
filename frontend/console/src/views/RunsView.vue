@@ -142,14 +142,6 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="page">
-    <div class="page-header">
-      <div class="toolbar">
-        <label class="auto-refresh"
-          ><input v-model="autoRefresh" type="checkbox" />自动刷新</label
-        >
-      </div>
-    </div>
-
     <div class="stats">
       <div class="stat teal">
         <span>全部运行</span><strong>{{ total }}</strong
@@ -170,7 +162,12 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="panel filter-panel">
-      <div class="panel-header"><h2>筛选</h2></div>
+      <div class="panel-header">
+        <h2>筛选记录</h2>
+        <label class="auto-refresh-label"
+          ><input v-model="autoRefresh" type="checkbox" />自动刷新</label
+        >
+      </div>
       <div class="panel-body">
         <div class="toolbar">
           <select v-model="domain" aria-label="领域筛选" @change="refresh">

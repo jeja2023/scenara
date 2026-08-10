@@ -233,8 +233,8 @@ useRefresh(refreshAssets);
       </div>
     </div>
 
-    <div v-if="error" class="notice error">{{ error }}</div>
-    <div v-if="message" class="notice success">{{ message }}</div>
+    <div v-if="error" class="callout error">{{ error }}</div>
+    <div v-if="message" class="callout success">{{ message }}</div>
 
     <div class="compare-layout">
       <div class="compare-sources">

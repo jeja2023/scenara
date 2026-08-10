@@ -145,7 +145,7 @@ useRefresh(refresh);
               </td>
             </tr>
             <tr v-if="!events.length">
-              <td colspan="6" class="empty">没有匹配的审计事件</td>
+              <td colspan="7" class="empty">没有匹配的审计事件</td>
             </tr>
           </tbody>
         </table>

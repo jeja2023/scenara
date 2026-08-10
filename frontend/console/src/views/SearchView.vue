@@ -303,7 +303,7 @@ useRefresh(runSearch);
 
 <template>
   <section class="page search-page">
-    <p v-if="error" class="notice error">{{ error }}</p>
+    <p v-if="error" class="callout error">{{ error }}</p>
 
     <section class="panel search-controls">
       <div class="mode-tabs" role="tablist" aria-label="检索方式">
