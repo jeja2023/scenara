@@ -12,6 +12,7 @@ import {
   streamJsonEvents,
   userFacingError,
 } from "../src/api";
+import { completeSignIn, isSignedIn, signOut } from "../src/auth";
 import {
   labelAccessCapability,
   labelCapability,
@@ -133,6 +134,44 @@ describe("console API contract", () => {
       requestId: "req-denied",
     });
     expect((error as ApiError).message).toBe("当前身份无权执行此操作");
+  });
+
+  it("dispatches auth-expired event and clears session on 401 response", async () => {
+    const expiredListener = vi.fn();
+    window.addEventListener("scenara:auth-expired", expiredListener);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            request_id: "req-expired",
+            error: { code: "POLICY_DENIED", message: "Token expired" },
+          }),
+          { status: 401, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+
+    await expect(api("/api/v1/runs")).rejects.toBeInstanceOf(ApiError);
+    expect(expiredListener).toHaveBeenCalledOnce();
+    window.removeEventListener("scenara:auth-expired", expiredListener);
+  });
+
+  it("evaluates session timestamp expiration in isSignedIn", () => {
+    completeSignIn(
+      { apiBase: "", token: "abc", tenantId: "default", projectId: "default" },
+      false,
+      Math.floor(Date.now() / 1000) - 60,
+    );
+    expect(isSignedIn()).toBe(false);
+
+    completeSignIn(
+      { apiBase: "", token: "abc", tenantId: "default", projectId: "default" },
+      false,
+      Math.floor(Date.now() / 1000) + 3600,
+    );
+    expect(isSignedIn()).toBe(true);
+    signOut();
   });
 
   it("turns network failures into a Chinese message", async () => {

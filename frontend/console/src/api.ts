@@ -225,6 +225,7 @@ async function request(path: string, init: RequestInit): Promise<Response> {
 }
 
 async function responseError(response: Response): Promise<ApiError> {
+  if (response.status === 401) notifyAuthExpired();
   const body = (await response.json().catch(() => ({}))) as ApiErrorBody;
   const code = body.error?.code ?? "HTTP_ERROR";
   return new ApiError(
@@ -240,6 +241,7 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
   const body = (await response.json().catch(() => ({}))) as
     Envelope<T> | ApiErrorBody;
   if (!response.ok) {
+    if (response.status === 401) notifyAuthExpired();
     const error = (body as ApiErrorBody).error;
     const code = error?.code ?? "HTTP_ERROR";
     throw new ApiError(

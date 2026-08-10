@@ -11,7 +11,7 @@ import {
 } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
-import { signOut } from "./auth";
+import { isSignedIn, signOut } from "./auth";
 import {
   api,
   connectionTokenIsPersistent,
@@ -91,12 +91,24 @@ function handleAuthExpired(): void {
   if (route.name !== "login") void router.replace({ name: "login" });
 }
 
-onMounted(() =>
-  window.addEventListener("scenara:auth-expired", handleAuthExpired),
-);
-onBeforeUnmount(() =>
-  window.removeEventListener("scenara:auth-expired", handleAuthExpired),
-);
+function checkAuthStatus(): void {
+  if (!isAuthRoute.value && !isSignedIn()) {
+    handleAuthExpired();
+  }
+}
+
+let authTimer: number | null = null;
+
+onMounted(() => {
+  window.addEventListener("scenara:auth-expired", handleAuthExpired);
+  window.addEventListener("focus", checkAuthStatus);
+  authTimer = window.setInterval(checkAuthStatus, 10000);
+});
+onBeforeUnmount(() => {
+  window.removeEventListener("scenara:auth-expired", handleAuthExpired);
+  window.removeEventListener("focus", checkAuthStatus);
+  if (authTimer !== null) window.clearInterval(authTimer);
+});
 
 watch(
   isAuthRoute,

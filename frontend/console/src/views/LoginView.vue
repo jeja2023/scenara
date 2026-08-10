@@ -39,6 +39,7 @@ async function submit(): Promise<void> {
     completeSignIn(
       { ...loadConnection(), token: session.token },
       remember.value,
+      session.session?.expires_at,
     );
     await router.replace(destination.value);
   } catch (caught) {
