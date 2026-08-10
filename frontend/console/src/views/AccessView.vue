@@ -687,6 +687,7 @@ onMounted(refresh);
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width: 50px">序号</th>
                 <th>用户</th>
                 <th>邮箱</th>
                 <th>状态</th>
@@ -694,7 +695,8 @@ onMounted(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in users" :key="item.user_id">
+              <tr v-for="(item, index) in users" :key="item.user_id">
+                <td class="muted">{{ index + 1 }}</td>
                 <td>
                   <strong>{{ item.display_name }}</strong>
                   <div class="mono muted">{{ item.user_id }}</div>
@@ -920,6 +922,7 @@ onMounted(refresh);
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width: 50px">序号</th>
                 <th>账号</th>
                 <th>权限范围</th>
                 <th>产品</th>
@@ -928,9 +931,10 @@ onMounted(refresh);
             </thead>
             <tbody>
               <tr
-                v-for="item in serviceAccounts"
+                v-for="(item, index) in serviceAccounts"
                 :key="item.service_account_id"
               >
+                <td class="muted">{{ index + 1 }}</td>
                 <td>
                   <strong>{{ item.display_name }}</strong>
                   <div class="mono muted">{{ item.service_account_id }}</div>
@@ -964,6 +968,7 @@ onMounted(refresh);
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width: 50px">序号</th>
                 <th>密钥</th>
                 <th>服务账号</th>
                 <th>权限范围</th>
@@ -973,7 +978,8 @@ onMounted(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in apiKeys" :key="item.key_id">
+              <tr v-for="(item, index) in apiKeys" :key="item.key_id">
+                <td class="muted">{{ index + 1 }}</td>
                 <td>
                   <strong>{{ item.name }}</strong>
                   <div class="mono muted">{{ item.token_prefix }}…</div>
@@ -1042,6 +1048,7 @@ onMounted(refresh);
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width: 50px">序号</th>
                 <th>产品</th>
                 <th>项目</th>
                 <th>来源</th>
@@ -1050,7 +1057,8 @@ onMounted(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in entitlements" :key="item.product_id">
+              <tr v-for="(item, index) in entitlements" :key="item.product_id">
+                <td class="muted">{{ index + 1 }}</td>
                 <td>
                   <strong>{{ labelProduct(item.product_id) }}</strong>
                 </td>
@@ -1124,6 +1132,7 @@ onMounted(refresh);
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width: 50px">序号</th>
                 <th>名称</th>
                 <th>地址</th>
                 <th>事件</th>
@@ -1132,7 +1141,11 @@ onMounted(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in subscriptions" :key="item.endpoint_id">
+              <tr
+                v-for="(item, index) in subscriptions"
+                :key="item.endpoint_id"
+              >
+                <td class="muted">{{ index + 1 }}</td>
                 <td>
                   <strong>{{ item.name }}</strong>
                   <div class="mono muted">{{ item.endpoint_id }}</div>
@@ -1170,6 +1183,7 @@ onMounted(refresh);
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width: 50px">序号</th>
                 <th>事件</th>
                 <th>订阅</th>
                 <th>状态</th>
@@ -1179,7 +1193,8 @@ onMounted(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in deliveries" :key="item.delivery_id">
+              <tr v-for="(item, index) in deliveries" :key="item.delivery_id">
+                <td class="muted">{{ index + 1 }}</td>
                 <td>
                   <strong>{{ labelEventType(item.event_type) }}</strong>
                   <div class="mono muted">{{ item.event_id }}</div>

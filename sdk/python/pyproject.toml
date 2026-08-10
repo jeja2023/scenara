@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scenara-sdk"
-version = "0.3.0.dev16"
+version = "0.3.0.dev17"
 description = "Official Python SDK for the Scenara v1 API"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -15,7 +15,6 @@ classifiers = ["Programming Language :: Python :: 3", "Typing :: Typed"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["scenara_sdk*"]
 
 [tool.setuptools.package-data]
 scenara_sdk = ["py.typed"]

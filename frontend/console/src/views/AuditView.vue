@@ -117,6 +117,7 @@ onMounted(refresh);
         <table>
           <thead>
             <tr>
+              <th style="width: 50px">序号</th>
               <th>时间</th>
               <th>操作</th>
               <th>资源</th>
@@ -126,7 +127,8 @@ onMounted(refresh);
             </tr>
           </thead>
           <tbody>
-            <tr v-for="event in events" :key="event.event_id">
+            <tr v-for="(event, index) in events" :key="event.event_id">
+              <td class="muted">{{ index + 1 }}</td>
               <td>{{ formatTime(event.created_at) }}</td>
               <td>
                 <strong>{{ event.action }}</strong

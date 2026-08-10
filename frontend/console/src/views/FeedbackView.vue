@@ -377,6 +377,7 @@ onMounted(refresh);
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width: 50px">序号</th>
                 <th>类型</th>
                 <th>运行</th>
                 <th>模型</th>
@@ -386,7 +387,8 @@ onMounted(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in feedback" :key="item.feedback_id">
+              <tr v-for="(item, index) in feedback" :key="item.feedback_id">
+                <td class="muted">{{ index + 1 }}</td>
                 <td>
                   <strong>{{ labelFeedbackKind(item.kind) }}</strong>
                   <div class="mono muted">{{ item.feedback_id }}</div>
@@ -487,6 +489,7 @@ onMounted(refresh);
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width: 50px">序号</th>
                 <th>数据集</th>
                 <th>版本</th>
                 <th>条目</th>
@@ -495,7 +498,8 @@ onMounted(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in manifests" :key="item.manifest_id">
+              <tr v-for="(item, index) in manifests" :key="item.manifest_id">
+                <td class="muted">{{ index + 1 }}</td>
                 <td>
                   <strong>{{ item.dataset_id }}</strong>
                   <div class="mono muted">{{ item.manifest_id }}</div>
@@ -552,6 +556,7 @@ onMounted(refresh);
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width: 50px">序号</th>
                 <th>模型</th>
                 <th>版本</th>
                 <th>状态</th>
@@ -560,7 +565,11 @@ onMounted(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in releases" :key="item.model_id + item.version">
+              <tr
+                v-for="(item, index) in releases"
+                :key="item.model_id + item.version"
+              >
+                <td class="muted">{{ index + 1 }}</td>
                 <td>
                   <strong>{{ item.model_id }}</strong>
                 </td>
@@ -628,6 +637,7 @@ onMounted(refresh);
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width: 50px">序号</th>
                 <th>操作</th>
                 <th>模型版本</th>
                 <th>状态变化</th>
@@ -636,7 +646,8 @@ onMounted(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in events" :key="item.event_id">
+              <tr v-for="(item, index) in events" :key="item.event_id">
+                <td class="muted">{{ index + 1 }}</td>
                 <td>{{ labelDeploymentAction(item.action) }}</td>
                 <td>
                   {{ item.model_id }}

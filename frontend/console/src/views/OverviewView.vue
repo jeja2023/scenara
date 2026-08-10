@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { Play, RefreshCw } from "@lucide/vue";
+import { Activity, AlertCircle, Boxes, Play, RefreshCw } from "@lucide/vue";
 import { computed, onMounted, ref } from "vue";
 import { api, userFacingError } from "../api";
 import {
   labelCapability,
   labelDomain,
+  labelDomainDescription,
   labelPipeline,
   labelPortraitAsset,
   labelPortraitAssetGate,
@@ -158,20 +159,36 @@ onMounted(refresh);
 
     <div class="stats">
       <div class="stat teal">
-        <span>运行</span><strong>{{ runs.total }}</strong
-        ><small>当前项目</small>
+        <div class="stat-header">
+          <span>运行</span>
+          <Activity :size="16" class="stat-icon" />
+        </div>
+        <strong>{{ runs.total }}</strong>
+        <small>当前项目总量</small>
       </div>
       <div class="stat green">
-        <span>活跃</span><strong>{{ activeRuns }}</strong
-        ><small>队列与执行中</small>
+        <div class="stat-header">
+          <span>活跃</span>
+          <Play :size="16" class="stat-icon" />
+        </div>
+        <strong>{{ activeRuns }}</strong>
+        <small>队列与执行中</small>
       </div>
       <div class="stat coral">
-        <span>需关注</span><strong>{{ failedRuns }}</strong
-        ><small>失败或取消</small>
+        <div class="stat-header">
+          <span>需关注</span>
+          <AlertCircle :size="16" class="stat-icon" />
+        </div>
+        <strong>{{ failedRuns }}</strong>
+        <small>失败或已取消</small>
       </div>
-      <div class="stat">
-        <span>产品模块</span><strong>{{ productModules.length }}</strong
-        ><small>{{ products.length }} 个目录项</small>
+      <div class="stat amber">
+        <div class="stat-header">
+          <span>产品模块</span>
+          <Boxes :size="16" class="stat-icon" />
+        </div>
+        <strong>{{ productModules.length }}</strong>
+        <small>{{ products.length }} 个目录项</small>
       </div>
     </div>
 
@@ -217,11 +234,17 @@ onMounted(refresh);
         </article>
       </div>
       <div class="shared-row">
-        <span v-for="product in sharedProducts" :key="product.product_id">
-          {{ labelProduct(product.product_id) }} ·
-          {{ labelLayer(product.layer) }} ·
-          {{ labelMaturity(product.maturity) }}
-        </span>
+        <div
+          v-for="product in sharedProducts"
+          :key="product.product_id"
+          class="shared-chip"
+        >
+          <span class="chip-name">{{ labelProduct(product.product_id) }}</span>
+          <span class="chip-layer">{{ labelLayer(product.layer) }}</span>
+          <span class="badge" :class="product.maturity">{{
+            labelMaturity(product.maturity)
+          }}</span>
+        </div>
       </div>
     </section>
 
@@ -269,19 +292,59 @@ onMounted(refresh);
             / {{ portraitIntelligence.capabilities.length }} 已就绪
           </span>
         </div>
-        <div class="pi-cap-grid">
-          <div
-            v-for="cap in portraitIntelligence.capabilities"
-            :key="cap.capability_id"
-            class="pi-cap-row"
-          >
-            <span class="pi-cap-name">{{
-              labelPortraitCapability(cap.capability_id)
-            }}</span>
-            <span class="badge" :class="`pi-${cap.readiness}`">{{
-              labelPortraitReadiness(cap.readiness)
-            }}</span>
-          </div>
+        <div class="table-scroll">
+          <table class="data-table bordered-table pi-cap-table">
+            <thead>
+              <tr>
+                <th style="width: 50px">序号</th>
+                <th>核心能力</th>
+                <th>就绪状态</th>
+                <th>生产支持</th>
+                <th>模型与配置</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="(cap, index) in portraitIntelligence.capabilities"
+                :key="cap.capability_id"
+              >
+                <td class="muted">{{ index + 1 }}</td>
+                <td class="pi-cap-name">
+                  <strong>{{
+                    labelPortraitCapability(cap.capability_id)
+                  }}</strong>
+                </td>
+                <td>
+                  <span class="badge" :class="`pi-${cap.readiness}`">{{
+                    labelPortraitReadiness(cap.readiness)
+                  }}</span>
+                </td>
+                <td>
+                  <span
+                    class="badge"
+                    :class="cap.production_ready ? 'active' : 'planned'"
+                  >
+                    {{ cap.production_ready ? "生产就绪" : "规划达标" }}
+                  </span>
+                </td>
+                <td class="muted mono">
+                  <template v-if="cap.current_model">
+                    {{ cap.current_model }}
+                    <span v-if="cap.embedding_dimension">
+                      ({{ cap.embedding_dimension }} 维)
+                    </span>
+                  </template>
+                  <template v-else-if="cap.target_model">
+                    目标：{{ cap.target_model }}
+                    <span v-if="cap.target_embedding_dimension">
+                      ({{ cap.target_embedding_dimension }} 维)
+                    </span>
+                  </template>
+                  <template v-else>-</template>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -315,48 +378,67 @@ onMounted(refresh);
         </div>
         <span class="badge">契约 {{ repositoryTopology.schema_version }}</span>
       </div>
-      <div class="repository-list">
-        <article
-          v-for="repository in repositoryTopology.repositories"
-          :key="repository.repository_id"
-          class="repository-row"
-          :class="{ current: repository.current_repository }"
-        >
-          <div class="repository-name">
-            <strong>{{ labelRepository(repository.repository_id) }}</strong>
-            <span class="badge" :class="repository.lifecycle">{{
-              labelRepositoryLifecycle(repository.lifecycle)
-            }}</span>
-            <small>{{
-              repository.primary_product_ids.map(labelProduct).join(" · ")
-            }}</small>
-          </div>
-          <div class="repository-scope">
-            <p>{{ labelRepositorySummary(repository.repository_id) }}</p>
-            <dl>
-              <dt>负责</dt>
-              <dd>
-                {{
-                  repository.responsibilities
-                    .map(labelRepositoryResponsibility)
-                    .join("、")
-                }}
-              </dd>
-              <dt>不负责</dt>
-              <dd>
-                {{
-                  repository.excluded_responsibilities
-                    .map(labelRepositoryResponsibility)
-                    .join("、")
-                }}
-              </dd>
-            </dl>
-          </div>
-          <div class="repository-gate">
-            <span>下一道门禁</span>
-            <p>{{ labelRepositoryGate(repository.repository_id) }}</p>
-          </div>
-        </article>
+      <div class="repository-table-wrapper">
+        <table class="repository-table">
+          <thead>
+            <tr>
+              <th scope="col" style="width: 50px">序号</th>
+              <th scope="col" class="col-name">仓库</th>
+              <th scope="col" class="col-scope">定位与职责界限</th>
+              <th scope="col" class="col-gate">下一道门禁</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(repository, index) in repositoryTopology.repositories"
+              :key="repository.repository_id"
+              :class="{ current: repository.current_repository }"
+            >
+              <td class="muted">{{ index + 1 }}</td>
+              <td class="cell-name">
+                <div class="repository-name">
+                  <strong>{{
+                    labelRepository(repository.repository_id)
+                  }}</strong>
+                  <span class="badge" :class="repository.lifecycle">{{
+                    labelRepositoryLifecycle(repository.lifecycle)
+                  }}</span>
+                  <small>{{
+                    repository.primary_product_ids.map(labelProduct).join(" · ")
+                  }}</small>
+                </div>
+              </td>
+              <td class="cell-scope">
+                <div class="repository-scope">
+                  <p>{{ labelRepositorySummary(repository.repository_id) }}</p>
+                  <dl>
+                    <dt>负责</dt>
+                    <dd>
+                      {{
+                        repository.responsibilities
+                          .map(labelRepositoryResponsibility)
+                          .join("、")
+                      }}
+                    </dd>
+                    <dt>不负责</dt>
+                    <dd>
+                      {{
+                        repository.excluded_responsibilities
+                          .map(labelRepositoryResponsibility)
+                          .join("、")
+                      }}
+                    </dd>
+                  </dl>
+                </div>
+              </td>
+              <td class="cell-gate">
+                <div class="repository-gate">
+                  <p>{{ labelRepositoryGate(repository.repository_id) }}</p>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
       <div class="repository-contracts">
         <div>
@@ -387,6 +469,7 @@ onMounted(refresh);
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width: 50px">序号</th>
                 <th>运行</th>
                 <th>领域</th>
                 <th>状态</th>
@@ -395,7 +478,8 @@ onMounted(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="run in runs.items" :key="run.run_id">
+              <tr v-for="(run, index) in runs.items" :key="run.run_id">
+                <td class="muted">{{ index + 1 }}</td>
                 <td class="mono">
                   <RouterLink
                     :to="{ path: '/parse', query: { run: run.run_id } }"
@@ -422,17 +506,32 @@ onMounted(refresh);
       </section>
 
       <section class="panel">
-        <div class="panel-header"><h2>已安装领域</h2></div>
-        <div class="panel-body">
+        <div class="panel-header">
+          <h2>已安装领域</h2>
+          <span class="badge">{{ domains.length }} 项</span>
+        </div>
+        <div class="panel-body domain-list">
           <div
             v-for="domain in domains"
             :key="domain.domain_id"
-            class="domain-row"
+            class="domain-card"
           >
-            <strong>{{ domain.display_name }}</strong>
-            <span>{{
-              domain.capabilities.map(labelCapability).join(" · ")
-            }}</span>
+            <div class="domain-card-header">
+              <strong class="domain-title">{{ domain.display_name }}</strong>
+              <span class="badge active">版本化插件</span>
+            </div>
+            <p class="domain-desc">
+              {{ labelDomainDescription(domain.domain_id, domain.description) }}
+            </p>
+            <div class="domain-capabilities-list">
+              <span
+                v-for="cap in domain.capabilities"
+                :key="cap"
+                class="cap-pill"
+              >
+                {{ labelCapability(cap) }}
+              </span>
+            </div>
           </div>
           <div v-if="!domains.length" class="empty">未读取到领域注册信息</div>
         </div>
@@ -443,7 +542,7 @@ onMounted(refresh);
 
 <style scoped>
 .product-matrix {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 .product-grid {
   display: grid;
@@ -453,13 +552,21 @@ onMounted(refresh);
 }
 .product-card {
   min-width: 0;
-  display: grid;
-  gap: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   padding: 14px;
   border: 1px solid var(--line);
   border-top: 3px solid var(--teal);
-  border-radius: 5px;
+  border-radius: 6px;
   background: #fff;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+.product-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
 }
 .product-card.foundation {
   border-top-color: var(--amber);
@@ -473,6 +580,7 @@ onMounted(refresh);
 .product-title strong {
   min-width: 0;
   font-size: 14px;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 .product-card p {
@@ -480,11 +588,14 @@ onMounted(refresh);
   color: #45534f;
   font-size: 12px;
   line-height: 1.45;
+  flex: 1;
 }
 .product-card small {
   color: var(--muted);
   font-size: 11px;
   line-height: 1.45;
+  padding-top: 6px;
+  border-top: 1px dashed #e8ecea;
 }
 .badge.available {
   background: #e4f2e9;
@@ -502,27 +613,82 @@ onMounted(refresh);
   background: #fbf0de;
   color: #8b5a14;
 }
+
 .shared-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 10px;
   padding: 0 16px 16px;
 }
-.shared-row span {
-  min-height: 28px;
+.shared-chip {
+  min-height: 32px;
   display: inline-flex;
   align-items: center;
-  padding: 0 9px;
+  gap: 8px;
+  padding: 0 12px;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 5px;
   background: #f7f8f8;
+  color: #25332f;
+  font-size: 12px;
+}
+.shared-chip .chip-name {
+  font-weight: 650;
+}
+.shared-chip .chip-layer {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+/* Stats section styling */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.stat {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--teal);
+  border-radius: 6px;
+  background: #fff;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+.stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+.stat.teal {
+  border-top-color: var(--teal);
+}
+.stat.green {
+  border-top-color: var(--green);
+}
+.stat.coral {
+  border-top-color: var(--coral);
+}
+.stat.amber {
+  border-top-color: var(--amber);
+}
+.stat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   color: var(--muted);
   font-size: 12px;
+  font-weight: 650;
+}
+.stat-icon {
+  color: var(--muted);
+  opacity: 0.75;
 }
 
 /* 人像智能面板 */
 .portrait-intelligence {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 .portrait-intelligence .panel-header > div {
   display: grid;
@@ -540,13 +706,21 @@ onMounted(refresh);
   padding: 16px;
 }
 .pi-module-card {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   padding: 14px;
   border: 1px solid var(--line);
   border-top: 3px solid #8b6fd4;
-  border-radius: 5px;
+  border-radius: 6px;
   background: #fff;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+.pi-module-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
 }
 .pi-card-header {
   display: flex;
@@ -557,6 +731,7 @@ onMounted(refresh);
 .pi-card-header strong {
   min-width: 0;
   font-size: 13px;
+  font-weight: 700;
   overflow-wrap: anywhere;
 }
 .pi-module-card p {
@@ -564,11 +739,14 @@ onMounted(refresh);
   color: #45534f;
   font-size: 12px;
   line-height: 1.45;
+  flex: 1;
 }
 .pi-gate {
   color: var(--muted);
   font-size: 11px;
   line-height: 1.45;
+  padding-top: 6px;
+  border-top: 1px dashed #e8ecea;
 }
 .badge.pi-available {
   background: #e4f2e9;
@@ -619,20 +797,10 @@ onMounted(refresh);
 .pi-cap-header strong {
   font-size: 13px;
 }
-.pi-cap-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 7px 16px;
+.pi-cap-table {
+  margin-bottom: 16px;
 }
-.pi-cap-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 5px 0;
-  border-bottom: 1px solid var(--line);
-}
-.pi-cap-name {
+.pi-cap-name strong {
   font-size: 12px;
   color: #25332f;
 }
@@ -644,17 +812,25 @@ onMounted(refresh);
   border-top: 1px solid var(--line);
 }
 .pi-asset-card {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
   padding: 14px;
   border: 1px solid var(--line);
   border-top: 3px solid var(--amber);
-  border-radius: 5px;
+  border-radius: 6px;
   background: #fff;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+.pi-asset-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
 }
 
 .repository-topology {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 .repository-topology .panel-header > div {
   display: grid;
@@ -665,25 +841,50 @@ onMounted(refresh);
   color: var(--muted);
   font-size: 12px;
 }
-.repository-list {
-  padding: 0 16px;
+.repository-table-wrapper {
+  padding: 0 16px 16px;
+  overflow-x: auto;
 }
-.repository-row {
-  display: grid;
-  grid-template-columns: minmax(180px, 0.75fr) minmax(320px, 2fr) minmax(
-      220px,
-      1fr
-    );
-  gap: 20px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--line);
+.repository-table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--line);
+  font-size: 12px;
 }
-.repository-row:last-child {
-  border-bottom: 0;
+.repository-table th {
+  padding: 10px 14px;
+  background: #f7f8f8;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  text-align: left;
+  border: 1px solid var(--line);
 }
-.repository-row.current {
-  box-shadow: inset 3px 0 0 var(--teal);
-  padding-left: 12px;
+.repository-table td {
+  padding: 14px;
+  border: 1px solid var(--line);
+  vertical-align: top;
+}
+.col-name {
+  width: 24%;
+  min-width: 180px;
+}
+.col-scope {
+  width: 52%;
+  min-width: 320px;
+}
+.col-gate {
+  width: 24%;
+  min-width: 200px;
+}
+.repository-table tbody tr:hover {
+  background: #fafbfa;
+}
+.repository-table tbody tr.current {
+  background: #f8fbfb;
+}
+.repository-table tbody tr.current td:first-child {
+  border-left: 3px solid var(--teal);
 }
 .repository-name,
 .repository-gate {
@@ -729,11 +930,6 @@ onMounted(refresh);
   color: #45534f;
   overflow-wrap: anywhere;
 }
-.repository-gate > span {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-}
 .badge.current {
   background: var(--teal-soft);
   color: #08636c;
@@ -765,20 +961,60 @@ onMounted(refresh);
   color: var(--muted);
   font-size: 11px;
 }
-.domain-row {
-  display: grid;
-  gap: 5px;
-  padding: 13px 0;
-  border-bottom: 1px solid var(--line);
+
+/* Domain List */
+.domain-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
 }
-.domain-row:last-child {
-  border-bottom: 0;
+.domain-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: #fff;
+  transition: background 160ms ease;
 }
-.domain-row span {
-  overflow-wrap: anywhere;
+.domain-card:hover {
+  background: #fafbfa;
+}
+.domain-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.domain-title {
+  font-size: 13px;
+  color: #17211f;
+}
+.domain-desc {
+  margin: 0;
   color: var(--muted);
   font-size: 12px;
+  line-height: 1.45;
 }
+.domain-capabilities-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+.cap-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: #f7f8f8;
+  color: #35433f;
+  font-size: 11px;
+}
+
 @media (max-width: 1180px) {
   .product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -786,23 +1022,22 @@ onMounted(refresh);
   .pi-modules {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .pi-cap-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .pi-assets {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 900px) {
-  .repository-row {
-    grid-template-columns: 1fr;
-    gap: 12px;
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .repository-contracts {
     grid-template-columns: 1fr;
   }
 }
 @media (max-width: 560px) {
+  .stats {
+    grid-template-columns: 1fr;
+  }
   .product-grid {
     grid-template-columns: 1fr;
     padding: 12px;
@@ -811,18 +1046,12 @@ onMounted(refresh);
     grid-template-columns: 1fr;
     padding: 12px;
   }
-  .pi-cap-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
   .pi-assets {
     grid-template-columns: 1fr;
     padding: 12px;
   }
-  .repository-list {
-    padding: 0 12px;
-  }
-  .repository-row.current {
-    padding-left: 9px;
+  .repository-table-wrapper {
+    padding: 0 12px 12px;
   }
   .repository-contracts {
     padding: 12px;

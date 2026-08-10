@@ -74,6 +74,7 @@ function formatCell(value: unknown): string {
         <table class="data-table">
           <thead>
             <tr>
+              <th style="width: 50px">序号</th>
               <th v-for="column in tableColumns(rows)" :key="column">
                 {{ formatKey(column) }}
               </th>
@@ -81,6 +82,7 @@ function formatCell(value: unknown): string {
           </thead>
           <tbody>
             <tr v-for="(row, index) in rows.slice(0, 100)" :key="index">
+              <td class="muted">{{ index + 1 }}</td>
               <td v-for="column in tableColumns(rows)" :key="column">
                 {{ formatCell(row[column]) }}
               </td>

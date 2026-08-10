@@ -367,6 +367,7 @@ onBeforeUnmount(closePreview);
           <thead>
             <tr>
               <th class="check-col"></th>
+              <th style="width: 50px">序号</th>
               <th>标识</th>
               <th>类型</th>
               <th>文件名</th>
@@ -376,7 +377,10 @@ onBeforeUnmount(closePreview);
             </tr>
           </thead>
           <tbody>
-            <template v-for="asset in filteredAssets" :key="asset.asset_id">
+            <template
+              v-for="(asset, index) in filteredAssets"
+              :key="asset.asset_id"
+            >
               <tr
                 :class="{
                   'selected-row': selectedForDelete.has(asset.asset_id),
@@ -390,6 +394,7 @@ onBeforeUnmount(closePreview);
                     @change="toggleSelect(asset.asset_id)"
                   />
                 </td>
+                <td class="muted">{{ index + 1 }}</td>
                 <td class="mono truncate">{{ asset.asset_id }}</td>
                 <td>
                   <span class="badge" :class="asset.kind">{{
@@ -456,7 +461,7 @@ onBeforeUnmount(closePreview);
                 v-if="expandedAssets.has(asset.asset_id)"
                 class="metadata-row"
               >
-                <td colspan="7">
+                <td colspan="8">
                   <dl class="metadata-list">
                     <div
                       v-for="[label, value] in metadataItems(asset)"
@@ -510,6 +515,7 @@ onBeforeUnmount(closePreview);
         <table class="data-table">
           <thead>
             <tr>
+              <th style="width: 50px">序号</th>
               <th>标识</th>
               <th>名称</th>
               <th>脱敏地址</th>
@@ -518,7 +524,8 @@ onBeforeUnmount(closePreview);
             </tr>
           </thead>
           <tbody>
-            <tr v-for="source in sources" :key="source.source_id">
+            <tr v-for="(source, index) in sources" :key="source.source_id">
+              <td class="muted">{{ index + 1 }}</td>
               <td class="mono">{{ source.source_id }}</td>
               <td>{{ source.name }}</td>
               <td class="mono truncate">{{ source.masked_url }}</td>

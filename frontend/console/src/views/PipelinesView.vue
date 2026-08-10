@@ -36,6 +36,7 @@ onMounted(refresh);
         <table class="data-table">
           <thead>
             <tr>
+              <th style="width: 50px">序号</th>
               <th>流水线</th>
               <th>版本</th>
               <th>领域</th>
@@ -45,7 +46,11 @@ onMounted(refresh);
             </tr>
           </thead>
           <tbody>
-            <tr v-for="row in rows" :key="row.pipeline_id + row.version">
+            <tr
+              v-for="(row, index) in rows"
+              :key="row.pipeline_id + row.version"
+            >
+              <td class="muted">{{ index + 1 }}</td>
               <td>
                 <strong>{{ labelPipeline(row.pipeline_id) }}</strong>
                 <div class="mono muted">{{ row.pipeline_id }}</div>

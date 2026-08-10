@@ -5,20 +5,18 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until signed, reproducible evidence is committed.
 
-Current development version: `0.3.0-dev.16` (`0.3.0.dev16` for Python packages).
-This version is an engineering qualification snapshot, not a `1.0.0` production release.
+Current development version: `0.3.0-dev.17` (`0.3.0.dev17` for Python packages).
 
-The `0.3.0-dev.16` engineering baseline cumulatively adds domain-scoped Parse
-workspaces, a first-class cross-domain Results center, Data Assets terminology,
-dataset version governance, tenant-scoped audit search/export, saved Search
-definitions, a tenant/project-scoped result-summary query path backed by
-PostgreSQL indexes, the remaining non-model P0-P2 control-plane contracts,
-username/password login, salted password credentials, browser sessions, a
-Chinese-only domain and capability catalog, and fully documented environment
-configuration with safe development and production guidance.
-It retains the `0.3.0-dev.5` migration, capacity, coverage, progressive media
-decoding, monotonic Run progress, and replaceable partial Result guarantees.
-The `0.3.0-dev.16` hardening also closes empty-scope/product authorization paths,
+## Release Gate Status
+The `0.3.0-dev.17` engineering baseline cumulatively adds domain-scoped Parse
+workspaces, explicit bordered data tables with index columns across the console,
+and optimized navigation bar grouping. Full implementation and architectural parity checks pass,
+including tests, linting, typechecking, and production builds.
+Formal 1.0 release evidence signatures (evaluation, security, GPU capacity, offline install, legal/commercial sign-off)
+remain fail-closed until official sign-off.
+
+## Implementation Parity Matrix
+The `0.3.0-dev.17` baseline adds full data-table cell borders, index columns (`序号`) across all frontend tables, and optimized 5-section sidebar navigation grouping.
 enforces enterprise policy in production, adds indexed and expiring Session
 authentication, paginated/streaming audit access, bulk Result reads, SSE
 fallback control, Console auth-expiry handling, composable/router extraction,

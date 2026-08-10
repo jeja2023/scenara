@@ -65,6 +65,7 @@ onMounted(refresh);
         <table class="data-table">
           <thead>
             <tr>
+              <th style="width: 50px">序号</th>
               <th>模型</th>
               <th>能力</th>
               <th>适配器</th>
@@ -74,7 +75,11 @@ onMounted(refresh);
             </tr>
           </thead>
           <tbody>
-            <tr v-for="model in models" :key="model.model_id + model.version">
+            <tr
+              v-for="(model, index) in models"
+              :key="model.model_id + model.version"
+            >
+              <td class="muted">{{ index + 1 }}</td>
               <td>
                 <strong>{{ model.model_id }}</strong>
                 <div class="mono muted">

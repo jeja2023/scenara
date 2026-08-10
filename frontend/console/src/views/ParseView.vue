@@ -36,6 +36,7 @@ import {
 import { useMediaPreview } from "../composables/useMediaPreview";
 import {
   labelDomain,
+  labelDomainDescription,
   labelMediaKind,
   labelPipeline,
   labelRunError,
@@ -148,7 +149,6 @@ const {
   supportedMediaKinds,
   selectedPipeline,
   parameterEntries,
-  pipeline,
   filteredAssets,
   selectedAsset,
   selectedSource,
@@ -305,7 +305,9 @@ const pageTitle = computed(() => {
   if (domain.value === "ocr") return "OCR 文档解析工作区";
   return `${currentDomainLabel.value}解析工作区`;
 });
-const isDomainScoped = computed(() => Boolean(route.params?.domain || props.initialDomain || domain.value));
+const isDomainScoped = computed(() =>
+  Boolean(route.params?.domain || props.initialDomain || domain.value),
+);
 const currentMediaLabel = computed(() => labelMediaKind(mode.value));
 const scopedHistoryRuns = computed(() =>
   historyRuns.value.filter((item) => {
@@ -1138,14 +1140,8 @@ onBeforeUnmount(() => {
       <div>
         <h1>{{ pageTitle }}</h1>
         <p>
-          {{ selectedDomainManifest?.display_name || labelDomain(domain) }} ·
-          {{ labelPipeline(pipeline) }} ·
           {{
-            run?.pipeline?.version
-              ? `版本 ${run.pipeline.version}`
-              : selectedPipeline
-                ? `版本 ${selectedPipeline.version}`
-                : "暂无可用流水线"
+            labelDomainDescription(domain, selectedDomainManifest?.description)
           }}
         </p>
       </div>
@@ -1200,30 +1196,8 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="parse-context-bar">
-      <div>
-        <span class="control-label">当前解析工作区</span>
-        <strong>{{ currentDomainLabel }} / {{ currentMediaLabel }}</strong>
-      </div>
-      <nav class="parse-context-nav" aria-label="解析工作区操作">
-        <RouterLink
-          class="parse-history-link"
-          :to="{ path: '/runs', query: { domain } }"
-        >
-          查看全部运行
-        </RouterLink>
-        <RouterLink v-if="hasResult" to="/results" class="parse-results-link">
-          查看解析结果
-        </RouterLink>
-      </nav>
-    </div>
-
     <div class="workbench-config">
-      <div v-if="isDomainScoped" class="parse-domain-context">
-        <span class="control-label">当前能力</span>
-        <strong>{{ currentDomainLabel }}</strong>
-      </div>
-      <div v-else>
+      <div v-if="!isDomainScoped">
         <span class="control-label">解析能力</span>
         <div
           v-if="availableDomains.length <= 4"
@@ -1285,6 +1259,17 @@ onBeforeUnmount(() => {
           </option>
         </select>
       </label>
+      <nav class="parse-context-nav" aria-label="解析工作区操作">
+        <RouterLink
+          class="parse-history-link"
+          :to="{ path: '/runs', query: { domain } }"
+        >
+          查看历史运行
+        </RouterLink>
+        <RouterLink v-if="hasResult" to="/results" class="parse-results-link">
+          查看结构化结果
+        </RouterLink>
+      </nav>
     </div>
 
     <div class="segmented media-modes" role="tablist" aria-label="数据类型">
@@ -1839,9 +1824,10 @@ onBeforeUnmount(() => {
             :payload="genericPayload"
           />
           <div v-if="selectedObjects.length" class="table-scroll">
-            <table class="data-table">
+            <table class="data-table bordered-table">
               <thead>
                 <tr>
+                  <th style="width: 50px">序号</th>
                   <th>对象</th>
                   <th>类型</th>
                   <th>置信度</th>
@@ -1849,7 +1835,11 @@ onBeforeUnmount(() => {
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="item in selectedObjects" :key="item.object_id">
+                <tr
+                  v-for="(item, index) in selectedObjects"
+                  :key="item.object_id"
+                >
+                  <td class="muted">{{ index + 1 }}</td>
                   <td class="mono">{{ item.object_id }}</td>
                   <td>{{ item.object_type }}</td>
                   <td>{{ item.score?.toFixed(3) ?? "-" }}</td>
@@ -1959,46 +1949,32 @@ onBeforeUnmount(() => {
 .parse-workbench {
   gap: 14px;
 }
-.parse-context-bar {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 11px 0;
-  border-bottom: 1px solid var(--line);
-}
-.parse-context-bar > div {
-  display: grid;
-  gap: 4px;
-}
 .parse-context-nav {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 5px;
-  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
 }
 .parse-context-nav a {
-  padding: 5px 9px;
+  padding: 6px 12px;
   border: 1px solid var(--line);
   border-radius: 4px;
   color: var(--muted);
   font-size: 12px;
   text-decoration: none;
+  background: var(--surface);
+  transition: all 150ms ease;
 }
 .parse-context-nav a:hover,
 .parse-context-nav a.active {
-  border-color: #8bb9ad;
+  border-color: var(--teal);
   background: #e7f1ee;
-  color: var(--text);
-}
-.parse-context-nav .parse-history-link {
-  border-color: transparent;
-  color: var(--teal-dark);
+  color: var(--teal);
 }
 .workbench-config {
   display: flex;
-  align-items: end;
+  align-items: center;
   gap: 18px;
   padding: 12px 0;
   border-block: 1px solid var(--line);
@@ -2008,13 +1984,6 @@ onBeforeUnmount(() => {
 .input-origin {
   display: grid;
   gap: 6px;
-}
-.parse-domain-context {
-  min-width: 180px;
-  align-content: start;
-}
-.parse-domain-context strong {
-  font-size: 15px;
 }
 .control-label {
   color: var(--muted);
@@ -2060,7 +2029,8 @@ onBeforeUnmount(() => {
   overflow: hidden;
   background: #101816;
   color: #dbe6e2;
-  border-radius: 4px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 .media-stage img,
 .media-stage video,
@@ -2165,8 +2135,9 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 12px;
   margin-top: 14px;
-  padding: 10px 12px;
+  padding: 10px 14px;
   border: 1px solid var(--line);
+  border-radius: 6px;
   background: var(--surface);
 }
 .run-strip > div:first-child {
@@ -2233,10 +2204,13 @@ onBeforeUnmount(() => {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin: 0 0 14px;
-  border-block: 1px solid var(--line);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #f8faf9;
+  overflow: hidden;
 }
 .result-counters div {
-  padding: 10px 12px;
+  padding: 10px 14px;
   border-right: 1px solid var(--line);
 }
 .result-counters div:last-child {
@@ -2245,11 +2219,13 @@ onBeforeUnmount(() => {
 .result-counters dt {
   color: var(--muted);
   font-size: 11px;
+  font-weight: 650;
 }
 .result-counters dd {
   margin: 4px 0 0;
-  font-size: 21px;
+  font-size: 20px;
   font-weight: 700;
+  color: #17211f;
 }
 .metadata-grid {
   display: grid;
@@ -2258,6 +2234,8 @@ onBeforeUnmount(() => {
   margin: 0 0 14px;
   background: var(--line);
   border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
 }
 .metadata-grid div {
   padding: 9px 10px;
@@ -2344,17 +2322,21 @@ onBeforeUnmount(() => {
   gap: 9px;
   align-items: center;
   width: 100%;
-  padding: 9px 10px;
+  padding: 9px 12px;
   border: 0;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
   color: var(--text);
   text-align: left;
   cursor: pointer;
+  transition: background 150ms ease;
 }
-.unit-list button:hover,
+.unit-list button:hover {
+  background: #f4f7f6;
+}
 .unit-list button.selected {
-  background: #e7f1ee;
+  background: #edf5f3;
+  box-shadow: inset 3px 0 0 var(--teal);
 }
 .unit-list small {
   display: block;

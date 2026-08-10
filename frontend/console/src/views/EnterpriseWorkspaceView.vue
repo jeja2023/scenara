@@ -176,6 +176,7 @@ onMounted(refresh);
             <table class="data-table">
               <thead>
                 <tr>
+                  <th style="width: 50px">序号</th>
                   <th>权益</th>
                   <th>用量</th>
                   <th>上限</th>
@@ -183,9 +184,10 @@ onMounted(refresh);
               </thead>
               <tbody>
                 <tr
-                  v-for="entitlement in status.entitlements"
+                  v-for="(entitlement, index) in status.entitlements"
                   :key="entitlement"
                 >
+                  <td class="muted">{{ index + 1 }}</td>
                   <td>
                     <strong>{{ labelEntitlement(entitlement) }}</strong>
                     <div class="mono muted">{{ entitlement }}</div>
@@ -238,6 +240,7 @@ onMounted(refresh);
             <table class="data-table">
               <thead>
                 <tr>
+                  <th style="width: 50px">序号</th>
                   <th>标题</th>
                   <th>严重级别</th>
                   <th>状态</th>
@@ -245,7 +248,11 @@ onMounted(refresh);
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="incident in incidents" :key="incident.incident_id">
+                <tr
+                  v-for="(incident, index) in incidents"
+                  :key="incident.incident_id"
+                >
+                  <td class="muted">{{ index + 1 }}</td>
                   <td>{{ incident.title }}</td>
                   <td>
                     <span class="badge">{{

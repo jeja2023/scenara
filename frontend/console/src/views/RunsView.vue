@@ -215,6 +215,7 @@ onBeforeUnmount(() => {
         <table class="data-table">
           <thead>
             <tr>
+              <th style="width: 50px">序号</th>
               <th>运行</th>
               <th>领域</th>
               <th>状态</th>
@@ -226,7 +227,8 @@ onBeforeUnmount(() => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="run in runs" :key="run.run_id">
+            <tr v-for="(run, index) in runs" :key="run.run_id">
+              <td class="muted">{{ index + 1 }}</td>
               <td class="mono truncate">{{ run.run_id }}</td>
               <td>{{ domainLabel(run.domain) }}</td>
               <td>

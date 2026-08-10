@@ -219,6 +219,7 @@ onMounted(refresh);
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width: 50px">序号</th>
                 <th>项目</th>
                 <th>动作</th>
                 <th>状态</th>
@@ -226,7 +227,8 @@ onMounted(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in lifecycle" :key="item.record_id">
+              <tr v-for="(item, index) in lifecycle" :key="item.record_id">
+                <td class="muted">{{ index + 1 }}</td>
                 <td>{{ item.project_id }}</td>
                 <td>{{ item.action }}</td>
                 <td>{{ item.status }}</td>
@@ -323,13 +325,15 @@ onMounted(refresh);
           <table class="data-table">
             <thead>
               <tr>
+                <th style="width: 50px">序号</th>
                 <th>指标</th>
                 <th>数量</th>
                 <th>周期</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="item in usage" :key="item.record_id">
+              <tr v-for="(item, index) in usage" :key="item.record_id">
+                <td class="muted">{{ index + 1 }}</td>
                 <td>{{ item.metric }}</td>
                 <td>{{ item.amount }}</td>
                 <td>

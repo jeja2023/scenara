@@ -30,7 +30,6 @@ LEGACY_PUBLIC_ALLOWLIST = {
     "docs/release/IMPLEMENTATION_MATRIX.md",
     "docs/release/PORTRAIT_HUB_CAPABILITY_MATRIX.md",
     "docs/adr/0003-chinese-brand-jingshu.md",
-    "CHANGELOG.md",
     "scripts/repository_gate.py",
     "Scenara 景枢全面优化升级方案.md",
 }
