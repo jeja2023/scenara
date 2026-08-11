@@ -1024,12 +1024,18 @@ class RunService:
             elif action == "cancel":
                 if run.status in TERMINAL_RUN_STATUSES:
                     raise InvalidTransition("a terminal run cannot be cancelled")
-                if run.status == RunStatus.CANCELLING:
-                    return run
-                target = RunStatus.CANCELLING
+                if run.status in {RunStatus.QUEUED, RunStatus.PAUSED, RunStatus.CANCELLING}:
+                    target = RunStatus.CANCELLED
+                else:
+                    target = RunStatus.CANCELLING
             else:
                 raise ValueError("unknown lifecycle action")
-            updated = run.model_copy(update={"status": target, "updated_at": time.time()})
+            updates: dict[str, Any] = {"status": target, "updated_at": time.time()}
+            if target == RunStatus.CANCELLED:
+                updates["completed_at"] = time.time()
+                if not run.termination_reason:
+                    updates["termination_reason"] = "cancelled_by_user"
+            updated = run.model_copy(update=updates)
             try:
                 saved = await self.state.save_run(updated, expected_revision=run.revision)
                 await self.audit.record(

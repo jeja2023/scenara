@@ -280,7 +280,7 @@ onBeforeUnmount(() => {
                     "
                     @click="transition(run, 'cancel')"
                   >
-                    取消
+                    {{ run.status === "cancelling" ? "强制取消" : "取消" }}
                   </button>
                 </div>
               </td>

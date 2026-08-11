@@ -1281,7 +1281,7 @@ onBeforeUnmount(() => {
           :disabled="transitioning"
           @click="transitionRun('cancel')"
         >
-          <Square :size="15" />取消运行
+          <Square :size="15" />{{ run.status === "cancelling" ? "强制取消" : "取消运行" }}
         </button>
         <button
           v-if="run?.status === 'running'"
