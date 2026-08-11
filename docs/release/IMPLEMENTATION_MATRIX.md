@@ -5,18 +5,21 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until signed, reproducible evidence is committed.
 
-Current development version: `0.3.0-dev.18` (`0.3.0.dev18` for Python packages).
+Current development version: `0.3.0-dev.19` (`0.3.0.dev19` for Python packages).
 
 ## Release Gate Status
-The `0.3.0-dev.18` engineering baseline cumulatively adds topbar refresh button and composable, domain-scoped topbar titles, and refactored Parse workspace action button placement.
-and optimized navigation bar grouping. Full implementation and architectural parity checks pass,
+The `0.3.0-dev.19` engineering baseline removes implicit unit caps from finite media,
+adds time-windowed Stream Sessions, append-only incremental Result shards, low-latency
+SSE/Webhook delivery, and disk-backed media transfer. Full implementation and architectural parity checks pass,
 including tests, linting, typechecking, and production builds.
 Formal 1.0 release evidence signatures (evaluation, security, GPU capacity, offline install, legal/commercial sign-off)
 remain fail-closed until official sign-off.
 
 ## Implementation Parity Matrix
-The `0.3.0-dev.18` baseline adds unified topbar refresh, domain-scoped Parse titles, and Start Analysis button relocation.
-enforces enterprise policy in production, adds indexed and expiring Session
+The `0.3.0-dev.19` baseline processes finite video and PDF inputs to EOF unless callers
+explicitly request a compatibility cap. Continuous streams are archived into linked Run
+segments under one Stream Session, while inference batches publish `result.delta` events
+and append-only Result shards. It also enforces enterprise policy in production, adds indexed and expiring Session
 authentication, paginated/streaming audit access, bulk Result reads, SSE
 fallback control, Console auth-expiry handling, composable/router extraction,
 and `runtime-state/logs/` governance. Portrait video and stream results omit

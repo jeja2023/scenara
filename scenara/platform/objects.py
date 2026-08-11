@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Protocol
 
 SAFE_COMPONENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
@@ -15,7 +16,11 @@ class ObjectStore(Protocol):
 
     async def put(self, object_key: str, data: bytes, content_type: str) -> None: ...
 
+    async def put_file(self, object_key: str, path: Path, content_type: str) -> None: ...
+
     async def get(self, object_key: str) -> bytes: ...
+
+    async def get_to_file(self, object_key: str, path: Path) -> None: ...
 
     async def delete(self, object_key: str) -> bool: ...
 

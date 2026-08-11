@@ -45,6 +45,8 @@ class MediaTechnicalMetadata(TypedDict):
     sample_strategy: NotRequired[SampleStrategy | None]
     sample_start_ms: NotRequired[int | None]
     sample_end_ms: NotRequired[int | None]
+    stream_segment_duration_ms: NotRequired[int | None]
+    stream_segment_index: NotRequired[int | None]
     keyframe_count: NotRequired[int | None]
     scene_change_count: NotRequired[int | None]
     frame_max_edge: NotRequired[int | None]
@@ -498,6 +500,10 @@ class Run(TypedDict):
     pipeline: PipelineRef
     asset_id: NotRequired[str | None]
     source_id: NotRequired[str | None]
+    stream_session_id: NotRequired[str | None]
+    stream_segment_index: NotRequired[int | None]
+    previous_run_id: NotRequired[str | None]
+    next_run_id: NotRequired[str | None]
     parameters: dict[str, Any]
     priority: int
     status: RunStatus
@@ -528,6 +534,13 @@ class ResultEnvelope(TypedDict):
     warnings: list[str]
     provenance: dict[str, Any]
     created_at: float
+
+
+class ResultPage(TypedDict):
+    result: ResultEnvelope
+    unit_offset: int
+    unit_limit: int
+    unit_total: int
 
 
 class ParseImageResponse(TypedDict):

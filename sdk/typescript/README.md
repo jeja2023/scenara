@@ -18,14 +18,14 @@ await client.parseVideo({
   sceneChangeThreshold: 0.25,
   frameMaxEdge: 1_280,
 });
-await client.parseDocument({ file: pdf, filename: "report.pdf", maxUnits: 20, pageScale: 2 });
+await client.parseDocument({ file: pdf, filename: "report.pdf", pageScale: 2 });
 await client.parseStream({
   sourceId: "source-id",
-  maxUnits: 64,
+  streamSegmentDurationMs: 300_000,
   maxReconnectAttempts: 5,
   connectTimeoutMs: 3_000,
   readTimeoutMs: 2_000,
 });
 ```
 
-省略 `pipelineVersion` 时由服务端选择唯一的 active 版本；需要固定复现某次运行时应显式传入版本。
+视频和文档省略 `maxUnits` 时处理至 EOF；实时流省略该参数时按时间窗口持续分段。`maxUnits` 仅用于兼容旧集成或调用方显式设置保护上限。省略 `pipelineVersion` 时由服务端选择唯一的 active 版本；需要固定复现某次运行时应显式传入版本。

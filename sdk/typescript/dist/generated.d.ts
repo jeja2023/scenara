@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "e92ae14efe216bdca1f1c11da211dcc93932efd2d2d7087534bde42220f5930a" /** gitleaks:allow - public contract digest */;
+export declare const OPENAPI_SHA256 = "e8e47335c665f125befe5cd702da3cb681ad963d6b2f63ca11371655dd9441b2" /** gitleaks:allow - public contract digest */;
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
@@ -558,6 +558,11 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_StreamSessionView_ = {
+        data: StreamSessionView;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_SupportCase_ = {
         data: SupportCase;
         request_id: string;
@@ -947,7 +952,7 @@ export declare namespace OpenApi {
     type Body_parse_document_api_v1_parse_document_post = {
         domain?: DomainId;
         file: string;
-        max_units?: number;
+        max_units?: (number) | (null);
         page_scale?: number;
         pipeline_id?: (string) | (null);
         pipeline_version?: (string) | (null);
@@ -964,7 +969,7 @@ export declare namespace OpenApi {
         domain?: DomainId;
         file: string;
         frame_max_edge?: (number) | (null);
-        max_units?: number;
+        max_units?: (number) | (null);
         page_scale?: number;
         pipeline_id?: (string) | (null);
         pipeline_version?: (string) | (null);
@@ -1827,6 +1832,8 @@ export declare namespace OpenApi {
         sample_strategy?: (SampleStrategy) | (null);
         sampled_units?: (number) | (null);
         scene_change_count?: (number) | (null);
+        stream_segment_duration_ms?: (number) | (null);
+        stream_segment_index?: (number) | (null);
         timestamp_source?: ("decoder_pts" | "position_msec" | "monotonic_clock") | (null);
         width?: (number) | (null);
     };
@@ -2493,10 +2500,12 @@ export declare namespace OpenApi {
         created_at: number;
         domain: DomainId;
         error_code?: (string) | (null);
+        next_run_id?: (string) | (null);
         parameters?: {
             [key: string]: unknown;
         };
         pipeline: PipelineRef;
+        previous_run_id?: (string) | (null);
         principal_id?: string;
         priority?: number;
         progress?: number;
@@ -2506,6 +2515,8 @@ export declare namespace OpenApi {
         source_id?: (string) | (null);
         started_at?: (number) | (null);
         status?: RunStatus;
+        stream_segment_index?: (number) | (null);
+        stream_session_id?: (string) | (null);
         tenant_id: string;
         termination_reason?: (string) | (null);
         updated_at: number;
@@ -2686,6 +2697,17 @@ export declare namespace OpenApi {
     type SplitIdentityRequest = {
         display_name?: string;
         segment_ids: Array<string>;
+    };
+    type StreamSessionView = {
+        created_at: number;
+        current_run_id: string;
+        domain: DomainId;
+        pipeline: PipelineRef;
+        segment_count: number;
+        session_id: string;
+        source_id: string;
+        status: "active" | "completed" | "failed" | "cancelled";
+        updated_at: number;
     };
     type SupportCase = {
         case_id: string;

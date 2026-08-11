@@ -81,6 +81,10 @@ const unitTypeLabels: Record<string, string> = {
 };
 
 const eventTypeLabels: Record<string, string> = {
+  "result.delta": "增量结果",
+  "stream.segment.started": "流分段开始",
+  "stream.segment.completed": "流分段完成",
+  "stream.session.error": "流会话异常",
   "result.available": "结果可用",
   "run.completed": "运行完成",
   "run.failed": "运行失败",
@@ -365,6 +369,7 @@ const terminationReasonLabels: Record<string, string> = {
   reconnect_exhausted: "媒体源重连次数已用尽",
   max_units_reached: "已达到最大处理单元数（达到上限后主动停止）",
   sample_window_completed: "已完成指定采样时间窗口",
+  segment_window_completed: "已完成当前流分段并自动接续",
   cancelled_by_user: "已由用户取消",
 };
 
@@ -715,6 +720,9 @@ export function labelWarning(value: string): string {
   }
   if (value === "media_termination:source_ended") {
     return "媒体源已正常读完，本次任务已完成全部可读取内容。";
+  }
+  if (value === "media_termination:segment_window_completed") {
+    return "当前实时流时间窗口已归档，系统正在同一会话中接续下一段。";
   }
   if (value.startsWith("development_substitute:")) {
     return `使用开发替代能力：${labelCapability(value.slice("development_substitute:".length))}`;

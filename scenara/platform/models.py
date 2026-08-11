@@ -91,6 +91,8 @@ class MediaTechnicalMetadata(StrictModel):
     decode_seek_used: bool | None = None
     reconnect_count: int | None = Field(default=None, ge=0)
     elapsed_ms: int | None = Field(default=None, ge=0)
+    stream_segment_duration_ms: int | None = Field(default=None, ge=1_000)
+    stream_segment_index: int | None = Field(default=None, ge=0)
     timestamp_source: Literal["decoder_pts", "position_msec", "monotonic_clock"] | None = None
 
 
@@ -351,6 +353,10 @@ class RunRecord(StrictModel):
     pipeline: PipelineRef
     asset_id: str | None = None
     source_id: str | None = None
+    stream_session_id: str | None = None
+    stream_segment_index: int | None = Field(default=None, ge=0)
+    previous_run_id: str | None = None
+    next_run_id: str | None = None
     parameters: dict[str, Any] = Field(default_factory=dict)
     priority: int = 0
     status: RunStatus = RunStatus.QUEUED
@@ -371,6 +377,18 @@ class RunEvent(StrictModel):
     status: RunStatus
     payload: dict[str, Any] = Field(default_factory=dict)
     created_at: float
+
+
+class StreamSessionView(StrictModel):
+    session_id: str
+    source_id: str
+    domain: DomainId
+    pipeline: PipelineRef
+    status: Literal["active", "completed", "failed", "cancelled"]
+    current_run_id: str
+    segment_count: int = Field(ge=1)
+    created_at: float
+    updated_at: float
 
 
 class BoundingBox(StrictModel):
@@ -532,6 +550,7 @@ class ResultReference(StrictModel):
     unit_count: int = Field(ge=0)
     shard_keys: list[str] = Field(default_factory=list)
     shard_sha256: list[str] = Field(default_factory=list)
+    shard_unit_counts: list[int] = Field(default_factory=list)
     domain: DomainId
     created_at: float
     asset_id: str | None = None

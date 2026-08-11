@@ -48,7 +48,7 @@ REQUIRED_IMPLEMENTATION = (
     "frontend/console/playwright.config.ts",
     "frontend/console/e2e/workspaces.spec.ts",
     "tests/test_control_plane.py",
-    "docs/release/0.3.0-dev.18.md",
+    "docs/release/0.3.0-dev.19.md",
     "docs/release/SUPPORT_MATRIX.md",
     "docs/release/EVIDENCE_OWNERS.md",
     "docs/release/evidence/manifest.example.json",
@@ -118,15 +118,12 @@ def repository_commit(root: Path = ROOT) -> str | None:
 
 
 def license_errors(root: Path = ROOT) -> list[str]:
-    errors: list[str] = []
-    license_path = root / "LICENSE"
-    if not license_path.is_file():
-        errors.append("missing LICENSE file")
-    else:
-        content = license_path.read_text(encoding="utf-8")
-        if LICENSE_PLACEHOLDER.search(content):
-            errors.append("LICENSE contains placeholder text")
-    return errors
+    path = root / "LICENSE"
+    if not path.is_file():
+        return ["software license is missing"]
+    if LICENSE_PLACEHOLDER.search(path.read_text(encoding="utf-8", errors="ignore")):
+        return ["software license still contains the engineering legal-review placeholder"]
+    return []
 
 
 def _timestamp(raw: Any, name: str, evidence_type: str, errors: list[str]) -> datetime | None:
@@ -141,63 +138,78 @@ def _timestamp(raw: Any, name: str, evidence_type: str, errors: list[str]) -> da
 
 
 def _string_set(metadata: dict[str, Any], field: str, evidence_type: str, errors: list[str]) -> set[str]:
-    values = metadata.get(field)
-    if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
-        errors.append(f"{evidence_type}: metadata.{field} must be a list of strings")
+    value = metadata.get(field)
+    if not isinstance(value, list) or any(not isinstance(item, str) or not item for item in value):
+        errors.append(f"{evidence_type}: metadata.{field} must be a list of non-empty strings")
         return set()
-    return set(values)
+    return set(value)
+
+
+def _required_values(metadata: dict[str, Any], names: set[str], evidence_type: str) -> list[str]:
+    return [f"{evidence_type}: metadata.{name} is required" for name in sorted(names) if metadata.get(name) is None]
 
 
 def _number(value: Any, fallback: float = 0.0) -> float:
-    return float(value) if isinstance(value, (int, float)) else fallback
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return fallback
 
 
 def _metadata_errors(evidence_type: str, metadata: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    if evidence_type in ("portrait_evaluation", "ocr_evaluation"):
-        if _number(metadata.get("test_sample_size")) < 100:
-            errors.append(f"{evidence_type}: test_sample_size must be >=100")
-        if _number(metadata.get("precision"), -1.0) < 0.0 or _number(metadata.get("recall"), -1.0) < 0.0:
-            errors.append(f"{evidence_type}: precision and recall must be between 0.0 and 1.0")
-        if _number(metadata.get("p95_latency_ms")) <= 0:
-            errors.append(f"{evidence_type}: p95_latency_ms must be >0")
-        if evidence_type == "portrait_evaluation" and _number(metadata.get("mAP50"), -1.0) < 0.0:
-            errors.append("portrait_evaluation: mAP50 must be between 0.0 and 1.0")
-        if evidence_type == "ocr_evaluation" and _number(metadata.get("cer"), -1.0) < 0.0:
-            errors.append("ocr_evaluation: cer must be between 0.0 and 1.0")
+    if evidence_type in {"portrait_evaluation", "ocr_evaluation"}:
+        if not metadata.get("dataset_version") or metadata.get("rights_cleared") is not True:
+            errors.append(f"{evidence_type}: versioned and rights-cleared dataset evidence is required")
+        if not isinstance(metadata.get("metrics"), dict) or not metadata["metrics"]:
+            errors.append(f"{evidence_type}: fixed evaluation metrics are required")
+        if metadata.get("thresholds_approved_before_run") is not True:
+            errors.append(f"{evidence_type}: thresholds must be approved before evaluation")
+        if _number(metadata.get("independent_runs"), 0) < 2 or metadata.get("within_tolerance") is not True:
+            errors.append(f"{evidence_type}: two reproducible runs within approved tolerance are required")
     elif evidence_type == "gpu_capacity":
-        if _number(metadata.get("target_gpu_count")) < 1:
-            errors.append("gpu_capacity: target_gpu_count must be >=1")
-        if _number(metadata.get("max_vram_gb")) <= 0:
-            errors.append("gpu_capacity: max_vram_gb must be >0")
-        if _number(metadata.get("max_concurrency")) < 1:
-            errors.append("gpu_capacity: max_concurrency must be >=1")
-    elif evidence_type == "model_rights":
-        items = metadata.get("commercial_rights")
-        if not isinstance(items, list) or not items:
-            errors.append("model_rights: commercial_rights must be a non-empty list")
-        elif not all(isinstance(item, dict) and item.get("commercial_approved") is True for item in items):
-            errors.append("model_rights: all models must be approved for commercial use")
-    elif evidence_type == "security_assessment":
-        findings = metadata.get("critical_high_findings")
-        if findings != 0:
-            errors.append("security_assessment: critical_high_findings must be 0")
-        if not metadata.get("scanner_name"):
-            errors.append("security_assessment: scanner_name is required")
-    elif evidence_type == "software_license_approval":
-        if metadata.get("license_type") != "Proprietary":
-            errors.append("software_license_approval: license_type must be Proprietary")
-        if metadata.get("commercial_approved") is not True:
-            errors.append("software_license_approval: commercial_approved must be true")
+        if _number(metadata.get("gpu_memory_mib"), 0) < 23_000:
+            errors.append("gpu_capacity: target GPU must provide at least 23000 MiB")
+        required = {"sustained_load", "burst", "vram_pressure", "backpressure", "recovery"}
+        if not required <= _string_set(metadata, "scenarios", evidence_type, errors):
+            errors.append("gpu_capacity: all capacity and recovery scenarios are required")
+        errors.extend(
+            _required_values(
+                metadata,
+                {"p50_ms", "p95_ms", "p99_ms", "throughput_per_second", "error_rate", "peak_vram_mib"},
+                evidence_type,
+            )
+        )
     elif evidence_type == "integration_services":
-        components = metadata.get("components")
-        expected = {"api", "postgres", "redis", "storage"}
-        if not isinstance(components, list) or not expected <= set(components):
-            errors.append("integration_services: components must include api, postgres, redis, and storage")
-        if metadata.get("healthcheck_passed") is not True:
-            errors.append("integration_services: healthcheck_passed must be true")
+        required = {"postgres_pgvector", "redis", "minio"}
+        if not required <= _string_set(metadata, "services", evidence_type, errors):
+            errors.append("integration_services: PostgreSQL/pgvector, Redis, and MinIO are required")
+        if metadata.get("skipped_tests") != 0 or metadata.get("duplicate_logical_results") != 0:
+            errors.append("integration_services: no skipped tests or duplicate logical results are allowed")
+        if metadata.get("redis_rebuild_verified") is not True:
+            errors.append("integration_services: Redis rebuild from PostgreSQL and MinIO must be verified")
+    elif evidence_type == "security_assessment":
+        required = {
+            "audit_fail_closed",
+            "authorization",
+            "biometric_deletion",
+            "credential_redaction",
+            "malicious_media",
+            "ssrf",
+        }
+        if not required <= _string_set(metadata, "scenarios", evidence_type, errors):
+            errors.append("security_assessment: all required security scenarios must be covered")
+    elif evidence_type == "model_rights":
+        models = _string_set(metadata, "models", evidence_type, errors)
+        if metadata.get("all_rights_cleared") is not True or not models:
+            errors.append("model_rights: every production model must have cleared rights")
+    elif evidence_type == "software_license_approval":
+        errors.extend(_required_values(metadata, {"license_sha256", "approval_reference"}, evidence_type))
+        if metadata.get("reviewed_by_legal") is not True:
+            errors.append("software_license_approval: legal review must be confirmed")
     elif evidence_type == "offline_install":
-        if metadata.get("target_environment") != "isolated_blank_host":
+        required = {"health", "console", "example_clients", "core_parse"}
+        if metadata.get("blank_host") is not True or metadata.get("isolated_network") is not True:
             errors.append("offline_install: a blank isolated target host is required")
         checks = _string_set(metadata, "checks", evidence_type, errors)
         if metadata.get("checksums_verified") is not True or not required <= checks:

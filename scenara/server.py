@@ -4,6 +4,7 @@ import asyncio
 import hmac
 import re
 import sys
+import tempfile
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
@@ -228,6 +229,7 @@ from scenara.platform.models import (
     RunRecord,
     RunStatus,
     SampleStrategy,
+    StreamSessionView,
     SavedSearch,
     SavedSearchPage,
     ServiceAccount,
@@ -383,6 +385,26 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     console_assets = CONSOLE_DIST / "assets"
     if console_assets.is_dir():
         app.mount("/console/assets", StaticFiles(directory=console_assets), name="console-assets")
+
+    async def spool_upload(file: UploadFile, max_bytes: int) -> Path:
+        handle = tempfile.NamedTemporaryFile(prefix="scenara-upload-", delete=False)
+        path = Path(handle.name)
+        size = 0
+        try:
+            while chunk := await file.read(1024 * 1024):
+                size += len(chunk)
+                if size > max_bytes:
+                    raise ValueError(f"media exceeds {max_bytes} bytes")
+                await asyncio.to_thread(handle.write, chunk)
+            await asyncio.to_thread(handle.flush)
+            return path
+        except BaseException:
+            handle.close()
+            with suppress(FileNotFoundError):
+                path.unlink()
+            raise
+        finally:
+            handle.close()
 
     @app.middleware("http")
     async def request_context(request: Request, call_next: RequestResponseEndpoint) -> Response:
@@ -558,14 +580,28 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         max_read = (
             runtime.settings.max_image_bytes + 1 if kind == MediaKind.IMAGE else runtime.settings.max_media_bytes + 1
         )
-        data = await file.read(max_read)
-        asset = await runtime.runs.create_asset(
-            context,
-            data=data,
-            filename=file.filename,
-            content_type=file.content_type or "application/octet-stream",
-            kind=kind,
-        )
+        if kind == MediaKind.VIDEO:
+            path = await spool_upload(file, runtime.settings.max_media_bytes)
+            try:
+                asset = await runtime.runs.create_asset_from_path(
+                    context,
+                    path=str(path),
+                    filename=file.filename,
+                    content_type=file.content_type or "application/octet-stream",
+                    kind=kind,
+                )
+            finally:
+                with suppress(FileNotFoundError):
+                    path.unlink()
+        else:
+            data = await file.read(max_read)
+            asset = await runtime.runs.create_asset(
+                context,
+                data=data,
+                filename=file.filename,
+                content_type=file.content_type or "application/octet-stream",
+                kind=kind,
+            )
         return _envelope(request, asset)  # type: ignore[return-value]
 
     @app.get("/api/v1/media/assets", tags=["Media"])
@@ -804,6 +840,22 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     ) -> ApiEnvelope[RunRecord]:
         return _envelope(request, await runtime.runs.get_run(context, run_id))  # type: ignore[return-value]
 
+    @app.get("/api/v1/stream-sessions/{session_id}", tags=["Runs"])
+    async def get_stream_session(
+        session_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[StreamSessionView]:
+        return _envelope(request, await runtime.runs.stream_session(context, session_id))  # type: ignore[return-value]
+
+    @app.post("/api/v1/stream-sessions/{session_id}/cancel", tags=["Runs"])
+    async def cancel_stream_session(
+        session_id: str,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[StreamSessionView]:
+        return _envelope(request, await runtime.runs.cancel_stream_session(context, session_id))  # type: ignore[return-value]
+
     async def lifecycle(
         run_id: str, action: str, request: Request, context: PrincipalContext
     ) -> ApiEnvelope[RunRecord]:
@@ -835,13 +887,13 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         unit_limit: Annotated[int, Query(ge=1, le=1000)] = 100,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[ResultPage]:
-        result = await runtime.runs.result(context, run_id)
-        total = len(result.units)
-        page = result.model_copy(update={"units": result.units[unit_offset : unit_offset + unit_limit]})
-        return _envelope(
-            request,
-            ResultPage(result=page, unit_offset=unit_offset, unit_limit=unit_limit, unit_total=total),
-        )  # type: ignore[return-value]
+        page = await runtime.runs.result_page(
+            context,
+            run_id,
+            unit_offset=unit_offset,
+            unit_limit=unit_limit,
+        )
+        return _envelope(request, page)  # type: ignore[return-value]
 
     @app.get("/api/v1/results", tags=["Results"])
     async def list_results(
@@ -965,7 +1017,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         pipeline_id: Annotated[str | None, Form()] = None,
         pipeline_version: Annotated[str | None, Form()] = None,
         sample_interval_ms: Annotated[int, Form(ge=1, le=3_600_000)] = 1000,
-        max_units: Annotated[int, Form(ge=1, le=10_000)] = 64,
+        max_units: Annotated[int | None, Form(ge=1, le=10_000)] = None,
         sample_strategy: Annotated[SampleStrategy, Form()] = SampleStrategy.INTERVAL,
         sample_start_ms: Annotated[int, Form(ge=0)] = 0,
         sample_end_ms: Annotated[int | None, Form(ge=0)] = None,
@@ -978,24 +1030,29 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[ParseVideoResponse]:
-        data = await file.read(runtime.settings.max_media_bytes + 1)
-        asset = await runtime.runs.create_asset(
-            context,
-            data=data,
-            filename=file.filename,
-            content_type=file.content_type or "application/octet-stream",
-            kind=MediaKind.VIDEO,
-            temporary=True,
-        )
+        path = await spool_upload(file, runtime.settings.max_media_bytes)
+        try:
+            asset = await runtime.runs.create_asset_from_path(
+                context,
+                path=str(path),
+                filename=file.filename,
+                content_type=file.content_type or "application/octet-stream",
+                kind=MediaKind.VIDEO,
+                temporary=True,
+            )
+        finally:
+            with suppress(FileNotFoundError):
+                path.unlink()
         selected_pipeline = pipeline_id or runtime.plugins.default_pipeline_id(domain)
         selected_pipeline_ref = await runtime.runs.resolve_pipeline_ref(selected_pipeline, pipeline_version)
         params: dict[str, object] = {
             "sample_interval_ms": sample_interval_ms,
-            "max_units": max_units,
             "sample_strategy": sample_strategy.value,
             "sample_start_ms": sample_start_ms,
             "scene_change_threshold": scene_change_threshold,
         }
+        if max_units is not None:
+            params["max_units"] = max_units
         if sample_end_ms is not None:
             params["sample_end_ms"] = sample_end_ms
         if frame_max_edge is not None:
@@ -1032,7 +1089,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         domain: Annotated[DomainId, Form()] = "ocr",
         pipeline_id: Annotated[str | None, Form()] = None,
         pipeline_version: Annotated[str | None, Form()] = None,
-        max_units: Annotated[int, Form(ge=1, le=1000)] = 64,
+        max_units: Annotated[int | None, Form(ge=1, le=1000)] = None,
         page_scale: Annotated[float, Form(ge=0.5, le=4.0)] = 1.5,
         wait_ms: Annotated[int, Form(ge=0, le=30_000)] = 0,
         idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
@@ -1055,7 +1112,10 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
                 domain=domain,
                 pipeline=selected_pipeline_ref,
                 asset_id=asset.asset_id,
-                parameters={"max_units": max_units, "page_scale": page_scale},
+                parameters={
+                    **({"max_units": max_units} if max_units is not None else {}),
+                    "page_scale": page_scale,
+                },
                 wait_ms=wait_ms,
             ),
             idempotency_key=idempotency_key or f"shortcut_{uuid4().hex}",

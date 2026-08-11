@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -34,8 +35,18 @@ class LocalObjectStore:
         await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
         await asyncio.to_thread(path.write_bytes, data)
 
+    async def put_file(self, object_key: str, source: Path, content_type: str) -> None:
+        del content_type
+        path = self._path(object_key)
+        await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(shutil.copyfile, source, path)
+
     async def get(self, object_key: str) -> bytes:
         return await asyncio.to_thread(self._path(object_key).read_bytes)
+
+    async def get_to_file(self, object_key: str, path: Path) -> None:
+        await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(shutil.copyfile, self._path(object_key), path)
 
     async def delete(self, object_key: str) -> bool:
         path = self._path(object_key)
@@ -87,10 +98,25 @@ class S3ObjectStore:
             ContentType=content_type,
         )
 
+    async def put_file(self, object_key: str, path: Path, content_type: str) -> None:
+        validate_object_key(object_key)
+        await asyncio.to_thread(
+            self.client.upload_file,
+            str(path),
+            self.bucket,
+            object_key,
+            ExtraArgs={"ContentType": content_type},
+        )
+
     async def get(self, object_key: str) -> bytes:
         validate_object_key(object_key)
         response = await asyncio.to_thread(self.client.get_object, Bucket=self.bucket, Key=object_key)
         return await asyncio.to_thread(response["Body"].read)
+
+    async def get_to_file(self, object_key: str, path: Path) -> None:
+        validate_object_key(object_key)
+        await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(self.client.download_file, self.bucket, object_key, str(path))
 
     async def delete(self, object_key: str) -> bool:
         validate_object_key(object_key)

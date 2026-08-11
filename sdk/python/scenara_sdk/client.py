@@ -8,6 +8,7 @@ from typing import Any, cast
 
 import httpx
 
+from ._version import __version__
 from .models import (
     AccessFoundationStatus,
     ApiKeyRecord,
@@ -36,6 +37,7 @@ from .models import (
     RepositoryContractCatalog,
     RepositoryTopology,
     ResultEnvelope,
+    ResultPage,
     Role,
     Run,
     SampleStrategy,
@@ -71,7 +73,7 @@ class ScenaraClient:
         headers = {
             "X-Tenant-Id": tenant_id,
             "X-Project-Id": project_id,
-            "User-Agent": "scenara-sdk-python/0.3.0.dev16",
+            "User-Agent": f"scenara-sdk-python/{__version__}",
         }
         if token:
             headers["Authorization"] = f"Bearer {token}"
@@ -151,8 +153,29 @@ class ScenaraClient:
         return cast(Run, self._request("POST", f"/api/v1/runs/{run_id}/cancel"))
 
     def get_result(self, run_id: str) -> ResultEnvelope:
-        page = cast(dict[str, Any], self._request("GET", f"/api/v1/runs/{run_id}/result"))
-        return cast(ResultEnvelope, page["result"])
+        page = self.get_result_page(run_id, unit_offset=0, unit_limit=1_000)
+        result = dict(page["result"])
+        units = list(page["result"]["units"])
+        total = page["unit_total"]
+        while len(units) < total:
+            next_page = self.get_result_page(run_id, unit_offset=len(units), unit_limit=1_000)
+            next_units = next_page["result"]["units"]
+            if not next_units:
+                break
+            units.extend(next_units)
+            total = max(total, next_page["unit_total"])
+        result["units"] = units
+        return cast(ResultEnvelope, result)
+
+    def get_result_page(self, run_id: str, *, unit_offset: int = 0, unit_limit: int = 100) -> ResultPage:
+        return cast(
+            ResultPage,
+            self._request(
+                "GET",
+                f"/api/v1/runs/{run_id}/result",
+                params={"unit_offset": unit_offset, "unit_limit": unit_limit},
+            ),
+        )
 
     def get_result_artifact(self, run_id: str, artifact_id: str) -> bytes:
         """Download one derived image declared by a run result.
@@ -216,7 +239,7 @@ class ScenaraClient:
         pipeline_id: str | None = None,
         pipeline_version: str | None = None,
         sample_interval_ms: int = 1_000,
-        max_units: int = 64,
+        max_units: int | None = None,
         sample_strategy: SampleStrategy = "interval",
         sample_start_ms: int = 0,
         sample_end_ms: int | None = None,
@@ -233,13 +256,14 @@ class ScenaraClient:
         data: dict[str, object] = {
             "domain": domain,
             "sample_interval_ms": sample_interval_ms,
-            "max_units": max_units,
             "sample_strategy": sample_strategy,
             "sample_start_ms": sample_start_ms,
             "scene_change_threshold": scene_change_threshold,
             "page_scale": page_scale,
             "wait_ms": wait_ms,
         }
+        if max_units is not None:
+            data["max_units"] = max_units
         if pipeline_id is not None:
             data["pipeline_id"] = pipeline_id
         if pipeline_version is not None:
@@ -271,7 +295,7 @@ class ScenaraClient:
         domain: Domain = "ocr",
         pipeline_id: str | None = None,
         pipeline_version: str | None = None,
-        max_units: int = 64,
+        max_units: int | None = None,
         page_scale: float = 1.5,
         wait_ms: int = 0,
         idempotency_key: str | None = None,
@@ -280,10 +304,11 @@ class ScenaraClient:
         content_type = mimetypes.guess_type(source.name)[0] or "application/pdf"
         data: dict[str, object] = {
             "domain": domain,
-            "max_units": max_units,
             "page_scale": page_scale,
             "wait_ms": wait_ms,
         }
+        if max_units is not None:
+            data["max_units"] = max_units
         if pipeline_id is not None:
             data["pipeline_id"] = pipeline_id
         if pipeline_version is not None:
@@ -308,10 +333,11 @@ class ScenaraClient:
         pipeline_id: str | None = None,
         pipeline_version: str | None = None,
         sample_interval_ms: int = 1_000,
-        max_units: int = 64,
+        max_units: int | None = None,
         sample_strategy: SampleStrategy = "interval",
         sample_start_ms: int = 0,
         sample_end_ms: int | None = None,
+        stream_segment_duration_ms: int | None = None,
         scene_change_threshold: float = 0.35,
         frame_max_edge: int | None = None,
         max_reconnect_attempts: int = 3,
@@ -324,7 +350,6 @@ class ScenaraClient:
         selected_pipeline = pipeline_id or ("portrait.person-detection" if domain == "portrait" else "ocr.document")
         parameters: dict[str, object] = {
             "sample_interval_ms": sample_interval_ms,
-            "max_units": max_units,
             "sample_strategy": sample_strategy,
             "sample_start_ms": sample_start_ms,
             "scene_change_threshold": scene_change_threshold,
@@ -332,6 +357,10 @@ class ScenaraClient:
             "connect_timeout_ms": connect_timeout_ms,
             "read_timeout_ms": read_timeout_ms,
         }
+        if max_units is not None:
+            parameters["max_units"] = max_units
+        if stream_segment_duration_ms is not None:
+            parameters["stream_segment_duration_ms"] = stream_segment_duration_ms
         if sample_end_ms is not None:
             parameters["sample_end_ms"] = sample_end_ms
         if frame_max_edge is not None:
@@ -355,6 +384,12 @@ class ScenaraClient:
                 headers={"Idempotency-Key": idempotency_key or f"sdk_{uuid.uuid4().hex}"},
             ),
         )
+
+    def get_stream_session(self, session_id: str) -> dict[str, Any]:
+        return cast(dict[str, Any], self._request("GET", f"/api/v1/stream-sessions/{session_id}"))
+
+    def cancel_stream_session(self, session_id: str) -> dict[str, Any]:
+        return cast(dict[str, Any], self._request("POST", f"/api/v1/stream-sessions/{session_id}/cancel"))
 
     def list_assets(self, *, offset: int = 0, limit: int = 50) -> dict[str, Any]:
         return cast(

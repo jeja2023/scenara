@@ -18,7 +18,7 @@ import {
   Video,
 } from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { RouterLink, useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import {
   ApiError,
   api,
@@ -112,7 +112,7 @@ const sourceUrl = ref("");
 
 // 抽样参数
 const sampleIntervalMs = ref(1000);
-const maxUnits = ref(32);
+const maxUnits = ref<number | null>(null);
 const sampleStrategy = ref<SampleStrategy>("interval");
 const sampleStartMs = ref(0);
 const sampleEndMs = ref<number | null>(null);
@@ -195,9 +195,10 @@ const samplingValid = computed(() => {
   const endMs = optionalNumber(sampleEndMs.value);
   const maxEdge = optionalNumber(frameMaxEdge.value);
   if (
-    !Number.isInteger(maxUnits.value) ||
-    maxUnits.value < 1 ||
-    maxUnits.value > (mode.value === "document" ? 1_000 : 10_000)
+    maxUnits.value != null &&
+    (!Number.isInteger(maxUnits.value) ||
+      maxUnits.value < 1 ||
+      maxUnits.value > (mode.value === "document" ? 1_000 : 10_000))
   )
     return false;
   if (mode.value === "document")
@@ -215,6 +216,7 @@ const samplingValid = computed(() => {
     (!Number.isInteger(endMs) || endMs <= sampleStartMs.value)
   )
     return false;
+  if (mode.value === "stream" && endMs != null && endMs < 1_000) return false;
   if (
     sampleStrategy.value === "scene_change" &&
     (sceneChangeThreshold.value < 0.01 || sceneChangeThreshold.value > 1)
@@ -505,10 +507,13 @@ function subscribeEvents(runId: string): EventSubscription {
         event_type?: string;
         status?: Run["status"];
         payload?: {
-          progress?: number;
+          progress?: number | null;
           processed_units?: number;
-          expected_units?: number;
+          expected_units?: number | null;
           unit_count?: number;
+          unit_total?: number;
+          latest_pts_ms?: number | null;
+          next_run_id?: string;
         };
       }>(response)) {
         if (
@@ -526,15 +531,19 @@ function subscribeEvents(runId: string): EventSubscription {
             progress: event.payload?.progress ?? run.value.progress,
           };
         }
-        if (
-          event.payload?.processed_units != null &&
-          event.payload.expected_units != null
-        ) {
-          progressDetail.value = `${event.payload.processed_units} / ${event.payload.expected_units} 个单元`;
+        if (event.payload?.processed_units != null) {
+          progressDetail.value =
+            event.payload.expected_units == null
+              ? `已处理 ${event.payload.processed_units} 个单元${event.payload.latest_pts_ms == null ? "" : ` · ${formatTime(event.payload.latest_pts_ms)}`}`
+              : `${event.payload.processed_units} / ${event.payload.expected_units} 个单元`;
         }
+        const availableUnitCount =
+          event.event_type === "result.delta"
+            ? event.payload?.unit_total
+            : event.payload?.unit_count;
         if (
-          event.event_type === "result.partial" &&
-          (event.payload?.unit_count ?? 0) > (result.value?.units.length ?? 0)
+          ["result.partial", "result.delta"].includes(event.event_type ?? "") &&
+          (availableUnitCount ?? 0) > (result.value?.units.length ?? 0)
         ) {
           void loadResult(runId, true).catch(() => undefined);
         }
@@ -606,6 +615,12 @@ async function pollRun(initial: Run): Promise<void> {
   }
   if (generation !== pollGeneration || run.value.status !== "completed") return;
   await loadResult(initial.run_id);
+  if (mode.value === "stream" && run.value.next_run_id) {
+    const next = await api<Run>(
+      "/api/v1/runs/" + encodeURIComponent(run.value.next_run_id),
+    );
+    followRun(next);
+  }
 }
 
 function samplingParameters(): Record<string, unknown> {
@@ -613,15 +628,17 @@ function samplingParameters(): Record<string, unknown> {
   const maxEdge = optionalNumber(frameMaxEdge.value);
   const params: Record<string, unknown> = {
     sample_interval_ms: sampleIntervalMs.value,
-    max_units: maxUnits.value,
     sample_strategy: sampleStrategy.value,
     sample_start_ms: sampleStartMs.value,
     scene_change_threshold: sceneChangeThreshold.value,
   };
-  if (endMs != null && endMs > sampleStartMs.value)
+  if (maxUnits.value != null) params.max_units = maxUnits.value;
+  if (mode.value !== "stream" && endMs != null && endMs > sampleStartMs.value)
     params.sample_end_ms = endMs;
   if (maxEdge != null) params.frame_max_edge = maxEdge;
   if (mode.value === "stream") {
+    if (endMs != null) params.stream_segment_duration_ms = endMs;
+    if (maxUnits.value != null && endMs != null) params.sample_end_ms = endMs;
     params.max_reconnect_attempts = maxReconnectAttempts.value;
     params.connect_timeout_ms = connectTimeoutMs.value;
     params.read_timeout_ms = readTimeoutMs.value;
@@ -652,7 +669,10 @@ function runParameters(): Record<string, unknown> {
     mode.value === "image"
       ? {}
       : mode.value === "document"
-        ? { max_units: maxUnits.value, page_scale: pageScale.value }
+        ? {
+            ...(maxUnits.value == null ? {} : { max_units: maxUnits.value }),
+            page_scale: pageScale.value,
+          }
         : samplingParameters();
   for (const [key, value] of Object.entries(pipelineParameters.value)) {
     if (
@@ -739,6 +759,8 @@ function applyRunParameters(parameters: Record<string, unknown>): void {
     sampleStartMs.value = Number(parameters.sample_start_ms);
   if (parameters.sample_end_ms != null)
     sampleEndMs.value = Number(parameters.sample_end_ms);
+  if (parameters.stream_segment_duration_ms != null)
+    sampleEndMs.value = Number(parameters.stream_segment_duration_ms);
   if (parameters.scene_change_threshold != null)
     sceneChangeThreshold.value = Number(parameters.scene_change_threshold);
   if (parameters.frame_max_edge != null)
@@ -1286,15 +1308,19 @@ onBeforeUnmount(() => {
         >
           <Play :size="16" />{{ loading ? "运行中" : "开始解析" }}
         </button>
-        <RouterLink
-          class="parse-history-link"
-          :to="{ path: '/runs', query: { domain } }"
+        <button
+          class="button secondary"
+          @click="router.push({ path: '/runs', query: { domain } })"
         >
-          查看历史运行
-        </RouterLink>
-        <RouterLink v-if="hasResult" to="/results" class="parse-results-link">
-          查看结构化结果
-        </RouterLink>
+          <Clock3 :size="16" />查看历史运行
+        </button>
+        <button
+          v-if="hasResult"
+          class="button secondary"
+          @click="router.push('/results')"
+        >
+          <FileText :size="16" />查看结构化结果
+        </button>
       </nav>
     </div>
 
@@ -1307,8 +1333,14 @@ onBeforeUnmount(() => {
           mode === "image"
             ? "单帧"
             : mode === "document"
-              ? `${maxUnits} 页上限`
-              : `${maxUnits} 个单元上限`
+              ? maxUnits == null
+                ? "全部页面"
+                : `${maxUnits} 页兼容上限`
+              : mode === "stream"
+                ? "自动连续分段"
+                : maxUnits == null
+                  ? "处理至视频结束"
+                  : `${maxUnits} 个兼容上限`
         }}</span>
       </div>
       <div class="panel-body input-layout">
@@ -1519,7 +1551,7 @@ onBeforeUnmount(() => {
 
           <div v-if="mode === 'document'" class="parameter-grid">
             <label
-              ><span>最大页数</span
+              ><span>兼容页数上限（可选）</span
               ><input
                 v-model.number="maxUnits"
                 type="number"
@@ -1562,7 +1594,7 @@ onBeforeUnmount(() => {
                   :disabled="sampleStrategy !== 'interval'"
               /></label>
               <label
-                ><span>最大分析单元</span
+                ><span>兼容单元上限（可选）</span
                 ><input
                   v-model.number="maxUnits"
                   type="number"
@@ -1969,6 +2001,12 @@ onBeforeUnmount(() => {
   gap: 18px;
   padding: 12px 0;
   border-bottom: 1px solid var(--line);
+}
+.parse-context-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
 }
 .workbench-config > div:not(.media-modes),
 .pipeline-picker,

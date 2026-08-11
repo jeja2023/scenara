@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 from scenara import __version__
+from scenara_sdk import __version__ as sdk_version
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -23,6 +24,8 @@ def test_release_version_is_consistent_across_packages_and_openapi() -> None:
     npm_version = __version__.replace(".dev", "-dev.")
     assert _toml("pyproject.toml")["project"]["version"] == __version__
     assert _toml("sdk/python/pyproject.toml")["project"]["version"] == __version__
+    assert sdk_version == __version__
+    assert f'APP_VERSION = "{__version__}"' in (ROOT / "app/settings.py").read_text(encoding="utf-8")
     assert _json("package.json")["version"] == npm_version
     assert _json("frontend/console/package.json")["version"] == npm_version
     assert _json("sdk/typescript/package.json")["version"] == npm_version

@@ -46,8 +46,8 @@ class Settings:
     bootstrap_admin_password: str
     max_image_bytes: int
     max_media_bytes: int
-    max_media_units: int
     media_sample_interval_ms: int
+    stream_segment_duration_ms: int
     enterprise_license_path: Path | None
     enterprise_public_key_path: Path | None
     result_shard_units: int
@@ -140,11 +140,14 @@ def load_settings() -> Settings:
         bootstrap_admin_username=os.getenv("SCENARA_BOOTSTRAP_ADMIN_USERNAME", "").strip(),
         bootstrap_admin_password=os.getenv("SCENARA_BOOTSTRAP_ADMIN_PASSWORD", ""),
         max_image_bytes=max(1, int(os.getenv("SCENARA_MAX_IMAGE_BYTES", str(25 * 1024 * 1024)))),
-        max_media_bytes=max(1, int(os.getenv("SCENARA_MAX_MEDIA_BYTES", str(512 * 1024 * 1024)))),
-        max_media_units=max(1, min(10_000, int(os.getenv("SCENARA_MAX_MEDIA_UNITS", "256")))),
+        max_media_bytes=max(1, int(os.getenv("SCENARA_MAX_MEDIA_BYTES", str(20 * 1024 * 1024 * 1024)))),
         media_sample_interval_ms=max(
             1,
             min(3_600_000, int(os.getenv("SCENARA_MEDIA_SAMPLE_INTERVAL_MS", "1000"))),
+        ),
+        stream_segment_duration_ms=max(
+            1_000,
+            min(86_400_000, int(os.getenv("SCENARA_STREAM_SEGMENT_DURATION_MS", "300000"))),
         ),
         result_shard_units=max(1, min(10_000, int(os.getenv("SCENARA_RESULT_SHARD_UNITS", "100")))),
         image_wait_timeout_ms=max(0, min(30_000, int(os.getenv("SCENARA_IMAGE_WAIT_TIMEOUT_MS", "10000")))),

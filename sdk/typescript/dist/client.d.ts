@@ -1,4 +1,4 @@
-import type { AccessFoundationStatus, AuditEventPage, ApiKeyRecord, CreateApiKeyResponse, DatasetRecord, DatasetVersion, Domain, FeedbackRecord, HardSampleManifest, IamSummary, MediaAsset, MediaAssetPage, MediaSource, MediaSourcePage, MediaSourceProbe, Membership, ModelDeploymentEvent, ModelPackage, ModelRelease, Organization, ParseDocumentResponse, ParseImageResponse, ParseVideoResponse, PortraitCompareResponse, IndexDefinition, IndexHit, IndexRecordView, SearchResponse, SavedSearch, SavedSearchPage, PortraitIntelligenceStatus, ProductCatalogItem, ProductEntitlement, Project, RepositoryContractCatalog, RepositoryTopology, ResultEnvelope, Run, RunPage, RunStatus, SampleStrategy, Role, ServiceAccount, UserAccount, WebhookDelivery, WebhookSubscription } from "./types.js";
+import type { AccessFoundationStatus, AuditEventPage, ApiKeyRecord, CreateApiKeyResponse, DatasetRecord, DatasetVersion, Domain, FeedbackRecord, HardSampleManifest, IamSummary, MediaAsset, MediaAssetPage, MediaSource, MediaSourcePage, MediaSourceProbe, Membership, ModelDeploymentEvent, ModelPackage, ModelRelease, Organization, ParseDocumentResponse, ParseImageResponse, ParseVideoResponse, PortraitCompareResponse, IndexDefinition, IndexHit, IndexRecordView, SearchResponse, SavedSearch, SavedSearchPage, PortraitIntelligenceStatus, ProductCatalogItem, ProductEntitlement, Project, RepositoryContractCatalog, RepositoryTopology, ResultEnvelope, ResultPage, Run, RunPage, RunStatus, SampleStrategy, Role, ServiceAccount, UserAccount, WebhookDelivery, WebhookSubscription } from "./types.js";
 export type ScenaraTransport = <T>(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", path: string, options?: {
     body?: unknown;
     idempotencyKey?: string;
@@ -54,6 +54,7 @@ export interface ParseStreamInput {
     sampleStrategy?: SampleStrategy;
     sampleStartMs?: number;
     sampleEndMs?: number;
+    streamSegmentDurationMs?: number;
     sceneChangeThreshold?: number;
     frameMaxEdge?: number;
     maxReconnectAttempts?: number;
@@ -81,6 +82,7 @@ export declare class ScenaraClient {
     createRun(input: CreateRunInput): Promise<Run>;
     cancelRun(runId: string): Promise<Run>;
     getResult(runId: string): Promise<ResultEnvelope>;
+    getResultPage(runId: string, unitOffset?: number, unitLimit?: number): Promise<ResultPage>;
     /**
      * Download one derived image declared by a run result: a feature crop
      * (`crop_artifact_id` on a detected object) or a full unit image
@@ -193,6 +195,8 @@ export declare class ScenaraClient {
     enrollPortraitIdentity(identityId: string, enrollment: Record<string, unknown>): Promise<Record<string, unknown>>;
     searchPortrait(query: Record<string, unknown>): Promise<Record<string, unknown>>;
     comparePortrait(comparison: Record<string, unknown>): Promise<Record<string, unknown>>;
+    getStreamSession(sessionId: string): Promise<Record<string, unknown>>;
+    cancelStreamSession(sessionId: string): Promise<Record<string, unknown>>;
     createIdentityProvider(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
     listIdentityProviders(): Promise<ControlPlaneRecord[]>;
     probeIdentityProvider(providerId: string): Promise<ControlPlaneRecord>;

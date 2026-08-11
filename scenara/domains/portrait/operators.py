@@ -140,7 +140,11 @@ class PortraitPersonDetectionOperator:
                             )
                         )
                 processed_units += len(chunk)
-                progress = 0.03 + 0.94 * min(1.0, processed_units / max(1, expected_units))
+                progress = (
+                    None
+                    if expected_units is None
+                    else 0.03 + 0.94 * min(1.0, processed_units / max(1, expected_units))
+                )
                 if decoded.kind in {MediaKind.VIDEO, MediaKind.STREAM}:
                     await context.publish_partial_result(
                         self._result(
@@ -157,6 +161,7 @@ class PortraitPersonDetectionOperator:
                     stage="inference",
                     processed_units=processed_units,
                     expected_units=expected_units,
+                    latest_pts_ms=chunk[-1].pts_ms if chunk else None,
                 )
         except BaseException:
             await decoded.close()

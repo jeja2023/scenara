@@ -4,11 +4,14 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
+import tempfile
 import time
 from collections.abc import Sequence
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any, Protocol
+from pathlib import Path
+from typing import Any, Literal, Protocol, cast
 from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
@@ -32,11 +35,13 @@ from scenara.platform.models import (
     PipelineStatus,
     PrincipalContext,
     ResultEnvelope,
+    ResultPage,
     ResultReference,
     ResultSummary,
     RunEvent,
     RunRecord,
     RunStatus,
+    StreamSessionView,
 )
 from scenara.platform.network import validate_external_url
 from scenara.platform.objects import ObjectStore
@@ -106,8 +111,8 @@ class RunService:
         policy: PolicyProvider,
         max_image_bytes: int,
         max_media_bytes: int,
-        max_media_units: int,
         media_sample_interval_ms: int,
+        stream_segment_duration_ms: int,
         result_shard_units: int,
         raw_media_retention_days: int,
         preview_retention_days: int,
@@ -132,8 +137,8 @@ class RunService:
         self.policy = policy
         self.max_image_bytes = max_image_bytes
         self.max_media_bytes = max_media_bytes
-        self.max_media_units = max_media_units
         self.media_sample_interval_ms = media_sample_interval_ms
+        self.stream_segment_duration_ms = stream_segment_duration_ms
         self.result_shard_units = result_shard_units
         self.raw_media_retention_days = raw_media_retention_days
         self.preview_retention_days = preview_retention_days
@@ -262,6 +267,109 @@ class RunService:
                 await self.objects.delete(preview_key)
             raise
 
+    async def create_asset_from_path(
+        self,
+        context: PrincipalContext,
+        *,
+        path: str,
+        filename: str | None,
+        content_type: str,
+        kind: MediaKind,
+        temporary: bool = False,
+    ) -> MediaAsset:
+        await require_allowed(self.policy, context, "create", "media_asset", {"kind": kind.value})
+        source_path = os.path.abspath(path)
+        size_bytes = os.path.getsize(source_path)
+        if size_bytes <= 0:
+            raise ValueError("media asset is empty")
+        if size_bytes > self.max_media_bytes:
+            raise ValueError(f"media exceeds {self.max_media_bytes} bytes")
+        if kind == MediaKind.IMAGE and size_bytes > self.max_image_bytes:
+            raise ValueError(f"image exceeds {self.max_image_bytes} bytes")
+
+        def inspect_path() -> tuple[str, MediaTechnicalMetadata, bytes]:
+            digest = hashlib.sha256()
+            with open(source_path, "rb") as handle:
+                while chunk := handle.read(1024 * 1024):
+                    digest.update(chunk)
+            raw_metadata, preview = inspect_media(
+                MediaInput(kind=kind, content_type=content_type, file_path=source_path, filename=filename)
+            )
+            return digest.hexdigest(), MediaTechnicalMetadata.model_validate(raw_metadata), preview
+
+        try:
+            sha256, metadata, preview_data = await asyncio.to_thread(inspect_path)
+        except PipelineError as exc:
+            raise ValueError(f"invalid {kind.value} media: {exc}") from exc
+        asset_id = f"ast_{uuid4().hex}"
+        object_key = f"tenants/{context.tenant_id}/projects/{context.project_id}/assets/{asset_id}/original"
+        preview_key = f"tenants/{context.tenant_id}/projects/{context.project_id}/assets/{asset_id}/preview.jpg"
+        now = time.time()
+        retention_days = 1 if temporary else self.raw_media_retention_days
+        asset = MediaAsset(
+            asset_id=asset_id,
+            tenant_id=context.tenant_id,
+            project_id=context.project_id,
+            kind=kind,
+            filename=filename,
+            content_type=content_type or "application/octet-stream",
+            size_bytes=size_bytes,
+            sha256=sha256,
+            object_key=object_key,
+            preview_object_key=preview_key,
+            preview_content_type="image/jpeg",
+            preview_sha256=hashlib.sha256(preview_data).hexdigest(),
+            metadata=metadata,
+            temporary=temporary,
+            created_at=now,
+            expires_at=now + retention_days * 86_400,
+        )
+        await self.objects.put_file(object_key, Path(source_path), asset.content_type)
+        stored: MediaAsset | None = None
+        try:
+            await self.objects.put(preview_key, preview_data, "image/jpeg")
+            stored = await self.state.create_asset(asset)
+            for record in (
+                ObjectRetentionRecord(
+                    tenant_id=context.tenant_id,
+                    project_id=context.project_id,
+                    object_key=object_key,
+                    category="raw_media",
+                    owner_type="media_asset",
+                    owner_id=asset_id,
+                    created_at=now,
+                    expires_at=asset.expires_at,
+                ),
+                ObjectRetentionRecord(
+                    tenant_id=context.tenant_id,
+                    project_id=context.project_id,
+                    object_key=preview_key,
+                    category="preview",
+                    owner_type="media_asset",
+                    owner_id=asset_id,
+                    created_at=now,
+                    expires_at=now + self.preview_retention_days * 86_400,
+                ),
+            ):
+                await self.state.track_object(record)
+            await self.policy.consume(context, "media_bytes", size_bytes, {"asset_id": asset_id})
+            await self.audit.record(
+                context,
+                action="media.asset.create",
+                resource_type="media_asset",
+                resource_id=asset_id,
+                evidence={"kind": kind.value, "size_bytes": size_bytes, "sha256": sha256},
+            )
+            return stored
+        except Exception:
+            if stored is not None:
+                with suppress(Exception):
+                    await self.state.delete_asset(context.tenant_id, context.project_id, asset_id)
+            with suppress(Exception):
+                await self.objects.delete(object_key)
+            with suppress(Exception):
+                await self.objects.delete(preview_key)
+            raise
     async def sync_pipeline_catalog(self) -> list[PipelineDefinition]:
         for pipeline in self.pipelines.pipelines():
             await self.state.register_pipeline_definition(pipeline)
@@ -519,6 +627,9 @@ class RunService:
         request: CreateRunRequest,
         *,
         idempotency_key: str,
+        stream_session_id: str | None = None,
+        stream_segment_index: int | None = None,
+        previous_run_id: str | None = None,
     ) -> CreateRunOutcome:
         if not idempotency_key or len(idempotency_key) > 128:
             raise ValueError("Idempotency-Key is required and must not exceed 128 characters")
@@ -534,7 +645,11 @@ class RunService:
         pipeline = await self.pipeline_definition(request.pipeline.pipeline_id, request.pipeline.version)
         if pipeline.domain != request.domain:
             raise ValueError("requested domain does not match pipeline domain")
-        self.pipelines.validate_run_parameters(pipeline, request.parameters)
+        effective_parameters = dict(request.parameters)
+        if request.source_id and "max_units" not in effective_parameters:
+            effective_parameters.setdefault("stream_segment_duration_ms", self.stream_segment_duration_ms)
+        effective_request = request.model_copy(update={"parameters": effective_parameters})
+        self.pipelines.validate_run_parameters(pipeline, effective_parameters)
         if request.asset_id:
             asset = await self.state.get_asset(context.tenant_id, context.project_id, request.asset_id)
             if asset is None or asset.deleted_at is not None or asset.original_deleted_at is not None:
@@ -553,12 +668,17 @@ class RunService:
             pipeline=request.pipeline,
             asset_id=request.asset_id,
             source_id=request.source_id,
-            parameters=request.parameters,
+            stream_session_id=(stream_session_id or f"sts_{uuid4().hex}") if request.source_id else None,
+            stream_segment_index=(stream_segment_index if stream_segment_index is not None else 0)
+            if request.source_id
+            else None,
+            previous_run_id=previous_run_id,
+            parameters=effective_parameters,
             priority=request.priority,
             created_at=now,
             updated_at=now,
         )
-        request_hash = hashlib.sha256(request.model_dump_json().encode("utf-8")).hexdigest()
+        request_hash = hashlib.sha256(effective_request.model_dump_json().encode("utf-8")).hexdigest()
         stored, created = await self.state.create_run_idempotent(
             run,
             idempotency_key=idempotency_key,
@@ -597,6 +717,44 @@ class RunService:
         if request.wait_ms:
             stored = await self.wait(context, stored.run_id, request.wait_ms)
         return CreateRunOutcome(run=stored, created=created)
+
+    async def stream_session(self, context: PrincipalContext, session_id: str) -> StreamSessionView:
+        await require_allowed(self.policy, context, "read", "run", {"stream_session_id": session_id})
+        runs = await self.state.list_runs(context.tenant_id, context.project_id, limit=None)
+        segments = sorted(
+            (item for item in runs if item.stream_session_id == session_id),
+            key=lambda item: (item.stream_segment_index or 0, item.created_at),
+        )
+        if not segments:
+            raise ResourceNotFound("stream session not found")
+        current = segments[-1]
+        status = (
+            "active"
+            if current.status not in TERMINAL_RUN_STATUSES
+            else "failed"
+            if current.status == RunStatus.FAILED
+            else "cancelled"
+            if current.status == RunStatus.CANCELLED
+            else "completed"
+        )
+        return StreamSessionView(
+            session_id=session_id,
+            source_id=current.source_id or "",
+            domain=current.domain,
+            pipeline=current.pipeline,
+            status=cast(Literal["active", "completed", "failed", "cancelled"], status),
+            current_run_id=current.run_id,
+            segment_count=len(segments),
+            created_at=segments[0].created_at,
+            updated_at=current.updated_at,
+        )
+
+    async def cancel_stream_session(self, context: PrincipalContext, session_id: str) -> StreamSessionView:
+        session = await self.stream_session(context, session_id)
+        current = await self._get_run(context, session.current_run_id)
+        if current.status not in TERMINAL_RUN_STATUSES:
+            await self.transition(context, current.run_id, "cancel")
+        return await self.stream_session(context, session_id)
 
     async def wait(self, context: PrincipalContext, run_id: str, wait_ms: int) -> RunRecord:
         deadline = asyncio.get_running_loop().time() + wait_ms / 1000
@@ -758,6 +916,67 @@ class RunService:
             result = result.model_copy(update={"units": units}, deep=True)
         return result
 
+    async def result_page(
+        self,
+        context: PrincipalContext,
+        run_id: str,
+        *,
+        unit_offset: int,
+        unit_limit: int,
+    ) -> ResultPage:
+        """Load only the result shards that overlap the requested unit page."""
+
+        await require_allowed(self.policy, context, "read", "run", {"run_id": run_id})
+        result, reference = await self._result_index(context, run_id)
+        total = reference.unit_count
+        page_end = min(total, unit_offset + unit_limit)
+        if unit_offset >= total:
+            units: list[MediaUnitResult] = []
+        elif not reference.shard_keys:
+            units = result.units[unit_offset:page_end]
+        else:
+            if len(reference.shard_keys) != len(reference.shard_sha256):
+                raise PipelineError("stored result shard manifest is invalid")
+            counts = reference.shard_unit_counts
+            if len(counts) != len(reference.shard_keys):
+                counts = [self.result_shard_units] * len(reference.shard_keys)
+                counts[-1] = max(0, total - self.result_shard_units * (len(counts) - 1))
+
+            selected: list[tuple[str, str, int, int]] = []
+            cursor = 0
+            for object_key, expected_sha256, count in zip(
+                reference.shard_keys,
+                reference.shard_sha256,
+                counts,
+                strict=True,
+            ):
+                shard_end = cursor + count
+                if cursor < page_end and shard_end > unit_offset:
+                    selected.append((object_key, expected_sha256, cursor, shard_end))
+                cursor = shard_end
+
+            async def load_selected(entry: tuple[str, str, int, int]) -> list[MediaUnitResult]:
+                object_key, expected_sha256, shard_start, shard_end = entry
+                document = await self.objects.get(object_key)
+                if hashlib.sha256(document).hexdigest() != expected_sha256:
+                    raise PipelineError("stored result shard checksum does not match its reference")
+                payload = json.loads(document)
+                if not isinstance(payload, list):
+                    raise PipelineError("stored result shard is not a unit list")
+                parsed = [MediaUnitResult.model_validate(item) for item in payload]
+                local_start = max(0, unit_offset - shard_start)
+                local_end = min(shard_end, page_end) - shard_start
+                return parsed[local_start:local_end]
+
+            pages = await asyncio.gather(*(load_selected(entry) for entry in selected))
+            units = [unit for page in pages for unit in page]
+        return ResultPage(
+            result=result.model_copy(update={"units": units}, deep=True),
+            unit_offset=unit_offset,
+            unit_limit=unit_limit,
+            unit_total=total,
+        )
+
     async def result_artifact(
         self,
         context: PrincipalContext,
@@ -847,10 +1066,20 @@ class RunService:
         if run.status in TERMINAL_RUN_STATUSES:
             return
         sink = self._artifact_sink(run)
+        media_file_path: str | None = None
         try:
             run = await self._begin_execution(run)
             if run.status == RunStatus.CANCELLED:
                 return
+            if run.source_id and run.stream_session_id:
+                await self._event(
+                    run,
+                    "stream.segment.started",
+                    {
+                        "session_id": run.stream_session_id,
+                        "segment_index": run.stream_segment_index or 0,
+                    },
+                )
             data: bytes | None = None
             source_url: str | None = None
             filename: str | None = None
@@ -859,10 +1088,17 @@ class RunService:
                 asset = await self.state.get_asset(run.tenant_id, run.project_id, run.asset_id)
                 if asset is None or asset.deleted_at is not None or asset.original_deleted_at is not None:
                     raise ResourceNotFound("media asset disappeared before execution")
-                data = await self.objects.get(asset.object_key)
                 media_kind = asset.kind
                 filename = asset.filename
                 content_type = asset.content_type
+                if media_kind == MediaKind.VIDEO:
+                    suffix = Path(filename or "media.mp4").suffix or ".mp4"
+                    handle = tempfile.NamedTemporaryFile(prefix="scenara-object-", suffix=suffix, delete=False)
+                    handle.close()
+                    media_file_path = handle.name
+                    await self.objects.get_to_file(asset.object_key, Path(media_file_path))
+                else:
+                    data = await self.objects.get(asset.object_key)
             else:
                 source = await self.state.get_source(run.tenant_id, run.project_id, run.source_id or "")
                 if source is None:
@@ -887,8 +1123,9 @@ class RunService:
             )
             checkpoint_run: RunRecord = run
             execution_run = run
+            published_unit_count = 0
 
-            async def report_progress(progress: float, payload: dict[str, Any]) -> None:
+            async def report_progress(progress: float | None, payload: dict[str, Any]) -> None:
                 nonlocal checkpoint_run
                 for _ in range(4):
                     latest = await self.state.get_run(
@@ -900,7 +1137,14 @@ class RunService:
                         raise ResourceNotFound("run disappeared while reporting progress")
                     if latest.status in TERMINAL_RUN_STATUSES:
                         return
-                    next_progress = max(latest.progress, min(0.99, progress))
+                    next_progress = (
+                        latest.progress
+                        if progress is None
+                        else max(latest.progress, min(0.99, progress))
+                    )
+                    if progress is None:
+                        await self._event(latest, "run.progress", {"progress": None, **payload})
+                        return
                     if next_progress <= latest.progress:
                         return
                     updated = latest.model_copy(update={"progress": next_progress, "updated_at": time.time()})
@@ -918,6 +1162,7 @@ class RunService:
                 raise StateConflict("run progress could not be saved")
 
             async def publish_partial_result(partial: Any) -> None:
+                nonlocal published_unit_count
                 if not isinstance(partial, ResultEnvelope):
                     raise PipelineError("partial pipeline result is not a ResultEnvelope")
                 if sink is not None and (sink.artifacts or sink.warnings):
@@ -936,10 +1181,26 @@ class RunService:
                         execution_run.run_id,
                     )
                     if latest is not None and latest.status not in TERMINAL_RUN_STATUSES:
+                        unit_count = len(partial.units)
+                        delta_count = max(0, unit_count - published_unit_count)
+                        if delta_count:
+                            await self._event(
+                                latest,
+                                "result.delta",
+                                {
+                                    "sequence": published_unit_count,
+                                    "unit_offset": published_unit_count,
+                                    "unit_count": delta_count,
+                                    "unit_total": unit_count,
+                                    "result_url": f"/api/v1/runs/{execution_run.run_id}/result"
+                                    f"?unit_offset={published_unit_count}&unit_limit={delta_count}",
+                                },
+                            )
+                            published_unit_count = unit_count
                         await self._event(
                             latest,
                             "result.partial",
-                            {"unit_count": len(partial.units), "progress": latest.progress},
+                            {"unit_count": unit_count, "progress": latest.progress},
                         )
                 except Exception:
                     logger.exception("could not publish partial result for run %s", execution_run.run_id)
@@ -965,10 +1226,13 @@ class RunService:
                 await self._checkpoint(checkpoint_run, context.control)
 
             parameters = {
-                "max_units": self.max_media_units,
                 "sample_interval_ms": self.media_sample_interval_ms,
                 **run.parameters,
             }
+            if run.source_id:
+                parameters.setdefault("stream_segment_duration_ms", self.stream_segment_duration_ms)
+            if run.stream_segment_index is not None:
+                parameters["stream_segment_index"] = run.stream_segment_index
             with runtime_binding_scope(model_bindings):
                 result = await self.pipelines.execute(
                     pipeline,
@@ -980,6 +1244,7 @@ class RunService:
                             content_type=content_type,
                             data=data,
                             source_url=source_url,
+                            file_path=media_file_path,
                             filename=filename,
                         ),
                     },
@@ -1033,7 +1298,17 @@ class RunService:
                 completed_at=time.time(),
                 termination_reason=media_termination,
             )
-            await self._event(run, "result.available", {"result_schema_version": result.schema_version})
+            await self._event(
+                run,
+                "result.available",
+                {
+                    "result_schema_version": result.schema_version,
+                    "unit_count": len(result.units),
+                    "result_url": f"/api/v1/runs/{run.run_id}/result",
+                },
+            )
+            if run.source_id and run.stream_session_id and media_termination == "segment_window_completed":
+                await self._rollover_stream_segment(run)
         except ExecutionStopped:
             await self._discard_partial_result(run)
             if sink is not None:
@@ -1058,6 +1333,7 @@ class RunService:
                     evidence={"status": cancelled.status.value},
                 )
         except Exception as exc:
+            logger.exception("run execution failed for %s", run.run_id)
             await self._discard_partial_result(run)
             if sink is not None:
                 await sink.discard()
@@ -1084,6 +1360,10 @@ class RunService:
                     outcome="failure",
                     evidence={"code": code, "message": str(exc)[:500]},
                 )
+        finally:
+            if media_file_path is not None:
+                with suppress(FileNotFoundError):
+                    os.unlink(media_file_path)
 
     async def _store_result(
         self,
@@ -1094,13 +1374,46 @@ class RunService:
         partial: bool = False,
     ) -> ResultReference:
         run_base_key = f"tenants/{run.tenant_id}/projects/{run.project_id}/runs/{run.run_id}"
-        base_key = f"{run_base_key}/partial/snapshot-{len(result.units):06d}" if partial else run_base_key
+        base_key = f"{run_base_key}/partial" if partial else run_base_key
         shard_keys: list[str] = []
         shard_sha256: list[str] = []
+        shard_unit_counts: list[int] = []
         written_keys: list[str] = []
         previous = await self.state.get_result_reference(run.tenant_id, run.project_id, run.run_id)
         try:
-            if len(result.units) > self.result_shard_units:
+            if partial:
+                previous_count = 0
+                if previous is not None and previous.index_status == "partial":
+                    shard_keys = list(previous.shard_keys)
+                    shard_sha256 = list(previous.shard_sha256)
+                    shard_unit_counts = list(previous.shard_unit_counts)
+                    if len(shard_unit_counts) != len(shard_keys):
+                        shard_unit_counts = [self.result_shard_units] * len(shard_keys)
+                        if shard_unit_counts:
+                            shard_unit_counts[-1] = max(
+                                0,
+                                previous.unit_count - self.result_shard_units * (len(shard_unit_counts) - 1),
+                            )
+                    previous_count = previous.unit_count
+                if len(result.units) < previous_count:
+                    raise PipelineError("partial result unit count must be monotonic")
+                new_units = result.units[previous_count:]
+                for offset in range(0, len(new_units), self.result_shard_units):
+                    units = new_units[offset : offset + self.result_shard_units]
+                    shard_document = json.dumps(
+                        [unit.model_dump(mode="json") for unit in units],
+                        ensure_ascii=False,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ).encode("utf-8")
+                    shard_key = f"{base_key}/units-{len(shard_keys):06d}.json"
+                    await self.objects.put(shard_key, shard_document, "application/json")
+                    written_keys.append(shard_key)
+                    shard_keys.append(shard_key)
+                    shard_sha256.append(hashlib.sha256(shard_document).hexdigest())
+                    shard_unit_counts.append(len(units))
+                index_result = result.model_copy(update={"units": []}, deep=True)
+            elif len(result.units) > self.result_shard_units:
                 for offset in range(0, len(result.units), self.result_shard_units):
                     units = result.units[offset : offset + self.result_shard_units]
                     shard_document = json.dumps(
@@ -1114,13 +1427,19 @@ class RunService:
                     written_keys.append(shard_key)
                     shard_keys.append(shard_key)
                     shard_sha256.append(hashlib.sha256(shard_document).hexdigest())
+                    shard_unit_counts.append(len(units))
                 index_result = result.model_copy(update={"units": []}, deep=True)
             else:
                 index_result = result
             result_document = index_result.model_dump_json().encode("utf-8")
-            result_key = f"{base_key}/result.json"
+            result_key = (
+                f"{base_key}/result-{len(result.units):012d}-{uuid4().hex}.json"
+                if partial
+                else f"{base_key}/result.json"
+            )
             await self.objects.put(result_key, result_document, "application/json")
-            written_keys.append(result_key)
+            if previous is None or previous.object_key != result_key:
+                written_keys.append(result_key)
             asset = (
                 await self.state.get_asset(run.tenant_id, run.project_id, run.asset_id)
                 if run.asset_id
@@ -1138,6 +1457,7 @@ class RunService:
                 unit_count=len(result.units),
                 shard_keys=shard_keys,
                 shard_sha256=shard_sha256,
+                shard_unit_counts=shard_unit_counts,
                 domain=result.domain,
                 created_at=result.created_at,
                 asset_id=run.asset_id,
@@ -1182,7 +1502,11 @@ class RunService:
                     reference = reference.model_copy(update={"index_status": "partial"})
             await self.state.save_result_reference(run.tenant_id, run.project_id, reference)
             if previous is not None and previous.object_key != reference.object_key:
-                previous_keys = [previous.object_key, *previous.shard_keys]
+                reused = set(reference.shard_keys)
+                previous_keys = [
+                    previous.object_key,
+                    *(key for key in previous.shard_keys if key not in reused),
+                ]
                 for object_key in previous_keys:
                     with suppress(Exception):
                         await self.objects.delete(object_key)
@@ -1443,6 +1767,60 @@ class RunService:
         saved = await self.state.save_run(updated, expected_revision=run.revision)
         await self._event(saved, f"run.{status.value}")
         return saved
+
+    async def _rollover_stream_segment(self, run: RunRecord) -> None:
+        """Queue the next bounded stream segment after a normal segment boundary."""
+
+        if not run.source_id or not run.stream_session_id:
+            return
+        next_index = (run.stream_segment_index or 0) + 1
+        context = PrincipalContext(
+            tenant_id=run.tenant_id,
+            project_id=run.project_id,
+            principal_id=run.principal_id,
+        )
+        request = CreateRunRequest(
+            domain=run.domain,
+            pipeline=run.pipeline,
+            source_id=run.source_id,
+            parameters=dict(run.parameters),
+            priority=run.priority,
+        )
+        try:
+            outcome = await self.create_run(
+                context,
+                request,
+                idempotency_key=f"stream:{run.stream_session_id}:{next_index}",
+                stream_session_id=run.stream_session_id,
+                stream_segment_index=next_index,
+                previous_run_id=run.run_id,
+            )
+            latest = await self.state.get_run(run.tenant_id, run.project_id, run.run_id)
+            if latest is not None and latest.next_run_id != outcome.run.run_id:
+                updated = latest.model_copy(update={"next_run_id": outcome.run.run_id, "updated_at": time.time()})
+                try:
+                    saved = await self.state.save_run(updated, expected_revision=latest.revision)
+                except StateConflict:
+                    saved = latest
+            else:
+                saved = latest or run
+            await self._event(
+                saved,
+                "stream.segment.completed",
+                {
+                    "session_id": run.stream_session_id,
+                    "segment_index": run.stream_segment_index or 0,
+                    "next_run_id": outcome.run.run_id,
+                    "next_segment_index": next_index,
+                },
+            )
+        except Exception as exc:
+            logger.exception("could not roll over stream session %s", run.stream_session_id)
+            await self._event(
+                run,
+                "stream.session.error",
+                {"session_id": run.stream_session_id, "message": str(exc)[:500]},
+            )
 
     async def _event(self, run: RunRecord, event_type: str, payload: dict[str, Any] | None = None) -> RunEvent:
         return await self.state.append_event(

@@ -112,3 +112,49 @@ test("media shortcuts serialize the complete public parsing contract", async () 
     read_timeout_ms: 2_000,
   });
 });
+
+test("result APIs aggregate all pages and retain delta-page access", async () => {
+  const calls = [];
+  const total = 1201;
+  const client = new ScenaraClient({
+    transport: async (_method, path) => {
+      const url = new URL(path, "https://scenara.example");
+      const offset = Number(url.searchParams.get("unit_offset") ?? 0);
+      const limit = Number(url.searchParams.get("unit_limit") ?? 100);
+      calls.push(offset);
+      return {
+        result: {
+          schema_version: "1.0",
+          run_id: "run-large",
+          domain: "ocr",
+          pipeline: { pipeline_id: "ocr.document", version: "0.1.0" },
+          asset_id: "asset-large",
+          source_id: null,
+          units: Array.from(
+            { length: Math.max(0, Math.min(total, offset + limit) - offset) },
+            (_, index) => ({ unit_id: `frame_${offset + index}` }),
+          ),
+          domain_payload: {},
+          relations: [],
+          artifacts: [],
+          models: [],
+          timings: {},
+          media_metadata: {},
+          warnings: [],
+          provenance: {},
+          created_at: 1,
+        },
+        unit_offset: offset,
+        unit_limit: limit,
+        unit_total: total,
+      };
+    },
+  });
+
+  const page = await client.getResultPage("run-large", 500, 2);
+  assert.deepEqual(page.result.units.map((unit) => unit.unit_id), ["frame_500", "frame_501"]);
+  const result = await client.getResult("run-large");
+  assert.equal(result.units.length, total);
+  assert.equal(result.units.at(-1).unit_id, "frame_1200");
+  assert.deepEqual(calls, [500, 0, 1000]);
+});

@@ -192,6 +192,50 @@ def test_python_sdk_preserves_api_errors() -> None:
     assert caught.value.request_id == "req-denied"
 
 
+def test_python_sdk_reads_complete_results_and_exposes_delta_pages() -> None:
+    offsets: list[int] = []
+    total = 1_201
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        offset = int(request.url.params.get("unit_offset", "0"))
+        limit = int(request.url.params.get("unit_limit", "100"))
+        offsets.append(offset)
+        units = [{"unit_id": f"frame_{index}"} for index in range(offset, min(total, offset + limit))]
+        result = {
+            "schema_version": "1.0",
+            "run_id": "run-large",
+            "domain": "ocr",
+            "pipeline": {"pipeline_id": "ocr.document", "version": "0.1.0"},
+            "asset_id": "asset-large",
+            "source_id": None,
+            "units": units,
+            "domain_payload": {},
+            "relations": [],
+            "artifacts": [],
+            "models": [],
+            "timings": {},
+            "media_metadata": {},
+            "warnings": [],
+            "provenance": {},
+            "created_at": 1.0,
+        }
+        return httpx.Response(
+            200,
+            content=envelope(
+                {"result": result, "unit_offset": offset, "unit_limit": limit, "unit_total": total}
+            ),
+        )
+
+    with ScenaraClient("https://scenara.example", transport=httpx.MockTransport(handler)) as client:
+        page = client.get_result_page("run-large", unit_offset=500, unit_limit=2)
+        assert [unit["unit_id"] for unit in page["result"]["units"]] == ["frame_500", "frame_501"]
+        result = client.get_result("run-large")
+
+    assert len(result["units"]) == total
+    assert result["units"][-1]["unit_id"] == "frame_1200"
+    assert offsets == [500, 0, 1000]
+
+
 def test_python_sdk_iam_administration_methods() -> None:
     requests: list[httpx.Request] = []
 

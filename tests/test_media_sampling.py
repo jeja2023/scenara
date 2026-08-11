@@ -105,6 +105,34 @@ def test_interval_strategy_samples_every_step(fake_capture: type[_FakeCapture]) 
     assert decoded.termination_reason == "max_units_reached"
 
 
+def test_finite_video_without_unit_limit_runs_to_end_of_file(fake_capture: type[_FakeCapture]) -> None:
+    fake_capture.frames = [_solid_frame(index * 4) for index in range(50)]
+    decoded = decode_media(_video_media(), max_units=None, sample_interval_ms=400)
+
+    assert [unit.unit_id for unit in decoded.units] == ["frame_0", "frame_10", "frame_20", "frame_30", "frame_40"]
+    assert decoded.termination_reason == "source_ended"
+
+
+def test_stream_without_unit_limit_stops_at_segment_boundary(fake_capture: type[_FakeCapture]) -> None:
+    fake_capture.frames = [_solid_frame(index) for index in range(40)]
+    decoded = decode_media(
+        MediaInput(
+            kind=MediaKind.STREAM,
+            content_type="application/octet-stream",
+            source_url="rtsp://1.1.1.1/live",
+        ),
+        max_units=None,
+        sample_interval_ms=1,
+        stream_segment_duration_ms=1_000,
+        stream_segment_index=3,
+    )
+
+    assert decoded.units
+    assert decoded.termination_reason == "segment_window_completed"
+    assert decoded.metadata.stream_segment_duration_ms == 1_000
+    assert decoded.metadata.stream_segment_index == 3
+
+
 def test_uniform_strategy_spreads_units_across_the_clip(fake_capture: type[_FakeCapture]) -> None:
     fake_capture.frames = [_solid_frame(index) for index in range(100)]
     decoded = decode_media(
@@ -116,6 +144,21 @@ def test_uniform_strategy_spreads_units_across_the_clip(fake_capture: type[_Fake
     assert len(decoded.units) == 4
     assert [unit.unit_id for unit in decoded.units] == ["frame_0", "frame_25", "frame_50", "frame_75"]
     assert decoded.metadata.sample_strategy == SampleStrategy.UNIFORM
+
+
+def test_uniform_strategy_without_unit_limit_processes_the_full_window(
+    fake_capture: type[_FakeCapture],
+) -> None:
+    fake_capture.frames = [_solid_frame(index) for index in range(12)]
+    decoded = decode_media(
+        _video_media(),
+        max_units=None,
+        sample_interval_ms=1000,
+        sample_strategy=SampleStrategy.UNIFORM,
+    )
+
+    assert len(decoded.units) == 12
+    assert decoded.termination_reason == "source_ended"
 
 
 def test_keyframe_strategy_only_keeps_container_keyframes(fake_capture: type[_FakeCapture]) -> None:

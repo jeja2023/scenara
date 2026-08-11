@@ -1,3 +1,4 @@
+from ._version import __version__
 from .client import ScenaraClient, ScenaraError
 from .models import (
     AccessFoundationStatus,
@@ -33,6 +34,7 @@ from .models import (
     RepositoryContractCatalog,
     RepositoryTopology,
     ResultEnvelope,
+    ResultPage,
     Role,
     Run,
     RunStatus,
@@ -78,6 +80,7 @@ __all__ = [
     "RepositoryContractCatalog",
     "RepositoryTopology",
     "ResultEnvelope",
+    "ResultPage",
     "Role",
     "Run",
     "RunStatus",
@@ -89,4 +92,5 @@ __all__ = [
     "UserAccount",
     "WebhookDelivery",
     "WebhookSubscription",
+    "__version__",
 ]

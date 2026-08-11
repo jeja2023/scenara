@@ -119,12 +119,13 @@ class ExecutionContext:
     model_bindings: dict[str, RuntimeModelBinding] = field(default_factory=dict)
     artifacts: ArtifactSink | None = None
     control: ExecutionControl = field(default_factory=ExecutionControl)
-    progress_reporter: Callable[[float, dict[str, Any]], Awaitable[None]] | None = None
+    progress_reporter: Callable[[float | None, dict[str, Any]], Awaitable[None]] | None = None
     partial_result_publisher: Callable[[Any], Awaitable[None]] | None = None
 
-    async def report_progress(self, progress: float, **payload: Any) -> None:
+    async def report_progress(self, progress: float | None, **payload: Any) -> None:
         if self.progress_reporter is not None:
-            await self.progress_reporter(max(0.0, min(0.99, progress)), payload)
+            normalized = None if progress is None else max(0.0, min(0.99, progress))
+            await self.progress_reporter(normalized, payload)
 
     async def publish_partial_result(self, result: Any) -> None:
         if self.partial_result_publisher is not None:

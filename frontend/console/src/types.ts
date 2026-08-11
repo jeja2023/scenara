@@ -260,6 +260,10 @@ export interface Run {
   pipeline: PipelineRef;
   asset_id?: string;
   source_id?: string;
+  stream_session_id?: string | null;
+  stream_segment_index?: number | null;
+  previous_run_id?: string | null;
+  next_run_id?: string | null;
   status: RunStatus;
   revision: number;
   progress: number;
@@ -277,6 +281,17 @@ export interface RunPage {
   offset: number;
   limit: number;
   total: number;
+}
+export interface StreamSession {
+  session_id: string;
+  source_id: string;
+  domain: Domain;
+  pipeline: PipelineRef;
+  status: "active" | "completed" | "failed" | "cancelled";
+  current_run_id: string;
+  segment_count: number;
+  created_at: number;
+  updated_at: number;
 }
 export interface VisionObject {
   object_id: string;

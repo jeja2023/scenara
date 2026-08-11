@@ -27,6 +27,8 @@ export interface MediaTechnicalMetadata {
     sample_strategy?: SampleStrategy | null;
     sample_start_ms?: number | null;
     sample_end_ms?: number | null;
+    stream_segment_duration_ms?: number | null;
+    stream_segment_index?: number | null;
     keyframe_count?: number | null;
     scene_change_count?: number | null;
     frame_max_edge?: number | null;
@@ -470,6 +472,10 @@ export interface Run {
     pipeline: PipelineRef;
     asset_id?: string | null;
     source_id?: string | null;
+    stream_session_id?: string | null;
+    stream_segment_index?: number | null;
+    previous_run_id?: string | null;
+    next_run_id?: string | null;
     parameters: Record<string, unknown>;
     priority: number;
     status: RunStatus;

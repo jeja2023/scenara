@@ -371,6 +371,113 @@ def _with_presentation_times(tracks: list[dict[str, Any]], units: list[Any]) -> 
     return enriched
 
 
+async def _convert_analysis_chunk(
+    context: ExecutionContext,
+    kind: MediaKind,
+    units: list[Any],
+    analyses: list[dict[str, Any]],
+) -> tuple[list[VisionObject], list[VisionObject], list[MediaUnitResult], list[ResultRelation], list[ResultIndexVector]]:
+    persons: list[VisionObject] = []
+    faces: list[VisionObject] = []
+    unit_results: list[MediaUnitResult] = []
+    relations: list[ResultRelation] = []
+    index_vectors: list[ResultIndexVector] = []
+    for unit, analysis in zip(units, analyses, strict=True):
+        objects: list[VisionObject] = []
+        unit_persons: list[VisionObject] = []
+        for item in analysis.get("persons", []):
+            person_box = _box(item.get("box"))
+            person = VisionObject(
+                object_id=f"person_{uuid4().hex}",
+                object_type="person",
+                score=float(item["score"]) if item.get("score") is not None else None,
+                bbox=person_box,
+                track_id=str(item["track_id"]) if item.get("track_id") else None,
+                attributes=_safe_attributes(item),
+                crop_artifact_id=await store_object_crop(context.artifacts, unit.image, bbox=person_box),
+            )
+            persons.append(person)
+            unit_persons.append(person)
+            objects.append(person)
+        for item in analysis.get("faces", []):
+            face_box = _box(item.get("box"))
+            face = VisionObject(
+                object_id=f"face_{uuid4().hex}",
+                object_type="face",
+                score=float(item["score"]) if item.get("score") is not None else None,
+                bbox=face_box,
+                attributes=_safe_attributes(item),
+                crop_artifact_id=await store_object_crop(context.artifacts, unit.image, bbox=face_box),
+            )
+            faces.append(face)
+            objects.append(face)
+            embedding = item.get("embedding")
+            if isinstance(embedding, list) and embedding:
+                model_id = str(item.get("embedding_model_id") or item.get("model_id") or "unknown")
+                model_version = str(item.get("embedding_model_version") or item.get("model_version") or "unknown")
+                quality = item.get("quality")
+                quality_score = None
+                if isinstance(quality, dict) and quality.get("score") is not None:
+                    quality_score = max(0.0, min(1.0, float(quality["score"])))
+                index_vectors.append(
+                    ResultIndexVector(
+                        object_id=face.object_id,
+                        feature_space_id=f"portrait.face.{model_id}.{model_version}",
+                        model_id=model_id,
+                        model_version=model_version,
+                        vector=[float(value) for value in embedding],
+                        quality=quality_score,
+                    )
+                )
+            if unit_persons:
+                relations.append(
+                    ResultRelation(
+                        relation_type="belongs_to",
+                        source_object_id=face.object_id,
+                        target_object_id=unit_persons[0].object_id,
+                    )
+                )
+        for item in analysis.get("silhouettes", []):
+            points = [Point(x=float(point[0]), y=float(point[1])) for point in item.get("polygon", [])]
+            silhouette = VisionObject(
+                object_id=f"silhouette_{uuid4().hex}",
+                object_type="silhouette",
+                score=float(item["score"]) if item.get("score") is not None else None,
+                polygon=points,
+                attributes=_safe_attributes(item),
+                crop_artifact_id=await store_object_crop(context.artifacts, unit.image, polygon=points),
+            )
+            objects.append(silhouette)
+            if unit_persons:
+                relations.append(
+                    ResultRelation(
+                        relation_type="segments",
+                        source_object_id=silhouette.object_id,
+                        target_object_id=unit_persons[0].object_id,
+                    )
+                )
+        if not objects and kind in {MediaKind.VIDEO, MediaKind.STREAM}:
+            continue
+        unit_results.append(
+            MediaUnitResult(
+                unit_id=unit.unit_id,
+                unit_type=unit.unit_type,
+                index=unit.index,
+                pts_ms=unit.pts_ms,
+                page_number=unit.page_number,
+                width=unit.width,
+                height=unit.height,
+                objects=objects,
+                frame_artifact_id=(
+                    await store_unit_frame(context.artifacts, unit.image)
+                    if any(item.crop_artifact_id for item in objects)
+                    else None
+                ),
+            )
+        )
+    return persons, faces, unit_results, relations, index_vectors
+
+
 class PortraitFullAnalysisOperator:
     definition = OperatorDefinition(
         operator_id="portrait.full-analysis",
@@ -398,7 +505,6 @@ class PortraitFullAnalysisOperator:
         decoded = inputs["batch"]
         if not isinstance(decoded, DecodedMedia):
             raise TypeError("portrait analysis requires a decoded media batch")
-        decoded = await decoded.materialize()
         requested_raw = parameters.get("capabilities", sorted(PORTRAIT_CAPABILITIES))
         if not isinstance(requested_raw, list) or not all(isinstance(item, str) for item in requested_raw):
             raise ValueError("portrait capabilities must be a list of strings")
@@ -409,6 +515,8 @@ class PortraitFullAnalysisOperator:
         missing = requested - self._backend.production_capabilities()
         if context.production and missing:
             raise DomainUnavailable("production portrait capabilities are unavailable: " + ", ".join(sorted(missing)))
+        if decoded.stream is not None:
+            return await self._execute_progressive(context, decoded, requested)
         output = await self._backend.analyze(
             [unit.image for unit in decoded.units],
             [context.filename for _ in decoded.units],
@@ -545,6 +653,133 @@ class PortraitFullAnalysisOperator:
         result._index_vectors = index_vectors
         result._trajectory_tracks = _with_presentation_times(output.trajectory_tracks, decoded.units)
         return {"result": result}
+
+    async def _execute_progressive(
+        self,
+        context: ExecutionContext,
+        decoded: DecodedMedia,
+        requested: frozenset[str],
+    ) -> dict[str, Any]:
+        persons: list[VisionObject] = []
+        faces: list[VisionObject] = []
+        unit_results: list[MediaUnitResult] = []
+        relations: list[ResultRelation] = []
+        index_vectors: list[ResultIndexVector] = []
+        tracks: list[dict[str, Any]] = []
+        trajectory_tracks: list[dict[str, Any]] = []
+        models: list[Any] = []
+        timings: dict[str, float] = {}
+        warnings: list[str] = []
+        substitutes: set[str] = set()
+        processed_units = 0
+        batch_index = 0
+        track_positions: dict[str, int] = {}
+        trajectory_positions: dict[str, int] = {}
+
+        def merge_track(target: dict[str, Any], incoming: dict[str, Any]) -> None:
+            target["frame_count"] = int(target.get("frame_count", 0) or 0) + int(
+                incoming.get("frame_count", 0) or 0
+            )
+            for name in ("tracklet_quality_score", "score"):
+                if incoming.get(name) is not None:
+                    target[name] = max(float(target.get(name, 0.0) or 0.0), float(incoming[name]))
+            first_pts = incoming.get("first_pts_ms")
+            if first_pts is not None:
+                target["first_pts_ms"] = min(float(target.get("first_pts_ms", first_pts)), float(first_pts))
+            last_pts = incoming.get("last_pts_ms")
+            if last_pts is not None:
+                target["last_pts_ms"] = max(float(target.get("last_pts_ms", last_pts)), float(last_pts))
+            for name, value in incoming.items():
+                if name not in target and name not in {"frame_count", "first_pts_ms", "last_pts_ms"}:
+                    target[name] = value
+
+        def build_result(*, final: bool = False) -> ResultEnvelope:
+            current_warnings = list(dict.fromkeys(warnings))
+            if substitutes:
+                current_warnings.append("development_substitutes:" + ",".join(sorted(substitutes)))
+            if final and decoded.termination_reason:
+                current_warnings.append(f"media_termination:{decoded.termination_reason}")
+            result = ResultEnvelope(
+                run_id=context.run_id,
+                domain="portrait",
+                pipeline=PipelineRef(pipeline_id=context.pipeline_id, version=context.pipeline_version),
+                asset_id=context.asset_id,
+                source_id=context.source_id,
+                units=list(unit_results),
+                domain_payload=PortraitDomainPayload(
+                    persons=list(persons),
+                    faces=list(faces),
+                    tracks=list(tracks),
+                    capabilities=sorted(requested),
+                ),
+                relations=list(relations),
+                models=list(models),
+                timings=dict(timings),
+                media_metadata=decoded.metadata.model_copy(update={"sampled_units": processed_units}),
+                warnings=current_warnings,
+                provenance=ProvenanceEvidence(development_substitutes=sorted(substitutes)),
+                created_at=time.time(),
+            )
+            result._index_vectors = list(index_vectors)
+            result._trajectory_tracks = list(trajectory_tracks)
+            return result
+
+        try:
+            async for chunk, expected_units in decoded.iter_batches(8):
+                output = await self._backend.analyze(
+                    [unit.image for unit in chunk],
+                    [context.filename for _ in chunk],
+                    requested,
+                )
+                converted = await _convert_analysis_chunk(context, decoded.kind, chunk, output.units)
+                chunk_persons, chunk_faces, chunk_units, chunk_relations, chunk_vectors = converted
+                persons.extend(chunk_persons)
+                faces.extend(chunk_faces)
+                unit_results.extend(chunk_units)
+                relations.extend(chunk_relations)
+                index_vectors.extend(chunk_vectors)
+                for track in output.tracks:
+                    track_id = str(track.get("track_id") or f"batch-{batch_index}-track-{len(tracks)}")
+                    incoming = {**track, "track_id": track_id}
+                    position = track_positions.get(track_id)
+                    if position is None:
+                        track_positions[track_id] = len(tracks)
+                        tracks.append(incoming)
+                    else:
+                        merge_track(tracks[position], incoming)
+                for track in _with_presentation_times(output.trajectory_tracks, chunk):
+                    track_id = str(track.get("track_id") or f"batch-{batch_index}-trajectory-{len(trajectory_tracks)}")
+                    incoming = {**track, "track_id": track_id}
+                    position = trajectory_positions.get(track_id)
+                    if position is None:
+                        trajectory_positions[track_id] = len(trajectory_tracks)
+                        trajectory_tracks.append(incoming)
+                    else:
+                        merge_track(trajectory_tracks[position], incoming)
+                models = output.models
+                for key, value in output.timings.items():
+                    timings[key] = timings.get(key, 0.0) + float(value)
+                warnings.extend(output.warnings)
+                substitutes.update(output.development_substitutes)
+                processed_units += len(chunk)
+                batch_index += 1
+                progress = (
+                    None
+                    if expected_units is None
+                    else 0.03 + 0.94 * min(1.0, processed_units / max(1, expected_units))
+                )
+                await context.publish_partial_result(build_result())
+                await context.report_progress(
+                    progress,
+                    stage="analysis",
+                    processed_units=processed_units,
+                    expected_units=expected_units,
+                    latest_pts_ms=chunk[-1].pts_ms if chunk else None,
+                )
+        except BaseException:
+            await decoded.close()
+            raise
+        return {"result": build_result(final=True)}
 
 
 __all__ = [

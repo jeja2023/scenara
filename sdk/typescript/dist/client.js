@@ -46,8 +46,24 @@ export class ScenaraClient {
         return this.transport("POST", "/api/v1/runs/" + encodeURIComponent(runId) + "/cancel");
     }
     async getResult(runId) {
-        const page = await this.transport("GET", "/api/v1/runs/" + encodeURIComponent(runId) + "/result");
-        return page.result;
+        const page = await this.getResultPage(runId, 0, 1000);
+        const units = [...page.result.units];
+        let total = page.unit_total;
+        while (units.length < total) {
+            const next = await this.getResultPage(runId, units.length, 1000);
+            if (!next.result.units.length)
+                break;
+            units.push(...next.result.units);
+            total = Math.max(total, next.unit_total);
+        }
+        return { ...page.result, units };
+    }
+    getResultPage(runId, unitOffset = 0, unitLimit = 100) {
+        const query = new URLSearchParams({
+            unit_offset: String(unitOffset),
+            unit_limit: String(unitLimit),
+        });
+        return this.transport("GET", "/api/v1/runs/" + encodeURIComponent(runId) + "/result?" + query.toString());
     }
     /**
      * Download one derived image declared by a run result: a feature crop
@@ -94,7 +110,8 @@ export class ScenaraClient {
         if (input.pipelineVersion)
             form.append("pipeline_version", input.pipelineVersion);
         form.append("sample_interval_ms", String(input.sampleIntervalMs ?? 1000));
-        form.append("max_units", String(input.maxUnits ?? 64));
+        if (input.maxUnits !== undefined)
+            form.append("max_units", String(input.maxUnits));
         form.append("sample_strategy", input.sampleStrategy ?? "interval");
         form.append("sample_start_ms", String(input.sampleStartMs ?? 0));
         if (input.sampleEndMs !== undefined)
@@ -121,7 +138,8 @@ export class ScenaraClient {
             form.append("pipeline_id", input.pipelineId);
         if (input.pipelineVersion)
             form.append("pipeline_version", input.pipelineVersion);
-        form.append("max_units", String(input.maxUnits ?? 64));
+        if (input.maxUnits !== undefined)
+            form.append("max_units", String(input.maxUnits));
         form.append("page_scale", String(input.pageScale ?? 1.5));
         form.append("wait_ms", String(input.waitMs ?? 0));
         return this.transport("POST", "/api/v1/parse/document", {
@@ -144,7 +162,7 @@ export class ScenaraClient {
                 pipeline,
                 parameters: {
                     sample_interval_ms: input.sampleIntervalMs ?? 1000,
-                    max_units: input.maxUnits ?? 64,
+                    ...(input.maxUnits === undefined ? {} : { max_units: input.maxUnits }),
                     sample_strategy: input.sampleStrategy ?? "interval",
                     sample_start_ms: input.sampleStartMs ?? 0,
                     ...(input.sampleEndMs === undefined ? {} : { sample_end_ms: input.sampleEndMs }),
@@ -153,6 +171,9 @@ export class ScenaraClient {
                     max_reconnect_attempts: input.maxReconnectAttempts ?? 3,
                     connect_timeout_ms: input.connectTimeoutMs ?? 10000,
                     read_timeout_ms: input.readTimeoutMs ?? 10000,
+                    ...(input.streamSegmentDurationMs === undefined
+                        ? {}
+                        : { stream_segment_duration_ms: input.streamSegmentDurationMs }),
                 },
                 priority: input.priority ?? 0,
                 wait_ms: input.waitMs ?? 0,
@@ -341,6 +362,12 @@ export class ScenaraClient {
         return this.transport("POST", "/api/v1/portrait/compare", {
             body: comparison,
         });
+    }
+    getStreamSession(sessionId) {
+        return this.transport("GET", "/api/v1/stream-sessions/" + encodeURIComponent(sessionId));
+    }
+    cancelStreamSession(sessionId) {
+        return this.transport("POST", "/api/v1/stream-sessions/" + encodeURIComponent(sessionId) + "/cancel");
     }
     createIdentityProvider(input) {
         return this.controlPlane("POST", "/api/v1/platform/identity-providers", input);

@@ -730,7 +730,7 @@ async def test_webhook_subscription_outbox_delivery_and_secret_cleanup(client, m
             "name": "result sink",
             "url": "https://events.example.test/scenara",
             "secret": "webhook-test-secret-1234",
-            "event_types": ["result.available"],
+            "event_types": ["result.available", "result.delta"],
         },
     )
     assert created.status_code == 201, created.text
@@ -738,6 +738,7 @@ async def test_webhook_subscription_outbox_delivery_and_secret_cleanup(client, m
     assert "secret" not in created.text
     stored_endpoint = await runtime.state.get_webhook_subscription("default", "default", endpoint["endpoint_id"])
     assert stored_endpoint is not None
+    assert stored_endpoint.event_types == frozenset({"result.available", "result.delta"})
 
     asset_id = await upload_image(api)
     run = await api.post(

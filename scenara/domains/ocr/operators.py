@@ -6,6 +6,7 @@ from typing import Any, Literal, Protocol, cast
 
 from scenara.platform.media_batch import DecodedMedia
 from scenara.platform.models import (
+    MediaKind,
     MediaUnitResult,
     ModelProvenance,
     OcrDomainPayload,
@@ -145,7 +146,7 @@ class OcrDocumentOperator:
         resource_budget={"vram_mb": 4096, "cpu_cores": 2},
         max_batch_size=256,
         output_types={"result": "result/ocr"},
-        timeout_seconds=120,
+        timeout_seconds=3600,
         resource_class="gpu",
         batchable=True,
     )
@@ -162,7 +163,6 @@ class OcrDocumentOperator:
         decoded = inputs["batch"]
         if not isinstance(decoded, DecodedMedia):
             raise TypeError("OCR requires a decoded media batch")
-        decoded = await decoded.materialize()
         if self._engine is None:
             loaded_engine = await asyncio.to_thread(lambda: PaddleOcrEngine())
             self._engine = loaded_engine
@@ -177,46 +177,6 @@ class OcrDocumentOperator:
             raise DomainUnavailable("OCR engine is not approved for production")
         if context.production and layout_required and not layout_ready:
             raise DomainUnavailable("OCR layout engine is not approved for production")
-
-        blocks: list[OcrTextBlock] = []
-        units: list[MediaUnitResult] = []
-        reading_order = 0
-        for unit in decoded.units:
-            raw_blocks = await asyncio.to_thread(engine.predict, unit.image)
-            regions: list[dict[str, Any]] = []
-            if callable(layout_predictor):
-                predicted = await asyncio.to_thread(layout_predictor, unit.image)
-                if not isinstance(predicted, list):
-                    raise TypeError("OCR layout engine must return a list")
-                regions = [item for item in predicted if isinstance(item, dict)]
-            ordered_blocks = _merge_layout(raw_blocks, regions)
-            for block_index, item in enumerate(ordered_blocks):
-                points = [Point(x=point[0], y=point[1]) for point in _polygon(item.get("polygon"))]
-                block_type = str(item.get("block_type", "text"))
-                if block_type not in OCR_BLOCK_TYPES:
-                    block_type = "text"
-                blocks.append(
-                    OcrTextBlock(
-                        block_id=f"{unit.unit_id}_block_{block_index}",
-                        text=str(item.get("text", "")),
-                        score=item.get("score"),
-                        polygon=points,
-                        block_type=cast(Literal["text", "title", "paragraph", "image", "table"], block_type),
-                        reading_order=reading_order,
-                    )
-                )
-                reading_order += 1
-            units.append(
-                MediaUnitResult(
-                    unit_id=unit.unit_id,
-                    unit_type=unit.unit_type,
-                    index=unit.index,
-                    pts_ms=unit.pts_ms,
-                    page_number=unit.page_number,
-                    width=unit.width,
-                    height=unit.height,
-                )
-            )
 
         substitutes: list[str] = []
         if not production_ready:
@@ -240,22 +200,91 @@ class OcrDocumentOperator:
                     production_ready=layout_ready,
                 )
             )
-        result = ResultEnvelope(
-            run_id=context.run_id,
-            domain="ocr",
-            pipeline=PipelineRef(pipeline_id=context.pipeline_id, version=context.pipeline_version),
-            asset_id=context.asset_id,
-            source_id=context.source_id,
-            units=units,
-            domain_payload=OcrDomainPayload(
-                text="\n".join(block.text for block in blocks if block.text),
-                blocks=blocks,
-            ),
-            models=models,
-            media_metadata=decoded.metadata,
-            warnings=[f"development_substitute:{item}" for item in substitutes]
-            + ([f"media_termination:{decoded.termination_reason}"] if decoded.termination_reason else []),
-            provenance=ProvenanceEvidence(development_substitutes=substitutes),
-            created_at=time.time(),
-        )
-        return {"result": result}
+
+        blocks: list[OcrTextBlock] = []
+        units: list[MediaUnitResult] = []
+        reading_order = 0
+        processed_units = 0
+
+        def build_result(*, final: bool = False) -> ResultEnvelope:
+            warnings = [f"development_substitute:{item}" for item in substitutes]
+            if final and decoded.termination_reason:
+                warnings.append(f"media_termination:{decoded.termination_reason}")
+            return ResultEnvelope(
+                run_id=context.run_id,
+                domain="ocr",
+                pipeline=PipelineRef(pipeline_id=context.pipeline_id, version=context.pipeline_version),
+                asset_id=context.asset_id,
+                source_id=context.source_id,
+                units=list(units),
+                domain_payload=OcrDomainPayload(
+                    text="\n".join(block.text for block in blocks if block.text),
+                    blocks=list(blocks),
+                ),
+                models=models,
+                media_metadata=decoded.metadata.model_copy(update={"sampled_units": processed_units}),
+                warnings=warnings,
+                provenance=ProvenanceEvidence(development_substitutes=substitutes),
+                created_at=time.time(),
+            )
+
+        batch_size = 1 if decoded.kind == MediaKind.STREAM else 4
+        try:
+            async for chunk, expected_units in decoded.iter_batches(batch_size):
+                for unit in chunk:
+                    raw_blocks = await asyncio.to_thread(engine.predict, unit.image)
+                    regions: list[dict[str, Any]] = []
+                    if callable(layout_predictor):
+                        predicted = await asyncio.to_thread(layout_predictor, unit.image)
+                        if not isinstance(predicted, list):
+                            raise TypeError("OCR layout engine must return a list")
+                        regions = [item for item in predicted if isinstance(item, dict)]
+                    ordered_blocks = _merge_layout(raw_blocks, regions)
+                    for block_index, item in enumerate(ordered_blocks):
+                        points = [Point(x=point[0], y=point[1]) for point in _polygon(item.get("polygon"))]
+                        block_type = str(item.get("block_type", "text"))
+                        if block_type not in OCR_BLOCK_TYPES:
+                            block_type = "text"
+                        blocks.append(
+                            OcrTextBlock(
+                                block_id=f"{unit.unit_id}_block_{block_index}",
+                                text=str(item.get("text", "")),
+                                score=item.get("score"),
+                                polygon=points,
+                                block_type=cast(
+                                    Literal["text", "title", "paragraph", "image", "table"], block_type
+                                ),
+                                reading_order=reading_order,
+                            )
+                        )
+                        reading_order += 1
+                    units.append(
+                        MediaUnitResult(
+                            unit_id=unit.unit_id,
+                            unit_type=unit.unit_type,
+                            index=unit.index,
+                            pts_ms=unit.pts_ms,
+                            page_number=unit.page_number,
+                            width=unit.width,
+                            height=unit.height,
+                        )
+                    )
+                processed_units += len(chunk)
+                progress = (
+                    None
+                    if expected_units is None
+                    else 0.03 + 0.94 * min(1.0, processed_units / max(1, expected_units))
+                )
+                if decoded.kind in {MediaKind.VIDEO, MediaKind.STREAM}:
+                    await context.publish_partial_result(build_result())
+                await context.report_progress(
+                    progress,
+                    stage="ocr",
+                    processed_units=processed_units,
+                    expected_units=expected_units,
+                    latest_pts_ms=chunk[-1].pts_ms if chunk else None,
+                )
+        except BaseException:
+            await decoded.close()
+            raise
+        return {"result": build_result(final=True)}
