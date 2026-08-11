@@ -1154,10 +1154,9 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="page parse-workbench">
-    <div v-if="hasResult || (run && !isTerminal)" class="page-header">
+    <div v-if="hasResult" class="page-header">
       <div class="toolbar">
         <button
-          v-if="hasResult"
           class="button secondary"
           title="导出结构化结果"
           @click="exportResult('json')"
@@ -1165,36 +1164,11 @@ onBeforeUnmount(() => {
           <Download :size="15" />导出 JSON
         </button>
         <button
-          v-if="hasResult"
           class="button secondary"
           title="导出对象明细表"
           @click="exportResult('csv')"
         >
           <Download :size="15" />导出 CSV
-        </button>
-        <button
-          v-if="run?.status === 'running'"
-          class="button secondary"
-          :disabled="transitioning"
-          @click="transitionRun('pause')"
-        >
-          <Pause :size="15" />暂停
-        </button>
-        <button
-          v-if="run?.status === 'paused'"
-          class="button secondary"
-          :disabled="transitioning"
-          @click="transitionRun('resume')"
-        >
-          <Play :size="15" />恢复
-        </button>
-        <button
-          v-if="run && !isTerminal"
-          class="button danger"
-          :disabled="transitioning"
-          @click="transitionRun('cancel')"
-        >
-          <Square :size="15" />取消运行
         </button>
       </div>
     </div>
@@ -1301,6 +1275,30 @@ onBeforeUnmount(() => {
         </select>
       </label>
       <nav class="parse-context-nav" aria-label="解析工作区操作">
+        <button
+          v-if="run && !isTerminal"
+          class="button danger"
+          :disabled="transitioning"
+          @click="transitionRun('cancel')"
+        >
+          <Square :size="15" />取消运行
+        </button>
+        <button
+          v-if="run?.status === 'running'"
+          class="button secondary"
+          :disabled="transitioning"
+          @click="transitionRun('pause')"
+        >
+          <Pause :size="15" />暂停
+        </button>
+        <button
+          v-if="run?.status === 'paused'"
+          class="button secondary"
+          :disabled="transitioning"
+          @click="transitionRun('resume')"
+        >
+          <Play :size="15" />恢复
+        </button>
         <button
           class="button primary"
           :disabled="!inputReady || loading"
