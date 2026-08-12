@@ -83,7 +83,6 @@ export interface ParseFileInput {
 
 export interface ParseVideoInput extends ParseFileInput {
   sampleIntervalMs?: number;
-  maxUnits?: number;
   sampleStrategy?: SampleStrategy;
   sampleStartMs?: number;
   sampleEndMs?: number;
@@ -107,7 +106,6 @@ export interface ParseStreamInput {
   pipelineId?: string;
   pipelineVersion?: string;
   sampleIntervalMs?: number;
-  maxUnits?: number;
   sampleStrategy?: SampleStrategy;
   sampleStartMs?: number;
   sampleEndMs?: number;
@@ -256,7 +254,6 @@ export class ScenaraClient {
     if (input.pipelineId) form.append("pipeline_id", input.pipelineId);
     if (input.pipelineVersion) form.append("pipeline_version", input.pipelineVersion);
     form.append("sample_interval_ms", String(input.sampleIntervalMs ?? 1000));
-    if (input.maxUnits !== undefined) form.append("max_units", String(input.maxUnits));
     form.append("sample_strategy", input.sampleStrategy ?? "interval");
     form.append("sample_start_ms", String(input.sampleStartMs ?? 0));
     if (input.sampleEndMs !== undefined) form.append("sample_end_ms", String(input.sampleEndMs));
@@ -305,7 +302,6 @@ export class ScenaraClient {
         pipeline,
         parameters: {
           sample_interval_ms: input.sampleIntervalMs ?? 1000,
-          ...(input.maxUnits === undefined ? {} : { max_units: input.maxUnits }),
           sample_strategy: input.sampleStrategy ?? "interval",
           sample_start_ms: input.sampleStartMs ?? 0,
           ...(input.sampleEndMs === undefined ? {} : { sample_end_ms: input.sampleEndMs }),

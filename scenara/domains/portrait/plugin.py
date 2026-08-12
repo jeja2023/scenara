@@ -59,7 +59,6 @@ class PortraitPlugin:
                     "confidence",
                     "iou",
                     "max_detections",
-                    "max_units",
                     "sample_interval_ms",
                     "max_reconnect_attempts",
                     "connect_timeout_ms",
@@ -115,7 +114,6 @@ class PortraitPlugin:
                 allowed_parameters={
                     "capabilities",
                     "camera_id",
-                    "max_units",
                     "recording_started_at",
                     "sample_interval_ms",
                     "max_reconnect_attempts",

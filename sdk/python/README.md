@@ -27,4 +27,4 @@ with ScenaraClient("https://scenara.example", token="...") as client:
     )
 ```
 
-视频和文档省略 `max_units` 时处理至 EOF；实时流省略该参数时按时间窗口持续分段。`max_units` 仅用于兼容旧集成或调用方显式设置保护上限。省略 `pipeline_version` 时由服务端选择唯一的 active 版本；需要固定复现某次运行时应显式传入版本。
+视频处理到 EOF 或显式 `sample_end_ms`，实时流按 `stream_segment_duration_ms` 时间窗口持续分段；这两类快捷接口不提供 `max_units`，旧版通用 Run 请求中的同名字段会被服务端忽略。PDF 文档仍可通过 `max_units` 设置页数上限。省略 `pipeline_version` 时由服务端选择唯一的 active 版本；需要固定复现某次运行时应显式传入版本。

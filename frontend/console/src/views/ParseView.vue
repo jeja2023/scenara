@@ -7,6 +7,7 @@ import {
   Download,
   FileImage,
   FileText,
+  Info,
   Library,
   Pause,
   Play,
@@ -17,11 +18,19 @@ import {
   Upload,
   Video,
 } from "@lucide/vue";
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   ApiError,
   api,
+  apiImageDataUrl,
   apiStream,
   idempotencyKey,
   streamJsonEvents,
@@ -48,6 +57,7 @@ import {
 import type {
   Domain,
   MediaAsset,
+  MediaUnitResult,
   MediaSource,
   ResultEnvelope,
   ResultPage,
@@ -105,6 +115,12 @@ const pipelineParameters = ref<Record<string, unknown>>({});
 const pipelineParameterDefaults = ref<Record<string, unknown>>({});
 const videoElement = ref<HTMLVideoElement | null>(null);
 const overlayCanvas = ref<HTMLCanvasElement | null>(null);
+const resultFrameUrl = ref("");
+const resultFrameUnitId = ref("");
+const resultFrameLoading = ref(false);
+const resultFrameUnavailable = ref(false);
+const videoFrameUnitId = ref("");
+const videoPlaying = ref(false);
 const sources = ref<MediaSource[]>([]);
 const sourceId = ref("");
 const sourceName = ref("");
@@ -139,7 +155,10 @@ const loadingHistory = ref(false);
 let pollGeneration = 0;
 let resultLoadSequence = 0;
 let sseAbort: AbortController | null = null;
+let resultFrameLoadSequence = 0;
+const resultFrameCache = new Map<string, string>();
 const POLL_NETWORK_RETRY_DELAYS_MS = [250, 500, 1000, 2000] as const;
+const RESULT_FRAME_CACHE_LIMIT = 8;
 
 const {
   domainPipelines,
@@ -195,6 +214,7 @@ const samplingValid = computed(() => {
   const endMs = optionalNumber(sampleEndMs.value);
   const maxEdge = optionalNumber(frameMaxEdge.value);
   if (
+    mode.value === "document" &&
     maxUnits.value != null &&
     (!Number.isInteger(maxUnits.value) ||
       maxUnits.value < 1 ||
@@ -295,8 +315,35 @@ const progressPercent = computed(() => {
   return isTerminal.value ? rounded : Math.min(99, rounded);
 });
 const warnings = computed(() => result.value?.warnings ?? []);
+const informationalWarningCodes = new Set([
+  "media_termination:source_ended",
+  "media_termination:segment_window_completed",
+]);
+const isInformationalWarning = (value: string): boolean =>
+  informationalWarningCodes.has(value);
+const actionableWarnings = computed(() =>
+  warnings.value.filter((item) => !isInformationalWarning(item)),
+);
+const hasActionableWarnings = computed(
+  () => actionableWarnings.value.length > 0,
+);
+const warningPanelTitle = computed(() => {
+  if (hasActionableWarnings.value) return "解析警告";
+  const hasInformational = warnings.value.some(isInformationalWarning);
+  if (hasInformational && hasActionableWarnings.value) return "解析提示与警告";
+  return hasInformational ? "解析提示" : "解析警告";
+});
 const totalObjects = computed(
   () => result.value?.units.reduce((s, u) => s + u.objects.length, 0) ?? 0,
+);
+const sampledUnitCount = computed(
+  () => mediaMetadata.value?.sampled_units ?? result.value?.units.length ?? 0,
+);
+const resultUnitCount = computed(() => result.value?.units.length ?? 0);
+const hasFilteredResultUnits = computed(
+  () =>
+    (mode.value === "video" || mode.value === "stream") &&
+    sampledUnitCount.value > resultUnitCount.value,
 );
 const hasResult = computed(() => !!result.value);
 const currentDomainLabel = computed(
@@ -320,9 +367,35 @@ const scopedHistoryRuns = computed(() =>
 const displayedMediaUrl = computed(
   () => serverPreviewUrl.value || mediaUrl.value,
 );
-const canvasMediaUrl = computed(
-  () => displayedMediaUrl.value || streamPreviewUrl.value,
+const prefersResultFramePreview = computed(
+  () =>
+    mode.value === "document" ||
+    mode.value === "stream" ||
+    (mode.value === "video" && (!mediaUrl.value || videoPlaybackFailed.value)),
 );
+const shouldUseResultFrame = computed(() => {
+  const unit = selectedUnit.value;
+  const runId = run.value?.run_id;
+  if (!unit || !runId) return false;
+  return prefersResultFramePreview.value;
+});
+const overlayReady = computed(() => {
+  const unit = selectedUnit.value;
+  if (!unit || !selectedObjects.value.length) return false;
+  if (mode.value === "image") return true;
+  if (shouldUseResultFrame.value)
+    return resultFrameUnitId.value === unit.unit_id && !!resultFrameUrl.value;
+  return videoFrameUnitId.value === unit.unit_id;
+});
+const overlayStatus = computed(() => {
+  if (!selectedObjects.value.length || overlayReady.value) return "";
+  if (videoPlaying.value) return "";
+  if (resultFrameLoading.value) return "正在同步结果帧";
+  if (resultFrameUnavailable.value && shouldUseResultFrame.value)
+    return "结果帧暂不可用，已暂停叠加标注";
+  if (mode.value === "video") return "正在定位结果帧";
+  return "正在加载结果帧";
+});
 
 function resetResult(): void {
   pollGeneration += 1;
@@ -334,6 +407,14 @@ function resetResult(): void {
   result.value = null;
   selectedUnitIndex.value = 0;
   followLatestUnit.value = true;
+  resultFrameLoadSequence += 1;
+  resultFrameUrl.value = "";
+  resultFrameUnitId.value = "";
+  resultFrameLoading.value = false;
+  resultFrameUnavailable.value = false;
+  videoFrameUnitId.value = "";
+  videoPlaying.value = false;
+  resultFrameCache.clear();
   progressDetail.value = "";
   resultLoadSequence += 1;
   error.value = "";
@@ -470,7 +551,7 @@ async function loadResult(runId: string, ignoreMissing = false): Promise<void> {
   const shouldFollowLatest = followLatestUnit.value || !result.value;
   result.value = { ...first.result, units };
   if (shouldFollowLatest && units.length) {
-    selectedUnitIndex.value = units.length - 1;
+    selectedUnitIndex.value = preferredPreviewUnitIndex(units);
   } else if (selectedUnitIndex.value >= units.length) {
     selectedUnitIndex.value = Math.max(0, units.length - 1);
   }
@@ -534,8 +615,8 @@ function subscribeEvents(runId: string): EventSubscription {
         if (event.payload?.processed_units != null) {
           progressDetail.value =
             event.payload.expected_units == null
-              ? `已处理 ${event.payload.processed_units} 个单元${event.payload.latest_pts_ms == null ? "" : ` · ${formatTime(event.payload.latest_pts_ms)}`}`
-              : `${event.payload.processed_units} / ${event.payload.expected_units} 个单元`;
+              ? `已处理 ${event.payload.processed_units} 个采样单元${event.payload.latest_pts_ms == null ? "" : ` · ${formatTime(event.payload.latest_pts_ms)}`}`
+              : `${event.payload.processed_units} / ${event.payload.expected_units} 个采样单元`;
         }
         const availableUnitCount =
           event.event_type === "result.delta"
@@ -632,13 +713,11 @@ function samplingParameters(): Record<string, unknown> {
     sample_start_ms: sampleStartMs.value,
     scene_change_threshold: sceneChangeThreshold.value,
   };
-  if (maxUnits.value != null) params.max_units = maxUnits.value;
   if (mode.value !== "stream" && endMs != null && endMs > sampleStartMs.value)
     params.sample_end_ms = endMs;
   if (maxEdge != null) params.frame_max_edge = maxEdge;
   if (mode.value === "stream") {
     if (endMs != null) params.stream_segment_duration_ms = endMs;
-    if (maxUnits.value != null && endMs != null) params.sample_end_ms = endMs;
     params.max_reconnect_attempts = maxReconnectAttempts.value;
     params.connect_timeout_ms = connectTimeoutMs.value;
     params.read_timeout_ms = readTimeoutMs.value;
@@ -675,6 +754,7 @@ function runParameters(): Record<string, unknown> {
           }
         : samplingParameters();
   for (const [key, value] of Object.entries(pipelineParameters.value)) {
+    if (key === "max_units" && mode.value !== "document") continue;
     if (
       value !== undefined &&
       value !== null &&
@@ -749,7 +829,7 @@ async function execute(): Promise<void> {
 }
 
 function applyRunParameters(parameters: Record<string, unknown>): void {
-  if (parameters.max_units != null)
+  if (mode.value === "document" && parameters.max_units != null)
     maxUnits.value = Number(parameters.max_units);
   if (parameters.sample_interval_ms != null)
     sampleIntervalMs.value = Number(parameters.sample_interval_ms);
@@ -894,14 +974,167 @@ async function transitionRun(
   }
 }
 
+const FRAME_ALIGNMENT_TOLERANCE_SECONDS = 0.15;
+
+function cacheResultFrame(key: string, value: string): void {
+  resultFrameCache.delete(key);
+  resultFrameCache.set(key, value);
+  while (resultFrameCache.size > RESULT_FRAME_CACHE_LIMIT) {
+    const oldest = resultFrameCache.keys().next().value;
+    if (oldest === undefined) break;
+    resultFrameCache.delete(oldest);
+  }
+}
+
+function resultFramePath(runId: string, artifactId: string): string {
+  return `/api/v1/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}`;
+}
+
+function preferredPreviewUnitIndex(units: MediaUnitResult[]): number {
+  if (!prefersResultFramePreview.value) return Math.max(0, units.length - 1);
+  for (let index = units.length - 1; index >= 0; index -= 1) {
+    if (units[index]?.frame_artifact_id) return index;
+  }
+  return Math.max(0, units.length - 1);
+}
+
 function selectUnit(index: number): void {
+  const alreadySelected = selectedUnitIndex.value === index;
   selectedUnitIndex.value = index;
   followLatestUnit.value = index >= (result.value?.units.length ?? 1) - 1;
-  const unit = result.value?.units[index];
-  if (mode.value === "video" && videoElement.value && unit?.pts_ms != null) {
-    videoElement.value.currentTime = unit.pts_ms / 1000;
+  if (alreadySelected) syncSelectedMediaFrame();
+}
+
+function syncVideoToSelectedUnit(): void {
+  videoFrameUnitId.value = "";
+  clearOverlay();
+  const video = videoElement.value;
+  const unit = selectedUnit.value;
+  if (
+    shouldUseResultFrame.value ||
+    mode.value !== "video" ||
+    !mediaUrl.value ||
+    videoPlaybackFailed.value ||
+    !video ||
+    unit?.pts_ms == null
+  )
+    return;
+  if (videoPlaying.value) return;
+  if (video.readyState < HTMLMediaElement.HAVE_METADATA) return;
+  const targetSeconds = unit.pts_ms / 1000;
+  try {
+    if (!video.paused) video.pause();
+    if (
+      Math.abs(video.currentTime - targetSeconds) <=
+      FRAME_ALIGNMENT_TOLERANCE_SECONDS
+    ) {
+      videoFrameUnitId.value = unit.unit_id;
+      drawOverlay();
+      return;
+    }
+    video.currentTime = targetSeconds;
+  } catch {
+    // Browsers may reject seeking until metadata is available; the event handler retries.
   }
-  drawOverlay();
+}
+
+function handleVideoSeeked(): void {
+  const video = videoElement.value;
+  const unit = selectedUnit.value;
+  if (!video || !unit || unit.pts_ms == null) return;
+  if (
+    Math.abs(video.currentTime - unit.pts_ms / 1000) <=
+    FRAME_ALIGNMENT_TOLERANCE_SECONDS
+  ) {
+    videoFrameUnitId.value = unit.unit_id;
+    drawOverlay();
+  } else {
+    syncVideoToSelectedUnit();
+  }
+}
+
+function handleVideoPlay(): void {
+  videoPlaying.value = true;
+  videoFrameUnitId.value = "";
+  clearOverlay();
+}
+
+function handleVideoPlaybackError(): void {
+  handleVideoError();
+  const units = result.value?.units ?? [];
+  if (!units.length) return;
+  const previewIndex = preferredPreviewUnitIndex(units);
+  if (previewIndex !== selectedUnitIndex.value) {
+    selectedUnitIndex.value = previewIndex;
+    followLatestUnit.value = true;
+    return;
+  }
+  void loadSelectedResultFrame();
+}
+
+function handleVideoPause(): void {
+  videoPlaying.value = false;
+  syncVideoToSelectedUnit();
+}
+
+function handleResultFrameLoaded(): void {
+  if (
+    resultFrameUrl.value &&
+    resultFrameUnitId.value === selectedUnit.value?.unit_id
+  )
+    drawOverlay();
+}
+
+async function loadSelectedResultFrame(): Promise<void> {
+  const sequence = ++resultFrameLoadSequence;
+  const unit = selectedUnit.value;
+  const runId = run.value?.run_id;
+  resultFrameUrl.value = "";
+  resultFrameUnitId.value = "";
+  resultFrameUnavailable.value = false;
+  resultFrameLoading.value = false;
+  videoFrameUnitId.value = "";
+  clearOverlay();
+
+  if (!shouldUseResultFrame.value || !unit || !runId) {
+    syncVideoToSelectedUnit();
+    await nextTick();
+    drawOverlay();
+    return;
+  }
+  const artifactId = unit.frame_artifact_id;
+  if (!artifactId) {
+    resultFrameUnavailable.value = true;
+    return;
+  }
+  const cacheKey = `${runId}:${artifactId}`;
+  const cached = resultFrameCache.get(cacheKey);
+  if (cached) {
+    resultFrameUrl.value = cached;
+    resultFrameUnitId.value = unit.unit_id;
+    await nextTick();
+    handleResultFrameLoaded();
+    return;
+  }
+  resultFrameLoading.value = true;
+  try {
+    const dataUrl = await apiImageDataUrl(resultFramePath(runId, artifactId));
+    if (sequence !== resultFrameLoadSequence) return;
+    cacheResultFrame(cacheKey, dataUrl);
+    resultFrameUrl.value = dataUrl;
+    resultFrameUnitId.value = unit.unit_id;
+    await nextTick();
+    handleResultFrameLoaded();
+  } catch {
+    if (sequence === resultFrameLoadSequence)
+      resultFrameUnavailable.value = true;
+  } finally {
+    if (sequence === resultFrameLoadSequence) resultFrameLoading.value = false;
+  }
+}
+
+function syncSelectedMediaFrame(): void {
+  void loadSelectedResultFrame();
 }
 
 const OVERLAY_COLORS: Record<string, string> = {
@@ -918,7 +1151,7 @@ const OVERLAY_COLORS: Record<string, string> = {
 function drawOverlay(): void {
   const canvas = overlayCanvas.value;
   const unit = selectedUnit.value;
-  if (!canvas || !unit) {
+  if (!canvas || !unit || !overlayReady.value) {
     clearOverlay();
     return;
   }
@@ -1135,7 +1368,18 @@ watch(
   },
 );
 watch(pipelineId, () => syncPipelineParameterDefaults());
-watch(selectedUnitIndex, drawOverlay);
+watch(selectedUnitIndex, syncSelectedMediaFrame);
+watch(
+  () => [
+    run.value?.run_id ?? "",
+    selectedUnit.value?.unit_id ?? "",
+    selectedUnit.value?.frame_artifact_id ?? "",
+    mode.value,
+    mediaUrl.value,
+    videoPlaybackFailed.value,
+  ],
+  syncSelectedMediaFrame,
+);
 onMounted(async () => {
   await refreshWorkspaceResources();
   await restoreRouteSelection();
@@ -1281,7 +1525,9 @@ onBeforeUnmount(() => {
           :disabled="transitioning"
           @click="transitionRun('cancel')"
         >
-          <Square :size="15" />{{ run.status === "cancelling" ? "强制取消" : "取消运行" }}
+          <Square :size="15" />{{
+            run.status === "cancelling" ? "强制取消" : "取消运行"
+          }}
         </button>
         <button
           v-if="run?.status === 'running'"
@@ -1336,91 +1582,123 @@ onBeforeUnmount(() => {
                 : `${maxUnits} 页兼容上限`
               : mode === "stream"
                 ? "自动连续分段"
-                : maxUnits == null
-                  ? "处理至视频结束"
-                  : `${maxUnits} 个兼容上限`
+                : "处理至视频结束"
         }}</span>
       </div>
       <div class="panel-body input-layout">
-        <div class="media-stage">
-          <img
-            v-if="mode === 'image' && displayedMediaUrl"
-            :src="displayedMediaUrl"
-            alt="待解析图片"
-            @error="handleImageError"
-          />
-          <template v-else-if="mode === 'video' && displayedMediaUrl">
-            <video
-              v-if="mediaUrl && !videoPlaybackFailed"
-              ref="videoElement"
-              :src="mediaUrl"
-              controls
-              preload="metadata"
-              @error="handleVideoError"
-            />
+        <div class="media-preview-column">
+          <div class="media-stage">
             <img
-              v-else-if="serverPreviewUrl"
-              :src="serverPreviewUrl"
-              alt="视频首帧预览"
+              v-if="mode === 'image' && displayedMediaUrl"
+              :src="displayedMediaUrl"
+              alt="待解析图片"
+              @error="handleImageError"
             />
+            <template
+              v-else-if="
+                mode === 'video' && (displayedMediaUrl || resultFrameUrl)
+              "
+            >
+              <img
+                v-if="shouldUseResultFrame && resultFrameUrl"
+                :src="resultFrameUrl"
+                alt="当前解析帧"
+                @load="handleResultFrameLoaded"
+              />
+              <video
+                v-else-if="mediaUrl && !videoPlaybackFailed"
+                ref="videoElement"
+                :src="mediaUrl"
+                controls
+                preload="metadata"
+                @loadedmetadata="syncVideoToSelectedUnit"
+                @seeked="handleVideoSeeked"
+                @play="handleVideoPlay"
+                @pause="handleVideoPause"
+                @error="handleVideoPlaybackError"
+              />
+              <img
+                v-else-if="serverPreviewUrl"
+                :src="serverPreviewUrl"
+                alt="视频首帧预览"
+              />
+              <div v-else class="empty">
+                视频文件无法在浏览器中播放，解析后将显示首帧
+              </div>
+            </template>
+            <template
+              v-else-if="mode === 'document' && (file || selectedAsset)"
+            >
+              <img
+                v-if="shouldUseResultFrame && resultFrameUrl"
+                :src="resultFrameUrl"
+                alt="当前解析页"
+                @load="handleResultFrameLoaded"
+              />
+              <img
+                v-else-if="serverPreviewUrl"
+                :src="serverPreviewUrl"
+                alt="文档首页预览"
+              />
+              <div v-else class="stream-stage">
+                <FileText :size="28" />
+                <strong>{{ file?.name || selectedAsset?.filename }}</strong>
+                <span
+                  >{{
+                    (
+                      (file?.size || selectedAsset?.size_bytes || 0) /
+                      1024 /
+                      1024
+                    ).toFixed(2)
+                  }}
+                  MiB · 解析后按页浏览结果</span
+                >
+              </div>
+            </template>
+            <template v-else-if="mode === 'stream'">
+              <img
+                v-if="shouldUseResultFrame && resultFrameUrl"
+                :src="resultFrameUrl"
+                alt="当前解析帧"
+                @load="handleResultFrameLoaded"
+              />
+              <img
+                v-else-if="streamPreviewUrl"
+                :src="streamPreviewUrl"
+                alt="实时流首帧预览"
+              />
+              <div v-else class="stream-stage">
+                <Radio :size="28" />
+                <strong>{{
+                  selectedSource?.name || sourceName || "未选择视频流"
+                }}</strong>
+                <span>{{
+                  selectedSource?.masked_url ||
+                  sourceUrl ||
+                  "登记或选择一个视频流源"
+                }}</span>
+              </div>
+            </template>
             <div v-else class="empty">
-              视频文件无法在浏览器中播放，解析后将显示首帧
+              等待{{
+                mode === "image"
+                  ? "图片"
+                  : mode === "document"
+                    ? "PDF 文档"
+                    : "视频文件"
+              }}
             </div>
-          </template>
-          <template v-else-if="mode === 'document' && (file || selectedAsset)">
-            <img
-              v-if="serverPreviewUrl"
-              :src="serverPreviewUrl"
-              alt="文档首页预览"
+            <canvas
+              v-show="overlayReady"
+              ref="overlayCanvas"
+              class="overlay"
+              aria-hidden="true"
             />
-            <div v-else class="stream-stage">
-              <FileText :size="28" />
-              <strong>{{ file?.name || selectedAsset?.filename }}</strong>
-              <span
-                >{{
-                  (
-                    (file?.size || selectedAsset?.size_bytes || 0) /
-                    1024 /
-                    1024
-                  ).toFixed(2)
-                }}
-                MiB · 解析后按页浏览结果</span
-              >
-            </div>
-          </template>
-          <template v-else-if="mode === 'stream'">
-            <img
-              v-if="streamPreviewUrl"
-              :src="streamPreviewUrl"
-              alt="实时流首帧预览"
-            />
-            <div v-else class="stream-stage">
-              <Radio :size="28" />
-              <strong>{{
-                selectedSource?.name || sourceName || "未选择视频流"
-              }}</strong>
-              <span>{{
-                selectedSource?.masked_url ||
-                sourceUrl ||
-                "登记或选择一个视频流源"
-              }}</span>
-            </div>
-          </template>
-          <div v-else class="empty">
-            等待{{
-              mode === "image"
-                ? "图片"
-                : mode === "document"
-                  ? "PDF 文档"
-                  : "视频文件"
-            }}
           </div>
-          <canvas
-            v-show="canvasMediaUrl && selectedObjects.length"
-            ref="overlayCanvas"
-            class="overlay"
-            aria-hidden="true"
-          />
+          <div v-if="overlayStatus" class="overlay-status" aria-live="polite">
+            <Info :size="14" />
+            <span>{{ overlayStatus }}</span>
+          </div>
         </div>
 
         <div class="input-controls">
@@ -1591,14 +1869,6 @@ onBeforeUnmount(() => {
                   step="100"
                   :disabled="sampleStrategy !== 'interval'"
               /></label>
-              <label
-                ><span>兼容单元上限（可选）</span
-                ><input
-                  v-model.number="maxUnits"
-                  type="number"
-                  min="1"
-                  max="10000"
-              /></label>
             </div>
             <button
               class="button secondary advanced-toggle"
@@ -1752,15 +2022,17 @@ onBeforeUnmount(() => {
       >
     </section>
 
-    <section v-if="warnings.length" class="panel warning-panel">
+    <section v-if="actionableWarnings.length" class="panel warning-panel">
       <div class="panel-header">
-        <h2><AlertTriangle :size="16" />解析告警</h2>
+        <h2><AlertTriangle :size="16" />{{ warningPanelTitle }}</h2>
         <button class="button secondary" @click="showWarnings = !showWarnings">
-          {{ showWarnings ? "收起" : `查看 ${warnings.length} 条` }}
+          {{ showWarnings ? "收起" : `查看 ${actionableWarnings.length} 条` }}
         </button>
       </div>
       <ul v-if="showWarnings" class="panel-body warning-list">
-        <li v-for="item in warnings" :key="item">{{ labelWarning(item) }}</li>
+        <li v-for="item in actionableWarnings" :key="item">
+          {{ labelWarning(item) }}
+        </li>
       </ul>
     </section>
 
@@ -1773,8 +2045,12 @@ onBeforeUnmount(() => {
         <div v-if="result" class="panel-body">
           <dl class="result-counters">
             <div>
-              <dt>分析单元</dt>
-              <dd>{{ result.units.length }}</dd>
+              <dt>{{ hasFilteredResultUnits ? "采样单元" : "分析单元" }}</dt>
+              <dd>{{ sampledUnitCount }}</dd>
+            </div>
+            <div v-if="hasFilteredResultUnits">
+              <dt>命中单元</dt>
+              <dd>{{ resultUnitCount }}</dd>
             </div>
             <div>
               <dt>识别对象</dt>
@@ -1823,7 +2099,7 @@ onBeforeUnmount(() => {
               <dt>解码耗时</dt>
               <dd>{{ (mediaMetadata.elapsed_ms / 1000).toFixed(2) }} 秒</dd>
             </div>
-            <div v-if="mediaMetadata.timestamp_source">
+            <div v-if="mediaMetadata.timestamp_source" class="metadata-wide">
               <dt>时间戳来源</dt>
               <dd>
                 {{ labelTimestampSource(mediaMetadata.timestamp_source) }}
@@ -2049,6 +2325,12 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(360px, 1.25fr) minmax(280px, 0.75fr);
   gap: 16px;
 }
+.media-preview-column {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+}
 .media-stage {
   position: relative;
   width: 100%;
@@ -2071,6 +2353,22 @@ onBeforeUnmount(() => {
   object-fit: contain;
 }
 .overlay {
+  pointer-events: none;
+}
+.overlay-status {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 30px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: #f4f8f6;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: left;
   pointer-events: none;
 }
 .stream-stage {
@@ -2232,7 +2530,7 @@ onBeforeUnmount(() => {
 }
 .result-counters {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   margin: 0 0 14px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -2270,6 +2568,9 @@ onBeforeUnmount(() => {
 .metadata-grid div {
   padding: 9px 10px;
   background: var(--surface);
+}
+.metadata-grid .metadata-wide {
+  grid-column: 1 / -1;
 }
 .metadata-grid dt {
   color: var(--muted);

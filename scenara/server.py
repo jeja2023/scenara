@@ -1017,7 +1017,6 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         pipeline_id: Annotated[str | None, Form()] = None,
         pipeline_version: Annotated[str | None, Form()] = None,
         sample_interval_ms: Annotated[int, Form(ge=1, le=3_600_000)] = 1000,
-        max_units: Annotated[int | None, Form(ge=1, le=10_000)] = None,
         sample_strategy: Annotated[SampleStrategy, Form()] = SampleStrategy.INTERVAL,
         sample_start_ms: Annotated[int, Form(ge=0)] = 0,
         sample_end_ms: Annotated[int | None, Form(ge=0)] = None,
@@ -1051,8 +1050,6 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             "sample_start_ms": sample_start_ms,
             "scene_change_threshold": scene_change_threshold,
         }
-        if max_units is not None:
-            params["max_units"] = max_units
         if sample_end_ms is not None:
             params["sample_end_ms"] = sample_end_ms
         if frame_max_edge is not None:
@@ -1089,7 +1086,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         domain: Annotated[DomainId, Form()] = "ocr",
         pipeline_id: Annotated[str | None, Form()] = None,
         pipeline_version: Annotated[str | None, Form()] = None,
-        max_units: Annotated[int | None, Form(ge=1, le=1000)] = None,
+        max_units: Annotated[int | None, Form(ge=1, le=10_000)] = None,
         page_scale: Annotated[float, Form(ge=0.5, le=4.0)] = 1.5,
         wait_ms: Annotated[int, Form(ge=0, le=30_000)] = 0,
         idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,

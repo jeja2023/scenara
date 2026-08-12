@@ -51,6 +51,7 @@ const apiMock = vi.mocked(api);
 const apiBlobMock = vi.mocked(apiBlob);
 const apiImageDataUrlMock = vi.mocked(apiImageDataUrl);
 const streamJsonEventsMock = vi.mocked(streamJsonEvents);
+const strokeRectMock = vi.fn();
 
 function resultPage(offset: number) {
   const count = offset === 0 ? 1000 : 1;
@@ -298,11 +299,12 @@ describe("media parse workbench", () => {
     });
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
       clearRect: vi.fn(),
-      strokeRect: vi.fn(),
+      strokeRect: strokeRectMock,
       fillRect: vi.fn(),
       fillText: vi.fn(),
       measureText: vi.fn(() => ({ width: 20 })),
     } as unknown as CanvasRenderingContext2D);
+    strokeRectMock.mockClear();
     // restoreAllMocks 会清掉 vi.mock 工厂里的实现，因此每个用例都重新装配图片接口。
     apiImageDataUrlMock.mockImplementation(
       async (path: string) => `data:image/jpeg;base64,${btoa(path)}`,
@@ -330,10 +332,11 @@ describe("media parse workbench", () => {
       .setValue("scene_change");
     await wrapper.get("button.advanced-toggle").trigger("click");
     const fields = wrapper.findAll(".parameter-grid input");
-    await fields[2]!.setValue("500");
-    await fields[3]!.setValue("2500");
-    await fields[4]!.setValue("0.2");
-    await fields[5]!.setValue("1280");
+    await fields[1]!.setValue("500");
+    await fields[2]!.setValue("2500");
+    await fields[3]!.setValue("0.2");
+    await fields[4]!.setValue("1280");
+    expect(wrapper.text()).not.toContain("兼容单元上限");
 
     const input = wrapper.get('input[type="file"]');
     Object.defineProperty(input.element, "files", {
@@ -364,7 +367,68 @@ describe("media parse workbench", () => {
         frame_max_edge: 1280,
       },
     });
+    expect(body.parameters).not.toHaveProperty("max_units");
     expect(wrapper.findAll(".unit-list button")).toHaveLength(1001);
+    wrapper.unmount();
+  });
+
+  it("distinguishes sampled units from hit units and styles completion notices", async () => {
+    apiMock.mockImplementation(async (path: string, init?: RequestInit) => {
+      const workspace = workspaceApi(path, init);
+      if (workspace !== undefined) return workspace;
+      if (path === "/api/v1/runs")
+        return runRecord("run-unit-clarity", "completed");
+      if (path.includes("/api/v1/runs/run-unit-clarity/result?")) {
+        const base = resultPage(0).result;
+        return {
+          result: {
+            ...base,
+            run_id: "run-unit-clarity",
+            units: [base.units[0]],
+            media_metadata: {
+              ...base.media_metadata,
+              sampled_units: 663,
+              timestamp_source: "position_msec",
+            },
+            warnings: [
+              "media_termination:source_ended",
+              "artifact_frame_quota_reached",
+            ],
+          },
+          unit_offset: 0,
+          unit_limit: 1000,
+          unit_total: 1,
+        };
+      }
+      throw new Error(`unexpected API path: ${path}`);
+    });
+
+    const wrapper = mount(ParseView, {
+      props: { initialDomain: "ocr" },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    await wrapper.get('[role="tab"]:nth-child(2)').trigger("click");
+    const input = wrapper.get('input[type="file"]');
+    Object.defineProperty(input.element, "files", {
+      configurable: true,
+      value: [new File(["video"], "sample.mp4", { type: "video/mp4" })],
+    });
+    await input.trigger("change");
+    await wrapper.get("button.button.primary").trigger("click");
+    await vi.waitFor(() => expect(wrapper.text()).toContain("采样单元"));
+
+    const counters = wrapper.find(".result-counters");
+    expect(counters.text()).toContain("663");
+    expect(counters.text()).toContain("命中单元");
+    expect(wrapper.find(".metadata-wide").exists()).toBe(true);
+    expect(wrapper.find(".warning-panel").text()).toContain("解析警告");
+    await wrapper.find(".warning-panel button").trigger("click");
+    expect(wrapper.find(".warning-panel").text()).toContain("历史运行");
+    expect(wrapper.find(".warning-panel").text()).not.toContain(
+      "媒体源已正常读完",
+    );
+    expect(wrapper.findAll(".warning-list li")).toHaveLength(1);
     wrapper.unmount();
   });
 
@@ -438,6 +502,118 @@ describe("media parse workbench", () => {
       parameters: { max_units: 20, page_scale: 2.5 },
     });
     documentWrapper.unmount();
+  });
+
+  it("does not draw stale boxes and uses the sampled frame when video playback fails", async () => {
+    apiMock.mockImplementation(async (path: string, init?: RequestInit) => {
+      const workspace = workspaceApi(path, init);
+      if (workspace !== undefined) return workspace;
+      if (path === "/api/v1/runs")
+        return runRecord("run-video-frame", "completed");
+      if (path.includes("/api/v1/runs/run-video-frame/result?")) {
+        const liveResult = {
+          ...portraitResult(),
+          run_id: "run-video-frame",
+          asset_id: "asset-video",
+          units: [{ ...portraitResult().units[0], pts_ms: 2_000 }],
+        };
+        return {
+          result: liveResult,
+          unit_offset: 0,
+          unit_limit: 1000,
+          unit_total: 1,
+        };
+      }
+      throw new Error(`unexpected API path: ${path}`);
+    });
+
+    const wrapper = mount(ParseView, {
+      props: { initialDomain: "portrait" },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    await wrapper.get('[role="tab"]:nth-child(2)').trigger("click");
+    const input = wrapper.get('input[type="file"]');
+    Object.defineProperty(input.element, "files", {
+      configurable: true,
+      value: [new File(["video"], "sample.mp4", { type: "video/mp4" })],
+    });
+    await input.trigger("change");
+    await wrapper.get("button.button.primary").trigger("click");
+    await vi.waitFor(() => expect(wrapper.find("video").exists()).toBe(true));
+
+    expect(strokeRectMock).not.toHaveBeenCalled();
+    await wrapper.get("video").trigger("error");
+    await vi.waitFor(() =>
+      expect(apiImageDataUrlMock).toHaveBeenCalledWith(
+        "/api/v1/runs/run-video-frame/artifacts/frame_a1",
+      ),
+    );
+    await vi.waitFor(() => expect(strokeRectMock).toHaveBeenCalled());
+    expect(wrapper.find('img[alt="当前解析帧"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("pins the preview to the latest unit with a frame artifact after playback fails", async () => {
+    apiMock.mockImplementation(async (path: string, init?: RequestInit) => {
+      const workspace = workspaceApi(path, init);
+      if (workspace !== undefined) return workspace;
+      if (path === "/api/v1/runs")
+        return runRecord("run-video-quota", "completed");
+      if (path.includes("/api/v1/runs/run-video-quota/result?")) {
+        const base = portraitResult().units[0];
+        return {
+          result: {
+            ...portraitResult(),
+            run_id: "run-video-quota",
+            asset_id: "asset-video",
+            units: [
+              { ...base, unit_id: "frame_viewable", pts_ms: 0 },
+              {
+                ...base,
+                unit_id: "frame_unavailable",
+                pts_ms: 2_000,
+                frame_artifact_id: null,
+              },
+            ],
+            media_metadata: { width: 200, height: 100, sampled_units: 2 },
+            warnings: ["artifact_frame_quota_reached"],
+          },
+          unit_offset: 0,
+          unit_limit: 1000,
+          unit_total: 2,
+        };
+      }
+      throw new Error(`unexpected API path: ${path}`);
+    });
+
+    const wrapper = mount(ParseView, {
+      props: { initialDomain: "portrait" },
+      attachTo: document.body,
+    });
+    await flushPromises();
+    await wrapper.get('[role="tab"]:nth-child(2)').trigger("click");
+    const input = wrapper.get('input[type="file"]');
+    Object.defineProperty(input.element, "files", {
+      configurable: true,
+      value: [new File(["video"], "sample.mp4", { type: "video/mp4" })],
+    });
+    await input.trigger("change");
+    await wrapper.get("button.button.primary").trigger("click");
+    await vi.waitFor(() => expect(wrapper.find("video").exists()).toBe(true));
+    apiImageDataUrlMock.mockClear();
+
+    await wrapper.get("video").trigger("error");
+    await vi.waitFor(() =>
+      expect(apiImageDataUrlMock).toHaveBeenCalledWith(
+        "/api/v1/runs/run-video-quota/artifacts/frame_a1",
+      ),
+    );
+    expect(apiImageDataUrlMock).not.toHaveBeenCalledWith(
+      "/api/v1/runs/run-video-quota/artifacts/undefined",
+    );
+    expect(wrapper.find(".overlay-status").exists()).toBe(false);
+    wrapper.unmount();
   });
 
   it("retries a transient network interruption while polling a run", async () => {
@@ -542,7 +718,7 @@ describe("media parse workbench", () => {
     const execution = wrapper.get("button.button.primary").trigger("click");
 
     await vi.waitFor(() => expect(wrapper.text()).toContain("50%"));
-    expect(wrapper.text()).toContain("1 / 2 个单元");
+    expect(wrapper.text()).toContain("1 / 2 个采样单元");
     expect(wrapper.text()).toContain("运行中");
     await vi.waitFor(() =>
       expect(wrapper.findAll(".unit-list button")).toHaveLength(1),
@@ -590,13 +766,12 @@ describe("media parse workbench", () => {
     await wrapper.findAll(".input-controls select")[1]!.setValue("keyframe");
     await wrapper.get("button.advanced-toggle").trigger("click");
     const fields = wrapper.findAll(".parameter-grid input");
-    await fields[1]!.setValue("8");
-    await fields[2]!.setValue("250");
-    await fields[3]!.setValue("5000");
-    await fields[4]!.setValue("720");
-    await fields[5]!.setValue("5");
-    await fields[6]!.setValue("3000");
-    await fields[7]!.setValue("2000");
+    await fields[1]!.setValue("250");
+    await fields[2]!.setValue("5000");
+    await fields[3]!.setValue("720");
+    await fields[4]!.setValue("5");
+    await fields[5]!.setValue("3000");
+    await fields[6]!.setValue("2000");
     await wrapper.get("button.button.primary").trigger("click");
 
     const runCall = apiMock.mock.calls.find(
@@ -610,14 +785,14 @@ describe("media parse workbench", () => {
     expect(body.source_id).toBe("source-1");
     expect(body.parameters).toMatchObject({
       sample_strategy: "keyframe",
-      max_units: 8,
       sample_start_ms: 250,
-      sample_end_ms: 5000,
+      stream_segment_duration_ms: 5000,
       frame_max_edge: 720,
       max_reconnect_attempts: 5,
       connect_timeout_ms: 3000,
       read_timeout_ms: 2000,
     });
+    expect(body.parameters).not.toHaveProperty("max_units");
     expect(apiBlobMock).not.toHaveBeenCalledWith(
       "/api/v1/media/sources/source-1/preview",
     );

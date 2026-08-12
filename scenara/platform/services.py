@@ -122,7 +122,6 @@ class RunService:
         active_model_resolver: ActiveModelResolver | None = None,
         run_artifacts_enabled: bool = True,
         run_artifact_max_crops: int = 200,
-        run_artifact_max_frames: int = 64,
         run_artifact_crop_max_edge: int = 256,
         run_artifact_frame_max_edge: int = 1920,
         indexes: IndexStore | None = None,
@@ -148,7 +147,6 @@ class RunService:
         self.active_model_resolver = active_model_resolver
         self.run_artifacts_enabled = run_artifacts_enabled
         self.run_artifact_max_crops = run_artifact_max_crops
-        self.run_artifact_max_frames = run_artifact_max_frames
         self.run_artifact_crop_max_edge = run_artifact_crop_max_edge
         self.run_artifact_frame_max_edge = run_artifact_frame_max_edge
         self.indexes = indexes
@@ -646,18 +644,29 @@ class RunService:
         if pipeline.domain != request.domain:
             raise ValueError("requested domain does not match pipeline domain")
         effective_parameters = dict(request.parameters)
-        if request.source_id and "max_units" not in effective_parameters:
-            effective_parameters.setdefault("stream_segment_duration_ms", self.stream_segment_duration_ms)
-        effective_request = request.model_copy(update={"parameters": effective_parameters})
-        self.pipelines.validate_run_parameters(pipeline, effective_parameters)
+        media_kind: MediaKind
         if request.asset_id:
             asset = await self.state.get_asset(context.tenant_id, context.project_id, request.asset_id)
             if asset is None or asset.deleted_at is not None or asset.original_deleted_at is not None:
                 raise ResourceNotFound("media asset not found")
+            media_kind = asset.kind
         else:
             source = await self.state.get_source(context.tenant_id, context.project_id, request.source_id or "")
             if source is None:
                 raise ResourceNotFound("media source not found")
+            media_kind = MediaKind.STREAM
+        if media_kind != MediaKind.DOCUMENT:
+            ignored_max_units = effective_parameters.pop("max_units", None)
+            if ignored_max_units is not None:
+                logger.info(
+                    "ignored max_units=%r for %s run; only document page limits are supported",
+                    ignored_max_units,
+                    media_kind.value,
+                )
+        if media_kind == MediaKind.STREAM:
+            effective_parameters.setdefault("stream_segment_duration_ms", self.stream_segment_duration_ms)
+        effective_request = request.model_copy(update={"parameters": effective_parameters})
+        self.pipelines.validate_run_parameters(pipeline, effective_parameters)
         now = time.time()
         run = RunRecord(
             run_id=f"run_{uuid4().hex}",
@@ -1060,7 +1069,6 @@ class RunService:
             project_id=run.project_id,
             run_id=run.run_id,
             max_crops=self.run_artifact_max_crops,
-            max_frames=self.run_artifact_max_frames,
             crop_max_edge=self.run_artifact_crop_max_edge,
             frame_max_edge=self.run_artifact_frame_max_edge,
         )
@@ -1235,7 +1243,17 @@ class RunService:
                 "sample_interval_ms": self.media_sample_interval_ms,
                 **run.parameters,
             }
-            if run.source_id:
+            if media_kind != MediaKind.DOCUMENT:
+                ignored_max_units = parameters.pop("max_units", None)
+                if ignored_max_units is not None:
+                    logger.info(
+                        "ignored max_units=%r while executing stored %s run %s; "
+                        "only document page limits are supported",
+                        ignored_max_units,
+                        media_kind.value,
+                        run.run_id,
+                    )
+            if media_kind == MediaKind.STREAM:
                 parameters.setdefault("stream_segment_duration_ms", self.stream_segment_duration_ms)
             if run.stream_segment_index is not None:
                 parameters["stream_segment_index"] = run.stream_segment_index

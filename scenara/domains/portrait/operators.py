@@ -89,7 +89,7 @@ class PortraitPersonDetectionOperator:
                     [context.filename for _ in chunk],
                     confidence=max(0.0, min(1.0, confidence)),
                     iou=max(0.0, min(1.0, iou)),
-                    max_detections=max(1, min(256, max_detections)),
+                    max_detections=max(1, max_detections),
                 )
                 for key, value in runtime_meta.get("timing", {}).items():
                     timing_totals[key] = timing_totals.get(key, 0.0) + float(value)
@@ -122,7 +122,7 @@ class PortraitPersonDetectionOperator:
                         persons.append(person)
                     frame_artifact_id = (
                         await store_unit_frame(context.artifacts, unit.image)
-                        if any(person.crop_artifact_id for person in unit_persons)
+                        if unit_persons
                         else None
                     )
                     if unit_persons or decoded.kind not in {MediaKind.VIDEO, MediaKind.STREAM}:

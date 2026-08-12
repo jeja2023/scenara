@@ -40,6 +40,15 @@ Scenara 1.0 不提供破坏性 down migration。发生不兼容 schema 变更时
 
 最低告警集合：API readiness 连续失败、HTTP 5xx 比例、p95/p99 延迟、Redis pending/lease 恢复、Webhook 死信、对象删除失败、审计写入失败、GPU 显存压力、worker 重启和备份校验失败。阈值必须来自目标 GPU 容量报告，不能使用开发机数据。
 
+## Run 长时间 queued 排查
+
+`/readyz` 能证明 API、Redis 和对象存储可连接，但不代表 Redis stream 已经有 worker 消费者。Run 长时间停留在 `queued` 时，先确认对应队列 lane 的 worker：图片、视频和文档使用 `batch`，实时流使用 `stream`。
+
+- Docker Compose：执行 `docker compose ps api batch-worker stream-worker`，再查看 `docker compose logs --tail=100 batch-worker`；生产环境必须同时运行 `batch-worker` 和 `stream-worker`。
+- 本地启动：使用 `python start.py` 重新启动；当 `.env` 配置 `SCENARA_QUEUE_BACKEND=redis` 时，启动器会自动拉起两个 worker，旧版启动进程不会热加载此行为。
+- Redis 侧：检查 `scenara:runs:batch` / `scenara:runs:stream` 的 consumer group、pending 数和 lag。只有 API 在写 stream、没有消费者时，Run 会持续显示 `queued`，图片解码器本身尚未开始执行。
+- worker 启动后若仍不前进，检查模型加载日志、CUDA/CPU provider、PostgreSQL/S3 连接和 `QUEUE_UNAVAILABLE` / `PIPELINE_ERROR`；首次加载模型可能需要数秒到数十秒，但不应无限停留在 `queued`。
+
 ## 已知限制
 
 - 仅支持 Ubuntu 24.04 x86_64、Docker Compose、单张不少于 23,000 MiB 的 NVIDIA GPU。

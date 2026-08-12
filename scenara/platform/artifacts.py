@@ -17,6 +17,7 @@ ArtifactType = Literal["object_crop", "unit_frame"]
 
 ARTIFACT_ID_PREFIX: dict[str, str] = {"object_crop": "crop", "unit_frame": "frame"}
 ARTIFACT_QUOTA_WARNING = "artifact_quota_reached"
+ARTIFACT_CROP_QUOTA_WARNING = "artifact_crop_quota_reached"
 ARTIFACT_STORAGE_WARNING = "artifact_storage_unavailable"
 CROP_PADDING_RATIO = 0.08
 JPEG_QUALITY = 85
@@ -72,11 +73,12 @@ class ArtifactSink(Protocol):
 
 
 class RunArtifactSink:
-    """Persist per-run crop and frame images under a bounded quota.
+    """Persist per-run crop and frame images.
 
-    Artifact production is best effort: quota exhaustion or an object store
-    failure records a warning and returns ``None`` instead of failing the run,
-    because a missing feature image must never discard a valid parse result.
+    Crop production uses a bounded quota because object counts can grow much
+    faster than media units. Unit frames have no count limit and follow the
+    preview retention policy. Storage failures remain best effort so a missing
+    image never discards a valid structured result.
     """
 
     def __init__(
@@ -87,7 +89,6 @@ class RunArtifactSink:
         project_id: str,
         run_id: str,
         max_crops: int,
-        max_frames: int,
         crop_max_edge: int,
         frame_max_edge: int,
     ) -> None:
@@ -95,7 +96,7 @@ class RunArtifactSink:
         self._tenant_id = tenant_id
         self._project_id = project_id
         self._run_id = run_id
-        self._quota: dict[str, int] = {"object_crop": max(0, max_crops), "unit_frame": max(0, max_frames)}
+        self._max_crops = max(0, max_crops)
         self._max_edge: dict[str, int] = {"object_crop": crop_max_edge, "unit_frame": frame_max_edge}
         self._stored: dict[str, int] = {"object_crop": 0, "unit_frame": 0}
         self._artifacts: list[ResultArtifact] = []
@@ -114,8 +115,8 @@ class RunArtifactSink:
             self._warnings.append(warning)
 
     async def store_image(self, image: Image.Image, *, artifact_type: ArtifactType) -> str | None:
-        if self._stored[artifact_type] >= self._quota[artifact_type]:
-            self._warn(ARTIFACT_QUOTA_WARNING)
+        if artifact_type == "object_crop" and self._stored[artifact_type] >= self._max_crops:
+            self._warn(ARTIFACT_CROP_QUOTA_WARNING)
             return None
         artifact_id = f"{ARTIFACT_ID_PREFIX[artifact_type]}_{uuid4().hex}"
         object_key = (
@@ -194,6 +195,7 @@ async def store_unit_frame(sink: ArtifactSink | None, image: Image.Image) -> str
 
 
 __all__ = [
+    "ARTIFACT_CROP_QUOTA_WARNING",
     "ARTIFACT_QUOTA_WARNING",
     "ARTIFACT_STORAGE_WARNING",
     "ArtifactSink",

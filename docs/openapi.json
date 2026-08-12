@@ -4911,7 +4911,7 @@
           "max_units": {
             "anyOf": [
               {
-                "maximum": 1000.0,
+                "maximum": 10000.0,
                 "minimum": 1.0,
                 "type": "integer"
               },
@@ -5039,19 +5039,6 @@
               }
             ],
             "title": "Frame Max Edge"
-          },
-          "max_units": {
-            "anyOf": [
-              {
-                "maximum": 10000.0,
-                "minimum": 1.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Max Units"
           },
           "page_scale": {
             "default": 1.5,

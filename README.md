@@ -47,7 +47,7 @@ python -m pip install -r requirements/dev.txt
 python start.py
 ```
 
-`start.py` 是本地开发一键启动器：缺少 `.env` 时从 `.env.example` 创建，准备 `runtime-state/`，再使用当前 Python 解释器启动 API。新创建的 `.env` 默认使用内存状态、内联队列和本地对象存储，不需要额外启动 PostgreSQL、Redis 或 MinIO；已有 `.env` 会按其中配置启动，不会被覆盖。已有 `.env` 使用本机 Redis 且端口尚未监听时，启动器会自动查找 `runtime-state/redis-*` 中的 Redis 并随 API 启停。
+`start.py` 是本地开发一键启动器：缺少 `.env` 时从 `.env.example` 创建，准备 `runtime-state/`，再使用当前 Python 解释器启动 API。新创建的 `.env` 默认使用内存状态、内联队列和本地对象存储，不需要额外启动 PostgreSQL、Redis 或 MinIO；已有 `.env` 会按其中配置启动，不会被覆盖。已有 `.env` 使用本机 Redis 且端口尚未监听时，启动器会自动查找 `runtime-state/redis-*` 中的 Redis 并随 API 启停，同时自动启动 batch/stream 两个 Run worker。
 
 如果现有 `.env` 配置了 PostgreSQL、Redis 或 S3，但本机暂时没有这些服务，可以使用 `python start.py --local` 临时覆盖为内存、本地对象存储和内联队列；该选项不会修改 `.env`。
 
@@ -57,7 +57,7 @@ python start.py
 python start.py --with-console --reload
 ```
 
-API 默认位于 `http://127.0.0.1:8000`，Console 开发服务器位于 `http://127.0.0.1:5173/console/`；不带 `--with-console` 时，已构建的 Console 仍可从 API 的 `/console/` 路径访问。按 `Ctrl+C` 会同时停止 API 和 Console 子进程。使用 `python start.py --help` 查看环境文件、端口和自动重载选项。
+API 默认位于 `http://127.0.0.1:8000`，Console 开发服务器位于 `http://127.0.0.1:5173/console/`；不带 `--with-console` 时，已构建的 Console 仍可从 API 的 `/console/` 路径访问。按 `Ctrl+C` 会同时停止 API、Console 和本地 worker 子进程。使用 `python start.py --help` 查看环境文件、端口和自动重载选项。
 
 本地运行时的持久化状态和 rollout 审计默认写入 `runtime-state/`，可保留的日志文件放在
 `runtime-state/logs/`；生产部署继续将应用日志输出到 stdout，由容器运行时统一采集。

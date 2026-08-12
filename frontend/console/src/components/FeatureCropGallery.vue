@@ -175,7 +175,7 @@ onBeforeUnmount(reset);
 <template>
   <section class="panel feature-crops">
     <div class="panel-header">
-      <h2>特征图片</h2>
+      <h2>当前单元特征图片</h2>
       <span class="badge">{{ croppedObjects.length }} 张</span>
     </div>
 

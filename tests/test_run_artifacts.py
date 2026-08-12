@@ -10,7 +10,8 @@ from PIL import Image
 
 from scenara.bootstrap import build_runtime
 from scenara.domains.portrait.analysis import PORTRAIT_CAPABILITIES, PortraitBackendOutput
-from scenara.platform.artifacts import crop_region, encode_jpeg, polygon_bounds
+from scenara.infrastructure.object_store import LocalObjectStore
+from scenara.platform.artifacts import RunArtifactSink, crop_region, encode_jpeg, polygon_bounds
 from scenara.platform.models import BoundingBox, Point
 from scenara.server import create_app
 
@@ -146,7 +147,28 @@ async def test_crop_quota_is_reported_as_a_warning(development_settings) -> None
         result = (await parse_portrait_image(api))["result"]
         crop_ids = [item["crop_artifact_id"] for item in result["units"][0]["objects"]]
         assert len([item for item in crop_ids if item]) == 1
-        assert "artifact_quota_reached" in result["warnings"]
+        assert result["units"][0]["frame_artifact_id"]
+        assert "artifact_crop_quota_reached" in result["warnings"]
+
+
+@pytest.mark.asyncio
+async def test_unit_frames_are_not_limited_by_a_per_run_quota(tmp_path) -> None:
+    sink = RunArtifactSink(
+        LocalObjectStore(tmp_path / "objects"),
+        tenant_id="tenant",
+        project_id="project",
+        run_id="run_unlimited_frames",
+        max_crops=0,
+        crop_max_edge=256,
+        frame_max_edge=1920,
+    )
+    frame = Image.new("RGB", (16, 12), "white")
+
+    frame_ids = [await sink.store_image(frame, artifact_type="unit_frame") for _ in range(65)]
+
+    assert all(frame_ids)
+    assert len(sink.artifacts) == 65
+    assert sink.warnings == []
 
 
 @pytest.mark.asyncio

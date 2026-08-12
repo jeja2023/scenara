@@ -268,6 +268,12 @@ describe("console information architecture", () => {
     expect(labelWarning("artifact_quota_reached")).toContain(
       "特征图片数量已达到本次运行的上限",
     );
+    expect(labelWarning("artifact_crop_quota_reached")).toContain(
+      "特征裁剪图片数量已达到本次运行的上限",
+    );
+    expect(labelWarning("artifact_frame_quota_reached")).toContain(
+      "该历史运行创建时仍启用了结果帧数量上限",
+    );
     expect(labelVersion("0.3.0.dev6")).toBe("0.3.0 开发版 6");
     expect(userFacingError(new TypeError("Failed to fetch"))).toBe(
       "操作失败，请稍后重试",

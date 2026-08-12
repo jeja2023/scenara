@@ -28,7 +28,6 @@ export interface ParseFileInput {
 }
 export interface ParseVideoInput extends ParseFileInput {
     sampleIntervalMs?: number;
-    maxUnits?: number;
     sampleStrategy?: SampleStrategy;
     sampleStartMs?: number;
     sampleEndMs?: number;
@@ -50,7 +49,6 @@ export interface ParseStreamInput {
     pipelineId?: string;
     pipelineVersion?: string;
     sampleIntervalMs?: number;
-    maxUnits?: number;
     sampleStrategy?: SampleStrategy;
     sampleStartMs?: number;
     sampleEndMs?: number;

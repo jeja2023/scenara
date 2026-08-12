@@ -493,7 +493,6 @@ def test_python_sdk_media_file_and_stream_shortcuts(tmp_path: Path) -> None:
             media_file,
             domain="ocr",
             sample_interval_ms=400,
-            max_units=3,
             sample_strategy="scene_change",
             sample_start_ms=500,
             sample_end_ms=2_500,
@@ -515,7 +514,6 @@ def test_python_sdk_media_file_and_stream_shortcuts(tmp_path: Path) -> None:
             "src-1",
             domain="ocr",
             sample_interval_ms=500,
-            max_units=4,
             sample_strategy="keyframe",
             sample_start_ms=250,
             sample_end_ms=5_000,
@@ -532,6 +530,7 @@ def test_python_sdk_media_file_and_stream_shortcuts(tmp_path: Path) -> None:
     assert video_request.headers["Idempotency-Key"] == "video-idempotency"
     assert b'name="sample_interval_ms"' in video_request.content
     assert b"400" in video_request.content
+    assert b'name="max_units"' not in video_request.content
     for field in (
         b'sample_strategy',
         b'sample_start_ms',
@@ -558,7 +557,6 @@ def test_python_sdk_media_file_and_stream_shortcuts(tmp_path: Path) -> None:
     assert stream_request.headers["Idempotency-Key"] == "stream-idempotency"
     assert json.loads(stream_request.content)["parameters"] == {
         "sample_interval_ms": 500,
-        "max_units": 4,
         "sample_strategy": "keyframe",
         "sample_start_ms": 250,
         "sample_end_ms": 5_000,

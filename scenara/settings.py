@@ -63,7 +63,6 @@ class Settings:
     ocr_engine_factory: str
     run_artifacts_enabled: bool
     run_artifact_max_crops: int
-    run_artifact_max_frames: int
     run_artifact_crop_max_edge: int
     run_artifact_frame_max_edge: int
     trajectory_enabled: bool
@@ -159,7 +158,6 @@ def load_settings() -> Settings:
         ocr_engine_factory=os.getenv("SCENARA_OCR_ENGINE_FACTORY", "").strip(),
         run_artifacts_enabled=_bool("SCENARA_RUN_ARTIFACTS_ENABLED", True),
         run_artifact_max_crops=max(0, min(5_000, int(os.getenv("SCENARA_RUN_ARTIFACT_MAX_CROPS", "200")))),
-        run_artifact_max_frames=max(0, min(1_000, int(os.getenv("SCENARA_RUN_ARTIFACT_MAX_FRAMES", "64")))),
         run_artifact_crop_max_edge=max(
             32,
             min(2_048, int(os.getenv("SCENARA_RUN_ARTIFACT_CROP_MAX_EDGE", "256"))),

@@ -239,7 +239,6 @@ class ScenaraClient:
         pipeline_id: str | None = None,
         pipeline_version: str | None = None,
         sample_interval_ms: int = 1_000,
-        max_units: int | None = None,
         sample_strategy: SampleStrategy = "interval",
         sample_start_ms: int = 0,
         sample_end_ms: int | None = None,
@@ -262,8 +261,6 @@ class ScenaraClient:
             "page_scale": page_scale,
             "wait_ms": wait_ms,
         }
-        if max_units is not None:
-            data["max_units"] = max_units
         if pipeline_id is not None:
             data["pipeline_id"] = pipeline_id
         if pipeline_version is not None:
@@ -333,7 +330,6 @@ class ScenaraClient:
         pipeline_id: str | None = None,
         pipeline_version: str | None = None,
         sample_interval_ms: int = 1_000,
-        max_units: int | None = None,
         sample_strategy: SampleStrategy = "interval",
         sample_start_ms: int = 0,
         sample_end_ms: int | None = None,
@@ -357,8 +353,6 @@ class ScenaraClient:
             "connect_timeout_ms": connect_timeout_ms,
             "read_timeout_ms": read_timeout_ms,
         }
-        if max_units is not None:
-            parameters["max_units"] = max_units
         if stream_segment_duration_ms is not None:
             parameters["stream_segment_duration_ms"] = stream_segment_duration_ms
         if sample_end_ms is not None:

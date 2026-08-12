@@ -470,7 +470,7 @@ async def _convert_analysis_chunk(
                 objects=objects,
                 frame_artifact_id=(
                     await store_unit_frame(context.artifacts, unit.image)
-                    if any(item.crop_artifact_id for item in objects)
+                    if objects
                     else None
                 ),
             )
@@ -618,7 +618,7 @@ class PortraitFullAnalysisOperator:
                     objects=objects,
                     frame_artifact_id=(
                         await store_unit_frame(context.artifacts, unit.image)
-                        if any(item.crop_artifact_id for item in objects)
+                        if objects
                         else None
                     ),
                 )

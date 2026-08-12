@@ -19,6 +19,7 @@ from scenara.platform.models import MediaKind, MediaTechnicalMetadata, SampleStr
 from scenara.platform.pipeline import ExecutionContext, ExecutionControl, OperatorDefinition, PipelineError
 
 MAX_PIXELS = 80_000_000
+MAX_DOCUMENT_PAGES = 10_000
 SCENE_CHANGE_HISTOGRAM_BINS = 32
 DECODED_BATCH_MEMORY_BUDGET_BYTES = 512 * 1024 * 1024
 DECODED_QUEUE_CAPACITY_UNITS = 32
@@ -647,7 +648,7 @@ def _decode_pdf(
 
         document = pdfium.PdfDocument(data)
         page_count = len(document)
-        if page_count <= 0 or page_count > 1000:
+        if page_count <= 0 or page_count > MAX_DOCUMENT_PAGES:
             raise PipelineError("PDF page count exceeds the safety limit")
         units: list[DecodedMediaUnit] = []
         for index in range(page_count if max_units is None else min(page_count, max_units)):
@@ -708,7 +709,7 @@ def decode_media(
     retain_units: bool = True,
 ) -> DecodedMedia:
     _check_control(control)
-    if max_units is not None and not 1 <= max_units <= 10_000:
+    if max_units is not None and not 1 <= max_units <= MAX_DOCUMENT_PAGES:
         raise PipelineError("max_units must be between 1 and 10000")
     if media.kind == MediaKind.IMAGE:
         if media.data is None:
@@ -799,7 +800,7 @@ class DecodeMediaOperator:
         media = inputs.get("media")
         if not isinstance(media, MediaInput):
             raise PipelineError("decode-media requires MediaInput")
-        max_units_raw = parameters.get("max_units")
+        max_units_raw = parameters.get("max_units") if media.kind == MediaKind.DOCUMENT else None
         max_units = int(max_units_raw) if max_units_raw is not None else None
         sample_interval_ms = int(parameters.get("sample_interval_ms", 1000))
         max_reconnect_attempts = int(parameters.get("max_reconnect_attempts", 3))

@@ -273,7 +273,7 @@ def test_video_batch_is_downscaled_to_the_memory_budget(
 
 
 @pytest.mark.asyncio
-async def test_decode_operator_streams_video_units_before_materialization(
+async def test_decode_operator_ignores_video_unit_limit_and_streams_to_eof(
     fake_capture: type[_FakeCapture],
 ) -> None:
     fake_capture.frames = [_solid_frame(index * 8) for index in range(20)]
@@ -301,11 +301,16 @@ async def test_decode_operator_streams_video_units_before_materialization(
     batches = []
     async for batch, expected_units in decoded.iter_batches(2):
         batches.append([unit.unit_id for unit in batch])
-        assert expected_units == 5
+        assert expected_units == 7
 
-    assert batches == [["frame_0", "frame_3"], ["frame_6", "frame_9"], ["frame_12"]]
-    assert decoded.metadata.sampled_units == 5
-    assert decoded.termination_reason == "max_units_reached"
+    assert batches == [
+        ["frame_0", "frame_3"],
+        ["frame_6", "frame_9"],
+        ["frame_12", "frame_15"],
+        ["frame_18"],
+    ]
+    assert decoded.metadata.sampled_units == 7
+    assert decoded.termination_reason == "source_ended"
 
 
 def test_image_decoding_honours_frame_max_edge() -> None:

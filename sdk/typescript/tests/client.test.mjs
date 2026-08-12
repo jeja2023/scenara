@@ -26,7 +26,6 @@ test("media shortcuts serialize the complete public parsing contract", async () 
     filename: "clip.mp4",
     domain: "ocr",
     sampleIntervalMs: 400,
-    maxUnits: 8,
     sampleStrategy: "scene_change",
     sampleStartMs: 250,
     sampleEndMs: 5_000,
@@ -48,7 +47,6 @@ test("media shortcuts serialize the complete public parsing contract", async () 
   await client.parseStream({
     sourceId: "source-1",
     sampleIntervalMs: 500,
-    maxUnits: 12,
     sampleStrategy: "keyframe",
     sampleStartMs: 100,
     sampleEndMs: 6_000,
@@ -70,7 +68,6 @@ test("media shortcuts serialize the complete public parsing contract", async () 
     {
       domain: "ocr",
       sample_interval_ms: "400",
-      max_units: "8",
       sample_strategy: "scene_change",
       sample_start_ms: "250",
       sample_end_ms: "5000",
@@ -101,7 +98,6 @@ test("media shortcuts serialize the complete public parsing contract", async () 
   assert.deepEqual(stream.options.body.pipeline, { pipeline_id: "portrait.person-detection" });
   assert.deepEqual(stream.options.body.parameters, {
     sample_interval_ms: 500,
-    max_units: 12,
     sample_strategy: "keyframe",
     sample_start_ms: 100,
     sample_end_ms: 6_000,

@@ -709,6 +709,12 @@ export function labelTerminationReason(value?: string | null): string {
 export function labelWarning(value: string): string {
   if (value === "gait_requires_at_least_8_frames")
     return "步态分析至少需要 8 帧画面";
+  if (value === "artifact_crop_quota_reached") {
+    return "特征裁剪图片数量已达到本次运行的上限，部分对象没有生成裁剪图；如需完整覆盖，请提高特征图片配额或缩小分析范围。";
+  }
+  if (value === "artifact_frame_quota_reached") {
+    return "该历史运行创建时仍启用了结果帧数量上限，部分单元没有保存回放图；新运行已取消此上限，请重新解析以生成完整结果帧。";
+  }
   if (value === "artifact_quota_reached") {
     return "特征图片数量已达到本次运行的上限，部分对象没有生成裁剪图；如需完整覆盖，请提高特征图片配额或缩小分析范围。";
   }

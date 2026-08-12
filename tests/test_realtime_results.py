@@ -179,12 +179,26 @@ async def test_stream_segment_completion_queues_the_next_session_run(
     pipeline = await runtime.runs.resolve_pipeline_ref("ocr.document")
     outcome = await runtime.runs.create_run(
         context,
-        CreateRunRequest(domain="ocr", pipeline=pipeline, source_id=source.source_id),
+        CreateRunRequest(
+            domain="ocr",
+            pipeline=pipeline,
+            source_id=source.source_id,
+            parameters={"max_units": 1},
+        ),
         idempotency_key="stream-session-first-segment",
     )
     first = outcome.run
     assert "max_units" not in first.parameters
     assert first.parameters["stream_segment_duration_ms"] == development_settings.stream_segment_duration_ms
+    first = await runtime.state.save_run(
+        first.model_copy(
+            update={
+                "parameters": {**first.parameters, "max_units": 1},
+                "updated_at": time.time(),
+            }
+        ),
+        expected_revision=first.revision,
+    )
 
     async def finish_segment(
         definition: Any,
@@ -195,6 +209,7 @@ async def test_stream_segment_completion_queues_the_next_session_run(
     ) -> ResultEnvelope:
         del definition, initial_inputs
         await checkpoint()
+        assert "max_units" not in parameters
         assert parameters["stream_segment_index"] == 0
         return ResultEnvelope(
             run_id=execution_context.run_id,
@@ -217,6 +232,8 @@ async def test_stream_segment_completion_queues_the_next_session_run(
     assert second.previous_run_id == first.run_id
     assert second.stream_session_id == first.stream_session_id
     assert second.stream_segment_index == 1
+    assert "max_units" not in second.parameters
+    assert second.parameters["stream_segment_duration_ms"] == development_settings.stream_segment_duration_ms
     assert len(enqueued) == 2
 
     session = await runtime.runs.stream_session(context, first.stream_session_id or "")

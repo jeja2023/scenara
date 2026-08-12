@@ -54,3 +54,31 @@ def test_bundled_redis_is_started_for_local_endpoint(tmp_path: Path, monkeypatch
     ]
     assert "--appendonly" in captured["command"]
     assert captured["kwargs"]["cwd"] == executable.parent
+
+
+def test_dotenv_environment_preserves_string_values(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+    env_file.write_text("SCENARA_QUEUE_BACKEND=redis\nSCENARA_REDIS_URL=redis://127.0.0.1:6380/0\n", encoding="utf-8")
+
+    assert start._dotenv_environment(env_file) == {
+        "SCENARA_QUEUE_BACKEND": "redis",
+        "SCENARA_REDIS_URL": "redis://127.0.0.1:6380/0",
+    }
+
+
+def test_worker_command_passes_env_file_and_lane(tmp_path: Path) -> None:
+    env_file = tmp_path / ".env"
+
+    command = start._worker_command(env_file, lane="batch", consumer="local-batch-8000")
+
+    assert command[-4:] == [
+        "--lane",
+        "batch",
+        "--env-file",
+        str(env_file),
+    ]
+
+
+def test_worker_specs_follow_queue_backend() -> None:
+    assert start._worker_specs("redis") == (("batch", "local-batch"), ("stream", "local-stream"))
+    assert start._worker_specs("inline") == ()

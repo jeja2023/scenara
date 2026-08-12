@@ -85,6 +85,25 @@ def _dotenv_value(env_file: Path, key: str) -> str | None:
     return candidate if isinstance(candidate, str) and candidate else None
 
 
+def _dotenv_environment(env_file: Path) -> dict[str, str]:
+    """Load string-valued dotenv entries for child processes.
+
+    The API receives ``--env-file`` through Uvicorn, but worker subprocesses
+    are started directly and otherwise would silently fall back to inline
+    queue/memory defaults.
+    """
+
+    try:
+        from dotenv import dotenv_values
+    except ImportError:
+        return {}
+    return {
+        key: value
+        for key, value in dotenv_values(env_file).items()
+        if isinstance(key, str) and isinstance(value, str)
+    }
+
+
 def _api_command(args: argparse.Namespace, env_file: Path) -> list[str]:
     command = [
         sys.executable,
@@ -118,6 +137,29 @@ def _console_command(args: argparse.Namespace) -> list[str]:
         "--port",
         str(args.console_port),
     ]
+
+
+def _worker_command(env_file: Path, *, lane: str, consumer: str) -> list[str]:
+    return [
+        sys.executable,
+        "-m",
+        "scenara.worker",
+        "--consumer",
+        consumer,
+        "--lane",
+        lane,
+        "--env-file",
+        str(env_file),
+    ]
+
+
+def _worker_specs(queue_backend: str) -> tuple[tuple[str, str], ...]:
+    if queue_backend.strip().lower() != "redis":
+        return ()
+    return (
+        ("batch", "local-batch"),
+        ("stream", "local-stream"),
+    )
 
 
 def _tcp_open(host: str, port: int) -> bool:
@@ -234,7 +276,8 @@ def _run(args: argparse.Namespace) -> int:
     prepared = prepare_runtime_state(runtime_root)
     print(f"运行目录已准备：{prepared[0].parent}")
 
-    child_env = os.environ.copy()
+    child_env = _dotenv_environment(env_file)
+    child_env.update(os.environ)
     if args.local:
         child_env.update(
             {
@@ -246,8 +289,14 @@ def _run(args: argparse.Namespace) -> int:
         )
     child_env.setdefault("SCENARA_DEV_API_URL", f"http://127.0.0.1:{args.port}")
     console_command = _console_command(args) if args.with_console else None
+    queue_backend = child_env.get("SCENARA_QUEUE_BACKEND", "inline").strip().lower()
+    worker_specs = tuple(
+        (lane, f"{consumer}-{args.port}")
+        for lane, consumer in _worker_specs(queue_backend)
+    )
     processes: list[subprocess.Popen[bytes]] = []
     console: subprocess.Popen[bytes] | None = None
+    workers: list[tuple[str, subprocess.Popen[bytes]]] = []
     try:
         if not args.local:
             redis = _start_local_redis(env_file, runtime_root)
@@ -256,6 +305,14 @@ def _run(args: argparse.Namespace) -> int:
 
         api = subprocess.Popen(_api_command(args, env_file), cwd=ROOT, env=child_env)
         processes.append(api)
+        for lane, consumer in worker_specs:
+            worker = subprocess.Popen(
+                _worker_command(env_file, lane=lane, consumer=consumer),
+                cwd=ROOT,
+                env=child_env,
+            )
+            workers.append((lane, worker))
+            processes.append(worker)
         if console_command is not None:
             console = subprocess.Popen(console_command, cwd=ROOT, env=child_env)
             processes.append(console)
@@ -267,6 +324,8 @@ def _run(args: argparse.Namespace) -> int:
     print(f"API: http://{args.host}:{args.port}")
     if args.local:
         print("后端：memory + local + inline（未连接外部服务）")
+    elif workers:
+        print("Worker：batch + stream（Redis 队列消费者已启动）")
     print(f"Console: http://127.0.0.1:{args.console_port}/console/" if console else "Console: /console/")
     print("按 Ctrl+C 停止本地开发服务。")
     try:
@@ -282,6 +341,14 @@ def _run(args: argparse.Namespace) -> int:
                     print(f"Console 已退出，状态码：{console_code}", file=sys.stderr)
                     _stop(api)
                     return console_code or 1
+            for lane, worker in workers:
+                worker_code = worker.poll()
+                if worker_code is not None:
+                    print(f"{lane} worker 已退出，状态码：{worker_code}", file=sys.stderr)
+                    _stop(api)
+                    if console is not None:
+                        _stop(console)
+                    return worker_code or 1
             time.sleep(0.2)
     except KeyboardInterrupt:
         print("\n正在停止本地开发服务……")

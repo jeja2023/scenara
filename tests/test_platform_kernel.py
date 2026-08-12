@@ -289,9 +289,12 @@ async def test_video_shortcut_runs_sampled_timeline_end_to_end(kernel_client) ->
     assert payload["run"]["status"] == "completed"
     assert payload["run"]["pipeline"] == {"pipeline_id": "ocr.document", "version": "0.1.0"}
     result = payload["result"]
-    assert [unit["pts_ms"] for unit in result["units"]] == [0, 400, 800]
-    assert result["media_metadata"]["sampled_units"] == 3
+    assert len(result["units"]) > 3
+    assert [unit["pts_ms"] for unit in result["units"][:3]] == [0, 400, 800]
+    assert result["media_metadata"]["sampled_units"] > 3
     assert result["media_metadata"]["duration_ms"] == 2000
+    assert "max_units" not in payload["run"]["parameters"]
+    assert "media_termination:max_units_reached" not in result["warnings"]
 
 
 @pytest.mark.asyncio
@@ -351,6 +354,8 @@ async def test_stream_shortcut_runs_decode_and_result_end_to_end(
 
         def read(self):
             self.reads += 1
+            if self.reads > 5:
+                return False, None
             return True, frame
 
         def release(self) -> None:
@@ -372,7 +377,11 @@ async def test_stream_shortcut_runs_decode_and_result_end_to_end(
             "source_id": source["source_id"],
             "domain": "ocr",
             "pipeline": {"pipeline_id": "ocr.document"},
-            "parameters": {"sample_interval_ms": 1, "max_units": 2},
+            "parameters": {
+                "sample_interval_ms": 1,
+                "max_units": 2,
+                "max_reconnect_attempts": 0,
+            },
             "wait_ms": 2000,
         },
         headers={"Idempotency-Key": "stream-shortcut"},
@@ -383,9 +392,11 @@ async def test_stream_shortcut_runs_decode_and_result_end_to_end(
     assert run["pipeline"] == {"pipeline_id": "ocr.document", "version": "0.1.0"}
     result = (await api.get(f"/api/v1/runs/{run['run_id']}/result")).json()["data"]["result"]
     assert result["source_id"] == source["source_id"]
-    assert len(result["units"]) == 2
-    assert result["media_metadata"]["sampled_units"] == 2
-    assert "media_termination:max_units_reached" in result["warnings"]
+    assert len(result["units"]) > 2
+    assert result["media_metadata"]["sampled_units"] > 2
+    assert "max_units" not in run["parameters"]
+    assert "stream_segment_duration_ms" in run["parameters"]
+    assert "media_termination:max_units_reached" not in result["warnings"]
 
 
 @pytest.mark.asyncio
