@@ -478,8 +478,7 @@ describe("media parse workbench", () => {
     await flushPromises();
     await documentWrapper.get('[role="tab"]:nth-child(3)').trigger("click");
     const documentFields = documentWrapper.findAll(".parameter-grid input");
-    await documentFields[0]!.setValue("20");
-    await documentFields[1]!.setValue("2.5");
+    await documentFields[0]!.setValue("2.5");
     const documentInput = documentWrapper.get('input[type="file"]');
     Object.defineProperty(documentInput.element, "files", {
       configurable: true,
@@ -499,7 +498,7 @@ describe("media parse workbench", () => {
       domain: "ocr",
       pipeline: { pipeline_id: "ocr.document", version: "2.1.0" },
       asset_id: "asset-document",
-      parameters: { max_units: 20, page_scale: 2.5 },
+      parameters: { page_scale: 2.5 },
     });
     documentWrapper.unmount();
   });

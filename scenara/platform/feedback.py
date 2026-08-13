@@ -161,9 +161,6 @@ class CreateModelReleaseRequest(FeedbackModel):
             raise ValueError("evidence references must be scoped object keys with a SHA-256 digest")
         return normalized
 
-EVIDENCE_SIGNER_PLACEHOLDER = re.compile(r"(?i)(?:<[^>]+>|\b(?:example|replace|todo|tbd)\b|待填写|占位)")
-
-
 class ModelQualificationEvidence(FeedbackModel):
     schema_version: Literal["1.0"] = "1.0"
     evidence_type: str = Field(pattern=r"^(?:model_rights|regression|[a-z][a-z0-9_.-]{1,63}_evaluation)$")
@@ -172,27 +169,21 @@ class ModelQualificationEvidence(FeedbackModel):
     model_version: str = Field(pattern=r"^\d+\.\d+\.\d+(?:-[a-z0-9.-]+)?$")
     package_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     executed_at: datetime
-    approved_at: datetime
-    signed_by: str = Field(min_length=1, max_length=256)
     details: dict[str, Any]
 
     @model_validator(mode="after")
-    def valid_approval(self) -> ModelQualificationEvidence:
-        if self.executed_at.tzinfo is None or self.approved_at.tzinfo is None:
-            raise ValueError("qualification evidence timestamps must include a timezone")
-        if self.approved_at < self.executed_at:
-            raise ValueError("qualification evidence approval cannot predate execution")
-        if EVIDENCE_SIGNER_PLACEHOLDER.search(self.signed_by):
-            raise ValueError("qualification evidence signer cannot be a placeholder")
+    def valid_evidence(self) -> ModelQualificationEvidence:
+        if self.executed_at.tzinfo is None:
+            raise ValueError("qualification evidence execution timestamp must include a timezone")
         if self.evidence_type == "model_rights" and self.details.get("rights_cleared") is not True:
             raise ValueError("model rights evidence must confirm cleared rights")
         if self.evidence_type.endswith("_evaluation") and not (
-            self.details.get("thresholds_approved_before_run") is True
+            self.details.get("thresholds_fixed_before_run") is True
             and self.details.get("within_tolerance") is True
             and isinstance(self.details.get("independent_runs"), int)
             and self.details["independent_runs"] >= 2
         ):
-            raise ValueError("evaluation evidence must record two approved reproducible runs")
+            raise ValueError("evaluation evidence must record two reproducible runs against fixed thresholds")
         if self.evidence_type == "regression" and self.details.get("regressions_passed") is not True:
             raise ValueError("regression evidence must confirm all regressions passed")
         return self

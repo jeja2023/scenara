@@ -39,7 +39,6 @@ export interface ParseVideoInput extends ParseFileInput {
     waitMs?: number;
 }
 export interface ParseDocumentInput extends ParseFileInput {
-    maxUnits?: number;
     pageScale?: number;
     waitMs?: number;
 }
@@ -202,10 +201,6 @@ export declare class ScenaraClient {
     decideProjectLifecycle(requestId: string, input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
     setAuditRetention(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
     purgeAudit(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
-    createBillingAccount(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
-    recordMeterEvent(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
-    listBillingUsage(accountId?: string): Promise<ControlPlaneRecord[]>;
-    assignBillingSeat(input: ControlPlaneRecord): Promise<ControlPlaneRecord>;
     createSession(input: {
         userId: string;
         ttlSeconds?: number;
@@ -356,7 +351,6 @@ export declare class ScenaraClient {
     }): Promise<SavedSearch>;
     runSavedSearch(savedSearchId: string): Promise<SearchResponse>;
     deleteSavedSearch(savedSearchId: string): Promise<void>;
-    enterpriseStatus(): Promise<Record<string, unknown>>;
     createFeedback(feedback: Record<string, unknown>): Promise<FeedbackRecord>;
     listFeedback(): Promise<FeedbackRecord[]>;
     reviewFeedback(feedbackId: string, status: "approved" | "rejected", notes?: string): Promise<FeedbackRecord>;

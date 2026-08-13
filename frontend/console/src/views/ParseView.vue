@@ -128,7 +128,6 @@ const sourceUrl = ref("");
 
 // 抽样参数
 const sampleIntervalMs = ref(1000);
-const maxUnits = ref<number | null>(null);
 const sampleStrategy = ref<SampleStrategy>("interval");
 const sampleStartMs = ref(0);
 const sampleEndMs = ref<number | null>(null);
@@ -213,14 +212,6 @@ function optionalNumber(value: unknown): number | null {
 const samplingValid = computed(() => {
   const endMs = optionalNumber(sampleEndMs.value);
   const maxEdge = optionalNumber(frameMaxEdge.value);
-  if (
-    mode.value === "document" &&
-    maxUnits.value != null &&
-    (!Number.isInteger(maxUnits.value) ||
-      maxUnits.value < 1 ||
-      maxUnits.value > (mode.value === "document" ? 1_000 : 10_000))
-  )
-    return false;
   if (mode.value === "document")
     return pageScale.value >= 0.5 && pageScale.value <= 4;
   if (
@@ -749,12 +740,11 @@ function runParameters(): Record<string, unknown> {
       ? {}
       : mode.value === "document"
         ? {
-            ...(maxUnits.value == null ? {} : { max_units: maxUnits.value }),
             page_scale: pageScale.value,
           }
         : samplingParameters();
   for (const [key, value] of Object.entries(pipelineParameters.value)) {
-    if (key === "max_units" && mode.value !== "document") continue;
+    if (key === "max_units") continue;
     if (
       value !== undefined &&
       value !== null &&
@@ -829,8 +819,6 @@ async function execute(): Promise<void> {
 }
 
 function applyRunParameters(parameters: Record<string, unknown>): void {
-  if (mode.value === "document" && parameters.max_units != null)
-    maxUnits.value = Number(parameters.max_units);
   if (parameters.sample_interval_ms != null)
     sampleIntervalMs.value = Number(parameters.sample_interval_ms);
   if (parameters.sample_strategy != null)
@@ -1577,9 +1565,7 @@ onBeforeUnmount(() => {
           mode === "image"
             ? "单帧"
             : mode === "document"
-              ? maxUnits == null
-                ? "全部页面"
-                : `${maxUnits} 页兼容上限`
+              ? "全部页面"
               : mode === "stream"
                 ? "自动连续分段"
                 : "处理至视频结束"
@@ -1826,14 +1812,6 @@ onBeforeUnmount(() => {
           </template>
 
           <div v-if="mode === 'document'" class="parameter-grid">
-            <label
-              ><span>兼容页数上限（可选）</span
-              ><input
-                v-model.number="maxUnits"
-                type="number"
-                min="1"
-                max="1000"
-            /></label>
             <label
               ><span>渲染倍率</span
               ><input

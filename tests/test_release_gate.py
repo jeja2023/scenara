@@ -25,19 +25,39 @@ def valid_metadata(evidence_type: str) -> dict[str, object]:
     values: dict[str, dict[str, object]] = {
         "portrait_evaluation": {
             "dataset_version": "portrait-1.0.0",
+            "dataset_manifest_sha256": "1" * 64,
             "rights_cleared": True,
             "metrics": {"map": 0.9},
-            "thresholds_approved_before_run": True,
+            "thresholds": {"map_min": 0.8},
+            "tolerances": {"map": 0.01},
+            "thresholds_sha256": "0" * 64,
+            "thresholds_fixed_at": "2026-07-29T01:00:00Z",
+            "thresholds_fixed_before_run": True,
             "independent_runs": 2,
             "within_tolerance": True,
+            "command": "python evaluate_portrait.py --dataset portrait-1.0.0",
+            "runs": [
+                {"run_id": "portrait-a", "executed_at": "2026-07-30T00:00:00Z", "exit_code": 0, "output_sha256": "2" * 64, "metrics": {"map": 0.9}},
+                {"run_id": "portrait-b", "executed_at": "2026-07-30T00:30:00Z", "exit_code": 0, "output_sha256": "3" * 64, "metrics": {"map": 0.9}},
+            ],
         },
         "ocr_evaluation": {
             "dataset_version": "ocr-1.0.0",
+            "dataset_manifest_sha256": "4" * 64,
             "rights_cleared": True,
             "metrics": {"cer": 0.01},
-            "thresholds_approved_before_run": True,
+            "thresholds": {"cer_max": 0.02},
+            "tolerances": {"cer": 0.001},
+            "thresholds_sha256": "0" * 64,
+            "thresholds_fixed_at": "2026-07-29T01:00:00Z",
+            "thresholds_fixed_before_run": True,
             "independent_runs": 2,
             "within_tolerance": True,
+            "command": "python evaluate_ocr.py --dataset ocr-1.0.0",
+            "runs": [
+                {"run_id": "ocr-a", "executed_at": "2026-07-30T00:00:00Z", "exit_code": 0, "output_sha256": "5" * 64, "metrics": {"cer": 0.01}},
+                {"run_id": "ocr-b", "executed_at": "2026-07-30T00:30:00Z", "exit_code": 0, "output_sha256": "6" * 64, "metrics": {"cer": 0.01}},
+            ],
         },
         "gpu_capacity": {
             "gpu_memory_mib": 24576,
@@ -48,6 +68,19 @@ def valid_metadata(evidence_type: str) -> dict[str, object]:
             "throughput_per_second": 5,
             "error_rate": 0,
             "peak_vram_mib": 22000,
+            "gpu_name": "NVIDIA RTX qualification GPU",
+            "driver_version": "575.57",
+            "command": "python capacity.py --duration 3600",
+            "duration_seconds": 3600,
+            "raw_result_sha256": "7" * 64,
+            "scenario_results": {
+                name: {
+                    "status": "passed",
+                    "exit_code": 0,
+                    "output_sha256": "f" * 64,
+                }
+                for name in ["sustained_load", "burst", "vram_pressure", "backpressure", "recovery"]
+            },
         },
         "integration_services": {
             "services": ["postgres_pgvector", "redis", "minio"],
@@ -65,17 +98,61 @@ def valid_metadata(evidence_type: str) -> dict[str, object]:
                 "ssrf",
             ]
         },
-        "model_rights": {"all_rights_cleared": True, "models": ["portrait-1.0.0"]},
-        "software_license_approval": {
+        "model_rights": {
+            "all_rights_cleared": True,
+            "models": [
+                {
+                    "model_id": "scenara.portrait.detector",
+                    "model_version": "1.0.0",
+                    "artifact_sha256": "e" * 64,
+                    "license_identifier": "LicenseRef-Test-Model",
+                    "license_source_uri": "https://spdx.org/licenses/Apache-2.0.html",
+                    "source_uri": "internal://models/portrait-detector-1.0.0",
+                    "rights_record_sha256": "8" * 64,
+                    "intended_use_allowed": True,
+                    "redistribution_allowed": True,
+                    "rights_cleared": True,
+                    "source_identity_verified": True,
+                }
+            ],
+        },
+        "software_license": {
             "license_sha256": "set-by-fixture",
-            "reviewed_by_legal": True,
-            "approval_reference": "LEGAL-2026-001",
+            "license_identifier": "LicenseRef-Scenara-Proprietary-Source-1.0",
+            "review_basis": "personal_project_self_review",
+            "review_scope": [
+                "compliance",
+                "copyright_and_ownership",
+                "grant_and_restrictions",
+                "termination",
+                "third_party_materials",
+                "warranty_and_liability",
+            ],
         },
         "offline_install": {
             "blank_host": True,
             "isolated_network": True,
             "checksums_verified": True,
             "checks": ["health", "console", "example_clients", "core_parse"],
+            "host_os": "ubuntu",
+            "host_version": "24.04",
+            "gpu_memory_mib": 24576,
+            "bundle_sha256": "9" * 64,
+            "installer_output_sha256": "a" * 64,
+            "installer_exit_code": 0,
+            "source_commit": "b" * 40,
+            "services": {
+                name: "running"
+                for name in ["api", "batch-worker", "stream-worker", "scheduler", "postgres", "redis", "minio"]
+            },
+            "check_results": {
+                name: {
+                    "status": "passed",
+                    "exit_code": 0,
+                    "output_sha256": "d" * 64,
+                }
+                for name in ["health", "console", "example_clients", "core_parse"]
+            },
         },
         "backup_restore": {
             "rpo_hours": 24,
@@ -114,15 +191,13 @@ def write_valid_manifest(root: Path) -> tuple[Path, dict[str, object]]:
     for evidence_type in sorted(REQUIRED_EVIDENCE_TYPES):
         report = reports / f"{evidence_type}.json"
         metadata = valid_metadata(evidence_type)
-        if evidence_type == "software_license_approval":
+        if evidence_type == "software_license":
             metadata["license_sha256"] = hashlib.sha256(license_path.read_bytes()).hexdigest()
         entry: dict[str, object] = {
             "evidence_type": evidence_type,
             "report": report.relative_to(root).as_posix(),
             "status": "passed",
             "executed_at": "2026-07-30T01:00:00Z",
-            "approved_at": "2026-07-30T02:00:00Z",
-            "signed_by": "测试负责人（仅单元测试）",
             "target": "qualification-target",
             "release_identity": release_identity,
             "metadata": metadata,
@@ -134,7 +209,7 @@ def write_valid_manifest(root: Path) -> tuple[Path, dict[str, object]]:
         entry["sha256"] = hashlib.sha256(report.read_bytes()).hexdigest()
         entries.append(entry)
     manifest: dict[str, object] = {
-        "schema_version": "1.1",
+        "schema_version": "1.2",
         "release": "1.0.0",
         "release_identity": release_identity,
         "entries": entries,
@@ -174,18 +249,49 @@ def test_strict_release_rejects_placeholder_software_license(tmp_path: Path) -> 
     ]
 
 
-def test_release_evidence_gate_rejects_duplicate_and_placeholder_signatures(tmp_path: Path) -> None:
+def test_release_evidence_gate_rejects_duplicate_and_placeholder_targets(tmp_path: Path) -> None:
     manifest_path, manifest = write_valid_manifest(tmp_path)
     entries = manifest["entries"]
     assert isinstance(entries, list)
     first = entries[0]
     assert isinstance(first, dict)
-    first["signed_by"] = "<name and role>"
+    first["target"] = "<target>"
     entries.append(dict(first))
     manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
     errors = evidence_errors(manifest_path, root=tmp_path)
-    assert any("signed_by must be a non-placeholder value" in error for error in errors)
+    assert any("target must be a non-placeholder value" in error for error in errors)
     assert any("duplicate release evidence type" in error for error in errors)
+
+
+def test_release_evidence_manifest_can_track_pending_personal_project_work(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "docs/release/evidence/manifest.json"
+    manifest_path.parent.mkdir(parents=True)
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1.2",
+                "release": "0.3.0-dev.20",
+                "release_identity": {
+                    "source_commit": None,
+                    "image_digest": None,
+                    "offline_bundle_sha256": None,
+                    "openapi_sha256": None,
+                    "model_set_sha256": None,
+                },
+                "entries": [
+                    {"evidence_type": evidence_type, "status": "pending"}
+                    for evidence_type in sorted(REQUIRED_EVIDENCE_TYPES)
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    errors = evidence_errors(manifest_path, root=tmp_path)
+
+    assert errors == [
+        "pending release evidence: " + ", ".join(sorted(REQUIRED_EVIDENCE_TYPES))
+    ]
 
 
 def test_release_evidence_gate_rejects_malformed_metadata_collections(tmp_path: Path) -> None:
@@ -203,3 +309,17 @@ def test_release_evidence_gate_rejects_malformed_metadata_collections(tmp_path: 
 
     assert "gpu_capacity: metadata.scenarios must be a list of non-empty strings" in errors
     assert "gpu_capacity: all capacity and recovery scenarios are required" in errors
+
+
+def test_release_evidence_gate_requires_objective_model_rights_records(tmp_path: Path) -> None:
+    manifest_path, manifest = write_valid_manifest(tmp_path)
+    entries = manifest["entries"]
+    assert isinstance(entries, list)
+    model_rights = next(entry for entry in entries if entry["evidence_type"] == "model_rights")
+    assert isinstance(model_rights, dict)
+    model_rights["metadata"] = {"all_rights_cleared": True, "models": ["portrait-1.0.0"]}
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    errors = evidence_errors(manifest_path, root=tmp_path)
+
+    assert "model_rights: metadata.models[0] must be an object" in errors

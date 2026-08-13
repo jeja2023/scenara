@@ -401,7 +401,7 @@ export interface ProductEntitlement {
   project_id: string;
   product_id: string;
   status: "active" | "suspended";
-  source: "manual" | "enterprise_license" | "system";
+  source: "manual" | "system";
   created_at: number;
   updated_at: number;
 }

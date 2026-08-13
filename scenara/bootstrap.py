@@ -50,7 +50,7 @@ from scenara.platform.model_runtime import ModelRegistry
 from scenara.platform.objects import ObjectStore
 from scenara.platform.pipeline import PipelineRegistry
 from scenara.platform.plugins import DomainPluginRegistry
-from scenara.platform.policy import DenyUnavailablePolicyProvider, DevelopmentPolicyProvider, PolicyProvider
+from scenara.platform.policy import DevelopmentPolicyProvider, LocalPolicyProvider, PolicyProvider
 from scenara.platform.queue import RunQueue
 from scenara.platform.search import SearchService
 from scenara.platform.secrets import EncryptedObjectSecretStore, MemorySecretStore, SecretStore
@@ -191,7 +191,10 @@ def build_runtime(
         policy: PolicyProvider = enterprise_policy
         enterprise = EnterpriseService(enterprise_policy, enterprise_repository, audit)
     elif settings.enterprise_policy_required:
-        policy = DenyUnavailablePolicyProvider()
+        # Kept as a compatibility flag; self-hosted production uses local scoped policy.
+        policy = LocalPolicyProvider()
+    elif settings.production:
+        policy = LocalPolicyProvider()
     else:
         policy = DevelopmentPolicyProvider()
 

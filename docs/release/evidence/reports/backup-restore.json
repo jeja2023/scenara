@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "evidence_type": "backup_restore",
+  "status": "passed",
+  "executed_at": "2026-08-13T14:16:30.8130631+08:00",
+  "target": "scenara-qualification PostgreSQL and MinIO Docker Linux/amd64 services on Windows 10.0.22631",
+  "release_identity": {
+    "source_commit": null,
+    "image_digest": null,
+    "offline_bundle_sha256": null,
+    "openapi_sha256": "bfa48af550fc86e610501feeb74f7ea8c7151047be3b0ee5cc1fa8bde30a7f62",
+    "model_set_sha256": null
+  },
+  "metadata": {
+    "rpo_hours": 0.001102,
+    "rto_hours": 0.001488,
+    "rpo_seconds": 3.967,
+    "rto_seconds": 5.358,
+    "entities_verified": [
+      "tenants",
+      "projects",
+      "media",
+      "runs",
+      "results",
+      "pipelines",
+      "models",
+      "audit",
+      "biometrics"
+    ],
+    "entity_counts": "1|1|1|1|1|1|1|1|1",
+    "postgres_dump_sha256": "b38f5eb2b5c47e3e03f88a129685fa74c0673a967b7d4c2de1d17214046c94df",
+    "postgres_marker_verified": true,
+    "minio_marker_verified": true,
+    "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/local_backup_restore_drill.ps1 -PostgresContainer scenara-qualification-postgres-1 -DockerNetwork scenara-qualification_default"
+  }
+}

@@ -677,7 +677,7 @@ class SystemStatus(StrictModel):
     queue_backend: str
     production_models_required: bool
     auth_required: bool
-    enterprise_policy_provider: str = "not_configured"
+    policy_provider: str = "not_configured"
 
 
 type ProductId = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.-]{1,63}$")]
@@ -915,7 +915,7 @@ class ProductEntitlement(StrictModel):
     project_id: AccessId
     product_id: ProductId
     status: EntitlementStatus = EntitlementStatus.ACTIVE
-    source: Literal["manual", "enterprise_license", "system"] = "manual"
+    source: Literal["manual", "system"] = "manual"
     created_at: float
     updated_at: float
 
@@ -979,12 +979,12 @@ class CreateProductEntitlementRequest(StrictModel):
     project_id: AccessId | None = None
     product_id: ProductId
     status: EntitlementStatus = EntitlementStatus.ACTIVE
-    source: Literal["manual", "enterprise_license", "system"] = "manual"
+    source: Literal["manual", "system"] = "manual"
 
 
 class UpdateProductEntitlementRequest(StrictModel):
     status: EntitlementStatus
-    source: Literal["manual", "enterprise_license", "system"] = "manual"
+    source: Literal["manual", "system"] = "manual"
 
 
 class IamInventory(StrictModel):

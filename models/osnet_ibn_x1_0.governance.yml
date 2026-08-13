@@ -55,6 +55,17 @@ privacy:
 
 release:
   rollback_target: portrait_hub/osnet_ibn_x1_0.onnx
-  approvers:
-    - ml-owner
-    - sre-owner
+  evidence_status: pending_model_rights_and_evaluation
+  rights_record_required:
+    - artifact_sha256
+    - license_identifier
+    - source_uri
+    - rights_cleared
+  rights_review:
+    status: pending
+    observed_code_license_identifier: MIT
+    observed_evidence:
+      - https://github.com/KaiyangZhou/deep-person-reid/blob/master/LICENSE
+    blockers:
+      - the ONNX file contains no source or license metadata
+      - the exact weights and export procedure are not linked to the upstream repository

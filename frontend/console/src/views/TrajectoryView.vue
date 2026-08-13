@@ -1,14 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, type Ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
-import {
-  Check,
-  GitMerge,
-  Route,
-  Scissors,
-  Trash2,
-  X,
-} from "@lucide/vue";
+import { Check, GitMerge, Route, Scissors, Trash2, X } from "@lucide/vue";
 import { api, userFacingError } from "../api";
 import type {
   CameraRecord,

@@ -262,24 +262,14 @@ const routes = [
       section: "平台治理与系统",
     },
   },
-  {
-    path: "/enterprise",
-    name: "enterprise",
-    component: () => import("./views/EnterpriseWorkspaceView.vue"),
-    meta: {
-      title: "企业专区",
-      description: "企业 SLA 监控、支持工单与合规证据存档。",
-      icon: ShieldCheck,
-      section: "平台治理与系统",
-    },
-  },
+  { path: "/enterprise", redirect: "/operations" },
   {
     path: "/governance",
     name: "governance",
     component: () => import("./views/GovernanceView.vue"),
     meta: {
-      title: "平台治理",
-      description: "平台配额方案、全局用量计量与高层治理概览。",
+      title: "资源与安全",
+      description: "项目生命周期、审计保留与外部适配器健康。",
       icon: ShieldCheck,
       section: "平台治理与系统",
     },

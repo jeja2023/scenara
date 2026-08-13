@@ -137,15 +137,13 @@ function triggerRefresh(): void {
 }
 
 const pageTitle = computed(() => {
-  const currentDomain = (
-    route.params.domain ||
+  const currentDomain = (route.params.domain ||
     route.query.domain ||
     (route.name === "portrait-parse"
       ? "portrait"
       : route.name === "ocr-parse"
         ? "ocr"
-        : "")
-  ) as string;
+        : "")) as string;
 
   if (route.path.startsWith("/parse") && currentDomain) {
     if (currentDomain === "portrait") return "人像解析";
@@ -163,15 +161,13 @@ const pageTitle = computed(() => {
 });
 
 const pageDescription = computed(() => {
-  const currentDomain = (
-    route.params.domain ||
+  const currentDomain = (route.params.domain ||
     route.query.domain ||
     (route.name === "portrait-parse"
       ? "portrait"
       : route.name === "ocr-parse"
         ? "ocr"
-        : "")
-  ) as string;
+        : "")) as string;
 
   if (route.path.startsWith("/parse") && currentDomain) {
     if (currentDomain === "portrait")

@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "3671ccf6d9ed450da357e6b05070891b51cc5530f3ccdc0ab4e721a09bdebbc2" /** gitleaks:allow - public contract digest */;
+export declare const OPENAPI_SHA256 = "4885898606a3bc9b2546a58198ad45ee09e7765e4a830a7de2fdb42c673d1cc5" /** gitleaks:allow - public contract digest */;
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
@@ -178,18 +178,8 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
-    type ApiEnvelope_BillingAccount_ = {
-        data: BillingAccount;
-        request_id: string;
-        schema_version?: "1.0";
-    };
     type ApiEnvelope_CameraRecord_ = {
         data: CameraRecord;
-        request_id: string;
-        schema_version?: "1.0";
-    };
-    type ApiEnvelope_ComplianceEvidence_ = {
-        data: ComplianceEvidence;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -238,11 +228,6 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
-    type ApiEnvelope_EnterpriseStatus_ = {
-        data: EnterpriseStatus;
-        request_id: string;
-        schema_version?: "1.0";
-    };
     type ApiEnvelope_FeedbackRecord_ = {
         data: FeedbackRecord;
         request_id: string;
@@ -280,11 +265,6 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_IdentityProvider_ = {
         data: IdentityProvider;
-        request_id: string;
-        schema_version?: "1.0";
-    };
-    type ApiEnvelope_Incident_ = {
-        data: Incident;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -335,11 +315,6 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_Membership_ = {
         data: Membership;
-        request_id: string;
-        schema_version?: "1.0";
-    };
-    type ApiEnvelope_MeterEvent_ = {
-        data: MeterEvent;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -533,11 +508,6 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
-    type ApiEnvelope_SeatAssignment_ = {
-        data: SeatAssignment;
-        request_id: string;
-        schema_version?: "1.0";
-    };
     type ApiEnvelope_SegmentPage_ = {
         data: SegmentPage;
         request_id: string;
@@ -553,18 +523,8 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
-    type ApiEnvelope_SlaSnapshot_ = {
-        data: SlaSnapshot;
-        request_id: string;
-        schema_version?: "1.0";
-    };
     type ApiEnvelope_StreamSessionView_ = {
         data: StreamSessionView;
-        request_id: string;
-        schema_version?: "1.0";
-    };
-    type ApiEnvelope_SupportCase_ = {
-        data: SupportCase;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -637,16 +597,6 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
-    type ApiEnvelope_list_BillingAccount__ = {
-        data: Array<BillingAccount>;
-        request_id: string;
-        schema_version?: "1.0";
-    };
-    type ApiEnvelope_list_BillingUsage__ = {
-        data: Array<BillingUsage>;
-        request_id: string;
-        schema_version?: "1.0";
-    };
     type ApiEnvelope_list_CameraRecord__ = {
         data: Array<CameraRecord>;
         request_id: string;
@@ -654,11 +604,6 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_list_CameraTransition__ = {
         data: Array<CameraTransition>;
-        request_id: string;
-        schema_version?: "1.0";
-    };
-    type ApiEnvelope_list_ComplianceEvidence__ = {
-        data: Array<ComplianceEvidence>;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -694,11 +639,6 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_list_IdentityProvider__ = {
         data: Array<IdentityProvider>;
-        request_id: string;
-        schema_version?: "1.0";
-    };
-    type ApiEnvelope_list_Incident__ = {
-        data: Array<Incident>;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -797,18 +737,8 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
-    type ApiEnvelope_list_SeatAssignment__ = {
-        data: Array<SeatAssignment>;
-        request_id: string;
-        schema_version?: "1.0";
-    };
     type ApiEnvelope_list_ServiceAccount__ = {
         data: Array<ServiceAccount>;
-        request_id: string;
-        schema_version?: "1.0";
-    };
-    type ApiEnvelope_list_SupportCase__ = {
-        data: Array<SupportCase>;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -862,10 +792,6 @@ export declare namespace OpenApi {
         approved: boolean;
         comment?: string;
     };
-    type AssignSeatRequest = {
-        account_id: string;
-        user_id: string;
-    };
     type AuditEventPage = {
         items: Array<AuditEventView>;
         limit: number;
@@ -898,30 +824,6 @@ export declare namespace OpenApi {
         updated_at: number;
         updated_by: string;
     };
-    type BillingAccount = {
-        created_at: number;
-        currency?: string;
-        period_ends_at: number;
-        period_started_at: number;
-        plan_id: string;
-        project_id: string;
-        record_id: string;
-        seat_limit?: number;
-        status?: string;
-        tenant_id: string;
-        updated_at: number;
-    };
-    type BillingUsage = {
-        account_id: string;
-        amount: number;
-        metric: string;
-        period_ends_at: number;
-        period_started_at: number;
-        project_id: string;
-        record_id: string;
-        tenant_id: string;
-        updated_at: number;
-    };
     type Body_compare_portrait_asset_image_api_v1_portrait_compare_asset_image_post = {
         asset_id: string;
         feature_space_id?: (string) | (null);
@@ -952,7 +854,6 @@ export declare namespace OpenApi {
     type Body_parse_document_api_v1_parse_document_post = {
         domain?: DomainId;
         file: string;
-        max_units?: (number) | (null);
         page_scale?: number;
         pipeline_id?: (string) | (null);
         pipeline_version?: (string) | (null);
@@ -1024,19 +925,6 @@ export declare namespace OpenApi {
         min_seconds?: number;
         to_camera_id: string;
     };
-    type ComplianceEvidence = {
-        created_at: number;
-        evidence_id: string;
-        evidence_type: string;
-        metadata?: {
-            [key: string]: unknown;
-        };
-        object_ref: string;
-        project_id: string;
-        sha256: string;
-        signed_by: string;
-        tenant_id: string;
-    };
     type CreateAgentEvaluationRequest = {
         policy_violation_count?: number;
         sample_count: number;
@@ -1072,21 +960,6 @@ export declare namespace OpenApi {
     type CreateApiKeyResponse = {
         api_key: string;
         record: ApiKeyRecord;
-    };
-    type CreateBillingAccountRequest = {
-        currency?: string;
-        period_seconds?: number;
-        plan_id: string;
-        seat_limit?: number;
-    };
-    type CreateComplianceEvidenceRequest = {
-        evidence_type: string;
-        metadata?: {
-            [key: string]: unknown;
-        };
-        object_ref: string;
-        sha256: string;
-        signed_by: string;
     };
     type CreateDatasetRequest = {
         description?: string;
@@ -1152,12 +1025,6 @@ export declare namespace OpenApi {
             [key: string]: unknown;
         };
     };
-    type CreateIncidentRequest = {
-        severity: "sev1" | "sev2" | "sev3" | "sev4";
-        started_at?: (number) | (null);
-        summary?: string;
-        title: string;
-    };
     type CreateIndexBackendRequest = {
         capabilities?: Array<string>;
         endpoint: string;
@@ -1216,7 +1083,7 @@ export declare namespace OpenApi {
     type CreateProductEntitlementRequest = {
         product_id: ProductId;
         project_id?: (AccessId) | (null);
-        source?: "manual" | "enterprise_license" | "system";
+        source?: "manual" | "system";
         status?: EntitlementStatus;
     };
     type CreateProjectLifecycleRequest = {
@@ -1291,11 +1158,6 @@ export declare namespace OpenApi {
     type CreateSessionRequest = {
         ttl_seconds?: number;
         user_id: string;
-    };
-    type CreateSupportCaseRequest = {
-        description: string;
-        priority?: "low" | "normal" | "high" | "urgent";
-        subject: string;
     };
     type CreateUserRequest = {
         display_name: string;
@@ -1439,25 +1301,6 @@ export declare namespace OpenApi {
         model_version: string;
         quality: number;
         threshold?: (number) | (null);
-    };
-    type EnterpriseStatus = {
-        customer: string;
-        document_sha256: string;
-        entitlements: Array<string>;
-        expires_at: number;
-        license_id: string;
-        limits: {
-            [key: string]: number;
-        };
-        provider_id: string;
-        sla_targets: {
-            [key: string]: number;
-        };
-        support_tier: string;
-        tenant_ids: Array<string>;
-        usage: {
-            [key: string]: number;
-        };
     };
     type EntitlementStatus = "active" | "suspended";
     type ExecuteFlowRequest = {
@@ -1616,19 +1459,6 @@ export declare namespace OpenApi {
         updated_at: number;
     };
     type IdentityProviderKind = "oidc" | "saml" | "scim";
-    type Incident = {
-        created_at: number;
-        incident_id: string;
-        project_id: string;
-        resolved_at?: (number) | (null);
-        severity: "sev1" | "sev2" | "sev3" | "sev4";
-        started_at: number;
-        status?: "open" | "mitigated" | "resolved";
-        summary?: string;
-        tenant_id: string;
-        title: string;
-        updated_at: number;
-    };
     type IndexBackend = {
         capabilities?: Array<string>;
         created_at: number;
@@ -1859,19 +1689,6 @@ export declare namespace OpenApi {
     type MergeIdentitiesRequest = {
         source_identity_ids: Array<string>;
         target_identity_id: string;
-    };
-    type MeterEvent = {
-        account_id: string;
-        amount: number;
-        created_at: number;
-        idempotency_key: string;
-        metadata?: {
-            [key: string]: unknown;
-        };
-        metric: string;
-        project_id: string;
-        record_id: string;
-        tenant_id: string;
     };
     type ModelDeploymentEvent = {
         action: string;
@@ -2206,7 +2023,7 @@ export declare namespace OpenApi {
         created_at: number;
         product_id: ProductId;
         project_id: AccessId;
-        source?: "manual" | "enterprise_license" | "system";
+        source?: "manual" | "system";
         status?: EntitlementStatus;
         tenant_id: AccessId;
         updated_at: number;
@@ -2292,15 +2109,6 @@ export declare namespace OpenApi {
         window_ends_at: number;
         window_started_at: number;
     };
-    type RecordMeterEventRequest = {
-        account_id: string;
-        amount: number;
-        idempotency_key: string;
-        metadata?: {
-            [key: string]: unknown;
-        };
-        metric: string;
-    };
     type RegisterAgentToolRequest = {
         description: string;
         name: string;
@@ -2383,9 +2191,6 @@ export declare namespace OpenApi {
         primary_product_ids?: Array<ProductId>;
         repository_id: RepositoryId;
         responsibilities?: Array<RepositoryResponsibilityId>;
-    };
-    type ResolveIncidentRequest = {
-        summary?: string;
     };
     type ResourceLifecycleRecord = {
         created_at: number;
@@ -2642,17 +2447,6 @@ export declare namespace OpenApi {
         profile_id?: (string) | (null);
         query: string;
     };
-    type SeatAssignment = {
-        account_id: string;
-        assigned_by: string;
-        created_at: number;
-        project_id: string;
-        record_id: string;
-        revoked_at?: (number) | (null);
-        status?: string;
-        tenant_id: string;
-        user_id: string;
-    };
     type SegmentPage = {
         items: Array<TrajectorySegment>;
         limit: number;
@@ -2682,16 +2476,6 @@ export declare namespace OpenApi {
     type SetCameraTransitionsRequest = {
         transitions?: Array<CameraTransitionEntry>;
     };
-    type SlaSnapshot = {
-        breaches: Array<string>;
-        measured_at: number;
-        measurements: {
-            [key: string]: number;
-        };
-        targets: {
-            [key: string]: number;
-        };
-    };
     type SourceKind = "stream";
     type SplitIdentityRequest = {
         display_name?: string;
@@ -2708,22 +2492,10 @@ export declare namespace OpenApi {
         status: "active" | "completed" | "failed" | "cancelled";
         updated_at: number;
     };
-    type SupportCase = {
-        case_id: string;
-        created_at: number;
-        created_by: string;
-        description: string;
-        priority: "low" | "normal" | "high" | "urgent";
-        project_id: string;
-        status?: "open" | "waiting" | "closed";
-        subject: string;
-        tenant_id: string;
-        updated_at: number;
-    };
     type SystemStatus = {
         auth_required: boolean;
-        enterprise_policy_provider?: string;
         object_backend: string;
+        policy_provider?: string;
         production_models_required: boolean;
         profile: string;
         queue_backend: string;
@@ -2801,7 +2573,7 @@ export declare namespace OpenApi {
         status?: ("auto" | "confirmed" | "rejected") | (null);
     };
     type UpdateProductEntitlementRequest = {
-        source?: "manual" | "enterprise_license" | "system";
+        source?: "manual" | "system";
         status: EntitlementStatus;
     };
     type UpdateSavedSearchRequest = {

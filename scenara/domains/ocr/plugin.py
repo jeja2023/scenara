@@ -56,7 +56,6 @@ class OcrPlugin:
                 output="ocr.result",
                 allowed_parameters={
                     "layout_required",
-                    "max_units",
                     "sample_interval_ms",
                     "max_reconnect_attempts",
                     "connect_timeout_ms",

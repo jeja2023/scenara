@@ -68,11 +68,7 @@ useRefresh(refresh);
 <template>
   <section class="page capabilities-page">
     <div class="page-header">
-      <div
-        v-if="!loading"
-        class="capability-summary"
-        aria-label="领域能力概况"
-      >
+      <div v-if="!loading" class="capability-summary" aria-label="领域能力概况">
         <span
           >已安装领域 <strong>{{ orderedDomains.length }}</strong> 个</span
         >

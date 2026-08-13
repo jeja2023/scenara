@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "evidence_type": "integration_services",
+  "status": "passed",
+  "executed_at": "2026-08-13T14:16:30.8130631+08:00",
+  "target": "scenara-qualification Docker Linux/amd64 services on Windows 10.0.22631; Docker Server 29.6.2",
+  "release_identity": {
+    "source_commit": null,
+    "image_digest": null,
+    "offline_bundle_sha256": null,
+    "openapi_sha256": "bfa48af550fc86e610501feeb74f7ea8c7151047be3b0ee5cc1fa8bde30a7f62",
+    "model_set_sha256": null
+  },
+  "metadata": {
+    "services": [
+      "postgres_pgvector",
+      "redis",
+      "minio"
+    ],
+    "command": "SCENARA_RUN_INTEGRATION=1 SCENARA_INTEGRATION_POSTGRES_DSN=postgresql://scenara:<redacted>@127.0.0.1:56432/scenara SCENARA_INTEGRATION_REDIS_URL=redis://127.0.0.1:57379/15 SCENARA_INTEGRATION_S3_ENDPOINT=http://127.0.0.1:60000 python -m pytest -q -m integration tests/integration -rs",
+    "passed_tests": 9,
+    "skipped_tests": 0,
+    "duplicate_logical_results": 0,
+    "redis_pending_recovery_verified": true,
+    "redis_rebuild_verified": true,
+    "service_images": [
+      "pgvector/pgvector@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb",
+      "redis@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2",
+      "minio/minio@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0"
+    ]
+  }
+}

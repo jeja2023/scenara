@@ -27,4 +27,4 @@ with ScenaraClient("https://scenara.example", token="...") as client:
     )
 ```
 
-视频处理到 EOF 或显式 `sample_end_ms`，实时流按 `stream_segment_duration_ms` 时间窗口持续分段；这两类快捷接口不提供 `max_units`，旧版通用 Run 请求中的同名字段会被服务端忽略。PDF 文档仍可通过 `max_units` 设置页数上限。省略 `pipeline_version` 时由服务端选择唯一的 active 版本；需要固定复现某次运行时应显式传入版本。
+视频处理到 EOF 或显式 `sample_end_ms`，实时流按 `stream_segment_duration_ms` 时间窗口持续分段，PDF 文档处理全部页面。解析入口不提供单元数、帧数或页数上限；旧版通用 Run 请求中的 `max_units` 会被服务端忽略。省略 `pipeline_version` 时由服务端选择唯一的 active 版本；需要固定复现某次运行时应显式传入版本。

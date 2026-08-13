@@ -48,6 +48,9 @@ class LocalObjectStore:
         await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
         await asyncio.to_thread(shutil.copyfile, self._path(object_key), path)
 
+    async def exists(self, object_key: str) -> bool:
+        return await asyncio.to_thread(self._path(object_key).is_file)
+
     async def delete(self, object_key: str) -> bool:
         path = self._path(object_key)
         if not path.exists():
@@ -117,6 +120,17 @@ class S3ObjectStore:
         validate_object_key(object_key)
         await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
         await asyncio.to_thread(self.client.download_file, self.bucket, object_key, str(path))
+
+    async def exists(self, object_key: str) -> bool:
+        validate_object_key(object_key)
+        try:
+            await asyncio.to_thread(self.client.head_object, Bucket=self.bucket, Key=object_key)
+        except self.client.exceptions.ClientError as exc:
+            code = str(exc.response.get("Error", {}).get("Code", ""))
+            if code in {"404", "NoSuchKey", "NotFound"}:
+                return False
+            raise
+        return True
 
     async def delete(self, object_key: str) -> bool:
         validate_object_key(object_key)

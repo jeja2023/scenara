@@ -31,6 +31,7 @@ from scenara.platform.models import (
     WebhookSubscription,
 )
 from scenara.platform.pipeline import PipelineDefinition, PipelineNode
+from scenara.queue_recovery import rebuild_redis_run_queue
 from scenara.platform.store import StateConflict
 
 pytestmark = pytest.mark.integration
@@ -454,6 +455,70 @@ async def test_redis_delivery_and_pending_recovery() -> None:
     second_consumer.cancel()
     await asyncio.gather(second_consumer, return_exceptions=True)
     assert received == [("integration", "qualification", f"run_{suffix}")]
+
+
+async def test_empty_redis_run_streams_rebuild_from_postgres_and_minio(
+    postgres: PostgresStateStore,
+) -> None:
+    suffix = uuid4().hex
+    tenant_id = f"queue_rebuild_{suffix}"
+    stream = f"scenara:integration:rebuild:{suffix}"
+    asset_data = b"persisted-media"
+    asset = MediaAsset(
+        asset_id=f"ast_{suffix}",
+        tenant_id=tenant_id,
+        project_id="qualification",
+        kind=MediaKind.IMAGE,
+        filename="rebuild.png",
+        content_type="image/png",
+        size_bytes=len(asset_data),
+        sha256=hashlib.sha256(asset_data).hexdigest(),
+        object_key=f"integration/{suffix}/rebuild.png",
+        created_at=time.time(),
+    )
+    run = _run(suffix, tenant_id=tenant_id).model_copy(update={"asset_id": asset.asset_id})
+    store = S3ObjectStore(
+        bucket="scenara",
+        endpoint_url=S3_ENDPOINT,
+        region="us-east-1",
+        access_key=S3_ACCESS_KEY,
+        secret_key=S3_SECRET_KEY,
+    )
+    queue = RedisRunQueue(REDIS_URL, stream=stream, group=f"workers-{suffix}")
+    await store.open()
+    try:
+        await postgres.create_asset(asset)
+        await postgres.create_run_idempotent(
+            run,
+            idempotency_key=f"rebuild-{suffix}",
+            request_hash="a" * 64,
+        )
+        await store.put(asset.object_key, asset_data, asset.content_type)
+
+        raw_redis = __import__("redis.asyncio", fromlist=["Redis"]).from_url(REDIS_URL)
+        await raw_redis.delete(f"{stream}:batch", f"{stream}:stream")
+        await raw_redis.aclose()
+        await queue.open()
+
+        summary = await rebuild_redis_run_queue(postgres, store, queue)
+
+        assert summary.recoverable_runs == 1
+        assert summary.enqueued_runs == 1
+        assert summary.assets_verified == 1
+        assert summary.sources_verified == 0
+        messages = await queue._client.xrange(f"{stream}:batch")
+        assert [fields["run_id"] for _, fields in messages] == [run.run_id]
+        with pytest.raises(RuntimeError, match="must be empty"):
+            await rebuild_redis_run_queue(postgres, store, queue)
+    finally:
+        if queue._client is not None:
+            await queue._client.delete(f"{stream}:batch", f"{stream}:stream")
+            await queue.close()
+        with suppress(Exception):
+            await store.delete(asset.object_key)
+        await store.close()
+        await postgres.delete_run(tenant_id, "qualification", run.run_id)
+        await postgres.delete_asset(tenant_id, "qualification", asset.asset_id)
 
 
 async def test_minio_object_round_trip_and_delete() -> None:

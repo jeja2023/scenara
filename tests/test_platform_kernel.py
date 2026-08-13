@@ -303,7 +303,7 @@ async def test_document_shortcut_has_a_document_specific_contract(kernel_client)
     response = await api.post(
         "/api/v1/parse/document",
         files={"file": ("pages.pdf", multipage_pdf(), "application/pdf")},
-        data={"domain": "ocr", "max_units": "2", "page_scale": "1.0", "wait_ms": "2000"},
+        data={"domain": "ocr", "max_units": "1", "page_scale": "1.0", "wait_ms": "2000"},
         headers={"Idempotency-Key": "document-shortcut"},
     )
     assert response.status_code == 202, response.text
@@ -311,7 +311,25 @@ async def test_document_shortcut_has_a_document_specific_contract(kernel_client)
     assert payload["asset"]["kind"] == "document"
     assert payload["run"]["pipeline"] == {"pipeline_id": "ocr.document", "version": "0.1.0"}
     assert payload["run"]["status"] == "completed"
-    assert [unit["unit_type"] for unit in payload["result"]["units"]] == ["page", "page"]
+    assert "max_units" not in payload["run"]["parameters"]
+    assert [unit["unit_type"] for unit in payload["result"]["units"]] == ["page", "page", "page"]
+
+    legacy = await api.post(
+        "/api/v1/runs",
+        json={
+            "domain": "ocr",
+            "pipeline": {"pipeline_id": "ocr.document", "version": "0.1.0"},
+            "asset_id": payload["asset"]["asset_id"],
+            "parameters": {"max_units": 1, "page_scale": 1.0},
+            "wait_ms": 2000,
+        },
+        headers={"Idempotency-Key": "document-legacy-max-units"},
+    )
+    assert legacy.status_code == 202, legacy.text
+    legacy_run = legacy.json()["data"]
+    assert "max_units" not in legacy_run["parameters"]
+    legacy_result = (await api.get(f"/api/v1/runs/{legacy_run['run_id']}/result")).json()["data"]["result"]
+    assert [unit["unit_type"] for unit in legacy_result["units"]] == ["page", "page", "page"]
 
 
 @pytest.mark.asyncio

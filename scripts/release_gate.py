@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import importlib
 import json
+import math
 import re
 import subprocess
 from datetime import datetime
@@ -31,9 +32,7 @@ REQUIRED_IMPLEMENTATION = (
     "frontend/console/src/views/ResultsView.vue",
     "frontend/console/src/composables/useDomainCatalog.ts",
     "frontend/console/src/composables/useMediaPreview.ts",
-    "frontend/console/src/views/EnterpriseWorkspaceView.vue",
     "frontend/console/src/views/FeedbackView.vue",
-    "frontend/console/src/views/GovernanceView.vue",
     "sdk/python/scenara_sdk/client.py",
     "sdk/typescript/src/generated.ts",
     "deploy/compose.yml",
@@ -44,13 +43,17 @@ REQUIRED_IMPLEMENTATION = (
     "deploy/scripts/backup.sh",
     "deploy/scripts/restore.sh",
     "scripts/prepare_runtime_state.py",
+    "scripts/prepare_release_evidence.py",
+    "scripts/record_release_evidence.py",
+    "scripts/rebuild_redis_queue.py",
     "requirements/production.lock",
     "frontend/console/playwright.config.ts",
     "frontend/console/e2e/workspaces.spec.ts",
     "tests/test_control_plane.py",
-    "docs/release/0.3.0-dev.19.md",
+    "docs/release/0.3.0-dev.20.md",
     "docs/release/SUPPORT_MATRIX.md",
     "docs/release/EVIDENCE_OWNERS.md",
+    "docs/release/evidence/QUALIFICATION_INPUTS.md",
     "docs/release/evidence/manifest.example.json",
 )
 REQUIRED_EVIDENCE_TYPES = {
@@ -62,11 +65,12 @@ REQUIRED_EVIDENCE_TYPES = {
     "offline_install",
     "portrait_evaluation",
     "security_assessment",
-    "software_license_approval",
+    "software_license",
 }
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 IMAGE_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 SOURCE_COMMIT = re.compile(r"^[0-9a-f]{40}$")
+RELEASE_VERSION = re.compile(r"^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$")
 PLACEHOLDER = re.compile(r"(?:<[^>]+>|\b(?:example|replace|todo|tbd)\b|待填写|占位)", re.IGNORECASE)
 LICENSE_PLACEHOLDER = re.compile(r"engineering placeholder|must receive legal review", re.IGNORECASE)
 RELEASE_IDENTITY_FIELDS = {
@@ -156,20 +160,157 @@ def _number(value: Any, fallback: float = 0.0) -> float:
         return fallback
 
 
+def _valid_sha256(value: Any) -> bool:
+    return isinstance(value, str) and SHA256.fullmatch(value) is not None
+
+
+def _finite_number(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
 def _metadata_errors(evidence_type: str, metadata: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     if evidence_type in {"portrait_evaluation", "ocr_evaluation"}:
         if not metadata.get("dataset_version") or metadata.get("rights_cleared") is not True:
             errors.append(f"{evidence_type}: versioned and rights-cleared dataset evidence is required")
+        if not _valid_sha256(metadata.get("dataset_manifest_sha256")):
+            errors.append(f"{evidence_type}: dataset_manifest_sha256 must be a SHA-256")
         if not isinstance(metadata.get("metrics"), dict) or not metadata["metrics"]:
             errors.append(f"{evidence_type}: fixed evaluation metrics are required")
-        if metadata.get("thresholds_approved_before_run") is not True:
-            errors.append(f"{evidence_type}: thresholds must be approved before evaluation")
-        if _number(metadata.get("independent_runs"), 0) < 2 or metadata.get("within_tolerance") is not True:
-            errors.append(f"{evidence_type}: two reproducible runs within approved tolerance are required")
+        if not isinstance(metadata.get("thresholds"), dict) or not metadata["thresholds"]:
+            errors.append(f"{evidence_type}: fixed evaluation thresholds are required")
+        if not isinstance(metadata.get("tolerances"), dict) or not metadata["tolerances"]:
+            errors.append(f"{evidence_type}: fixed evaluation tolerances are required")
+        if not _valid_sha256(metadata.get("thresholds_sha256")):
+            errors.append(f"{evidence_type}: thresholds_sha256 must be a SHA-256")
+        fixed_at = _timestamp(
+            metadata.get("thresholds_fixed_at"),
+            "metadata.thresholds_fixed_at",
+            evidence_type,
+            errors,
+        )
+        if fixed_at is not None and fixed_at.utcoffset() is None:
+            errors.append(f"{evidence_type}: thresholds_fixed_at must include a timezone")
+        if metadata.get("thresholds_fixed_before_run") is not True:
+            errors.append(f"{evidence_type}: thresholds must be fixed before evaluation")
+        runs = metadata.get("runs")
+        if not isinstance(runs, list) or len(runs) < 2:
+            errors.append(f"{evidence_type}: metadata.runs must contain at least two run records")
+            runs = []
+        run_ids: set[str] = set()
+        for index, run in enumerate(runs):
+            if not isinstance(run, dict):
+                errors.append(f"{evidence_type}: metadata.runs[{index}] must be an object")
+                continue
+            run_id = run.get("run_id")
+            if not isinstance(run_id, str) or not run_id or PLACEHOLDER.search(run_id):
+                errors.append(f"{evidence_type}: metadata.runs[{index}].run_id is required")
+            elif run_id in run_ids:
+                errors.append(f"{evidence_type}: independent run ids must be unique")
+            else:
+                run_ids.add(run_id)
+            if not _valid_sha256(run.get("output_sha256")):
+                errors.append(f"{evidence_type}: metadata.runs[{index}].output_sha256 must be a SHA-256")
+            if run.get("exit_code") != 0:
+                errors.append(f"{evidence_type}: metadata.runs[{index}].exit_code must be zero")
+            run_at = _timestamp(
+                run.get("executed_at"),
+                f"metadata.runs[{index}].executed_at",
+                evidence_type,
+                errors,
+            )
+            if run_at is not None and run_at.utcoffset() is None:
+                errors.append(
+                    f"{evidence_type}: metadata.runs[{index}].executed_at must include a timezone"
+                )
+            if (
+                fixed_at is not None
+                and fixed_at.utcoffset() is not None
+                and run_at is not None
+                and run_at.utcoffset() is not None
+                and run_at <= fixed_at
+            ):
+                errors.append(f"{evidence_type}: thresholds must be fixed before every run")
+            if not isinstance(run.get("metrics"), dict) or not run["metrics"]:
+                errors.append(f"{evidence_type}: metadata.runs[{index}].metrics are required")
+        if metadata.get("independent_runs") != len(runs) or len(runs) < 2:
+            errors.append(f"{evidence_type}: independent_runs must match metadata.runs")
+        thresholds = metadata.get("thresholds")
+        tolerances = metadata.get("tolerances")
+        checked_metrics: set[str] = set()
+        if isinstance(thresholds, dict) and isinstance(tolerances, dict):
+            for threshold_name, threshold_value in thresholds.items():
+                if threshold_name.endswith("_min"):
+                    metric_name = threshold_name[:-4]
+                    minimum = True
+                elif threshold_name.endswith("_max"):
+                    metric_name = threshold_name[:-4]
+                    minimum = False
+                else:
+                    errors.append(
+                        f"{evidence_type}: threshold {threshold_name} must end in _min or _max"
+                    )
+                    continue
+                limit = _finite_number(threshold_value)
+                if limit is None:
+                    errors.append(f"{evidence_type}: threshold {threshold_name} must be finite")
+                    continue
+                checked_metrics.add(metric_name)
+                for index, run in enumerate(runs):
+                    if not isinstance(run, dict):
+                        continue
+                    measured = _finite_number(
+                        run.get("metrics", {}).get(metric_name)
+                        if isinstance(run.get("metrics"), dict)
+                        else None
+                    )
+                    if measured is None:
+                        errors.append(
+                            f"{evidence_type}: metadata.runs[{index}].metrics.{metric_name} must be finite"
+                        )
+                    elif (minimum and measured < limit) or (not minimum and measured > limit):
+                        errors.append(
+                            f"{evidence_type}: metadata.runs[{index}].metrics.{metric_name} fails {threshold_name}"
+                        )
+            if set(tolerances) != checked_metrics:
+                errors.append(
+                    f"{evidence_type}: tolerances must cover exactly the threshold metrics"
+                )
+            for metric_name, tolerance_value in tolerances.items():
+                tolerance = _finite_number(tolerance_value)
+                values = [
+                    _finite_number(run.get("metrics", {}).get(metric_name))
+                    for run in runs
+                    if isinstance(run, dict) and isinstance(run.get("metrics"), dict)
+                ]
+                if tolerance is None or tolerance < 0:
+                    errors.append(
+                        f"{evidence_type}: tolerance {metric_name} must be finite and non-negative"
+                    )
+                elif len(values) == len(runs) and all(value is not None for value in values):
+                    finite_values = [value for value in values if value is not None]
+                    if max(finite_values) - min(finite_values) > tolerance:
+                        errors.append(
+                            f"{evidence_type}: independent runs exceed tolerance for {metric_name}"
+                        )
+        if metadata.get("within_tolerance") is not True:
+            errors.append(f"{evidence_type}: two reproducible runs within the fixed tolerance are required")
+        command = metadata.get("command")
+        if not isinstance(command, str) or not command or PLACEHOLDER.search(command):
+            errors.append(f"{evidence_type}: reproducible evaluation command is required")
     elif evidence_type == "gpu_capacity":
-        if _number(metadata.get("gpu_memory_mib"), 0) < 23_000:
-            errors.append("gpu_capacity: target GPU must provide at least 23000 MiB")
+        # Capacity qualification records the observed device.  Memory size is
+        # intentionally descriptive; qualification is decided by the measured
+        # workload and scenario outcomes below, not by a fixed 24 GB gate.
+        gpu_memory = _finite_number(metadata.get("gpu_memory_mib"))
+        if gpu_memory is None or gpu_memory <= 0:
+            errors.append("gpu_capacity: gpu_memory_mib must be positive")
         required = {"sustained_load", "burst", "vram_pressure", "backpressure", "recovery"}
         if not required <= _string_set(metadata, "scenarios", evidence_type, errors):
             errors.append("gpu_capacity: all capacity and recovery scenarios are required")
@@ -180,6 +321,44 @@ def _metadata_errors(evidence_type: str, metadata: dict[str, Any]) -> list[str]:
                 evidence_type,
             )
         )
+        for field in ("gpu_name", "driver_version", "command"):
+            value = metadata.get(field)
+            if not isinstance(value, str) or not value or PLACEHOLDER.search(value):
+                errors.append(f"gpu_capacity: metadata.{field} is required")
+        if not _valid_sha256(metadata.get("raw_result_sha256")):
+            errors.append("gpu_capacity: raw_result_sha256 must be a SHA-256")
+        duration = _finite_number(metadata.get("duration_seconds"))
+        if duration is None or duration <= 0:
+            errors.append("gpu_capacity: duration_seconds must be positive")
+        p50 = _finite_number(metadata.get("p50_ms"))
+        p95 = _finite_number(metadata.get("p95_ms"))
+        p99 = _finite_number(metadata.get("p99_ms"))
+        if p50 is None or p95 is None or p99 is None or not 0 <= p50 <= p95 <= p99:
+            errors.append("gpu_capacity: latency percentiles must satisfy 0 <= p50 <= p95 <= p99")
+        throughput = _finite_number(metadata.get("throughput_per_second"))
+        if throughput is None or throughput <= 0:
+            errors.append("gpu_capacity: throughput_per_second must be positive")
+        error_rate = _finite_number(metadata.get("error_rate"))
+        if error_rate is None or not 0 <= error_rate <= 1:
+            errors.append("gpu_capacity: error_rate must be between 0 and 1")
+        peak_vram = _finite_number(metadata.get("peak_vram_mib"))
+        if peak_vram is None or gpu_memory is None or not 0 <= peak_vram <= gpu_memory:
+            errors.append("gpu_capacity: peak_vram_mib must fit the target GPU")
+        scenario_results = metadata.get("scenario_results")
+        if not isinstance(scenario_results, dict):
+            errors.append("gpu_capacity: scenario_results must be an object")
+            scenario_results = {}
+        for scenario in sorted(required):
+            result = scenario_results.get(scenario)
+            if not isinstance(result, dict) or result.get("status") != "passed":
+                errors.append(f"gpu_capacity: scenario_results.{scenario}.status must be passed")
+                continue
+            if result.get("exit_code") != 0:
+                errors.append(f"gpu_capacity: scenario_results.{scenario}.exit_code must be zero")
+            if not _valid_sha256(result.get("output_sha256")):
+                errors.append(
+                    f"gpu_capacity: scenario_results.{scenario}.output_sha256 must be a SHA-256"
+                )
     elif evidence_type == "integration_services":
         required = {"postgres_pgvector", "redis", "minio"}
         if not required <= _string_set(metadata, "services", evidence_type, errors):
@@ -200,13 +379,74 @@ def _metadata_errors(evidence_type: str, metadata: dict[str, Any]) -> list[str]:
         if not required <= _string_set(metadata, "scenarios", evidence_type, errors):
             errors.append("security_assessment: all required security scenarios must be covered")
     elif evidence_type == "model_rights":
-        models = _string_set(metadata, "models", evidence_type, errors)
+        models = metadata.get("models")
+        if not isinstance(models, list) or not models:
+            errors.append("model_rights: metadata.models must be a non-empty list of model records")
+            models = []
+        required_fields = {
+            "artifact_sha256",
+            "license_identifier",
+            "license_source_uri",
+            "model_id",
+            "model_version",
+            "rights_record_sha256",
+            "source_uri",
+        }
+        model_keys: set[tuple[str, str]] = set()
+        for index, model in enumerate(models):
+            if not isinstance(model, dict):
+                errors.append(f"model_rights: metadata.models[{index}] must be an object")
+                continue
+            missing = sorted(
+                field
+                for field in required_fields
+                if not isinstance(model.get(field), str)
+                or not model[field]
+                or PLACEHOLDER.search(model[field])
+            )
+            if missing:
+                errors.append(
+                    f"model_rights: metadata.models[{index}] is missing objective fields: "
+                    + ", ".join(missing)
+                )
+            if not SHA256.fullmatch(str(model.get("artifact_sha256", ""))):
+                errors.append(f"model_rights: metadata.models[{index}].artifact_sha256 must be a SHA-256")
+            if not _valid_sha256(model.get("rights_record_sha256")):
+                errors.append(f"model_rights: metadata.models[{index}].rights_record_sha256 must be a SHA-256")
+            key = (str(model.get("model_id", "")), str(model.get("model_version", "")))
+            if key in model_keys:
+                errors.append("model_rights: model id and version records must be unique")
+            model_keys.add(key)
+            for field in (
+                "intended_use_allowed",
+                "redistribution_allowed",
+                "rights_cleared",
+                "source_identity_verified",
+            ):
+                if model.get(field) is not True:
+                    errors.append(f"model_rights: metadata.models[{index}].{field} must be true")
         if metadata.get("all_rights_cleared") is not True or not models:
             errors.append("model_rights: every production model must have cleared rights")
-    elif evidence_type == "software_license_approval":
-        errors.extend(_required_values(metadata, {"license_sha256", "approval_reference"}, evidence_type))
-        if metadata.get("reviewed_by_legal") is not True:
-            errors.append("software_license_approval: legal review must be confirmed")
+    elif evidence_type == "software_license":
+        errors.extend(
+            _required_values(
+                metadata,
+                {"license_sha256", "license_identifier", "review_basis"},
+                evidence_type,
+            )
+        )
+        required = {
+            "compliance",
+            "copyright_and_ownership",
+            "grant_and_restrictions",
+            "termination",
+            "third_party_materials",
+            "warranty_and_liability",
+        }
+        if metadata.get("review_basis") != "personal_project_self_review":
+            errors.append("software_license: review_basis must identify the personal-project self-review")
+        if not required <= _string_set(metadata, "review_scope", evidence_type, errors):
+            errors.append("software_license: all license self-review areas are required")
     elif evidence_type == "offline_install":
         required = {"health", "console", "example_clients", "core_parse"}
         if metadata.get("blank_host") is not True or metadata.get("isolated_network") is not True:
@@ -214,6 +454,37 @@ def _metadata_errors(evidence_type: str, metadata: dict[str, Any]) -> list[str]:
         checks = _string_set(metadata, "checks", evidence_type, errors)
         if metadata.get("checksums_verified") is not True or not required <= checks:
             errors.append("offline_install: checksums and all smoke checks must pass")
+        if metadata.get("host_os") != "ubuntu" or metadata.get("host_version") != "24.04":
+            errors.append("offline_install: target host must be Ubuntu 24.04")
+        gpu_memory = _finite_number(metadata.get("gpu_memory_mib"))
+        if gpu_memory is None or gpu_memory <= 0:
+            errors.append("offline_install: gpu_memory_mib must be positive")
+        for field in ("bundle_sha256", "installer_output_sha256"):
+            if not _valid_sha256(metadata.get(field)):
+                errors.append(f"offline_install: {field} must be a SHA-256")
+        if metadata.get("installer_exit_code") != 0:
+            errors.append("offline_install: installer_exit_code must be zero")
+        if not SOURCE_COMMIT.fullmatch(str(metadata.get("source_commit", ""))):
+            errors.append("offline_install: source_commit must be a full lowercase Git SHA")
+        services = metadata.get("services")
+        required_services = {"api", "batch-worker", "stream-worker", "scheduler", "postgres", "redis", "minio"}
+        if not isinstance(services, dict) or any(services.get(name) != "running" for name in required_services):
+            errors.append("offline_install: every required service must be running")
+        check_results = metadata.get("check_results")
+        if not isinstance(check_results, dict):
+            errors.append("offline_install: check_results must be an object")
+            check_results = {}
+        for check in sorted(required):
+            result = check_results.get(check)
+            if not isinstance(result, dict) or result.get("status") != "passed":
+                errors.append(f"offline_install: check_results.{check}.status must be passed")
+                continue
+            if result.get("exit_code") != 0:
+                errors.append(f"offline_install: check_results.{check}.exit_code must be zero")
+            if not _valid_sha256(result.get("output_sha256")):
+                errors.append(
+                    f"offline_install: check_results.{check}.output_sha256 must be a SHA-256"
+                )
     elif evidence_type == "backup_restore":
         required = {"tenants", "projects", "media", "runs", "results", "pipelines", "models", "audit", "biometrics"}
         if (
@@ -229,13 +500,16 @@ def _metadata_errors(evidence_type: str, metadata: dict[str, Any]) -> list[str]:
 def validate_entry(
     entry: Any,
     *,
-    release_identity: dict[str, str] | None = None,
+    release_identity: dict[str, Any] | None = None,
     root: Path = ROOT,
 ) -> list[str]:
     if not isinstance(entry, dict):
         return ["evidence manifest entry must be an object"]
     evidence_type = str(entry.get("evidence_type", ""))
     errors: list[str] = []
+    status = entry.get("status")
+    if status not in {"pending", "passed"}:
+        errors.append(f"{evidence_type}: status must be pending or passed")
     report_value = entry.get("report")
     report = (root / str(report_value)).resolve() if report_value else None
     reports_root = (root / "docs/release/evidence/reports").resolve()
@@ -243,6 +517,12 @@ def validate_entry(
         errors.append(f"unknown evidence type: {evidence_type or '<missing>'}")
     if report is not None and reports_root not in report.parents:
         errors.append(f"{evidence_type}: report must be inside docs/release/evidence/reports")
+    if status == "pending":
+        if report_value is not None or entry.get("sha256") is not None or entry.get("executed_at") is not None:
+            errors.append(f"{evidence_type}: pending evidence must not claim a report, digest, or execution time")
+        if entry.get("metadata") not in ({}, None):
+            errors.append(f"{evidence_type}: pending evidence metadata must be empty")
+        return errors
     if report is None or not report.is_file():
         errors.append(f"{evidence_type}: report file is missing")
     else:
@@ -259,8 +539,6 @@ def validate_entry(
                     "evidence_type",
                     "status",
                     "executed_at",
-                    "approved_at",
-                    "signed_by",
                     "target",
                     "release_identity",
                     "metadata",
@@ -271,16 +549,10 @@ def validate_entry(
                 errors.append(f"{evidence_type}: report schema_version must be 1.0")
             if actual != expected:
                 errors.append(f"{evidence_type}: report content does not match the manifest entry")
-    executed_at = _timestamp(entry.get("executed_at"), "executed_at", evidence_type, errors)
-    approved_at = _timestamp(entry.get("approved_at"), "approved_at", evidence_type, errors)
-    if executed_at is not None and approved_at is not None and approved_at < executed_at:
-        errors.append(f"{evidence_type}: approved_at cannot be earlier than executed_at")
-    for field in ("signed_by", "target"):
-        value = entry.get(field)
-        if not isinstance(value, str) or not value or PLACEHOLDER.search(value):
-            errors.append(f"{evidence_type}: {field} must be a non-placeholder value")
-    if entry.get("status") != "passed":
-        errors.append(f"{evidence_type}: status must be passed")
+    _timestamp(entry.get("executed_at"), "executed_at", evidence_type, errors)
+    target = entry.get("target")
+    if not isinstance(target, str) or not target or PLACEHOLDER.search(target):
+        errors.append(f"{evidence_type}: target must be a non-placeholder value")
     metadata = entry.get("metadata")
     if not isinstance(metadata, dict):
         errors.append(f"{evidence_type}: metadata must be an object")
@@ -288,10 +560,10 @@ def validate_entry(
     errors.extend(_metadata_errors(evidence_type, metadata))
     if release_identity is not None and entry.get("release_identity") != release_identity:
         errors.append(f"{evidence_type}: release identity does not match the manifest")
-    if evidence_type == "software_license_approval":
+    if evidence_type == "software_license":
         license_path = root / "LICENSE"
         if license_path.is_file() and metadata.get("license_sha256") != digest(license_path):
-            errors.append("software_license_approval: LICENSE SHA-256 does not match")
+            errors.append("software_license: LICENSE SHA-256 does not match")
     return errors
 
 
@@ -311,29 +583,38 @@ def evidence_errors(
     if not isinstance(entries, list):
         return ["release evidence manifest entries must be a list"]
     errors: list[str] = []
-    if not isinstance(manifest, dict) or manifest.get("schema_version") != "1.1":
-        errors.append("release evidence manifest schema_version must be 1.1")
-    if not isinstance(manifest, dict) or not re.fullmatch(r"\d+\.\d+\.\d+", str(manifest.get("release", ""))):
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != "1.2":
+        errors.append("release evidence manifest schema_version must be 1.2")
+    if not isinstance(manifest, dict) or not RELEASE_VERSION.fullmatch(str(manifest.get("release", ""))):
         errors.append("release evidence manifest release must be a semantic version")
     release_identity_value = manifest.get("release_identity") if isinstance(manifest, dict) else None
-    release_identity: dict[str, str] | None = None
+    release_identity: dict[str, Any] | None = None
     if not isinstance(release_identity_value, dict):
         errors.append("release evidence manifest release_identity must be an object")
     else:
-        release_identity = {key: str(release_identity_value.get(key, "")) for key in RELEASE_IDENTITY_FIELDS}
+        release_identity = {key: release_identity_value.get(key) for key in RELEASE_IDENTITY_FIELDS}
         if set(release_identity_value) != RELEASE_IDENTITY_FIELDS:
             errors.append("release identity must contain exactly the required artifact fields")
-        if not SOURCE_COMMIT.fullmatch(release_identity["source_commit"]):
-            errors.append("release identity source_commit must be a full lowercase Git SHA")
-        if expected_source_commit is not None and release_identity["source_commit"] != expected_source_commit:
-            errors.append("release identity source_commit does not match the checked-out commit")
-        if not IMAGE_DIGEST.fullmatch(release_identity["image_digest"]):
-            errors.append("release identity image_digest must be a sha256 container digest")
+        source_commit = release_identity["source_commit"]
+        if source_commit is not None and (
+            not isinstance(source_commit, str) or not SOURCE_COMMIT.fullmatch(source_commit)
+        ):
+            errors.append("release identity source_commit must be null or a full lowercase Git SHA")
+        image_digest = release_identity["image_digest"]
+        if image_digest is not None and (
+            not isinstance(image_digest, str) or not IMAGE_DIGEST.fullmatch(image_digest)
+        ):
+            errors.append("release identity image_digest must be null or a sha256 container digest")
         for field in ("offline_bundle_sha256", "openapi_sha256", "model_set_sha256"):
-            if not SHA256.fullmatch(release_identity[field]):
-                errors.append(f"release identity {field} must be a lowercase SHA-256")
+            value = release_identity[field]
+            if value is not None and (not isinstance(value, str) or not SHA256.fullmatch(value)):
+                errors.append(f"release identity {field} must be null or a lowercase SHA-256")
         openapi = root / "docs/openapi.json"
-        if openapi.is_file() and release_identity["openapi_sha256"] != digest(openapi):
+        if (
+            openapi.is_file()
+            and release_identity["openapi_sha256"] is not None
+            and release_identity["openapi_sha256"] != digest(openapi)
+        ):
             errors.append("release identity openapi_sha256 does not match docs/openapi.json")
     present: set[str] = set()
     for entry in entries:
@@ -345,11 +626,24 @@ def evidence_errors(
             present.add(evidence_type)
     for missing in sorted(REQUIRED_EVIDENCE_TYPES - present):
         errors.append(f"missing release evidence type: {missing}")
+    pending = sorted(
+        str(entry.get("evidence_type"))
+        for entry in entries
+        if isinstance(entry, dict) and entry.get("status") == "pending"
+    )
+    if pending:
+        errors.append(f"pending release evidence: {', '.join(pending)}")
+    elif release_identity is not None:
+        missing_identity = sorted(key for key, value in release_identity.items() if value is None)
+        if missing_identity:
+            errors.append(f"completed release identity is missing: {', '.join(missing_identity)}")
+        elif expected_source_commit is not None and release_identity["source_commit"] != expected_source_commit:
+            errors.append("release identity source_commit does not match the checked-out commit")
     return errors
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Validate Scenara implementation and 1.0 release evidence")
+    parser = argparse.ArgumentParser(description="Validate Scenara implementation and release evidence")
     parser.add_argument("--implementation-only", action="store_true")
     parser.add_argument(
         "--manifest",

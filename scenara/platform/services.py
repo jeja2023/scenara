@@ -655,14 +655,13 @@ class RunService:
             if source is None:
                 raise ResourceNotFound("media source not found")
             media_kind = MediaKind.STREAM
-        if media_kind != MediaKind.DOCUMENT:
-            ignored_max_units = effective_parameters.pop("max_units", None)
-            if ignored_max_units is not None:
-                logger.info(
-                    "ignored max_units=%r for %s run; only document page limits are supported",
-                    ignored_max_units,
-                    media_kind.value,
-                )
+        ignored_max_units = effective_parameters.pop("max_units", None)
+        if ignored_max_units is not None:
+            logger.info(
+                "ignored legacy max_units=%r for %s run; parse unit limits are not supported",
+                ignored_max_units,
+                media_kind.value,
+            )
         if media_kind == MediaKind.STREAM:
             effective_parameters.setdefault("stream_segment_duration_ms", self.stream_segment_duration_ms)
         effective_request = request.model_copy(update={"parameters": effective_parameters})
@@ -1243,16 +1242,15 @@ class RunService:
                 "sample_interval_ms": self.media_sample_interval_ms,
                 **run.parameters,
             }
-            if media_kind != MediaKind.DOCUMENT:
-                ignored_max_units = parameters.pop("max_units", None)
-                if ignored_max_units is not None:
-                    logger.info(
-                        "ignored max_units=%r while executing stored %s run %s; "
-                        "only document page limits are supported",
-                        ignored_max_units,
-                        media_kind.value,
-                        run.run_id,
-                    )
+            ignored_max_units = parameters.pop("max_units", None)
+            if ignored_max_units is not None:
+                logger.info(
+                    "ignored legacy max_units=%r while executing stored %s run %s; "
+                    "parse unit limits are not supported",
+                    ignored_max_units,
+                    media_kind.value,
+                    run.run_id,
+                )
             if media_kind == MediaKind.STREAM:
                 parameters.setdefault("stream_segment_duration_ms", self.stream_segment_duration_ms)
             if run.stream_segment_index is not None:

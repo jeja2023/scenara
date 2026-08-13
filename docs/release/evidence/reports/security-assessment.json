@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0",
+  "evidence_type": "security_assessment",
+  "status": "passed",
+  "executed_at": "2026-08-13T15:25:12.7341120+08:00",
+  "target": "Scenara security regression and dependency audit on Windows 10.0.22631 x86_64 with Python 3.12.4",
+  "release_identity": {
+    "source_commit": null,
+    "image_digest": null,
+    "offline_bundle_sha256": null,
+    "openapi_sha256": "bfa48af550fc86e610501feeb74f7ea8c7151047be3b0ee5cc1fa8bde30a7f62",
+    "model_set_sha256": null
+  },
+  "metadata": {
+    "scenarios": [
+      "audit_fail_closed",
+      "authorization",
+      "biometric_deletion",
+      "credential_redaction",
+      "malicious_media",
+      "ssrf"
+    ],
+    "assessment_kind": "code_level_regression",
+    "passed_tests": 61,
+    "skipped_tests": 0,
+    "third_party_penetration_test": false,
+    "command": "python -m pytest -q tests/test_security_media.py tests/test_platform_extensions.py tests/test_platform_kernel.py tests/test_portrait_analysis.py tests/test_portrait_identity.py tests/test_api.py -rs",
+    "dependency_audits": {
+      "python_dev": {
+        "command": "python -m pip_audit -r requirements/dev.txt",
+        "known_vulnerabilities": 0
+      },
+      "python_production_lock": {
+        "command": "python -m pip_audit -r requirements/production.lock --no-deps --disable-pip",
+        "known_vulnerabilities": 0,
+        "resolution_note": "No dependency installation was attempted because the Linux production lock contains uvloop, which does not install on Windows."
+      },
+      "javascript_lock": {
+        "command": "pnpm audit --audit-level high --json",
+        "known_vulnerabilities": 0,
+        "remediation": "Pinned transitive nanoid to 3.3.17 for GHSA-2v37-7h3g-55p8."
+      }
+    }
+  }
+}

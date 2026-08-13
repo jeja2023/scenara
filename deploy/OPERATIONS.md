@@ -1,6 +1,6 @@
 # Scenara 1.0 运维基线
 
-本文档定义单节点、单 GPU 私有化部署的升级、回滚、探针、指标和告警最低要求。它不能替代目标环境的签署演练报告。
+本文档定义单节点、单 GPU 私有化部署的升级、回滚、探针、指标和告警最低要求。它不能替代目标环境的可复现演练报告。
 
 ## 数据库升级
 
@@ -18,7 +18,7 @@
 - `requirements/production.in` 是生产依赖输入，`requirements/production.lock` 是生产镜像和离线包唯一允许使用的解析结果；安装和下载必须启用 `--require-hashes`。
 - 修改生产依赖后必须用固定的 uv 版本为 Python 3.12、x86_64 manylinux 目标重新生成锁文件；CI 会再次生成并拒绝任何漂移。
 - PostgreSQL/pgvector、Redis 和 MinIO 镜像在 Compose 中使用 manifest digest。联网发布构建还必须记录 Node、CUDA 基础镜像的实际 digest，并以最终应用镜像 digest 进入发布身份。
-- 离线包摘要、应用镜像 digest、OpenAPI 摘要、模型集合摘要和源提交共同构成发布身份；任一值变化都必须重新执行并签署九类发布证据。
+- 离线包摘要、应用镜像 digest、OpenAPI 摘要、模型集合摘要和源提交共同构成发布身份；任一值变化都必须重新执行并记录九类发布证据。
 
 ## 升级与恢复式回滚
 
@@ -49,8 +49,17 @@ Scenara 1.0 不提供破坏性 down migration。发生不兼容 schema 变更时
 - Redis 侧：检查 `scenara:runs:batch` / `scenara:runs:stream` 的 consumer group、pending 数和 lag。只有 API 在写 stream、没有消费者时，Run 会持续显示 `queued`，图片解码器本身尚未开始执行。
 - worker 启动后若仍不前进，检查模型加载日志、CUDA/CPU provider、PostgreSQL/S3 连接和 `QUEUE_UNAVAILABLE` / `PIPELINE_ERROR`；首次加载模型可能需要数秒到数十秒，但不应无限停留在 `queued`。
 
+## Redis Run queue recovery
+
+PostgreSQL is the source of truth for Run state and MinIO retains uploaded media. If Redis Run streams are lost, stop both workers and run the following command before restarting them:
+
+    python scripts/rebuild_redis_queue.py --env-file deploy/.env.production
+
+The command requires PostgreSQL, S3/MinIO, and Redis backends. It enumerates every non-terminal Run, verifies each retained media object, and atomically repopulates the empty batch and stream queues. It refuses to run when either Redis Run stream already contains messages, or when a Run record or required media object is missing. The JSON output records the number of recoverable, verified, and enqueued Runs for release evidence.
+
 ## 已知限制
 
-- 仅支持 Ubuntu 24.04 x86_64、Docker Compose、单张不少于 23,000 MiB 的 NVIDIA GPU。
+
+- 仅支持 Ubuntu 24.04 x86_64、Docker Compose、单张可被 `nvidia-smi` 测量的 NVIDIA GPU；显存容量记录在资格报告中，但不是固定 24G 门槛。
 - 不提供多节点高可用、跨地域容灾、在线 schema 降级或自动模型训练。
-- 发布仓库当前仍缺法律批准许可证以及严格门禁要求的真实签署证据；缺失时不得声明 1.0 Released。
+- 发布仓库当前仍缺目标 GPU、模型权利、固定评估集和隔离离线安装等严格门禁要求的客观证据；缺失时不得声明 1.0 Released。

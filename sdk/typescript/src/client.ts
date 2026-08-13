@@ -95,7 +95,6 @@ export interface ParseVideoInput extends ParseFileInput {
 }
 
 export interface ParseDocumentInput extends ParseFileInput {
-  maxUnits?: number;
   pageScale?: number;
   waitMs?: number;
 }
@@ -276,7 +275,6 @@ export class ScenaraClient {
     form.append("domain", input.domain ?? "ocr");
     if (input.pipelineId) form.append("pipeline_id", input.pipelineId);
     if (input.pipelineVersion) form.append("pipeline_version", input.pipelineVersion);
-    if (input.maxUnits !== undefined) form.append("max_units", String(input.maxUnits));
     form.append("page_scale", String(input.pageScale ?? 1.5));
     form.append("wait_ms", String(input.waitMs ?? 0));
     return this.transport<ParseDocumentResponse>("POST", "/api/v1/parse/document", {
@@ -665,23 +663,6 @@ export class ScenaraClient {
 
   purgeAudit(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
     return this.controlPlane("POST", "/api/v1/platform/audit/purge", input);
-  }
-
-  createBillingAccount(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
-    return this.controlPlane("POST", "/api/v1/platform/billing/accounts", input);
-  }
-
-  recordMeterEvent(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
-    return this.controlPlane("POST", "/api/v1/platform/billing/meter-events", input);
-  }
-
-  listBillingUsage(accountId?: string): Promise<ControlPlaneRecord[]> {
-    const query = accountId === undefined ? "" : "?account_id=" + encodeURIComponent(accountId);
-    return this.controlPlane<ControlPlaneRecord[]>("GET", "/api/v1/platform/billing/usage" + query);
-  }
-
-  assignBillingSeat(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
-    return this.controlPlane("POST", "/api/v1/platform/billing/seats", input);
   }
 
   createSession(input: { userId: string; ttlSeconds?: number }): Promise<ControlPlaneRecord> {
@@ -1096,10 +1077,6 @@ export class ScenaraClient {
 
   deleteSavedSearch(savedSearchId: string): Promise<void> {
     return this.transport<void>("DELETE", "/api/v1/search/saved/" + encodeURIComponent(savedSearchId));
-  }
-
-  enterpriseStatus(): Promise<Record<string, unknown>> {
-    return this.transport<Record<string, unknown>>("GET", "/api/v1/enterprise/status");
   }
 
   createFeedback(feedback: Record<string, unknown>): Promise<FeedbackRecord> {

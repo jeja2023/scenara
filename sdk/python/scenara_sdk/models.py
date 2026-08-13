@@ -378,7 +378,7 @@ class ProductEntitlement(TypedDict):
     project_id: str
     product_id: str
     status: Literal["active", "suspended"]
-    source: Literal["manual", "enterprise_license", "system"]
+    source: Literal["manual", "system"]
     created_at: float
     updated_at: float
 

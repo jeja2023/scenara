@@ -1,121 +1,73 @@
 {
-  "schema_version": "1.1",
-  "release": "1.0.0",
+  "schema_version": "1.2",
+  "release": "0.3.0-dev.20",
   "release_identity": {
-    "source_commit": "<40 lowercase hex characters>",
-    "image_digest": "sha256:<64 lowercase hex characters>",
-    "offline_bundle_sha256": "<64 lowercase hex characters>",
-    "openapi_sha256": "<64 lowercase hex characters>",
-    "model_set_sha256": "<64 lowercase hex characters>"
+    "source_commit": null,
+    "image_digest": null,
+    "offline_bundle_sha256": null,
+    "openapi_sha256": null,
+    "model_set_sha256": null
   },
   "entries": [
     {
       "evidence_type": "portrait_evaluation",
-      "report": "docs/release/evidence/reports/portrait-evaluation.json",
-      "sha256": "<64 lowercase hex characters>",
-      "status": "passed",
-      "executed_at": "<ISO-8601>",
-      "approved_at": "<ISO-8601>",
-      "signed_by": "<name and role>",
-      "target": "<target identifier>",
-      "release_identity": {"source_commit": "<40 lowercase hex characters>", "image_digest": "sha256:<64 lowercase hex characters>", "offline_bundle_sha256": "<64 lowercase hex characters>", "openapi_sha256": "<64 lowercase hex characters>", "model_set_sha256": "<64 lowercase hex characters>"},
-      "metadata": {"dataset_version": "<version>", "rights_cleared": true, "metrics": {"<metric>": 0.0}, "thresholds_approved_before_run": true, "independent_runs": 2, "within_tolerance": true}
+      "status": "pending"
     },
     {
       "evidence_type": "ocr_evaluation",
-      "report": "docs/release/evidence/reports/ocr-evaluation.json",
-      "sha256": "<64 lowercase hex characters>",
-      "status": "passed",
-      "executed_at": "<ISO-8601>",
-      "approved_at": "<ISO-8601>",
-      "signed_by": "<name and role>",
-      "target": "<target identifier>",
-      "release_identity": {"source_commit": "<40 lowercase hex characters>", "image_digest": "sha256:<64 lowercase hex characters>", "offline_bundle_sha256": "<64 lowercase hex characters>", "openapi_sha256": "<64 lowercase hex characters>", "model_set_sha256": "<64 lowercase hex characters>"},
-      "metadata": {"dataset_version": "<version>", "rights_cleared": true, "metrics": {"<metric>": 0.0}, "thresholds_approved_before_run": true, "independent_runs": 2, "within_tolerance": true}
+      "status": "pending"
     },
     {
       "evidence_type": "gpu_capacity",
-      "report": "docs/release/evidence/reports/gpu-capacity.json",
-      "sha256": "<64 lowercase hex characters>",
-      "status": "passed",
-      "executed_at": "<ISO-8601>",
-      "approved_at": "<ISO-8601>",
-      "signed_by": "<name and role>",
-      "target": "Ubuntu x86_64 / single NVIDIA GPU",
-      "release_identity": {"source_commit": "<40 lowercase hex characters>", "image_digest": "sha256:<64 lowercase hex characters>", "offline_bundle_sha256": "<64 lowercase hex characters>", "openapi_sha256": "<64 lowercase hex characters>", "model_set_sha256": "<64 lowercase hex characters>"},
-      "metadata": {"gpu_memory_mib": 24576, "scenarios": ["sustained_load", "burst", "vram_pressure", "backpressure", "recovery"], "p50_ms": 0.0, "p95_ms": 0.0, "p99_ms": 0.0, "throughput_per_second": 0.0, "error_rate": 0.0, "peak_vram_mib": 0}
+      "status": "pending"
     },
     {
       "evidence_type": "integration_services",
-      "report": "docs/release/evidence/reports/integration-services.json",
-      "sha256": "<64 lowercase hex characters>",
-      "status": "passed",
-      "executed_at": "<ISO-8601>",
-      "approved_at": "<ISO-8601>",
-      "signed_by": "<name and role>",
-      "target": "<target identifier>",
-      "release_identity": {"source_commit": "<40 lowercase hex characters>", "image_digest": "sha256:<64 lowercase hex characters>", "offline_bundle_sha256": "<64 lowercase hex characters>", "openapi_sha256": "<64 lowercase hex characters>", "model_set_sha256": "<64 lowercase hex characters>"},
-      "metadata": {"services": ["postgres_pgvector", "redis", "minio"], "skipped_tests": 0, "duplicate_logical_results": 0, "redis_rebuild_verified": true}
+      "status": "pending"
     },
     {
       "evidence_type": "security_assessment",
-      "report": "docs/release/evidence/reports/security-assessment.json",
-      "sha256": "<64 lowercase hex characters>",
-      "status": "passed",
-      "executed_at": "<ISO-8601>",
-      "approved_at": "<ISO-8601>",
-      "signed_by": "<name and role>",
-      "target": "<target identifier>",
-      "release_identity": {"source_commit": "<40 lowercase hex characters>", "image_digest": "sha256:<64 lowercase hex characters>", "offline_bundle_sha256": "<64 lowercase hex characters>", "openapi_sha256": "<64 lowercase hex characters>", "model_set_sha256": "<64 lowercase hex characters>"},
-      "metadata": {"scenarios": ["audit_fail_closed", "authorization", "biometric_deletion", "credential_redaction", "malicious_media", "ssrf"]}
+      "status": "pending"
     },
     {
       "evidence_type": "model_rights",
-      "report": "docs/release/evidence/reports/model-rights.json",
-      "sha256": "<64 lowercase hex characters>",
-      "status": "passed",
-      "executed_at": "<ISO-8601>",
-      "approved_at": "<ISO-8601>",
-      "signed_by": "<name and role>",
-      "target": "<release model set>",
-      "release_identity": {"source_commit": "<40 lowercase hex characters>", "image_digest": "sha256:<64 lowercase hex characters>", "offline_bundle_sha256": "<64 lowercase hex characters>", "openapi_sha256": "<64 lowercase hex characters>", "model_set_sha256": "<64 lowercase hex characters>"},
-      "metadata": {"all_rights_cleared": true, "models": ["<model id and version>"]}
+      "status": "pending"
     },
     {
-      "evidence_type": "software_license_approval",
-      "report": "docs/release/evidence/reports/software-license-approval.json",
+      "evidence_type": "software_license",
+      "report": "docs/release/evidence/reports/software-license.json",
       "sha256": "<64 lowercase hex characters>",
       "status": "passed",
       "executed_at": "<ISO-8601>",
-      "approved_at": "<ISO-8601>",
-      "signed_by": "<legal approver name and role>",
-      "target": "Scenara 1.0 commercial distribution",
-      "release_identity": {"source_commit": "<40 lowercase hex characters>", "image_digest": "sha256:<64 lowercase hex characters>", "offline_bundle_sha256": "<64 lowercase hex characters>", "openapi_sha256": "<64 lowercase hex characters>", "model_set_sha256": "<64 lowercase hex characters>"},
-      "metadata": {"license_sha256": "<64 lowercase hex characters>", "reviewed_by_legal": true, "approval_reference": "<controlled approval record>"}
+      "target": "<real execution target>",
+      "release_identity": {
+        "source_commit": null,
+        "image_digest": null,
+        "offline_bundle_sha256": null,
+        "openapi_sha256": null,
+        "model_set_sha256": null
+      },
+      "metadata": {
+        "license_sha256": "<64 lowercase hex characters>",
+        "license_identifier": "LicenseRef-Scenara-Proprietary-Source-1.0",
+        "review_basis": "personal_project_self_review",
+        "review_scope": [
+          "compliance",
+          "copyright_and_ownership",
+          "grant_and_restrictions",
+          "termination",
+          "third_party_materials",
+          "warranty_and_liability"
+        ]
+      }
     },
     {
       "evidence_type": "offline_install",
-      "report": "docs/release/evidence/reports/offline-install.json",
-      "sha256": "<64 lowercase hex characters>",
-      "status": "passed",
-      "executed_at": "<ISO-8601>",
-      "approved_at": "<ISO-8601>",
-      "signed_by": "<name and role>",
-      "target": "<target identifier>",
-      "release_identity": {"source_commit": "<40 lowercase hex characters>", "image_digest": "sha256:<64 lowercase hex characters>", "offline_bundle_sha256": "<64 lowercase hex characters>", "openapi_sha256": "<64 lowercase hex characters>", "model_set_sha256": "<64 lowercase hex characters>"},
-      "metadata": {"blank_host": true, "isolated_network": true, "checksums_verified": true, "checks": ["health", "console", "example_clients", "core_parse"]}
+      "status": "pending"
     },
     {
       "evidence_type": "backup_restore",
-      "report": "docs/release/evidence/reports/backup-restore.json",
-      "sha256": "<64 lowercase hex characters>",
-      "status": "passed",
-      "executed_at": "<ISO-8601>",
-      "approved_at": "<ISO-8601>",
-      "signed_by": "<name and role>",
-      "target": "<target identifier>",
-      "release_identity": {"source_commit": "<40 lowercase hex characters>", "image_digest": "sha256:<64 lowercase hex characters>", "offline_bundle_sha256": "<64 lowercase hex characters>", "openapi_sha256": "<64 lowercase hex characters>", "model_set_sha256": "<64 lowercase hex characters>"},
-      "metadata": {"rpo_hours": 24, "rto_hours": 4, "entities_verified": ["tenants", "projects", "media", "runs", "results", "pipelines", "models", "audit", "biometrics"]}
+      "status": "pending"
     }
   ]
 }

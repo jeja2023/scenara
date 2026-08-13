@@ -58,7 +58,6 @@ const workspaces = [
   ["feedback", "反馈与发布", "反馈与发布"],
   ["access", "接入", "接入"],
   ["operations", "运维", "运维"],
-  ["enterprise", "企业工作区", "企业"],
 ] as const;
 
 test.beforeEach(async ({ page }) => {
@@ -68,17 +67,6 @@ test.beforeEach(async ({ page }) => {
   });
   await page.route("**/api/**", async (route) => {
     const path = new URL(route.request().url()).pathname;
-    if (path === "/api/v1/enterprise/status") {
-      await route.fulfill({
-        status: 404,
-        contentType: "application/json",
-        body: JSON.stringify({
-          request_id: "e2e",
-          error: { code: "NOT_INSTALLED", message: "not installed" },
-        }),
-      });
-      return;
-    }
     let data: unknown = [];
     if (path === "/api/v1/auth/login") {
       data = {
@@ -567,7 +555,7 @@ test("parse workbench exposes complete media-mode controls", async ({
   await expect(page.getByLabel("帧最大边长（像素）")).toBeVisible();
 
   await page.getByRole("tab", { name: "文档" }).click();
-  await expect(page.getByLabel("最大页数")).toBeVisible();
+  await expect(page.getByLabel("最大页数")).toHaveCount(0);
   await expect(page.getByLabel("渲染倍率")).toBeVisible();
 
   await page.getByRole("tab", { name: "视频流" }).click();

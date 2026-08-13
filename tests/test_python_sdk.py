@@ -121,8 +121,6 @@ def test_python_sdk_context_lifecycle_and_domain_methods() -> None:
             return httpx.Response(200, content=envelope({"run_id": "run-1", "status": "pausing"}))
         if request.url.path.endswith("/portrait/search"):
             return httpx.Response(200, content=envelope({"feature_space_id": "face-v1", "matches": []}))
-        if request.url.path.endswith("/enterprise/status"):
-            return httpx.Response(200, content=envelope({"license_id": "lic-1"}))
         return httpx.Response(200, content=envelope({"items": [], "total": 0}))
 
     with ScenaraClient(
@@ -135,7 +133,6 @@ def test_python_sdk_context_lifecycle_and_domain_methods() -> None:
         assert client.list_assets()["total"] == 0
         assert client.pause_run("run-1")["status"] == "pausing"
         assert client.search_portrait({"feature_space_id": "face-v1", "embedding": [1.0, 0.0]})["matches"] == []
-        assert client.enterprise_status()["license_id"] == "lic-1"
         assert client.get_asset_preview("asset-1") == b"jpeg-preview"
         assert client.list_products()[0]["product_id"] == "parse"
         assert client.get_repository_topology()["current_repository_id"] == "scenara"
@@ -186,7 +183,7 @@ def test_python_sdk_preserves_api_errors() -> None:
         ) as client,
         pytest.raises(ScenaraError) as caught,
     ):
-        client.enterprise_status()
+            client.list_assets()
     assert caught.value.status_code == 403
     assert caught.value.code == "POLICY_DENIED"
     assert caught.value.request_id == "req-denied"
@@ -506,7 +503,6 @@ def test_python_sdk_media_file_and_stream_shortcuts(tmp_path: Path) -> None:
         )["asset"]["asset_id"] == "asset-video"
         assert client.parse_document(
             document_file,
-            max_units=5,
             page_scale=2.5,
             idempotency_key="document-idempotency",
         )["asset"]["asset_id"] == "asset-document"
@@ -553,6 +549,7 @@ def test_python_sdk_media_file_and_stream_shortcuts(tmp_path: Path) -> None:
     assert document_request.headers["Idempotency-Key"] == "document-idempotency"
     assert b'name="page_scale"' in document_request.content
     assert b"2.5" in document_request.content
+    assert b'name="max_units"' not in document_request.content
     stream_request = next(item for item in requests if item.url.path.endswith("/parse/stream"))
     assert stream_request.headers["Idempotency-Key"] == "stream-idempotency"
     assert json.loads(stream_request.content)["parameters"] == {

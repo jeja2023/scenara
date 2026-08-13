@@ -292,7 +292,6 @@ class ScenaraClient:
         domain: Domain = "ocr",
         pipeline_id: str | None = None,
         pipeline_version: str | None = None,
-        max_units: int | None = None,
         page_scale: float = 1.5,
         wait_ms: int = 0,
         idempotency_key: str | None = None,
@@ -304,8 +303,6 @@ class ScenaraClient:
             "page_scale": page_scale,
             "wait_ms": wait_ms,
         }
-        if max_units is not None:
-            data["max_units"] = max_units
         if pipeline_id is not None:
             data["pipeline_id"] = pipeline_id
         if pipeline_version is not None:
@@ -1281,9 +1278,6 @@ class ScenaraClient:
             ),
         )
 
-    def enterprise_status(self) -> dict[str, Any]:
-        return cast(dict[str, Any], self._request("GET", "/api/v1/enterprise/status"))
-
     def create_feedback(self, feedback: dict[str, Any]) -> FeedbackRecord:
         return cast(FeedbackRecord, self._request("POST", "/api/v1/feedback", json=feedback))
 
@@ -1411,24 +1405,6 @@ class ScenaraClient:
 
     def purge_audit(self, body: dict[str, Any]) -> dict[str, Any]:
         return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/platform/audit/purge", json=body))
-
-    def create_billing_account(self, body: dict[str, Any]) -> dict[str, Any]:
-        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/platform/billing/accounts", json=body))
-
-    def record_meter_event(self, body: dict[str, Any]) -> dict[str, Any]:
-        return cast(
-            dict[str, Any],
-            self.control_plane_request("POST", "/api/v1/platform/billing/meter-events", json=body),
-        )
-
-    def list_billing_usage(self, *, account_id: str | None = None) -> list[dict[str, Any]]:
-        return cast(
-            list[dict[str, Any]],
-            self.control_plane_request("GET", "/api/v1/platform/billing/usage", params={"account_id": account_id}),
-        )
-
-    def assign_billing_seat(self, body: dict[str, Any]) -> dict[str, Any]:
-        return cast(dict[str, Any], self.control_plane_request("POST", "/api/v1/platform/billing/seats", json=body))
 
     def create_session(self, user_id: str, *, ttl_seconds: int = 3600) -> dict[str, Any]:
         return cast(

@@ -96,24 +96,16 @@ def _video_media() -> MediaInput:
 
 def test_interval_strategy_samples_every_step(fake_capture: type[_FakeCapture]) -> None:
     fake_capture.frames = [_solid_frame(index * 4) for index in range(50)]
-    decoded = decode_media(_video_media(), max_units=5, sample_interval_ms=400)
+    decoded = decode_media(_video_media(), sample_interval_ms=400)
     assert len(decoded.units) == 5
     # 25 fps 下 400 毫秒等于 10 帧步长
     assert [unit.unit_id for unit in decoded.units] == [f"frame_{index * 10}" for index in range(5)]
     assert decoded.metadata.sample_strategy == SampleStrategy.INTERVAL
     assert decoded.metadata.sample_interval_ms == 400
-    assert decoded.termination_reason == "max_units_reached"
-
-
-def test_finite_video_without_unit_limit_runs_to_end_of_file(fake_capture: type[_FakeCapture]) -> None:
-    fake_capture.frames = [_solid_frame(index * 4) for index in range(50)]
-    decoded = decode_media(_video_media(), max_units=None, sample_interval_ms=400)
-
-    assert [unit.unit_id for unit in decoded.units] == ["frame_0", "frame_10", "frame_20", "frame_30", "frame_40"]
     assert decoded.termination_reason == "source_ended"
 
 
-def test_stream_without_unit_limit_stops_at_segment_boundary(fake_capture: type[_FakeCapture]) -> None:
+def test_stream_stops_at_segment_boundary(fake_capture: type[_FakeCapture]) -> None:
     fake_capture.frames = [_solid_frame(index) for index in range(40)]
     decoded = decode_media(
         MediaInput(
@@ -121,7 +113,6 @@ def test_stream_without_unit_limit_stops_at_segment_boundary(fake_capture: type[
             content_type="application/octet-stream",
             source_url="rtsp://1.1.1.1/live",
         ),
-        max_units=None,
         sample_interval_ms=1,
         stream_segment_duration_ms=1_000,
         stream_segment_index=3,
@@ -133,26 +124,12 @@ def test_stream_without_unit_limit_stops_at_segment_boundary(fake_capture: type[
     assert decoded.metadata.stream_segment_index == 3
 
 
-def test_uniform_strategy_spreads_units_across_the_clip(fake_capture: type[_FakeCapture]) -> None:
-    fake_capture.frames = [_solid_frame(index) for index in range(100)]
-    decoded = decode_media(
-        _video_media(),
-        max_units=4,
-        sample_interval_ms=1000,
-        sample_strategy=SampleStrategy.UNIFORM,
-    )
-    assert len(decoded.units) == 4
-    assert [unit.unit_id for unit in decoded.units] == ["frame_0", "frame_25", "frame_50", "frame_75"]
-    assert decoded.metadata.sample_strategy == SampleStrategy.UNIFORM
-
-
-def test_uniform_strategy_without_unit_limit_processes_the_full_window(
+def test_uniform_strategy_processes_the_full_window(
     fake_capture: type[_FakeCapture],
 ) -> None:
     fake_capture.frames = [_solid_frame(index) for index in range(12)]
     decoded = decode_media(
         _video_media(),
-        max_units=None,
         sample_interval_ms=1000,
         sample_strategy=SampleStrategy.UNIFORM,
     )
@@ -166,12 +143,11 @@ def test_keyframe_strategy_only_keeps_container_keyframes(fake_capture: type[_Fa
     fake_capture.keyframe_every = 8
     decoded = decode_media(
         _video_media(),
-        max_units=4,
         sample_interval_ms=1000,
         sample_strategy=SampleStrategy.KEYFRAME,
     )
-    assert [unit.unit_id for unit in decoded.units] == ["frame_0", "frame_8", "frame_16", "frame_24"]
-    assert decoded.metadata.keyframe_count == 4
+    assert [unit.unit_id for unit in decoded.units] == ["frame_0", "frame_8", "frame_16", "frame_24", "frame_32"]
+    assert decoded.metadata.keyframe_count == 5
     assert decoded.metadata.timestamp_source == "position_msec"
 
 
@@ -191,7 +167,6 @@ def test_keyframe_strategy_rejects_backends_without_decoded_frame_types(
     with pytest.raises(PipelineError, match="does not expose decoded frame types"):
         decode_media(
             _video_media(),
-            max_units=1,
             sample_interval_ms=1000,
             sample_strategy=SampleStrategy.KEYFRAME,
         )
@@ -202,7 +177,6 @@ def test_scene_change_strategy_only_keeps_visually_distinct_frames(fake_capture:
     fake_capture.frames = [_solid_frame(0)] * 6 + [_solid_frame(255)] * 6 + [_solid_frame(0)] * 6
     decoded = decode_media(
         _video_media(),
-        max_units=8,
         sample_interval_ms=1000,
         sample_strategy=SampleStrategy.SCENE_CHANGE,
         scene_change_threshold=0.5,
@@ -216,7 +190,6 @@ def test_sample_window_limits_decoding_to_the_requested_range(fake_capture: type
     fake_capture.frames = [_solid_frame(index) for index in range(100)]
     decoded = decode_media(
         _video_media(),
-        max_units=32,
         sample_interval_ms=400,
         sample_start_ms=1000,
         sample_end_ms=2000,
@@ -236,7 +209,6 @@ def test_sample_window_without_seek_support_still_skips_leading_frames(
     fake_capture.seek_supported = False
     decoded = decode_media(
         _video_media(),
-        max_units=3,
         sample_interval_ms=400,
         sample_start_ms=1000,
     )
@@ -248,7 +220,6 @@ def test_frame_max_edge_downscales_sampled_frames(fake_capture: type[_FakeCaptur
     fake_capture.frames = [_solid_frame(64, width=800, height=600) for _ in range(5)]
     decoded = decode_media(
         _video_media(),
-        max_units=2,
         sample_interval_ms=40,
         frame_max_edge=200,
     )
@@ -265,11 +236,10 @@ def test_video_batch_is_downscaled_to_the_memory_budget(
     monkeypatch.setattr("scenara.platform.media_batch.DECODED_BATCH_MEMORY_BUDGET_BYTES", 360_000)
     decoded = decode_media(
         _video_media(),
-        max_units=4,
         sample_interval_ms=40,
     )
-    assert decoded.metadata.frame_max_edge == 200
-    assert all((unit.width, unit.height) == (200, 150) for unit in decoded.units)
+    assert decoded.metadata.frame_max_edge == 178
+    assert all((unit.width, unit.height) == (178, 134) for unit in decoded.units)
 
 
 @pytest.mark.asyncio
@@ -318,7 +288,6 @@ def test_image_decoding_honours_frame_max_edge() -> None:
     Image.new("RGB", (1000, 500), "white").save(buffer, format="PNG")
     decoded = decode_media(
         MediaInput(kind=MediaKind.IMAGE, content_type="image/png", data=buffer.getvalue()),
-        max_units=1,
         sample_interval_ms=1,
         frame_max_edge=250,
     )
@@ -360,11 +329,10 @@ def test_stream_reconnect_count_is_reported(monkeypatch: pytest.MonkeyPatch) -> 
     monkeypatch.setattr("scenara.platform.media_batch.time.sleep", lambda _: None)
     decoded = decode_media(
         MediaInput(kind=MediaKind.STREAM, content_type="video/rtsp", source_url="rtsp://example.test/live"),
-        max_units=2,
         sample_interval_ms=1,
     )
-    assert len(decoded.units) == 2
-    assert decoded.metadata.reconnect_count == 1
+    assert len(decoded.units) == 4
+    assert decoded.metadata.reconnect_count == 3
     assert decoded.metadata.elapsed_ms is not None
     assert decoded.metadata.timestamp_source == "monotonic_clock"
     assert decoded.units[1].pts_ms is not None
@@ -401,7 +369,6 @@ def test_stream_allows_an_initial_connection_when_reconnects_are_disabled(
     monkeypatch.setattr("scenara.platform.media_batch.cv2.VideoCapture", _SingleCapture)
     decoded = decode_media(
         MediaInput(kind=MediaKind.STREAM, content_type="video/rtsp", source_url="rtsp://example.test/live"),
-        max_units=1,
         sample_interval_ms=1,
         max_reconnect_attempts=0,
     )
@@ -441,7 +408,6 @@ async def test_decode_control_pauses_and_cancels_stream_reads(monkeypatch: pytes
         asyncio.to_thread(
             decode_media,
             MediaInput(kind=MediaKind.STREAM, content_type="video/rtsp", source_url="rtsp://example.test/live"),
-            max_units=10_000,
             sample_interval_ms=1000,
             control=control,
         )
@@ -469,7 +435,7 @@ async def test_decode_control_pauses_and_cancels_stream_reads(monkeypatch: pytes
 def test_unsupported_sample_strategy_is_rejected(fake_capture: type[_FakeCapture]) -> None:
     fake_capture.frames = [_solid_frame(1)]
     with pytest.raises(PipelineError, match="unsupported sample_strategy"):
-        decode_media(_video_media(), max_units=1, sample_interval_ms=1000, sample_strategy="every-other-frame")
+        decode_media(_video_media(), sample_interval_ms=1000, sample_strategy="every-other-frame")
 
 
 def test_sample_plan_rejects_inverted_time_windows() -> None:

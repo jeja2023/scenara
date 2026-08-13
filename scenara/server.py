@@ -1086,7 +1086,6 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         domain: Annotated[DomainId, Form()] = "ocr",
         pipeline_id: Annotated[str | None, Form()] = None,
         pipeline_version: Annotated[str | None, Form()] = None,
-        max_units: Annotated[int | None, Form(ge=1, le=10_000)] = None,
         page_scale: Annotated[float, Form(ge=0.5, le=4.0)] = 1.5,
         wait_ms: Annotated[int, Form(ge=0, le=30_000)] = 0,
         idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
@@ -1109,10 +1108,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
                 domain=domain,
                 pipeline=selected_pipeline_ref,
                 asset_id=asset.asset_id,
-                parameters={
-                    **({"max_units": max_units} if max_units is not None else {}),
-                    "page_scale": page_scale,
-                },
+                parameters={"page_scale": page_scale},
                 wait_ms=wait_ms,
             ),
             idempotency_key=idempotency_key or f"shortcut_{uuid4().hex}",
@@ -1760,7 +1756,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         )
         return _envelope(request, hits)  # type: ignore[return-value]
 
-    @app.get("/api/v1/enterprise/status", tags=["Enterprise"])
+    @app.get("/api/v1/enterprise/status", tags=["Legacy"], deprecated=True, include_in_schema=False)
     async def enterprise_status(
         request: Request,
         context: PrincipalContext = Depends(principal_context),
@@ -1768,7 +1764,9 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         result = await enterprise_service().status(context)
         return _envelope(request, result)  # type: ignore[return-value]
 
-    @app.post("/api/v1/enterprise/sla/evaluate", tags=["Enterprise"])
+    @app.post(
+        "/api/v1/enterprise/sla/evaluate", tags=["Legacy"], deprecated=True, include_in_schema=False
+    )
     async def enterprise_sla(
         body: dict[str, float],
         request: Request,
@@ -1777,7 +1775,9 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         result = await enterprise_service().sla(context, body)
         return _envelope(request, result)  # type: ignore[return-value]
 
-    @app.get("/api/v1/enterprise/incidents", tags=["Enterprise"])
+    @app.get(
+        "/api/v1/enterprise/incidents", tags=["Legacy"], deprecated=True, include_in_schema=False
+    )
     async def list_enterprise_incidents(
         request: Request,
         context: PrincipalContext = Depends(principal_context),
@@ -1785,7 +1785,13 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         rows = await enterprise_service().list_incidents(context)
         return _envelope(request, rows)  # type: ignore[return-value]
 
-    @app.post("/api/v1/enterprise/incidents", status_code=201, tags=["Enterprise"])
+    @app.post(
+        "/api/v1/enterprise/incidents",
+        status_code=201,
+        tags=["Legacy"],
+        deprecated=True,
+        include_in_schema=False,
+    )
     async def create_enterprise_incident(
         body: CreateIncidentRequest,
         request: Request,
@@ -1794,7 +1800,12 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         result = await enterprise_service().create_incident(context, body)
         return _envelope(request, result)  # type: ignore[return-value]
 
-    @app.post("/api/v1/enterprise/incidents/{incident_id}/resolve", tags=["Enterprise"])
+    @app.post(
+        "/api/v1/enterprise/incidents/{incident_id}/resolve",
+        tags=["Legacy"],
+        deprecated=True,
+        include_in_schema=False,
+    )
     async def resolve_enterprise_incident(
         incident_id: str,
         body: ResolveIncidentRequest,
@@ -1804,7 +1815,9 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         result = await enterprise_service().resolve_incident(context, incident_id, body)
         return _envelope(request, result)  # type: ignore[return-value]
 
-    @app.get("/api/v1/enterprise/support/cases", tags=["Enterprise"])
+    @app.get(
+        "/api/v1/enterprise/support/cases", tags=["Legacy"], deprecated=True, include_in_schema=False
+    )
     async def list_enterprise_support_cases(
         request: Request,
         context: PrincipalContext = Depends(principal_context),
@@ -1812,7 +1825,13 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         rows = await enterprise_service().list_support_cases(context)
         return _envelope(request, rows)  # type: ignore[return-value]
 
-    @app.post("/api/v1/enterprise/support/cases", status_code=201, tags=["Enterprise"])
+    @app.post(
+        "/api/v1/enterprise/support/cases",
+        status_code=201,
+        tags=["Legacy"],
+        deprecated=True,
+        include_in_schema=False,
+    )
     async def create_enterprise_support_case(
         body: CreateSupportCaseRequest,
         request: Request,
@@ -1821,7 +1840,12 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         result = await enterprise_service().create_support_case(context, body)
         return _envelope(request, result)  # type: ignore[return-value]
 
-    @app.get("/api/v1/enterprise/compliance/evidence", tags=["Enterprise"])
+    @app.get(
+        "/api/v1/enterprise/compliance/evidence",
+        tags=["Legacy"],
+        deprecated=True,
+        include_in_schema=False,
+    )
     async def list_enterprise_evidence(
         request: Request,
         context: PrincipalContext = Depends(principal_context),
@@ -1832,7 +1856,9 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     @app.post(
         "/api/v1/enterprise/compliance/evidence",
         status_code=201,
-        tags=["Enterprise"],
+        tags=["Legacy"],
+        deprecated=True,
+        include_in_schema=False,
     )
     async def create_enterprise_evidence(
         body: CreateComplianceEvidenceRequest,
@@ -2390,7 +2416,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             request, await runtime.control_plane.lifecycle(context, resource_type, resource_id, action, reason)
         )  # type: ignore[return-value]
 
-    @app.post("/api/v1/platform/quotas/plans", status_code=201, tags=["Enterprise"])
+    @app.post("/api/v1/platform/quotas/plans", status_code=201, tags=["Operations"])
     async def create_quota_plan(
         body: CreateQuotaPlanRequest,
         request: Request,
@@ -2398,13 +2424,13 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     ) -> ApiEnvelope[QuotaPlan]:
         return _envelope(request, await runtime.control_plane.create_quota_plan(context, body))  # type: ignore[return-value]
 
-    @app.get("/api/v1/platform/quotas/plans", tags=["Enterprise"])
+    @app.get("/api/v1/platform/quotas/plans", tags=["Operations"])
     async def list_quota_plans(
         request: Request, context: PrincipalContext = Depends(principal_context)
     ) -> ApiEnvelope[list[QuotaPlan]]:
         return _envelope(request, await runtime.control_plane.list_quota_plans(context))  # type: ignore[return-value]
 
-    @app.post("/api/v1/platform/quotas/check", tags=["Enterprise"])
+    @app.post("/api/v1/platform/quotas/check", tags=["Operations"])
     async def check_quota(
         body: QuotaCheckRequest,
         request: Request,
@@ -2412,7 +2438,13 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     ) -> ApiEnvelope[QuotaCheckResponse]:
         return _envelope(request, await runtime.control_plane.check_quota(context, body))  # type: ignore[return-value]
 
-    @app.post("/api/v1/platform/billing/accounts", status_code=201, tags=["Enterprise"])
+    @app.post(
+        "/api/v1/platform/billing/accounts",
+        status_code=201,
+        tags=["Legacy"],
+        deprecated=True,
+        include_in_schema=False,
+    )
     async def create_billing_account(
         body: CreateBillingAccountRequest,
         request: Request,
@@ -2420,13 +2452,21 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     ) -> ApiEnvelope[BillingAccount]:
         return _envelope(request, await runtime.control_plane.create_billing_account(context, body))  # type: ignore[return-value]
 
-    @app.get("/api/v1/platform/billing/accounts", tags=["Enterprise"])
+    @app.get(
+        "/api/v1/platform/billing/accounts", tags=["Legacy"], deprecated=True, include_in_schema=False
+    )
     async def list_billing_accounts(
         request: Request, context: PrincipalContext = Depends(principal_context)
     ) -> ApiEnvelope[list[BillingAccount]]:
         return _envelope(request, await runtime.control_plane.list_billing_accounts(context))  # type: ignore[return-value]
 
-    @app.post("/api/v1/platform/billing/meter-events", status_code=201, tags=["Enterprise"])
+    @app.post(
+        "/api/v1/platform/billing/meter-events",
+        status_code=201,
+        tags=["Legacy"],
+        deprecated=True,
+        include_in_schema=False,
+    )
     async def record_meter_event(
         body: RecordMeterEventRequest,
         request: Request,
@@ -2434,7 +2474,9 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     ) -> ApiEnvelope[MeterEvent]:
         return _envelope(request, await runtime.control_plane.record_meter_event(context, body))  # type: ignore[return-value]
 
-    @app.get("/api/v1/platform/billing/usage", tags=["Enterprise"])
+    @app.get(
+        "/api/v1/platform/billing/usage", tags=["Legacy"], deprecated=True, include_in_schema=False
+    )
     async def list_billing_usage(
         request: Request,
         account_id: str | None = None,
@@ -2442,7 +2484,13 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     ) -> ApiEnvelope[list[BillingUsage]]:
         return _envelope(request, await runtime.control_plane.list_billing_usage(context, account_id))  # type: ignore[return-value]
 
-    @app.post("/api/v1/platform/billing/seats", status_code=201, tags=["Enterprise"])
+    @app.post(
+        "/api/v1/platform/billing/seats",
+        status_code=201,
+        tags=["Legacy"],
+        deprecated=True,
+        include_in_schema=False,
+    )
     async def assign_billing_seat(
         body: AssignSeatRequest,
         request: Request,
@@ -2450,7 +2498,9 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     ) -> ApiEnvelope[SeatAssignment]:
         return _envelope(request, await runtime.control_plane.assign_billing_seat(context, body))  # type: ignore[return-value]
 
-    @app.get("/api/v1/platform/billing/seats", tags=["Enterprise"])
+    @app.get(
+        "/api/v1/platform/billing/seats", tags=["Legacy"], deprecated=True, include_in_schema=False
+    )
     async def list_billing_seats(
         request: Request,
         account_id: str | None = None,
@@ -2884,7 +2934,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
                 queue_backend=settings.queue_backend,
                 production_models_required=settings.production_models_required,
                 auth_required=settings.auth_required,
-                enterprise_policy_provider=runtime.policy.provider_id,
+                policy_provider=runtime.policy.provider_id,
             ),
         )  # type: ignore[return-value]
 

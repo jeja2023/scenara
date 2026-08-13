@@ -28,4 +28,4 @@ await client.parseStream({
 });
 ```
 
-视频处理到 EOF 或显式 `sampleEndMs`，实时流按 `streamSegmentDurationMs` 时间窗口持续分段；这两类快捷接口不提供 `maxUnits`，旧版通用 Run 请求中的 `max_units` 会被服务端忽略。PDF 文档仍可通过 `maxUnits` 设置页数上限。省略 `pipelineVersion` 时由服务端选择唯一的 active 版本；需要固定复现某次运行时应显式传入版本。
+视频处理到 EOF 或显式 `sampleEndMs`，实时流按 `streamSegmentDurationMs` 时间窗口持续分段，PDF 文档处理全部页面。解析入口不提供单元数、帧数或页数上限；旧版通用 Run 请求中的 `max_units` 会被服务端忽略。省略 `pipelineVersion` 时由服务端选择唯一的 active 版本；需要固定复现某次运行时应显式传入版本。

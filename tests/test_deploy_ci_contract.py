@@ -14,6 +14,7 @@ BACKUP_SCRIPT = ROOT / "deploy" / "scripts" / "backup.sh"
 RESTORE_SCRIPT = ROOT / "deploy" / "scripts" / "restore.sh"
 MIGRATE_SCRIPT = ROOT / "deploy" / "scripts" / "migrate.sh"
 OFFLINE_BUILD_SCRIPT = ROOT / "deploy" / "scripts" / "build-offline-bundle.sh"
+OFFLINE_INSTALL_SCRIPT = ROOT / "deploy" / "scripts" / "install-offline.sh"
 DOCKERFILE = ROOT / "Dockerfile"
 MODEL_CONFIG = ROOT / "models.yml"
 MODEL_CAPABILITIES = ROOT / "model-capabilities.yml"
@@ -184,6 +185,18 @@ def test_offline_builder_emits_release_identity_and_model_manifest() -> None:
     assert "model-SHA256SUMS" in offline_build
     assert "container-images.txt" in offline_build
     assert "release-identity.json" in offline_build
+
+
+def test_offline_installer_records_gpu_memory_without_a_fixed_capacity_gate() -> None:
+    installer = OFFLINE_INSTALL_SCRIPT.read_text(encoding="utf-8")
+    assert "gpu_memory_mib=%s" in installer
+    assert '"schema_version": "1.0"' in installer
+    assert '"evidence_type": "offline_install"' in installer
+    assert 'refusing to overwrite existing result' in installer
+    assert "23000" not in installer
+    assert "24 GB" not in installer
+    assert "check.example_clients=passed" not in installer
+    assert "check.core_parse=passed" not in installer
 
 
 def test_ci_checks_legacy_adapter_code_and_enforces_coverage() -> None:

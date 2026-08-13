@@ -12,8 +12,6 @@ type RecordMap = {
 };
 
 const lifecycle = ref<RecordMap[]>([]);
-const billingAccounts = ref<RecordMap[]>([]);
-const usage = ref<RecordMap[]>([]);
 const identityProviders = ref<RecordMap[]>([]);
 const annotationProviders = ref<RecordMap[]>([]);
 const indexBackends = ref<RecordMap[]>([]);
@@ -32,53 +30,27 @@ const retentionForm = reactive({
   export_approval_required: true,
   enabled: true,
 });
-const billingForm = reactive({
-  plan_id: "team",
-  currency: "USD",
-  seat_limit: 5,
-  period_seconds: 2592000,
-});
-const meterForm = reactive({
-  account_id: "",
-  metric: "runs",
-  amount: 1,
-  idempotency_key: "",
-});
-const seatForm = reactive({ account_id: "", user_id: "" });
 
 async function refresh(): Promise<void> {
   loading.value = true;
   error.value = "";
   try {
-    const [requests, policy, accounts, adapters, indexes, rerank] =
-      await Promise.all([
-        api<RecordMap[]>("/api/v1/platform/projects/lifecycle-requests"),
-        api<RecordMap>("/api/v1/platform/audit/retention"),
-        api<RecordMap[]>("/api/v1/platform/billing/accounts"),
-        api<RecordMap[]>("/api/v1/platform/identity-providers"),
-        api<RecordMap[]>("/api/v1/search/index-backends"),
-        api<RecordMap[]>("/api/v1/search/rerankers"),
-      ]);
+    const [requests, policy, adapters, indexes, rerank] = await Promise.all([
+      api<RecordMap[]>("/api/v1/platform/projects/lifecycle-requests"),
+      api<RecordMap>("/api/v1/platform/audit/retention"),
+      api<RecordMap[]>("/api/v1/platform/identity-providers"),
+      api<RecordMap[]>("/api/v1/search/index-backends"),
+      api<RecordMap[]>("/api/v1/search/rerankers"),
+    ]);
     lifecycle.value = requests;
     retention.value = policy;
     Object.assign(retentionForm, policy);
-    billingAccounts.value = accounts;
     identityProviders.value = adapters;
     indexBackends.value = indexes;
     rerankers.value = rerank;
     annotationProviders.value = await api<RecordMap[]>(
       "/api/v1/data/annotation-providers",
     );
-    if (!meterForm.account_id && accounts[0])
-      meterForm.account_id = accounts[0].record_id;
-    if (!seatForm.account_id && accounts[0])
-      seatForm.account_id = accounts[0].record_id;
-    usage.value = meterForm.account_id
-      ? await api<RecordMap[]>(
-          "/api/v1/platform/billing/usage?account_id=" +
-            encodeURIComponent(meterForm.account_id),
-        )
-      : [];
   } catch (caught) {
     error.value = userFacingError(caught, "Platform data could not be loaded");
   } finally {
@@ -129,37 +101,6 @@ async function saveRetention(): Promise<void> {
     api("/api/v1/platform/audit/retention", {
       method: "PUT",
       body: JSON.stringify(retentionForm),
-    }).then(() => undefined),
-  );
-}
-
-async function createBilling(): Promise<void> {
-  await mutate(() =>
-    api("/api/v1/platform/billing/accounts", {
-      method: "POST",
-      body: JSON.stringify(billingForm),
-    }).then(() => undefined),
-  );
-}
-
-async function recordMeter(): Promise<void> {
-  await mutate(() =>
-    api("/api/v1/platform/billing/meter-events", {
-      method: "POST",
-      body: JSON.stringify({
-        ...meterForm,
-        idempotency_key:
-          meterForm.idempotency_key || `console-${crypto.randomUUID()}`,
-      }),
-    }).then(() => undefined),
-  );
-}
-
-async function assignSeat(): Promise<void> {
-  await mutate(() =>
-    api("/api/v1/platform/billing/seats", {
-      method: "POST",
-      body: JSON.stringify(seatForm),
     }).then(() => undefined),
   );
 }
@@ -262,81 +203,6 @@ useRefresh(refresh);
           ><span v-if="retention" class="muted"
             >当前：{{ retention.retention_days }} 天</span
           >
-        </div>
-      </section>
-      <section class="panel">
-        <div class="panel-header"><h2>计费与用量</h2></div>
-        <div class="panel-body form-grid">
-          <label><span>套餐</span><input v-model="billingForm.plan_id" /></label
-          ><label
-            ><span>席位上限</span
-            ><input
-              v-model.number="billingForm.seat_limit"
-              type="number"
-              min="1" /></label
-          ><button
-            class="button secondary"
-            :disabled="saving"
-            @click="createBilling"
-          >
-            创建账户</button
-          ><label
-            ><span>账户</span
-            ><select v-model="meterForm.account_id">
-              <option
-                v-for="account in billingAccounts"
-                :key="account.record_id"
-                :value="account.record_id"
-              >
-                {{ account.plan_id }} · {{ account.record_id }}
-              </option>
-            </select></label
-          ><label
-            ><span>指标数量</span
-            ><input
-              v-model.number="meterForm.amount"
-              type="number"
-              min="1" /></label
-          ><button
-            class="button primary"
-            :disabled="saving || !meterForm.account_id"
-            @click="recordMeter"
-          >
-            记录用量</button
-          ><label
-            ><span>席位用户</span
-            ><input v-model="seatForm.user_id" placeholder="输入用户" /></label
-          ><button
-            class="button secondary"
-            :disabled="saving || !seatForm.user_id || !seatForm.account_id"
-            @click="assignSeat"
-          >
-            分配席位
-          </button>
-        </div>
-        <div class="table-scroll">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th style="width: 50px">序号</th>
-                <th>指标</th>
-                <th>数量</th>
-                <th>周期</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(item, index) in usage" :key="item.record_id">
-                <td class="muted">{{ index + 1 }}</td>
-                <td>{{ item.metric }}</td>
-                <td>{{ item.amount }}</td>
-                <td>
-                  {{
-                    new Date(item.period_started_at * 1000).toLocaleDateString()
-                  }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
         </div>
       </section>
       <section class="panel">

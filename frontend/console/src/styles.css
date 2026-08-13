@@ -445,7 +445,9 @@ a.button {
   border: 1px solid var(--line);
   border-top: 3px solid #9aaca6;
   border-radius: 6px;
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
 }
 .stat:hover {
   transform: translateY(-1px);
@@ -593,7 +595,9 @@ textarea {
   border-radius: 4px;
   background: #fff;
   color: var(--graphite);
-  transition: border-color 150ms ease, box-shadow 150ms ease;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
 }
 input:not([type="checkbox"]):not([type="radio"]):focus,
 select:focus,

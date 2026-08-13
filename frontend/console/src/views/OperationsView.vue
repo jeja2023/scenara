@@ -72,9 +72,7 @@ useRefresh(refresh);
               <td class="muted">1</td>
               <td><strong>接口认证</strong></td>
               <td><span class="badge">访问控制</span></td>
-              <td class="muted">
-                强校验 HTTP 接口访问令牌与会话认证凭据
-              </td>
+              <td class="muted">强校验 HTTP 接口访问令牌与会话认证凭据</td>
               <td>
                 <span
                   class="badge"

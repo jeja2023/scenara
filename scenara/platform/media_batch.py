@@ -19,7 +19,6 @@ from scenara.platform.models import MediaKind, MediaTechnicalMetadata, SampleStr
 from scenara.platform.pipeline import ExecutionContext, ExecutionControl, OperatorDefinition, PipelineError
 
 MAX_PIXELS = 80_000_000
-MAX_DOCUMENT_PAGES = 10_000
 SCENE_CHANGE_HISTOGRAM_BINS = 32
 DECODED_BATCH_MEMORY_BUDGET_BYTES = 512 * 1024 * 1024
 DECODED_QUEUE_CAPACITY_UNITS = 32
@@ -42,7 +41,6 @@ class SamplePlan:
 
     strategy: SampleStrategy = SampleStrategy.INTERVAL
     sample_interval_ms: int = 1000
-    max_units: int | None = None
     start_ms: int = 0
     end_ms: int | None = None
     stream_segment_duration_ms: int | None = None
@@ -51,8 +49,6 @@ class SamplePlan:
     frame_max_edge: int | None = None
 
     def validate(self) -> None:
-        if self.max_units is not None and not 1 <= self.max_units <= 10_000:
-            raise PipelineError("max_units must be between 1 and 10000")
         if not 1 <= self.sample_interval_ms <= 3_600_000:
             raise PipelineError("sample_interval_ms is outside the supported range")
         if self.start_ms < 0:
@@ -342,18 +338,18 @@ def _estimated_sample_count(
     is_stream: bool,
 ) -> int | None:
     if is_stream or plan.strategy in {SampleStrategy.KEYFRAME, SampleStrategy.SCENE_CHANGE}:
-        return plan.max_units
+        return None
     if plan.strategy == SampleStrategy.UNIFORM and frame_count > 0:
         window_start = min(frame_count - 1, max(0, round(plan.start_ms / 1000 * fps)))
         window_end = frame_count if plan.end_ms is None else min(frame_count, round(plan.end_ms / 1000 * fps))
         span = max(1, window_end - window_start)
-        return min(plan.max_units, span) if plan.max_units is not None else span
+        return span
     if duration_ms > 0:
         window_end_ms = duration_ms if plan.end_ms is None else min(duration_ms, plan.end_ms)
         window_ms = max(0, window_end_ms - plan.start_ms)
         estimated = max(1, window_ms // plan.sample_interval_ms + 1)
-        return min(plan.max_units, estimated) if plan.max_units is not None else estimated
-    return plan.max_units
+        return estimated
+    return None
 
 
 def _effective_frame_max_edge(
@@ -391,6 +387,7 @@ def _decode_video(
     control: ExecutionControl | None = None,
     unit_callback: Callable[[DecodedMediaUnit, int | None], None] | None = None,
     retain_units: bool = True,
+    preview_only: bool = False,
 ) -> DecodedMedia:
     plan.validate()
     _check_control(control)
@@ -459,11 +456,8 @@ def _decode_video(
         )
         step = max(1, round(plan.sample_interval_ms / 1000 * fps))
         uniform_step = step
-        if plan.strategy == SampleStrategy.UNIFORM and not is_stream and frame_count > 0:
-            window_start = min(frame_count - 1, max(0, round(plan.start_ms / 1000 * fps)))
-            window_end = frame_count if plan.end_ms is None else min(frame_count, round(plan.end_ms / 1000 * fps))
-            span = max(1, window_end - window_start)
-            uniform_step = max(1, span // plan.max_units) if plan.max_units is not None else 1
+        if plan.strategy == SampleStrategy.UNIFORM:
+            uniform_step = 1
 
         seek_used = False
         if plan.start_ms > 0 and not is_stream:
@@ -484,7 +478,7 @@ def _decode_video(
         next_interval_ms = plan.start_ms
         termination_reason = "source_ended"
         sampled_units = 0
-        while plan.max_units is None or sampled_units < plan.max_units:
+        while True:
             _check_control(control)
             ok, frame = capture.read()
             _check_control(control)
@@ -586,13 +580,11 @@ def _decode_video(
                 units.append(unit)
             if unit_callback is not None:
                 unit_callback(unit, estimated_units)
+            if preview_only:
+                termination_reason = "preview_completed"
+                break
         if sampled_units == 0:
             raise PipelineError("video or stream did not yield a decodable frame")
-        reason = (
-            "max_units_reached"
-            if plan.max_units is not None and sampled_units == plan.max_units
-            else termination_reason
-        )
         metadata.update(
             {
                 "sampled_units": sampled_units,
@@ -623,7 +615,7 @@ def _decode_video(
             metadata=MediaTechnicalMetadata.model_validate(
                 {key: value for key, value in metadata.items() if value is not None}
             ),
-            termination_reason=reason,
+            termination_reason=termination_reason,
         )
     finally:
         capture.release()
@@ -635,9 +627,9 @@ def _decode_video(
 def _decode_pdf(
     data: bytes,
     *,
-    max_units: int | None,
     page_scale: float = 1.5,
     control: ExecutionControl | None = None,
+    preview_only: bool = False,
 ) -> DecodedMedia:
     if not data.startswith(b"%PDF-"):
         raise PipelineError("document is not a PDF")
@@ -648,10 +640,11 @@ def _decode_pdf(
 
         document = pdfium.PdfDocument(data)
         page_count = len(document)
-        if page_count <= 0 or page_count > MAX_DOCUMENT_PAGES:
+        if page_count <= 0:
             raise PipelineError("PDF page count exceeds the safety limit")
         units: list[DecodedMediaUnit] = []
-        for index in range(page_count if max_units is None else min(page_count, max_units)):
+        page_indexes = range(min(page_count, 1)) if preview_only else range(page_count)
+        for index in page_indexes:
             _check_control(control)
             page = document[index]
             bitmap = page.render(scale=page_scale)
@@ -684,14 +677,12 @@ def _decode_pdf(
             width=first.width if first else None,
             height=first.height if first else None,
         ),
-        termination_reason="max_units_reached" if max_units is not None and page_count > len(units) else None,
     )
 
 
 def decode_media(
     media: MediaInput,
     *,
-    max_units: int | None,
     sample_interval_ms: int,
     max_reconnect_attempts: int = 3,
     connect_timeout_ms: int = 10_000,
@@ -709,8 +700,6 @@ def decode_media(
     retain_units: bool = True,
 ) -> DecodedMedia:
     _check_control(control)
-    if max_units is not None and not 1 <= max_units <= MAX_DOCUMENT_PAGES:
-        raise PipelineError("max_units must be between 1 and 10000")
     if media.kind == MediaKind.IMAGE:
         if media.data is None:
             raise PipelineError("image input is empty")
@@ -730,7 +719,7 @@ def decode_media(
     if media.kind == MediaKind.DOCUMENT:
         if media.data is None:
             raise PipelineError("document input is empty")
-        return _decode_pdf(media.data, max_units=max_units, page_scale=page_scale, control=control)
+        return _decode_pdf(media.data, page_scale=page_scale, control=control)
     try:
         strategy = SampleStrategy(sample_strategy)
     except ValueError as exc:
@@ -740,7 +729,6 @@ def decode_media(
         plan=SamplePlan(
             strategy=strategy,
             sample_interval_ms=sample_interval_ms,
-            max_units=max_units,
             start_ms=sample_start_ms,
             end_ms=sample_end_ms,
             stream_segment_duration_ms=stream_segment_duration_ms,
@@ -757,8 +745,22 @@ def decode_media(
     )
 
 
+def _decode_media_preview(media: MediaInput) -> DecodedMedia:
+    if media.kind == MediaKind.DOCUMENT:
+        if media.data is None:
+            raise PipelineError("document input is empty")
+        return _decode_pdf(media.data, preview_only=True)
+    if media.kind == MediaKind.IMAGE:
+        return decode_media(media, sample_interval_ms=1)
+    return _decode_video(
+        media,
+        plan=SamplePlan(sample_interval_ms=1),
+        preview_only=True,
+    )
+
+
 def inspect_media(media: MediaInput) -> tuple[dict[str, Any], bytes]:
-    decoded = decode_media(media, max_units=1, sample_interval_ms=1)
+    decoded = _decode_media_preview(media)
     image = decoded.units[0].image.copy()
     image.thumbnail((640, 640), Image.Resampling.LANCZOS)
     output = BytesIO()
@@ -769,7 +771,7 @@ def inspect_media(media: MediaInput) -> tuple[dict[str, Any], bytes]:
 def create_media_preview(media: MediaInput, *, max_edge: int = 640) -> bytes:
     if not 64 <= max_edge <= 2048:
         raise ValueError("preview max_edge must be between 64 and 2048")
-    decoded = decode_media(media, max_units=1, sample_interval_ms=1)
+    decoded = _decode_media_preview(media)
     if not decoded.units:
         raise PipelineError("media did not yield a previewable unit")
     image = decoded.units[0].image.copy()
@@ -800,8 +802,6 @@ class DecodeMediaOperator:
         media = inputs.get("media")
         if not isinstance(media, MediaInput):
             raise PipelineError("decode-media requires MediaInput")
-        max_units_raw = parameters.get("max_units") if media.kind == MediaKind.DOCUMENT else None
-        max_units = int(max_units_raw) if max_units_raw is not None else None
         sample_interval_ms = int(parameters.get("sample_interval_ms", 1000))
         max_reconnect_attempts = int(parameters.get("max_reconnect_attempts", 3))
         connect_timeout_ms = int(parameters.get("connect_timeout_ms", 10_000))
@@ -827,7 +827,6 @@ class DecodeMediaOperator:
         if not 100 <= connect_timeout_ms <= 120_000 or not 100 <= read_timeout_ms <= 120_000:
             raise PipelineError("media timeout is outside the supported range")
         decode_arguments: dict[str, Any] = {
-            "max_units": max_units,
             "sample_interval_ms": sample_interval_ms,
             "max_reconnect_attempts": max_reconnect_attempts,
             "connect_timeout_ms": connect_timeout_ms,

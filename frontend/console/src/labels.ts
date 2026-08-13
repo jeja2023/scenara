@@ -367,7 +367,7 @@ const runErrorLabels: Record<string, string> = {
 const terminationReasonLabels: Record<string, string> = {
   source_ended: "媒体源已结束",
   reconnect_exhausted: "媒体源重连次数已用尽",
-  max_units_reached: "已达到最大处理单元数（达到上限后主动停止）",
+  max_units_reached: "历史运行达到旧版处理单元上限",
   sample_window_completed: "已完成指定采样时间窗口",
   segment_window_completed: "已完成当前流分段并自动接续",
   cancelled_by_user: "已由用户取消",
@@ -722,7 +722,7 @@ export function labelWarning(value: string): string {
     return "特征图片写入对象存储失败，解析结果不受影响，但部分裁剪图无法查看。";
   }
   if (value === "media_termination:max_units_reached") {
-    return "已达到最大分析单元上限，本次任务已正常完成；如需继续处理，请提高“最大分析单元”或缩小采样间隔。";
+    return "该历史运行创建时仍启用了处理单元数量上限；新运行已取消此限制，请重新解析以处理完整输入。";
   }
   if (value === "media_termination:source_ended") {
     return "媒体源已正常读完，本次任务已完成全部可读取内容。";

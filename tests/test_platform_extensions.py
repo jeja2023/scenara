@@ -37,7 +37,6 @@ def test_image_media_batch() -> None:
     Image.new("RGB", (8, 6), (10, 20, 30)).save(output, format="PNG")
     decoded = decode_media(
         MediaInput(kind=MediaKind.IMAGE, content_type="image/png", data=output.getvalue()),
-        max_units=1,
         sample_interval_ms=1000,
     )
     assert [(unit.width, unit.height, unit.unit_id) for unit in decoded.units] == [(8, 6, "frame_0")]
@@ -76,12 +75,11 @@ def test_stream_reconnects_after_consecutive_read_failures(monkeypatch: pytest.M
     monkeypatch.setattr("scenara.platform.media_batch.time.sleep", lambda _: None)
     decoded = decode_media(
         MediaInput(kind=MediaKind.STREAM, content_type="video/rtsp", source_url="rtsp://example.test/live"),
-        max_units=2,
         sample_interval_ms=1,
     )
-    assert len(decoded.units) == 2
-    assert decoded.termination_reason == "max_units_reached"
-    assert Capture.created == 2
+    assert len(decoded.units) == 4
+    assert decoded.termination_reason == "reconnect_exhausted"
+    assert Capture.created == 4
 
 
 @pytest.mark.asyncio

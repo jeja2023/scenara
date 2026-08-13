@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from io import BytesIO
 from types import SimpleNamespace
 
@@ -239,13 +239,13 @@ async def qualification_refs(
     version: str,
     package_sha256: str,
     *,
-    signed_by: str = "算法评估负责人",
+    status: str = "passed",
 ) -> list[str]:
     executed_at = datetime.now(UTC)
     details = {
         "model_rights": {"rights_cleared": True},
         "portrait_evaluation": {
-            "thresholds_approved_before_run": True,
+            "thresholds_fixed_before_run": True,
             "independent_runs": 2,
             "within_tolerance": True,
         },
@@ -257,13 +257,11 @@ async def qualification_refs(
             {
                 "schema_version": "1.0",
                 "evidence_type": evidence_type,
-                "status": "passed",
+                "status": status,
                 "model_id": "scenara.portrait.release",
                 "model_version": version,
                 "package_sha256": package_sha256,
                 "executed_at": executed_at.isoformat(),
-                "approved_at": (executed_at + timedelta(minutes=5)).isoformat(),
-                "signed_by": signed_by,
                 "details": evidence_details,
             },
             ensure_ascii=False,
@@ -451,7 +449,7 @@ async def test_model_release_cannot_be_validated_without_evidence(feedback_clien
 
 
 @pytest.mark.asyncio
-async def test_model_release_rejects_untrusted_or_placeholder_evidence(feedback_client) -> None:
+async def test_model_release_rejects_untrusted_or_invalid_evidence(feedback_client) -> None:
     api, runtime = feedback_client
     malformed = await api.post(
         "/api/v1/model-releases",
@@ -464,7 +462,7 @@ async def test_model_release_rejects_untrusted_or_placeholder_evidence(feedback_
     )
     assert malformed.status_code == 400
 
-    evidence_refs = await qualification_refs(runtime, "1.0.0", "a" * 64, signed_by="TBD")
+    evidence_refs = await qualification_refs(runtime, "1.0.0", "a" * 64, status="failed")
     created = await api.post(
         "/api/v1/model-releases",
         json={
@@ -477,6 +475,6 @@ async def test_model_release_rejects_untrusted_or_placeholder_evidence(feedback_
     assert created.status_code == 201
     rejected = await api.post(
         "/api/v1/model-releases/scenara.portrait.release/versions/1.0.0/transition",
-        json={"status": "validated", "reason": "placeholder signer"},
+        json={"status": "validated", "reason": "invalid evidence status"},
     )
     assert rejected.status_code == 409

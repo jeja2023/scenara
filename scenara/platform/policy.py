@@ -94,6 +94,33 @@ class DevelopmentPolicyProvider:
         del context, metric, amount, attributes
 
 
+class LocalPolicyProvider:
+    """Self-hosted policy provider. Scope and product checks happen before this provider."""
+
+    provider_id = "local-scoped"
+
+    async def authorize(
+        self,
+        context: PrincipalContext,
+        action: str,
+        resource: str,
+        attributes: dict[str, Any] | None = None,
+    ) -> PolicyDecision:
+        del context, action, resource, attributes
+        return PolicyDecision(allowed=True, reason="local self-hosted policy")
+
+    async def consume(
+        self,
+        context: PrincipalContext,
+        metric: str,
+        amount: int,
+        attributes: dict[str, Any] | None = None,
+    ) -> None:
+        if amount < 0:
+            raise ValueError("usage amount must be non-negative")
+        del context, metric, attributes
+
+
 class DenyUnavailablePolicyProvider:
     provider_id = "unavailable"
 
@@ -145,6 +172,7 @@ __all__ = [
     "RESOURCE_PRODUCTS",
     "DenyUnavailablePolicyProvider",
     "DevelopmentPolicyProvider",
+    "LocalPolicyProvider",
     "PolicyDecision",
     "PolicyDenied",
     "PolicyProvider",

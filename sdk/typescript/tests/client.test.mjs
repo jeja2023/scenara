@@ -40,7 +40,6 @@ test("media shortcuts serialize the complete public parsing contract", async () 
   await client.parseDocument({
     file,
     filename: "report.pdf",
-    maxUnits: 10,
     pageScale: 2.5,
     idempotencyKey: "document-key",
   });
@@ -90,7 +89,7 @@ test("media shortcuts serialize the complete public parsing contract", async () 
   const document = calls.find(({ path }) => path.endsWith("/parse/document"));
   assert.equal(document.options.idempotencyKey, "document-key");
   assert.equal(document.options.body.get("domain"), "ocr");
-  assert.equal(document.options.body.get("max_units"), "10");
+  assert.equal(document.options.body.get("max_units"), null);
   assert.equal(document.options.body.get("page_scale"), "2.5");
 
   const stream = calls.find(({ path }) => path.endsWith("/parse/stream"));

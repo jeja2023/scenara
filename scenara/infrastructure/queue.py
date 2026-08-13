@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Sequence
 from importlib import import_module
 from typing import Any
 
@@ -104,6 +105,40 @@ class RedisRunQueue:
             maxlen=100_000,
             approximate=True,
         )
+
+    async def rebuild_empty(self, runs: Sequence[RunRecord]) -> int:
+        """Atomically repopulate empty Run streams after verified Redis data loss."""
+        if self._client is None:
+            raise RuntimeError("Redis run queue is not open")
+        streams = (f"{self._stream}:batch", f"{self._stream}:stream")
+        pipeline = self._client.pipeline()
+        try:
+            await pipeline.watch(*streams)
+            lengths = [await pipeline.xlen(stream) for stream in streams]
+            if any(lengths):
+                raise RuntimeError("Redis run streams must be empty before queue recovery")
+            pipeline.multi()
+            for run in runs:
+                lane = "stream" if run.source_id else "batch"
+                pipeline.xadd(
+                    f"{self._stream}:{lane}",
+                    {
+                        "tenant_id": run.tenant_id,
+                        "project_id": run.project_id,
+                        "run_id": run.run_id,
+                        "priority": str(run.priority),
+                    },
+                    maxlen=100_000,
+                    approximate=True,
+                )
+            await pipeline.execute()
+        except Exception as exc:
+            if exc.__class__.__name__ == "WatchError":
+                raise RuntimeError("Redis run streams changed during queue recovery") from exc
+            raise
+        finally:
+            await pipeline.reset()
+        return len(runs)
 
     async def _renew_lease(
         self,

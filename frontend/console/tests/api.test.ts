@@ -265,6 +265,9 @@ describe("console information architecture", () => {
     expect(labelWarning("media_termination:source_ended")).toBe(
       "媒体源已正常读完，本次任务已完成全部可读取内容。",
     );
+    expect(labelWarning("media_termination:max_units_reached")).toContain(
+      "新运行已取消此限制",
+    );
     expect(labelWarning("artifact_quota_reached")).toContain(
       "特征图片数量已达到本次运行的上限",
     );
@@ -327,7 +330,6 @@ describe("console information architecture", () => {
         "access",
         "operations",
         "audit",
-        "enterprise",
         "governance",
         "feedback",
         "fallback",

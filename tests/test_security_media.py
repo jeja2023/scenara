@@ -18,7 +18,6 @@ def test_malformed_image_is_rejected_without_partial_decode() -> None:
                 content_type="image/png",
                 data=b"\x89PNG\r\n\x1a\nmalformed",
             ),
-            max_units=1,
             sample_interval_ms=1,
         )
 
@@ -28,7 +27,6 @@ def test_malformed_pdf_is_rejected_by_bounded_decoder() -> None:
     with pytest.raises(PipelineError, match="PDF could not be decoded safely"):
         decode_media(
             MediaInput(kind=MediaKind.DOCUMENT, content_type="application/pdf", data=payload),
-            max_units=1,
             sample_interval_ms=1,
         )
 
@@ -40,6 +38,5 @@ def test_image_decompression_bomb_is_rejected(monkeypatch: pytest.MonkeyPatch) -
     with pytest.raises(PipelineError, match="valid supported image"):
         decode_media(
             MediaInput(kind=MediaKind.IMAGE, content_type="image/png", data=output.getvalue()),
-            max_units=1,
             sample_interval_ms=1,
         )
