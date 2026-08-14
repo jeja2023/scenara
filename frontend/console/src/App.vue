@@ -203,7 +203,7 @@ const pageDescription = computed(() => {
       <div class="topbar-context">
         <span class="context-product">视觉 AI 中枢平台</span>
         <span class="context-separator"></span>
-        <strong class="context-title">{{ pageTitle }}</strong>
+        <h1 class="context-title">{{ pageTitle }}</h1>
         <span
           v-if="pageDescription"
           class="context-description"

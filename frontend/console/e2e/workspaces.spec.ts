@@ -45,20 +45,20 @@ async function expectChineseInterface(
 }
 
 const workspaces = [
-  ["datasets", "数据集", "数据集治理"],
+  ["datasets", "数据集治理", "数据集治理"],
   ["audit", "审计中心", "审计中心"],
   ["", "总览", "总览"],
-  ["parse/portrait", "解析工作区", "解析"],
+  ["parse/portrait", "人像解析", "人像解析"],
   ["assets", "数据资产", "数据资产"],
   ["results", "解析结果", "解析结果"],
-  ["search", "检索", "检索"],
-  ["runs", "运行", "运行"],
+  ["search", "综合检索", "综合检索"],
+  ["runs", "运行历史", "运行历史"],
   ["capabilities", "领域与能力", "领域与能力"],
   ["pipelines", "流水线", "流水线"],
-  ["models", "模型", "模型"],
+  ["models", "模型管理", "模型管理"],
   ["feedback", "反馈与发布", "反馈与发布"],
-  ["access", "接入", "接入"],
-  ["operations", "运维", "运维"],
+  ["access", "接入与权限", "接入与权限"],
+  ["operations", "系统运维", "系统运维"],
 ] as const;
 
 test.beforeEach(async ({ page }) => {
@@ -400,7 +400,7 @@ test("username and password login returns to the workspace", async ({
   await page.getByRole("button", { name: "登录", exact: true }).click();
   await expect(page).toHaveURL(/\/console\/runs$/);
   await expect(
-    page.getByRole("heading", { level: 1, name: "运行" }),
+    page.getByRole("heading", { level: 1, name: "运行历史" }),
   ).toBeVisible();
 });
 
@@ -580,7 +580,7 @@ test("parse domain pages keep media tabs inside the workspace", async ({
   await expect(context).toContainText("人像");
   await expect(context).toContainText("视频");
 
-  const portraitMenu = page.getByRole("link", { name: "人像", exact: true });
+  const portraitMenu = page.getByRole("link", { name: "人像解析", exact: true });
   await expect(portraitMenu).toBeVisible();
   await expect(page.locator(".parse-media-link")).toHaveCount(0);
   await expect(page.locator(".parse-domain-link small")).toHaveCount(0);
