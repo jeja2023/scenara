@@ -524,23 +524,17 @@ test("mobile navigation opens and reaches another workspace", async ({
   expect(pageErrors).toEqual([]);
 });
 
-test("解析菜单只负责展开领域入口，不会导航到默认解析页", async ({ page }) => {
+test("导航栏直接提供人像解析与 OCR 文档解析入口", async ({ page }) => {
   await page.goto("");
   const mobileMenu = page.locator(".mobile-menu");
   if (await mobileMenu.isVisible()) await mobileMenu.click();
-  const parseMenu = page.getByRole("button", { name: "解析", exact: true });
-  await expect(parseMenu).toHaveAttribute("aria-expanded", "false");
-  await parseMenu.click();
-  await expect(parseMenu).toHaveAttribute("aria-expanded", "true");
-  await expect(page.locator(".parse-subnav")).toBeVisible();
-  await expect(page).toHaveURL(/\/console\/$/);
-  await expect(page.getByRole("heading", { name: "解析工作区" })).toHaveCount(
-    0,
-  );
-
-  await parseMenu.click();
-  await expect(parseMenu).toHaveAttribute("aria-expanded", "false");
-  await expect(page.locator(".parse-subnav")).toHaveCount(0);
+  const portraitLink = page.getByRole("link", { name: "人像解析", exact: true });
+  await expect(portraitLink).toBeVisible();
+  await portraitLink.click();
+  await expect(page).toHaveURL(/\/parse\/portrait$/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: "人像解析" }),
+  ).toBeVisible();
 });
 
 test("parse workbench exposes complete media-mode controls", async ({

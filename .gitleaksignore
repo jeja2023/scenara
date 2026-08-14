@@ -1,4 +1,4 @@
-﻿# Gitleaks ignore fingerprints for historical commits
+# Gitleaks ignore fingerprints for historical commits
 c28859db121899cf18914d5e1f7b54c1c6b86adc:docs/release/evidence/manifest.json:generic-api-key:8
 c28859db121899cf18914d5e1f7b54c1c6b86adc:docs/release/evidence/manifest.json:generic-api-key:23
 c28859db121899cf18914d5e1f7b54c1c6b86adc:docs/release/evidence/reports/backup-restore.json:generic-api-key:11
@@ -13,3 +13,4 @@ c28859db121899cf18914d5e1f7b54c1c6b86adc:sdk/typescript/src/generated.ts:generic
 4ecc6e4c1f8c97d964d92579311fcb1d0cf594dc:sdk/typescript/dist/generated.d.ts:generic-api-key:13
 4ecc6e4c1f8c97d964d92579311fcb1d0cf594dc:sdk/typescript/dist/generated.js:generic-api-key:10
 4ecc6e4c1f8c97d964d92579311fcb1d0cf594dc:sdk/typescript/src/generated.ts:generic-api-key:13
+

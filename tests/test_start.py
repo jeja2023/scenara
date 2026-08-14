@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import os
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -27,7 +26,8 @@ def test_existing_redis_is_reused(tmp_path: Path, monkeypatch: Any) -> None:
 def test_bundled_redis_is_started_for_local_endpoint(tmp_path: Path, monkeypatch: Any) -> None:
     env_file = tmp_path / ".env"
     _redis_env(env_file)
-    executable = tmp_path / "redis-7.4.10" / "bin" / "redis-server.exe"
+    binary_name = "redis-server.exe" if os.name == "nt" else "redis-server"
+    executable = tmp_path / "redis-7.4.10" / "bin" / binary_name
     executable.parent.mkdir(parents=True)
     executable.touch()
     monkeypatch.delenv("SCENARA_QUEUE_BACKEND", raising=False)

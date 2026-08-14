@@ -70,6 +70,8 @@ jobs:
       SCENARA_RUN_INTEGRATION: "1"
       SCENARA_POSTGRES_PASSWORD: scenara-integration
       SCENARA_API_TOKEN: integration-api-token
+      SCENARA_S3_ACCESS_KEY: scenara
+      SCENARA_INTEGRATION_S3_ACCESS_KEY: scenara
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -81,7 +83,7 @@ jobs:
       - name: Generate ephemeral encryption key
         run: |
           python -c "from cryptography.fernet import Fernet; print('SCENARA_SECRET_ENCRYPTION_KEY=' + Fernet.generate_key().decode())" >> "$GITHUB_ENV"
-          python -c "import secrets; value=secrets.token_urlsafe(32); print('SCENARA_S3_SECRET_KEY=' + value); print('SCENARA_INTEGRATION_S3_SECRET_KEY=' + value)" >> "$GITHUB_ENV"
+          python -c "import secrets; value=secrets.token_urlsafe(32); print('SCENARA_S3_SECRET_KEY=' + value); print('SCENARA_INTEGRATION_S3_SECRET_KEY=' + value); print('SCENARA_S3_ACCESS_KEY=scenara'); print('SCENARA_INTEGRATION_S3_ACCESS_KEY=scenara')" >> "$GITHUB_ENV"
       - name: Start PostgreSQL, Redis, and MinIO
         # Compose interpolates every required variable even when only the data
         # services start. Keep the adapter path scoped to the Compose steps so

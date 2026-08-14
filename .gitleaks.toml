@@ -1,4 +1,4 @@
-﻿# Gitleaks configuration for Scenara repository
+# Gitleaks configuration for Scenara repository
 
 [allowlist]
 description = "Allowlist for SHA-256 hashes in release evidence, OpenAPI, generated SDKs, and tests"
