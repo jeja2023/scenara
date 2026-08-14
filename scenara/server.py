@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+import json
 import re
 import sys
 import tempfile
@@ -173,6 +174,11 @@ from scenara.platform.index import (
     IndexVectorQueryRequest,
 )
 from scenara.platform.model_runtime import ModelPackageManifest
+from scenara.platform.objects import (
+    ObjectAlreadyExistsError,
+    ObjectIntegrityError,
+    ObjectStoreCapabilityError,
+)
 from scenara.platform.models import (
     TERMINAL_RUN_STATUSES,
     AccessFoundationStatus,
@@ -180,6 +186,7 @@ from scenara.platform.models import (
     ApiErrorDetail,
     ApiErrorEnvelope,
     ApiKeyRecord,
+    CompleteMediaUploadRequest,
     CreateApiKeyRequest,
     CreateApiKeyResponse,
     CreateDatasetRequest,
@@ -215,6 +222,9 @@ from scenara.platform.models import (
     ParseImageResponse,
     ParseStreamRequest,
     ParseVideoResponse,
+    PresignedMediaDownload,
+    PresignedMediaUpload,
+    PresignMediaUploadRequest,
     PipelineTransitionRequest,
     PortraitIntelligenceStatus,
     PrincipalContext,
@@ -406,6 +416,44 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         finally:
             handle.close()
 
+    def require_presigned_storage() -> None:
+        if not runtime.settings.s3_presigned_urls_enabled:
+            raise HTTPException(status_code=404, detail="presigned object URLs are not enabled")
+        if runtime.settings.object_backend != "s3":
+            raise HTTPException(status_code=409, detail="presigned object URLs require an S3 provider")
+
+    def validate_direct_upload_size(body: PresignMediaUploadRequest) -> None:
+        maximum = runtime.settings.max_image_bytes if body.kind == MediaKind.IMAGE else runtime.settings.max_media_bytes
+        if body.size_bytes > maximum:
+            raise ValueError(f"media exceeds {maximum} bytes")
+
+    def upload_token(
+        context: PrincipalContext,
+        upload_id: str,
+        body: PresignMediaUploadRequest,
+        expires_at: int,
+    ) -> str:
+        secret = runtime.settings.api_token or runtime.settings.secret_encryption_key
+        if not secret:
+            raise HTTPException(status_code=503, detail="presigned upload signing key is not configured")
+        payload = json.dumps(
+            {
+                "tenant_id": context.tenant_id,
+                "project_id": context.project_id,
+                "upload_id": upload_id,
+                "filename": body.filename,
+                "content_type": body.content_type,
+                "kind": body.kind.value,
+                "size_bytes": body.size_bytes,
+                "sha256": body.sha256,
+                "expires_at": expires_at,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        return hmac.new(secret.encode("utf-8"), payload.encode("utf-8"), "sha256").hexdigest()
+
     @app.middleware("http")
     async def request_context(request: Request, call_next: RequestResponseEndpoint) -> Response:
         request.state.request_id = request.headers.get("X-Request-Id", f"req_{uuid4().hex}")[:128]
@@ -542,6 +590,18 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     async def pipeline_error(request: Request, exc: PipelineError) -> JSONResponse:
         return error_response(request, 422, "PIPELINE_ERROR", str(exc))
 
+    @app.exception_handler(ObjectAlreadyExistsError)
+    async def immutable_object_conflict(request: Request, exc: ObjectAlreadyExistsError) -> JSONResponse:
+        return error_response(request, 409, "IMMUTABLE_OBJECT_CONFLICT", str(exc))
+
+    @app.exception_handler(ObjectIntegrityError)
+    async def object_integrity_error(request: Request, exc: ObjectIntegrityError) -> JSONResponse:
+        return error_response(request, 409, "OBJECT_INTEGRITY_ERROR", str(exc))
+
+    @app.exception_handler(ObjectStoreCapabilityError)
+    async def object_capability_error(request: Request, exc: ObjectStoreCapabilityError) -> JSONResponse:
+        return error_response(request, 409, "OBJECT_CAPABILITY_UNAVAILABLE", str(exc))
+
     @app.exception_handler(ValueError)
     async def value_error(request: Request, exc: ValueError) -> JSONResponse:
         return error_response(request, 400, "INVALID_ARGUMENT", str(exc))
@@ -603,6 +663,114 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
                 kind=kind,
             )
         return _envelope(request, asset)  # type: ignore[return-value]
+
+    @app.post("/api/v1/media/uploads/presign", tags=["Media"])
+    async def presign_media_upload(
+        body: PresignMediaUploadRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[PresignedMediaUpload]:
+        require_presigned_storage()
+        validate_direct_upload_size(body)
+        await require_allowed(runtime.policy, context, "create", "media_asset", {"kind": body.kind.value})
+        upload_id = f"upl_{uuid4().hex}"
+        object_key = (
+            f"tenants/{context.tenant_id}/projects/{context.project_id}"
+            f"/pending-uploads/{upload_id}/original"
+        )
+        expires_at = int(time.time()) + runtime.settings.s3_presign_expiry_seconds
+        signed = await runtime.objects.presign_upload(
+            object_key,
+            content_type=body.content_type,
+            sha256=body.sha256,
+            size_bytes=body.size_bytes,
+            expires_in=runtime.settings.s3_presign_expiry_seconds,
+            retention_category="pending_upload",
+        )
+        response = PresignedMediaUpload(
+            upload_id=upload_id,
+            upload_token=upload_token(context, upload_id, body, expires_at),
+            url=signed.url,
+            headers=signed.headers,
+            expires_at=expires_at,
+        )
+        return _envelope(request, response)  # type: ignore[return-value]
+
+    @app.post("/api/v1/media/uploads/complete", status_code=201, tags=["Media"])
+    async def complete_media_upload(
+        body: CompleteMediaUploadRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[MediaAsset]:
+        require_presigned_storage()
+        validate_direct_upload_size(body)
+        expected_token = upload_token(context, body.upload_id, body, int(body.expires_at))
+        if not hmac.compare_digest(expected_token, body.upload_token):
+            raise HTTPException(status_code=403, detail="presigned upload token is invalid")
+        if time.time() > body.expires_at + 60:
+            raise HTTPException(status_code=410, detail="presigned upload has expired")
+        object_key = (
+            f"tenants/{context.tenant_id}/projects/{context.project_id}"
+            f"/pending-uploads/{body.upload_id}/original"
+        )
+        if not await runtime.objects.exists(object_key):
+            raise HTTPException(status_code=409, detail="presigned upload object is not available")
+        metadata = await runtime.objects.verify(object_key, body.sha256)
+        if metadata.size_bytes != body.size_bytes:
+            raise ValueError("uploaded object size does not match the request")
+        suffix = Path(body.filename or "media.bin").suffix or ".bin"
+        handle = tempfile.NamedTemporaryFile(prefix="scenara-direct-upload-", suffix=suffix, delete=False)
+        handle.close()
+        path = Path(handle.name)
+        try:
+            await runtime.objects.get_to_file(object_key, path, expected_sha256=body.sha256)
+            if body.kind == MediaKind.VIDEO:
+                asset = await runtime.runs.create_asset_from_path(
+                    context,
+                    path=str(path),
+                    filename=body.filename,
+                    content_type=body.content_type,
+                    kind=body.kind,
+                )
+            else:
+                asset = await runtime.runs.create_asset(
+                    context,
+                    data=await asyncio.to_thread(path.read_bytes),
+                    filename=body.filename,
+                    content_type=body.content_type,
+                    kind=body.kind,
+                )
+        finally:
+            with suppress(FileNotFoundError):
+                path.unlink()
+            with suppress(Exception):
+                await runtime.objects.delete(object_key)
+        return _envelope(request, asset)  # type: ignore[return-value]
+
+    @app.get("/api/v1/media/assets/{asset_id}/download-url", tags=["Media"])
+    async def presign_media_download(
+        asset_id: str,
+        request: Request,
+        expires_in: Annotated[int | None, Query(ge=60, le=86_400)] = None,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[PresignedMediaDownload]:
+        require_presigned_storage()
+        await require_allowed(runtime.policy, context, "read", "media_asset", {"asset_id": asset_id})
+        asset = await runtime.state.get_asset(context.tenant_id, context.project_id, asset_id)
+        if asset is None or asset.deleted_at is not None or asset.original_deleted_at is not None:
+            raise ResourceNotFound("media asset not found")
+        await runtime.objects.verify(asset.object_key, asset.sha256)
+        signed = await runtime.objects.presign_download(
+            asset.object_key,
+            expires_in=expires_in or runtime.settings.s3_presign_expiry_seconds,
+            filename=asset.filename,
+        )
+        response = PresignedMediaDownload(
+            url=signed.url,
+            headers=signed.headers,
+            expires_at=signed.expires_at,
+        )
+        return _envelope(request, response)  # type: ignore[return-value]
 
     @app.get("/api/v1/media/assets", tags=["Media"])
     async def list_media_assets(

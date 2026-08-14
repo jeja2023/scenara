@@ -22,6 +22,8 @@ import type {
   ParseDocumentResponse,
   ParseImageResponse,
   ParseVideoResponse,
+  PresignedMediaDownload,
+  PresignedMediaUpload,
   PortraitCompareResponse,
   IndexDefinition,
   IndexHit,
@@ -232,6 +234,47 @@ export class ScenaraClient {
     form.append("file", input.file, input.filename);
     form.append("kind", input.kind ?? "image");
     return this.transport<MediaAsset>("POST", "/api/v1/media/assets", { body: form });
+  }
+
+  async uploadAssetDirect(input: {
+    file: Blob;
+    filename: string;
+    kind?: "image" | "video" | "document";
+  }): Promise<MediaAsset> {
+    const digest = await crypto.subtle.digest("SHA-256", await input.file.arrayBuffer());
+    const sha256 = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
+    const request = {
+      filename: input.filename,
+      content_type: input.file.type || "application/octet-stream",
+      kind: input.kind ?? "video",
+      size_bytes: input.file.size,
+      sha256,
+    };
+    const upload = await this.transport<PresignedMediaUpload>("POST", "/api/v1/media/uploads/presign", {
+      body: request,
+    });
+    const response = await fetch(upload.url, {
+      method: upload.method,
+      headers: upload.headers,
+      body: input.file,
+    });
+    if (!response.ok) throw new ScenaraError("OBJECT_UPLOAD_FAILED", `Object upload failed with ${response.status}`);
+    return this.transport<MediaAsset>("POST", "/api/v1/media/uploads/complete", {
+      body: {
+        ...request,
+        upload_id: upload.upload_id,
+        upload_token: upload.upload_token,
+        expires_at: upload.expires_at,
+      },
+    });
+  }
+
+  getAssetDownloadUrl(assetId: string, expiresIn?: number): Promise<PresignedMediaDownload> {
+    const query = expiresIn === undefined ? "" : "?expires_in=" + String(expiresIn);
+    return this.transport<PresignedMediaDownload>(
+      "GET",
+      "/api/v1/media/assets/" + encodeURIComponent(assetId) + "/download-url" + query,
+    );
   }
 
   parseImage(input: ParseFileInput): Promise<ParseImageResponse> {

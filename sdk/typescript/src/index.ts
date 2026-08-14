@@ -33,6 +33,8 @@ export type {
   PortraitIntelligenceStatus,
   PortraitModuleItem,
   PortraitModuleMaturity,
+  PresignedMediaDownload,
+  PresignedMediaUpload,
   ResultEnvelope,
   ResultPage,
   RepositoryBoundaryRule,

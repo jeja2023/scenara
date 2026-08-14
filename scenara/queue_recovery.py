@@ -37,8 +37,12 @@ async def rebuild_redis_run_queue(
             asset = await state.get_asset(run.tenant_id, run.project_id, run.asset_id)
             if asset is None or asset.original_deleted_at is not None:
                 raise RuntimeError(f"recoverable Run {run.run_id} has no retained media asset")
-            if not await objects.exists(asset.object_key):
-                raise RuntimeError(f"recoverable Run {run.run_id} media object is missing")
+            try:
+                await objects.verify(asset.object_key, asset.sha256)
+            except Exception as exc:
+                raise RuntimeError(
+                    f"recoverable Run {run.run_id} media object is missing or corrupt"
+                ) from exc
             assets_verified += 1
             continue
         if run.source_id is not None:

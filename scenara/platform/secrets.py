@@ -65,7 +65,13 @@ class EncryptedObjectSecretStore:
         if not value:
             raise ValueError("secret value is empty")
         encrypted = self._cipher.encrypt(value.encode("utf-8"))
-        await self._objects.put(self._object_key(secret_ref), encrypted, "application/octet-stream")
+        await self._objects.put(
+            self._object_key(secret_ref),
+            encrypted,
+            "application/octet-stream",
+            overwrite=True,
+            retention_category="secret",
+        )
 
     async def get(self, secret_ref: str) -> str:
         try:

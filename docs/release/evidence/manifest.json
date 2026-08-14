@@ -1,50 +1,17 @@
 {
   "schema_version": "1.2",
-  "release": "0.3.0-dev.20",
+  "release": "0.3.0-dev.21",
   "release_identity": {
     "source_commit": null,
     "image_digest": null,
     "offline_bundle_sha256": null,
-    "openapi_sha256": "bfa48af550fc86e610501feeb74f7ea8c7151047be3b0ee5cc1fa8bde30a7f62",
+    "openapi_sha256": "5967881b1298c48a6d0fc8c58f423e016828736f932bd9a156539ce72a550573",
     "model_set_sha256": null
   },
   "entries": [
     {
       "evidence_type": "backup_restore",
-      "report": "docs/release/evidence/reports/backup-restore.json",
-      "sha256": "2403d615e529e5d04e3ce2e81ecbc2ccdde62646a579246fe4a9924620f5bf85",
-      "status": "passed",
-      "executed_at": "2026-08-13T14:16:30.8130631+08:00",
-      "target": "scenara-qualification PostgreSQL and MinIO Docker Linux/amd64 services on Windows 10.0.22631",
-      "release_identity": {
-        "source_commit": null,
-        "image_digest": null,
-        "offline_bundle_sha256": null,
-        "openapi_sha256": "bfa48af550fc86e610501feeb74f7ea8c7151047be3b0ee5cc1fa8bde30a7f62",
-        "model_set_sha256": null
-      },
-      "metadata": {
-        "rpo_hours": 0.001102,
-        "rto_hours": 0.001488,
-        "rpo_seconds": 3.967,
-        "rto_seconds": 5.358,
-        "entities_verified": [
-          "tenants",
-          "projects",
-          "media",
-          "runs",
-          "results",
-          "pipelines",
-          "models",
-          "audit",
-          "biometrics"
-        ],
-        "entity_counts": "1|1|1|1|1|1|1|1|1",
-        "postgres_dump_sha256": "b38f5eb2b5c47e3e03f88a129685fa74c0673a967b7d4c2de1d17214046c94df",
-        "postgres_marker_verified": true,
-        "minio_marker_verified": true,
-        "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/local_backup_restore_drill.ps1 -PostgresContainer scenara-qualification-postgres-1 -DockerNetwork scenara-qualification_default"
-      }
+      "status": "pending"
     },
     {
       "evidence_type": "gpu_capacity",
@@ -52,36 +19,7 @@
     },
     {
       "evidence_type": "integration_services",
-      "report": "docs/release/evidence/reports/integration-services.json",
-      "sha256": "23332ecd4bb1557237877e466fd1b575c589d3b7af36e71bd3ceff62aa675787",
-      "status": "passed",
-      "executed_at": "2026-08-13T14:16:30.8130631+08:00",
-      "target": "scenara-qualification Docker Linux/amd64 services on Windows 10.0.22631; Docker Server 29.6.2",
-      "release_identity": {
-        "source_commit": null,
-        "image_digest": null,
-        "offline_bundle_sha256": null,
-        "openapi_sha256": "bfa48af550fc86e610501feeb74f7ea8c7151047be3b0ee5cc1fa8bde30a7f62",
-        "model_set_sha256": null
-      },
-      "metadata": {
-        "services": [
-          "postgres_pgvector",
-          "redis",
-          "minio"
-        ],
-        "command": "SCENARA_RUN_INTEGRATION=1 SCENARA_INTEGRATION_POSTGRES_DSN=postgresql://scenara:<redacted>@127.0.0.1:56432/scenara SCENARA_INTEGRATION_REDIS_URL=redis://127.0.0.1:57379/15 SCENARA_INTEGRATION_S3_ENDPOINT=http://127.0.0.1:60000 python -m pytest -q -m integration tests/integration -rs",
-        "passed_tests": 9,
-        "skipped_tests": 0,
-        "duplicate_logical_results": 0,
-        "redis_pending_recovery_verified": true,
-        "redis_rebuild_verified": true,
-        "service_images": [
-          "pgvector/pgvector@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb",
-          "redis@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2",
-          "minio/minio@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0"
-        ]
-      }
+      "status": "pending"
     },
     {
       "evidence_type": "model_rights",
@@ -101,77 +39,11 @@
     },
     {
       "evidence_type": "security_assessment",
-      "report": "docs/release/evidence/reports/security-assessment.json",
-      "sha256": "3590a7dd6571b0ed58a625d842461eef5d91cbf786374c118cdc2d5f7260b141",
-      "status": "passed",
-      "executed_at": "2026-08-13T15:25:12.7341120+08:00",
-      "target": "Scenara security regression and dependency audit on Windows 10.0.22631 x86_64 with Python 3.12.4",
-      "release_identity": {
-        "source_commit": null,
-        "image_digest": null,
-        "offline_bundle_sha256": null,
-        "openapi_sha256": "bfa48af550fc86e610501feeb74f7ea8c7151047be3b0ee5cc1fa8bde30a7f62",
-        "model_set_sha256": null
-      },
-      "metadata": {
-        "scenarios": [
-          "audit_fail_closed",
-          "authorization",
-          "biometric_deletion",
-          "credential_redaction",
-          "malicious_media",
-          "ssrf"
-        ],
-        "assessment_kind": "code_level_regression",
-        "passed_tests": 61,
-        "skipped_tests": 0,
-        "third_party_penetration_test": false,
-        "command": "python -m pytest -q tests/test_security_media.py tests/test_platform_extensions.py tests/test_platform_kernel.py tests/test_portrait_analysis.py tests/test_portrait_identity.py tests/test_api.py -rs",
-        "dependency_audits": {
-          "python_dev": {
-            "command": "python -m pip_audit -r requirements/dev.txt",
-            "known_vulnerabilities": 0
-          },
-          "python_production_lock": {
-            "command": "python -m pip_audit -r requirements/production.lock --no-deps --disable-pip",
-            "known_vulnerabilities": 0,
-            "resolution_note": "No dependency installation was attempted because the Linux production lock contains uvloop, which does not install on Windows."
-          },
-          "javascript_lock": {
-            "command": "pnpm audit --audit-level high --json",
-            "known_vulnerabilities": 0,
-            "remediation": "Pinned transitive nanoid to 3.3.17 for GHSA-2v37-7h3g-55p8."
-          }
-        }
-      }
+      "status": "pending"
     },
     {
       "evidence_type": "software_license",
-      "report": "docs/release/evidence/reports/software-license.json",
-      "sha256": "0860cf9fc283ae39d6345f7e35b07bab30327d1e4d58392876ff91133993b0bb",
-      "status": "passed",
-      "executed_at": "2026-08-13T11:06:32+08:00",
-      "target": "Scenara 0.3.0-dev.20 repository license text",
-      "release_identity": {
-        "source_commit": null,
-        "image_digest": null,
-        "offline_bundle_sha256": null,
-        "openapi_sha256": "bfa48af550fc86e610501feeb74f7ea8c7151047be3b0ee5cc1fa8bde30a7f62",
-        "model_set_sha256": null
-      },
-      "metadata": {
-        "license_sha256": "a4711a0d889bff4a3bf3d06ff7b3cc594d074cbdd79435b70448daa6377e584b",
-        "license_identifier": "LicenseRef-Scenara-Proprietary-Source-1.0",
-        "review_basis": "personal_project_self_review",
-        "review_scope": [
-          "compliance",
-          "copyright_and_ownership",
-          "grant_and_restrictions",
-          "termination",
-          "third_party_materials",
-          "warranty_and_liability"
-        ]
-      }
+      "status": "pending"
     }
   ]
 }

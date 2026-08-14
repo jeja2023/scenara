@@ -20,7 +20,8 @@ The repository is divided into four dependency directions:
    time and is visible only through `DomainPluginRegistry`. Runtime code upload
    is not supported.
 3. `scenara.infrastructure` implements platform ports for PostgreSQL, Redis, and
-   S3-compatible storage. It does not define domain behavior.
+   certified S3-compatible providers. It does not define domain behavior or bind
+   the platform contract to MinIO, Amazon S3, OSS, or Ceph RGW.
 4. `scenara.enterprise` implements optional policy providers. Platform code
    calls a provider contract and does not import an enterprise implementation.
 

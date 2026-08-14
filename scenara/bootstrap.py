@@ -168,9 +168,22 @@ def build_runtime(
         objects: ObjectStore = S3ObjectStore(
             bucket=settings.s3_bucket,
             endpoint_url=settings.s3_endpoint_url,
+            public_endpoint_url=settings.s3_public_endpoint_url,
             region=settings.s3_region,
             access_key=settings.s3_access_key,
             secret_key=settings.s3_secret_key,
+            session_token=settings.s3_session_token,
+            verify_tls=settings.s3_verify_tls,
+            ca_bundle=settings.s3_ca_bundle,
+            server_side_encryption=settings.s3_server_side_encryption,
+            kms_key_id=settings.s3_kms_key_id,
+            multipart_threshold_bytes=settings.s3_multipart_threshold_bytes,
+            multipart_chunk_bytes=settings.s3_multipart_chunk_bytes,
+            lifecycle_enabled=settings.s3_lifecycle_enabled,
+            raw_media_retention_days=settings.raw_media_retention_days,
+            preview_retention_days=settings.preview_retention_days,
+            structured_result_retention_days=settings.structured_result_retention_days,
+            addressing_style=settings.s3_addressing_style,
         )
     else:
         objects = LocalObjectStore(settings.data_dir / "objects")

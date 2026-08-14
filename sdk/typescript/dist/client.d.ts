@@ -1,4 +1,4 @@
-import type { AccessFoundationStatus, AuditEventPage, ApiKeyRecord, CreateApiKeyResponse, DatasetRecord, DatasetVersion, Domain, FeedbackRecord, HardSampleManifest, IamSummary, MediaAsset, MediaAssetPage, MediaSource, MediaSourcePage, MediaSourceProbe, Membership, ModelDeploymentEvent, ModelPackage, ModelRelease, Organization, ParseDocumentResponse, ParseImageResponse, ParseVideoResponse, PortraitCompareResponse, IndexDefinition, IndexHit, IndexRecordView, SearchResponse, SavedSearch, SavedSearchPage, PortraitIntelligenceStatus, ProductCatalogItem, ProductEntitlement, Project, RepositoryContractCatalog, RepositoryTopology, ResultEnvelope, ResultPage, Run, RunPage, RunStatus, SampleStrategy, Role, ServiceAccount, UserAccount, WebhookDelivery, WebhookSubscription } from "./types.js";
+import type { AccessFoundationStatus, AuditEventPage, ApiKeyRecord, CreateApiKeyResponse, DatasetRecord, DatasetVersion, Domain, FeedbackRecord, HardSampleManifest, IamSummary, MediaAsset, MediaAssetPage, MediaSource, MediaSourcePage, MediaSourceProbe, Membership, ModelDeploymentEvent, ModelPackage, ModelRelease, Organization, ParseDocumentResponse, ParseImageResponse, ParseVideoResponse, PresignedMediaDownload, PortraitCompareResponse, IndexDefinition, IndexHit, IndexRecordView, SearchResponse, SavedSearch, SavedSearchPage, PortraitIntelligenceStatus, ProductCatalogItem, ProductEntitlement, Project, RepositoryContractCatalog, RepositoryTopology, ResultEnvelope, ResultPage, Run, RunPage, RunStatus, SampleStrategy, Role, ServiceAccount, UserAccount, WebhookDelivery, WebhookSubscription } from "./types.js";
 export type ScenaraTransport = <T>(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", path: string, options?: {
     body?: unknown;
     idempotencyKey?: string;
@@ -94,6 +94,12 @@ export declare class ScenaraClient {
         filename: string;
         kind?: "image" | "video" | "document";
     }): Promise<MediaAsset>;
+    uploadAssetDirect(input: {
+        file: Blob;
+        filename: string;
+        kind?: "image" | "video" | "document";
+    }): Promise<MediaAsset>;
+    getAssetDownloadUrl(assetId: string, expiresIn?: number): Promise<PresignedMediaDownload>;
     parseImage(input: ParseFileInput): Promise<ParseImageResponse>;
     parseVideo(input: ParseVideoInput): Promise<ParseVideoResponse>;
     parseDocument(input: ParseDocumentInput): Promise<ParseDocumentResponse>;

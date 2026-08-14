@@ -8,10 +8,22 @@ x-scenara-environment: &scenara-environment
   SCENARA_POSTGRES_DSN: postgresql://scenara:${SCENARA_POSTGRES_PASSWORD:?set SCENARA_POSTGRES_PASSWORD}@postgres:5432/scenara
   SCENARA_REDIS_URL: redis://redis:6379/0
   SCENARA_S3_ENDPOINT_URL: http://minio:9000
+  SCENARA_S3_PUBLIC_ENDPOINT_URL: ${SCENARA_S3_PUBLIC_ENDPOINT_URL:-}
   SCENARA_S3_REGION: us-east-1
   SCENARA_S3_BUCKET: scenara
   SCENARA_S3_ACCESS_KEY: ${SCENARA_S3_ACCESS_KEY:-scenara}
   SCENARA_S3_SECRET_KEY: ${SCENARA_S3_SECRET_KEY:?set SCENARA_S3_SECRET_KEY}
+  SCENARA_S3_SESSION_TOKEN: ${SCENARA_S3_SESSION_TOKEN:-}
+  SCENARA_S3_VERIFY_TLS: ${SCENARA_S3_VERIFY_TLS:-true}
+  SCENARA_S3_CA_BUNDLE: ${SCENARA_S3_CA_BUNDLE:-}
+  SCENARA_S3_SERVER_SIDE_ENCRYPTION: ${SCENARA_S3_SERVER_SIDE_ENCRYPTION:-}
+  SCENARA_S3_KMS_KEY_ID: ${SCENARA_S3_KMS_KEY_ID:-}
+  SCENARA_S3_MULTIPART_THRESHOLD_BYTES: ${SCENARA_S3_MULTIPART_THRESHOLD_BYTES:-67108864}
+  SCENARA_S3_MULTIPART_CHUNK_BYTES: ${SCENARA_S3_MULTIPART_CHUNK_BYTES:-16777216}
+  SCENARA_S3_LIFECYCLE_ENABLED: ${SCENARA_S3_LIFECYCLE_ENABLED:-true}
+  SCENARA_S3_PRESIGNED_URLS_ENABLED: ${SCENARA_S3_PRESIGNED_URLS_ENABLED:-false}
+  SCENARA_S3_PRESIGN_EXPIRY_SECONDS: ${SCENARA_S3_PRESIGN_EXPIRY_SECONDS:-900}
+  SCENARA_S3_ADDRESSING_STYLE: ${SCENARA_S3_ADDRESSING_STYLE:-path}
   SCENARA_AUTH_REQUIRED: "true"
   SCENARA_API_TOKEN: ${SCENARA_API_TOKEN:?set SCENARA_API_TOKEN}
   SCENARA_PRODUCTION_MODELS_REQUIRED: "true"
@@ -112,7 +124,7 @@ services:
     restart: "no"
 
   api:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.20}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.21}
     build:
       context: ..
     environment: *scenara-environment
@@ -136,7 +148,7 @@ services:
     restart: unless-stopped
 
   batch-worker:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.20}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.21}
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "batch-gpu-1", "--lane", "batch"]
@@ -157,7 +169,7 @@ services:
     restart: unless-stopped
 
   stream-worker:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.20}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.21}
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "stream-gpu-1", "--lane", "stream"]
@@ -178,7 +190,7 @@ services:
     restart: unless-stopped
 
   scheduler:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.20}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.21}
     build:
       context: ..
     command:

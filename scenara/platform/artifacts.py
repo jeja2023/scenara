@@ -125,7 +125,13 @@ class RunArtifactSink:
         )
         try:
             data = await asyncio.to_thread(encode_jpeg, image, max_edge=self._max_edge[artifact_type])
-            await self._objects.put(object_key, data, "image/jpeg")
+            await self._objects.put(
+                object_key,
+                data,
+                "image/jpeg",
+                sha256=hashlib.sha256(data).hexdigest(),
+                retention_category="preview",
+            )
         except Exception:
             self._warn(ARTIFACT_STORAGE_WARNING)
             return None

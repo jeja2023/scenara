@@ -51,7 +51,7 @@ Scenara 1.0 不提供破坏性 down migration。发生不兼容 schema 变更时
 
 ## Redis Run queue recovery
 
-PostgreSQL is the source of truth for Run state and MinIO retains uploaded media. If Redis Run streams are lost, stop both workers and run the following command before restarting them:
+PostgreSQL is the source of truth for Run state and the certified S3 provider retains uploaded media. If Redis Run streams are lost, stop both workers and run the following command before restarting them:
 
     python scripts/rebuild_redis_queue.py --env-file deploy/.env.production
 

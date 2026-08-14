@@ -134,6 +134,22 @@ export interface AuditEvent {
   created_at: number;
 }
 
+export interface PresignedMediaUpload {
+  upload_id: string;
+  upload_token: string;
+  method: "PUT";
+  url: string;
+  headers: Record<string, string>;
+  expires_at: number;
+}
+
+export interface PresignedMediaDownload {
+  method: "GET";
+  url: string;
+  headers: Record<string, string>;
+  expires_at: number;
+}
+
 export interface AuditEventPage {
   items: AuditEvent[];
   offset: number;

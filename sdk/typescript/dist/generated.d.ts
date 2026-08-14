@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "4885898606a3bc9b2546a58198ad45ee09e7765e4a830a7de2fdb42c673d1cc5" /** gitleaks:allow - public contract digest */;
+export declare const OPENAPI_SHA256 = "e36f906e5cf4e7ec62d8620d42a2179358860b003c938e4491ced35181804678" /** gitleaks:allow - public contract digest */;
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
@@ -400,6 +400,16 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_PortraitSearchResponse_ = {
         data: PortraitSearchResponse;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_PresignedMediaDownload_ = {
+        data: PresignedMediaDownload;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_PresignedMediaUpload_ = {
+        data: PresignedMediaUpload;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -924,6 +934,16 @@ export declare namespace OpenApi {
         max_seconds?: (number) | (null);
         min_seconds?: number;
         to_camera_id: string;
+    };
+    type CompleteMediaUploadRequest = {
+        content_type: string;
+        expires_at: number;
+        filename?: (string) | (null);
+        kind: MediaKind;
+        sha256: string;
+        size_bytes: number;
+        upload_id: string;
+        upload_token: string;
     };
     type CreateAgentEvaluationRequest = {
         policy_violation_count?: number;
@@ -2004,6 +2024,31 @@ export declare namespace OpenApi {
     type PortraitSearchResponse = {
         feature_space_id: string;
         matches: Array<PortraitSearchMatch>;
+    };
+    type PresignMediaUploadRequest = {
+        content_type: string;
+        filename?: (string) | (null);
+        kind: MediaKind;
+        sha256: string;
+        size_bytes: number;
+    };
+    type PresignedMediaDownload = {
+        expires_at: number;
+        headers?: {
+            [key: string]: string;
+        };
+        method?: "GET";
+        url: string;
+    };
+    type PresignedMediaUpload = {
+        expires_at: number;
+        headers: {
+            [key: string]: string;
+        };
+        method?: "PUT";
+        upload_id: string;
+        upload_token: string;
+        url: string;
     };
     type PrincipalType = "user" | "service_account";
     type ProductCatalogItem = {

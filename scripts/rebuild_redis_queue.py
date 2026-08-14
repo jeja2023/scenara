@@ -23,7 +23,7 @@ async def rebuild() -> dict[str, int]:
     if not isinstance(runtime.state, PostgresStateStore):
         raise RuntimeError("queue recovery requires the PostgreSQL state backend")
     if not isinstance(runtime.objects, S3ObjectStore):
-        raise RuntimeError("queue recovery requires the S3/MinIO object backend")
+        raise RuntimeError("queue recovery requires a certified S3 object provider")
     if not isinstance(runtime.queue, RedisRunQueue):
         raise RuntimeError("queue recovery requires the Redis queue backend")
     await runtime.open()
@@ -35,7 +35,7 @@ async def rebuild() -> dict[str, int]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Rebuild empty Redis Run streams from PostgreSQL and MinIO",
+        description="Rebuild empty Redis Run streams from PostgreSQL and certified S3 storage",
     )
     parser.add_argument("--env-file", default=None)
     args = parser.parse_args()

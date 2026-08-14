@@ -4,7 +4,7 @@ set -euo pipefail
 output_dir="${1:?usage: build-offline-bundle.sh OUTPUT_DIRECTORY}"
 output_dir="$(realpath -m "$output_dir")"
 test "$output_dir" != "/"
-tag="${SCENARA_IMAGE_TAG:-0.3.0-dev.20}"
+tag="${SCENARA_IMAGE_TAG:-0.3.0-dev.21}"
 [[ "$tag" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || {
   echo "SCENARA_IMAGE_TAG contains unsupported characters" >&2
   exit 2

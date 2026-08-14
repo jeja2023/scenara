@@ -128,7 +128,7 @@ On the isolated blank Ubuntu 24.04 host, ask the installer to write its atomic
 structured result as the third argument:
 
     deploy/scripts/install-offline.sh \
-      /srv/scenara-offline-0.3.0-dev.20 \
+      /srv/scenara-offline-0.3.0-dev.21 \
       /secure/scenara.env \
       /secure/offline-installer-result.json
 
@@ -144,7 +144,7 @@ Then provide:
       "evidence_type": "offline_install",
       "blank_host": true,
       "isolated_network": true,
-      "bundle_path": "scenara-offline-0.3.0-dev.20.tar.gz",
+      "bundle_path": "scenara-offline-0.3.0-dev.21.tar.gz",
       "installer_result_path": "offline-installer-result.json",
       "source_commit_path": "source-commit.txt",
       "check_results": {

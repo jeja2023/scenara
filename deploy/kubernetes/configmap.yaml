@@ -10,8 +10,13 @@ data:
   SCENARA_POSTGRES_DSN: postgresql://scenara@postgresql.default.svc.cluster.local:5432/scenara
   SCENARA_REDIS_URL: redis://redis.default.svc.cluster.local:6379/0
   SCENARA_S3_ENDPOINT_URL: http://minio.default.svc.cluster.local:9000
+  SCENARA_S3_PUBLIC_ENDPOINT_URL: ""
   SCENARA_S3_REGION: us-east-1
   SCENARA_S3_BUCKET: scenara
+  SCENARA_S3_VERIFY_TLS: "true"
+  SCENARA_S3_LIFECYCLE_ENABLED: "true"
+  SCENARA_S3_PRESIGNED_URLS_ENABLED: "false"
+  SCENARA_S3_ADDRESSING_STYLE: path
   SCENARA_AUTH_REQUIRED: "true"
   SCENARA_PRODUCTION_MODELS_REQUIRED: "true"
   SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES: "false"

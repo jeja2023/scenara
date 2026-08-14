@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 import hashlib
 import os
 import sys
@@ -11,8 +12,13 @@ from uuid import uuid4
 
 import pytest
 import pytest_asyncio
+import httpx
+from PIL import Image
+from io import BytesIO
 
 from scenara.infrastructure.object_store import S3ObjectStore
+from scenara.bootstrap import build_runtime
+from scenara.server import create_app
 from scenara.infrastructure.postgres_features import PostgresFeatureStore
 from scenara.infrastructure.postgres_state import PostgresStateStore
 from scenara.infrastructure.queue import RedisRunQueue
@@ -33,6 +39,7 @@ from scenara.platform.models import (
 from scenara.platform.pipeline import PipelineDefinition, PipelineNode
 from scenara.queue_recovery import rebuild_redis_run_queue
 from scenara.platform.store import StateConflict
+from tests.object_store_contract import assert_object_store_contract
 
 pytestmark = pytest.mark.integration
 
@@ -542,3 +549,104 @@ async def test_minio_object_round_trip_and_delete() -> None:
         with suppress(Exception):
             await store.delete(key)
         await store.close()
+
+
+async def test_s3_provider_satisfies_object_store_contract(tmp_path) -> None:
+    def factory() -> S3ObjectStore:
+        return S3ObjectStore(
+            bucket="scenara",
+            endpoint_url=S3_ENDPOINT,
+            region="us-east-1",
+            access_key=S3_ACCESS_KEY,
+            secret_key=S3_SECRET_KEY,
+            multipart_threshold_bytes=5 * 1024 * 1024,
+            multipart_chunk_bytes=5 * 1024 * 1024,
+        )
+
+    await assert_object_store_contract(factory, tmp_path)
+
+
+async def test_s3_provider_installs_category_lifecycle_rules() -> None:
+    store = S3ObjectStore(
+        bucket="scenara",
+        endpoint_url=S3_ENDPOINT,
+        region="us-east-1",
+        access_key=S3_ACCESS_KEY,
+        secret_key=S3_SECRET_KEY,
+        raw_media_retention_days=7,
+        preview_retention_days=30,
+        structured_result_retention_days=180,
+    )
+    try:
+        await store.configure_lifecycle()
+        configured = await asyncio.to_thread(
+            store.client.get_bucket_lifecycle_configuration,
+            Bucket="scenara",
+        )
+        rules = {rule["ID"]: rule for rule in configured["Rules"]}
+        assert rules["scenara-raw_media"]["Expiration"]["Days"] == 8
+        assert rules["scenara-preview"]["Expiration"]["Days"] == 31
+        assert rules["scenara-structured_result"]["Expiration"]["Days"] == 181
+        assert rules["scenara-pending_upload"]["Expiration"]["Days"] == 1
+    finally:
+        await store.close()
+
+
+async def test_presigned_media_upload_and_download_bypass_api_payload(development_settings) -> None:
+    image_buffer = BytesIO()
+    Image.new("RGB", (32, 24), "white").save(image_buffer, format="PNG")
+    payload = image_buffer.getvalue()
+    digest = hashlib.sha256(payload).hexdigest()
+    settings = replace(
+        development_settings,
+        object_backend="s3",
+        s3_endpoint_url=S3_ENDPOINT,
+        s3_bucket="scenara",
+        s3_access_key=S3_ACCESS_KEY,
+        s3_secret_key=S3_SECRET_KEY,
+        s3_presigned_urls_enabled=True,
+        api_token="example-integration-direct-upload-signing-key",
+    )
+    runtime = build_runtime(settings)
+    app = create_app(runtime=runtime)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as api:
+        presigned = await api.post(
+            "/api/v1/media/uploads/presign",
+            json={
+                "filename": "direct.png",
+                "content_type": "image/png",
+                "kind": "image",
+                "size_bytes": len(payload),
+                "sha256": digest,
+            },
+        )
+        assert presigned.status_code == 200, presigned.text
+        upload = presigned.json()["data"]
+        async with httpx.AsyncClient() as direct:
+            uploaded = await direct.put(upload["url"], content=payload, headers=upload["headers"])
+        assert uploaded.status_code in {200, 201}, uploaded.text
+
+        completed = await api.post(
+            "/api/v1/media/uploads/complete",
+            json={
+                "filename": "direct.png",
+                "content_type": "image/png",
+                "kind": "image",
+                "size_bytes": len(payload),
+                "sha256": digest,
+                "upload_id": upload["upload_id"],
+                "upload_token": upload["upload_token"],
+                "expires_at": upload["expires_at"],
+            },
+        )
+        assert completed.status_code == 201, completed.text
+        asset = completed.json()["data"]
+        assert asset["sha256"] == digest
+
+        download = await api.get(f"/api/v1/media/assets/{asset['asset_id']}/download-url")
+        assert download.status_code == 200, download.text
+        async with httpx.AsyncClient() as direct:
+            downloaded = await direct.get(download.json()["data"]["url"])
+        assert downloaded.status_code == 200
+        assert downloaded.content == payload
+        assert (await api.delete(f"/api/v1/media/assets/{asset['asset_id']}")).status_code == 204

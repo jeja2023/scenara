@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import mimetypes
+import hashlib
 import time
 import uuid
 from pathlib import Path
@@ -30,6 +31,8 @@ from .models import (
     ParseDocumentResponse,
     ParseImageResponse,
     ParseVideoResponse,
+    PresignedMediaDownload,
+    PresignedMediaUpload,
     PortraitIntelligenceStatus,
     ProductCatalogItem,
     ProductEntitlement,
@@ -106,6 +109,50 @@ class ScenaraClient:
                     data={"kind": kind},
                 ),
             )
+
+    def upload_asset_direct(self, path: str | Path, *, kind: str = "video") -> MediaAsset:
+        """Upload directly to the configured S3 provider, then register the asset."""
+
+        source = Path(path)
+        content_type = mimetypes.guess_type(source.name)[0] or "application/octet-stream"
+        digest = hashlib.sha256()
+        with source.open("rb") as handle:
+            while chunk := handle.read(1024 * 1024):
+                digest.update(chunk)
+        request = {
+            "filename": source.name,
+            "content_type": content_type,
+            "kind": kind,
+            "size_bytes": source.stat().st_size,
+            "sha256": digest.hexdigest(),
+        }
+        upload = cast(
+            PresignedMediaUpload,
+            self._request("POST", "/api/v1/media/uploads/presign", json=request),
+        )
+        with source.open("rb") as handle, httpx.Client(timeout=None) as direct:
+            response = direct.put(upload["url"], content=handle, headers=upload["headers"])
+            response.raise_for_status()
+        return cast(
+            MediaAsset,
+            self._request(
+                "POST",
+                "/api/v1/media/uploads/complete",
+                json={
+                    **request,
+                    "upload_id": upload["upload_id"],
+                    "upload_token": upload["upload_token"],
+                    "expires_at": upload["expires_at"],
+                },
+            ),
+        )
+
+    def get_asset_download_url(self, asset_id: str, *, expires_in: int | None = None) -> PresignedMediaDownload:
+        params = {"expires_in": expires_in} if expires_in is not None else None
+        return cast(
+            PresignedMediaDownload,
+            self._request("GET", f"/api/v1/media/assets/{asset_id}/download-url", params=params),
+        )
 
     def create_run(
         self,

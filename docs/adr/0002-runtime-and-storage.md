@@ -18,3 +18,7 @@ S3 objects are immutable after publication. A result reference is committed only
 after the object is written and includes its SHA-256 checksum. Deleting media or
 biometric subjects removes both the database record and referenced objects.
 
+Immutable publication is enforced with conditional writes and checksum metadata,
+including multipart completion. Provider lifecycle rules are a delayed safety net;
+PostgreSQL retention records and the governance scheduler remain authoritative.
+

@@ -9,7 +9,7 @@
 | GPU | 单张 NVIDIA GPU，驱动支持 CUDA 12.8，显存不少于 23,000 MiB |
 | 数据库 | PostgreSQL 16 + pgvector |
 | 队列 | Redis 7.4 |
-| 对象存储 | MinIO 兼容 S3 API |
+| 对象存储 | 经认证的 S3 Provider；当前 1.0 私有化基线为 MinIO，其他供应商需通过对象存储兼容测试 |
 | Python SDK | Python 3.12 |
 | TypeScript SDK | Node.js 22.22.2 |
 | 控制台 | Chrome/Edge 当前与前一稳定版 |

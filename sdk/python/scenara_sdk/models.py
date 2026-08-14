@@ -102,6 +102,22 @@ class DatasetRecord(TypedDict):
     status: DatasetStatus
     metadata: dict[str, Any]
     created_at: float
+
+
+class PresignedMediaUpload(TypedDict):
+    upload_id: str
+    upload_token: str
+    method: Literal["PUT"]
+    url: str
+    headers: dict[str, str]
+    expires_at: float
+
+
+class PresignedMediaDownload(TypedDict):
+    method: Literal["GET"]
+    url: str
+    headers: dict[str, str]
+    expires_at: float
     updated_at: float
 
 

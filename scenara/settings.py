@@ -34,10 +34,22 @@ class Settings:
     postgres_dsn: str
     redis_url: str
     s3_endpoint_url: str
+    s3_public_endpoint_url: str
     s3_region: str
     s3_bucket: str
     s3_access_key: str
     s3_secret_key: str
+    s3_session_token: str
+    s3_verify_tls: bool
+    s3_ca_bundle: str
+    s3_server_side_encryption: str
+    s3_kms_key_id: str
+    s3_multipart_threshold_bytes: int
+    s3_multipart_chunk_bytes: int
+    s3_lifecycle_enabled: bool
+    s3_presigned_urls_enabled: bool
+    s3_presign_expiry_seconds: int
+    s3_addressing_style: str
     api_token: str
     auth_required: bool
     default_tenant_id: str
@@ -78,6 +90,18 @@ class Settings:
         return self.profile in {"prod", "production"}
 
     def validate(self) -> None:
+        if bool(self.s3_access_key) != bool(self.s3_secret_key):
+            raise RuntimeError("SCENARA_S3_ACCESS_KEY and SCENARA_S3_SECRET_KEY must be configured together")
+        if self.s3_session_token and not self.s3_access_key:
+            raise RuntimeError("SCENARA_S3_SESSION_TOKEN requires explicit S3 access credentials")
+        if self.s3_server_side_encryption not in {"", "AES256", "aws:kms"}:
+            raise RuntimeError("SCENARA_S3_SERVER_SIDE_ENCRYPTION must be empty, AES256, or aws:kms")
+        if self.s3_kms_key_id and self.s3_server_side_encryption != "aws:kms":
+            raise RuntimeError("SCENARA_S3_KMS_KEY_ID requires aws:kms server-side encryption")
+        if self.s3_ca_bundle and not Path(self.s3_ca_bundle).is_file():
+            raise RuntimeError("SCENARA_S3_CA_BUNDLE must reference a readable CA bundle")
+        if self.s3_addressing_style not in {"auto", "path", "virtual"}:
+            raise RuntimeError("SCENARA_S3_ADDRESSING_STYLE must be auto, path, or virtual")
         if bool(self.bootstrap_admin_username) != bool(self.bootstrap_admin_password):
             raise RuntimeError(
                 "SCENARA_BOOTSTRAP_ADMIN_USERNAME and SCENARA_BOOTSTRAP_ADMIN_PASSWORD must be configured together"
@@ -124,10 +148,31 @@ def load_settings() -> Settings:
         postgres_dsn=os.getenv("SCENARA_POSTGRES_DSN", "").strip(),
         redis_url=os.getenv("SCENARA_REDIS_URL", "").strip(),
         s3_endpoint_url=os.getenv("SCENARA_S3_ENDPOINT_URL", "").strip(),
+        s3_public_endpoint_url=os.getenv("SCENARA_S3_PUBLIC_ENDPOINT_URL", "").strip(),
         s3_region=os.getenv("SCENARA_S3_REGION", "us-east-1").strip(),
         s3_bucket=os.getenv("SCENARA_S3_BUCKET", "").strip(),
         s3_access_key=os.getenv("SCENARA_S3_ACCESS_KEY", "").strip(),
         s3_secret_key=os.getenv("SCENARA_S3_SECRET_KEY", "").strip(),
+        s3_session_token=os.getenv("SCENARA_S3_SESSION_TOKEN", "").strip(),
+        s3_verify_tls=_bool("SCENARA_S3_VERIFY_TLS", True),
+        s3_ca_bundle=os.getenv("SCENARA_S3_CA_BUNDLE", "").strip(),
+        s3_server_side_encryption=os.getenv("SCENARA_S3_SERVER_SIDE_ENCRYPTION", "").strip(),
+        s3_kms_key_id=os.getenv("SCENARA_S3_KMS_KEY_ID", "").strip(),
+        s3_multipart_threshold_bytes=max(
+            5 * 1024 * 1024,
+            int(os.getenv("SCENARA_S3_MULTIPART_THRESHOLD_BYTES", str(64 * 1024 * 1024))),
+        ),
+        s3_multipart_chunk_bytes=max(
+            5 * 1024 * 1024,
+            int(os.getenv("SCENARA_S3_MULTIPART_CHUNK_BYTES", str(16 * 1024 * 1024))),
+        ),
+        s3_lifecycle_enabled=_bool("SCENARA_S3_LIFECYCLE_ENABLED", False),
+        s3_presigned_urls_enabled=_bool("SCENARA_S3_PRESIGNED_URLS_ENABLED", False),
+        s3_presign_expiry_seconds=max(
+            60,
+            min(86_400, int(os.getenv("SCENARA_S3_PRESIGN_EXPIRY_SECONDS", "900"))),
+        ),
+        s3_addressing_style=os.getenv("SCENARA_S3_ADDRESSING_STYLE", "auto").strip().lower(),
         api_token=os.getenv("SCENARA_API_TOKEN", "").strip(),
         auth_required=_bool("SCENARA_AUTH_REQUIRED", profile in {"prod", "production"}),
         default_tenant_id=os.getenv("SCENARA_DEFAULT_TENANT_ID", "default").strip(),

@@ -117,6 +117,42 @@ class MediaAsset(StrictModel):
     deleted_at: float | None = None
 
 
+class PresignMediaUploadRequest(StrictModel):
+    filename: str | None = Field(default=None, max_length=512)
+    content_type: str = Field(min_length=1, max_length=256)
+    kind: MediaKind
+    size_bytes: int = Field(gt=0)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def reject_stream(self) -> PresignMediaUploadRequest:
+        if self.kind == MediaKind.STREAM:
+            raise ValueError("stream inputs must be registered as media sources")
+        return self
+
+
+class PresignedMediaUpload(StrictModel):
+    upload_id: str
+    upload_token: str
+    method: Literal["PUT"] = "PUT"
+    url: str
+    headers: dict[str, str]
+    expires_at: float
+
+
+class CompleteMediaUploadRequest(PresignMediaUploadRequest):
+    upload_id: str = Field(pattern=r"^upl_[0-9a-f]{32}$")
+    upload_token: str = Field(pattern=r"^[0-9a-f]{64}$")
+    expires_at: float
+
+
+class PresignedMediaDownload(StrictModel):
+    method: Literal["GET"] = "GET"
+    url: str
+    headers: dict[str, str] = Field(default_factory=dict)
+    expires_at: float
+
+
 class CreateMediaSourceRequest(StrictModel):
     name: str = Field(min_length=1, max_length=256)
     url: str = Field(min_length=1, max_length=4096)

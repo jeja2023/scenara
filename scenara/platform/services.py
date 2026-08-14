@@ -206,9 +206,21 @@ class RunService:
             created_at=now,
             expires_at=now + retention_days * 86_400,
         )
-        await self.objects.put(object_key, data, asset.content_type)
+        await self.objects.put(
+            object_key,
+            data,
+            asset.content_type,
+            sha256=asset.sha256,
+            retention_category="raw_media",
+        )
         try:
-            await self.objects.put(preview_key, preview_data, "image/jpeg")
+            await self.objects.put(
+                preview_key,
+                preview_data,
+                "image/jpeg",
+                sha256=asset.preview_sha256,
+                retention_category="preview",
+            )
         except Exception:
             with suppress(Exception):
                 await self.objects.delete(object_key)
@@ -322,10 +334,22 @@ class RunService:
             created_at=now,
             expires_at=now + retention_days * 86_400,
         )
-        await self.objects.put_file(object_key, Path(source_path), asset.content_type)
+        await self.objects.put_file(
+            object_key,
+            Path(source_path),
+            asset.content_type,
+            sha256=asset.sha256,
+            retention_category="raw_media",
+        )
         stored: MediaAsset | None = None
         try:
-            await self.objects.put(preview_key, preview_data, "image/jpeg")
+            await self.objects.put(
+                preview_key,
+                preview_data,
+                "image/jpeg",
+                sha256=asset.preview_sha256,
+                retention_category="preview",
+            )
             stored = await self.state.create_asset(asset)
             for record in (
                 ObjectRetentionRecord(
@@ -440,7 +464,10 @@ class RunService:
         asset = await self.state.get_asset(context.tenant_id, context.project_id, asset_id)
         if asset is None or asset.deleted_at is not None or asset.preview_object_key is None:
             raise ResourceNotFound("media asset preview not found")
-        return await self.objects.get(asset.preview_object_key), asset.preview_content_type or "image/jpeg"
+        return (
+            await self.objects.get(asset.preview_object_key, expected_sha256=asset.preview_sha256),
+            asset.preview_content_type or "image/jpeg",
+        )
 
     async def delete_asset(self, context: PrincipalContext, asset_id: str) -> None:
         await require_allowed(self.policy, context, "delete", "media_asset", {"asset_id": asset_id})
@@ -888,7 +915,7 @@ class RunService:
         reference = await self.state.get_result_reference(context.tenant_id, context.project_id, run_id)
         if reference is None:
             raise ResourceNotFound("run result is not available")
-        document = await self.objects.get(reference.object_key)
+        document = await self.objects.get(reference.object_key, expected_sha256=reference.sha256)
         if hashlib.sha256(document).hexdigest() != reference.sha256:
             raise PipelineError("stored result checksum does not match its database reference")
         return ResultEnvelope.model_validate_json(document), reference
@@ -900,7 +927,7 @@ class RunService:
             if len(reference.shard_keys) != len(reference.shard_sha256):
                 raise PipelineError("stored result shard manifest is invalid")
             async def load_shard(object_key: str, expected_sha256: str) -> list[MediaUnitResult]:
-                shard = await self.objects.get(object_key)
+                shard = await self.objects.get(object_key, expected_sha256=expected_sha256)
                 if hashlib.sha256(shard).hexdigest() != expected_sha256:
                     raise PipelineError("stored result shard checksum does not match its reference")
                 payload = json.loads(shard)
@@ -965,7 +992,7 @@ class RunService:
 
             async def load_selected(entry: tuple[str, str, int, int]) -> list[MediaUnitResult]:
                 object_key, expected_sha256, shard_start, shard_end = entry
-                document = await self.objects.get(object_key)
+                document = await self.objects.get(object_key, expected_sha256=expected_sha256)
                 if hashlib.sha256(document).hexdigest() != expected_sha256:
                     raise PipelineError("stored result shard checksum does not match its reference")
                 payload = json.loads(document)
@@ -1003,7 +1030,7 @@ class RunService:
         if artifact is None:
             raise ResourceNotFound("run artifact not found")
         try:
-            data = await self.objects.get(artifact.object_key)
+            data = await self.objects.get(artifact.object_key, expected_sha256=artifact.sha256)
         except Exception as exc:
             raise ResourceNotFound("run artifact is no longer stored") from exc
         if hashlib.sha256(data).hexdigest() != artifact.sha256:
@@ -1109,9 +1136,13 @@ class RunService:
                     handle = tempfile.NamedTemporaryFile(prefix="scenara-object-", suffix=suffix, delete=False)
                     handle.close()
                     media_file_path = handle.name
-                    await self.objects.get_to_file(asset.object_key, Path(media_file_path))
+                    await self.objects.get_to_file(
+                        asset.object_key,
+                        Path(media_file_path),
+                        expected_sha256=asset.sha256,
+                    )
                 else:
-                    data = await self.objects.get(asset.object_key)
+                    data = await self.objects.get(asset.object_key, expected_sha256=asset.sha256)
             else:
                 source = await self.state.get_source(run.tenant_id, run.project_id, run.source_id or "")
                 if source is None:
@@ -1429,7 +1460,13 @@ class RunService:
                         separators=(",", ":"),
                     ).encode("utf-8")
                     shard_key = f"{base_key}/units-{len(shard_keys):06d}.json"
-                    await self.objects.put(shard_key, shard_document, "application/json")
+                    await self.objects.put(
+                        shard_key,
+                        shard_document,
+                        "application/json",
+                        sha256=hashlib.sha256(shard_document).hexdigest(),
+                        retention_category="structured_result",
+                    )
                     written_keys.append(shard_key)
                     shard_keys.append(shard_key)
                     shard_sha256.append(hashlib.sha256(shard_document).hexdigest())
@@ -1445,7 +1482,13 @@ class RunService:
                         separators=(",", ":"),
                     ).encode("utf-8")
                     shard_key = f"{base_key}/units-{offset // self.result_shard_units:06d}.json"
-                    await self.objects.put(shard_key, shard_document, "application/json")
+                    await self.objects.put(
+                        shard_key,
+                        shard_document,
+                        "application/json",
+                        sha256=hashlib.sha256(shard_document).hexdigest(),
+                        retention_category="structured_result",
+                    )
                     written_keys.append(shard_key)
                     shard_keys.append(shard_key)
                     shard_sha256.append(hashlib.sha256(shard_document).hexdigest())
@@ -1459,7 +1502,13 @@ class RunService:
                 if partial
                 else f"{base_key}/result.json"
             )
-            await self.objects.put(result_key, result_document, "application/json")
+            await self.objects.put(
+                result_key,
+                result_document,
+                "application/json",
+                sha256=hashlib.sha256(result_document).hexdigest(),
+                retention_category="structured_result",
+            )
             if previous is None or previous.object_key != result_key:
                 written_keys.append(result_key)
             asset = (

@@ -83,6 +83,23 @@ async def test_readiness_fails_when_a_required_backend_is_unavailable(client, mo
     monkeypatch.setattr(runtime.state, "health_check", unavailable)
     response = await api.get("/readyz")
     assert response.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_presigned_upload_is_explicitly_disabled_for_local_storage(client) -> None:
+    api, _ = client
+    data = image_bytes()
+    response = await api.post(
+        "/api/v1/media/uploads/presign",
+        json={
+            "filename": "sample.png",
+            "content_type": "image/png",
+            "kind": "image",
+            "size_bytes": len(data),
+            "sha256": __import__("hashlib").sha256(data).hexdigest(),
+        },
+    )
+    assert response.status_code == 404
     assert response.json()["error"]["code"] == "HTTP_ERROR"
 
 

@@ -5,18 +5,19 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until reproducible objective evidence is committed.
 
-Current development version: `0.3.0-dev.20` (`0.3.0.dev20` for Python packages).
+Current development version: `0.3.0-dev.21` (`0.3.0.dev21` for Python packages).
 
 ## Release Gate Status
-The `0.3.0-dev.20` engineering baseline cleans OpenAPI schemas, adds Redis queue state recovery, automates release evidence tag generation, and delivers enhanced result frame previewing in Console. Full implementation and architectural parity checks pass,
+The `0.3.0-dev.21` engineering baseline abstracts storage behind a certified S3 Provider contract, enforces immutable publication and SHA-256 verification, adds provider lifecycle/security controls and presigned media transfer, while retaining OpenAPI cleanup, Redis queue recovery, release evidence automation, and enhanced result frame previewing in Console. Full implementation and architectural parity checks pass,
 including tests, linting, typechecking, and production builds.
 Formal 1.0 release evidence remains fail-closed until the required evaluation,
-GPU capacity, offline-install, and model-rights checks are completed. Integration,
-security, backup/restore, and software-license evidence is recorded. This personal
+GPU capacity, offline-install, model-rights, integration, security, backup/restore,
+and software-license checks are rerun for `0.3.0-dev.21`. Historical `0.3.0-dev.20`
+reports remain archived but are not reused as current-release evidence. This personal
 project does not require named approvers or legal/commercial sign-off records.
 
 ## Implementation Parity Matrix
-The `0.3.0-dev.20` baseline processes finite video and PDF inputs to EOF unless callers
+The `0.3.0-dev.21` baseline processes finite video and PDF inputs to EOF unless callers
 explicitly request a compatibility cap. Continuous streams are archived into linked Run
 segments under one Stream Session, while inference batches publish `result.delta` events
 and append-only Result shards. It also enforces enterprise policy in production, adds indexed and expiring Session
