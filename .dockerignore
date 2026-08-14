@@ -29,6 +29,10 @@ runtime-state/
 rollout-audit*.jsonl
 shared-models/
 models/
-node_modules/
+**/node_modules/
+**/.pnpm-store/
 frontend/console/dist/
 frontend/console-next/dist/
+sdk/typescript/dist/
+*.patch
+gitleaks-results.json

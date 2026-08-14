@@ -1,0 +1,17 @@
+﻿# Gitleaks configuration for Scenara repository
+
+[allowlist]
+description = "Allowlist for SHA-256 hashes in release evidence, OpenAPI, generated SDKs, and tests"
+paths = [
+    '''(?i)docs/release/evidence/.*''',
+    '''(?i)docs/openapi\.json''',
+    '''(?i)sdk/typescript/(src|dist)/generated\.(ts|js|d\.ts)''',
+    '''(?i)tests/.*''',
+    '''(?i)requirements/.*''',
+    '''(?i)pnpm-lock\.yaml''',
+    '''(?i)package-lock\.json''',
+]
+regexes = [
+    '''(?i)bfa48af550fc86e610501feeb74f7ea8c7151047be3b0ee5cc1fa8bde30a7f62''',
+    '''api_sha256''',
+]

@@ -10,7 +10,7 @@ import tempfile
 import time
 from contextlib import suppress
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from scenara.platform.objects import (
     ObjectAlreadyExistsError,
@@ -22,6 +22,12 @@ from scenara.platform.objects import (
     validate_object_key,
     validate_sha256,
 )
+
+try:
+    from botocore.exceptions import ClientError
+except ImportError:  # pragma: no cover
+    class ClientError(Exception):  # type: ignore[no-redef]
+        response: dict[str, Any]
 
 
 def _sha256_bytes(data: bytes) -> str:
@@ -321,7 +327,7 @@ class S3ObjectStore:
             "config": Config(
                 signature_version="s3v4",
                 retries={"mode": "standard", "max_attempts": 5},
-                s3={"addressing_style": addressing_style},
+                s3=cast(Any, {"addressing_style": addressing_style}),
             ),
             **credentials,
         }
@@ -395,7 +401,7 @@ class S3ObjectStore:
             response = await asyncio.to_thread(
                 self.client.put_object, Bucket=self.bucket, Key=object_key, Body=data, **args
             )
-        except self.client.exceptions.ClientError as exc:
+        except ClientError as exc:
             code = str(exc.response.get("Error", {}).get("Code", ""))
             if not overwrite and code in {"412", "PreconditionFailed", "ConditionalRequestConflict"}:
                 return await self._existing_or_raise(object_key, digest)
@@ -477,7 +483,7 @@ class S3ObjectStore:
                 complete_args["IfNoneMatch"] = "*"
             try:
                 response = await asyncio.to_thread(self.client.complete_multipart_upload, **complete_args)
-            except self.client.exceptions.ClientError as exc:
+            except ClientError as exc:
                 code = str(exc.response.get("Error", {}).get("Code", ""))
                 if not overwrite and code in {"412", "PreconditionFailed", "ConditionalRequestConflict"}:
                     return await self._existing_or_raise(object_key, digest)
@@ -562,7 +568,7 @@ class S3ObjectStore:
         validate_object_key(object_key)
         try:
             await asyncio.to_thread(self.client.head_object, Bucket=self.bucket, Key=object_key)
-        except self.client.exceptions.ClientError as exc:
+        except ClientError as exc:
             code = str(exc.response.get("Error", {}).get("Code", ""))
             if code in {"404", "NoSuchKey", "NotFound"}:
                 return False

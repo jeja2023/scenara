@@ -13,16 +13,16 @@ Array = npt.NDArray[Any]
 def box_area(box: list[float]) -> float:
     if len(box) < 4:
         return 0.0
-    return max(0.0, float(box[2]) - float(box[0])) * max(0.0, float(box[3]) - float(box[1]))
+    return max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1])
 
 
 def box_iou(box_a: list[float], box_b: list[float]) -> float:
     if len(box_a) < 4 or len(box_b) < 4:
         return 0.0
-    x1 = max(float(box_a[0]), float(box_b[0]))
-    y1 = max(float(box_a[1]), float(box_b[1]))
-    x2 = min(float(box_a[2]), float(box_b[2]))
-    y2 = min(float(box_a[3]), float(box_b[3]))
+    x1 = max(box_a[0], box_b[0])
+    y1 = max(box_a[1], box_b[1])
+    x2 = min(box_a[2], box_b[2])
+    y2 = min(box_a[3], box_b[3])
     intersection = max(0.0, x2 - x1) * max(0.0, y2 - y1)
     union = box_area(box_a) + box_area(box_b) - intersection
     return intersection / union if union > 0 else 0.0
@@ -64,7 +64,7 @@ def make_embedding_sample(
     crop_quality = raw_crop_quality if isinstance(raw_crop_quality, dict) else {}
     return {
         "frame_index": frame_index,
-        "embedding": [float(value) for value in embedding],
+        "embedding": list(embedding),
         "quality": person_quality_score(person),
         "crop_quality": float(crop_quality.get("score", person_quality_score(person))),
         "crop_usable": bool(crop_quality.get("usable", True)),
@@ -163,14 +163,16 @@ def aggregate_track_template(
         refined_weights = weights[:]
 
     total_weight = max(1e-9, sum(refined_weights))
-    template = sum(vector * weight for vector, weight in zip(vectors, refined_weights, strict=False)) / total_weight
-    template = l2_normalize_vector(np.asarray(template, dtype=np.float32))
+    vectors_array = np.asarray(vectors, dtype=np.float32)
+    weights_array = np.asarray(refined_weights, dtype=np.float32)
+    weighted_vector: Array = np.sum(vectors_array * weights_array[:, np.newaxis], axis=0) / total_weight
+    template: Array = l2_normalize_vector(weighted_vector)
     consensus_score = (
         sum(consensus * weight for consensus, weight in zip(consensus_scores, refined_weights, strict=False))
         / total_weight
     )
     payload: dict[str, Any] = {
-        "embedding_dim": int(template.shape[0]),
+        "embedding_dim": template.shape[0],
         "sample_count": len(vectors),
         "aggregation": "quality_confidence_weighted_mean",
         "quality": round(
@@ -219,7 +221,7 @@ def association_decision(details: dict[str, Any], min_score: float) -> dict[str,
             appearance = float(appearance_raw)
         except (TypeError, ValueError):
             appearance = None
-    margin = score - float(min_score)
+    margin = score - min_score
 
     supporting_signals: list[str] = []
     if geometry >= 0.35:
@@ -252,7 +254,7 @@ def association_decision(details: dict[str, Any], min_score: float) -> dict[str,
     )
     risk_factors = [] if risk == "clear" else [risk]
     return {
-        "margin": round(float(margin), 6),
+        "margin": round(margin, 6),
         "confidence": round(max(0.0, min(1.0, confidence)), 6),
         "risk": risk,
         "risk_factors": risk_factors,

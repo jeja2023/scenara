@@ -38,7 +38,7 @@
       "javascript_lock": {
         "command": "pnpm audit --audit-level high --json",
         "known_vulnerabilities": 0,
-        "remediation": "Pinned transitive nanoid to 3.3.17 for GHSA-2v37-7h3g-55p8."
+        "remediation": "Pinned transitive nanoid to 3.3.18 for GHSA-2v37-7h3g-55p8."
       }
     }
   }

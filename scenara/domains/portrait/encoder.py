@@ -36,7 +36,9 @@ def decode_portrait_image(data: bytes) -> Image.Image:
         with Image.open(BytesIO(data)) as decoded:
             decoded.verify()
         with Image.open(BytesIO(data)) as decoded:
-            return decoded.convert("RGB")
+            image = decoded.convert("RGB")
+            assert isinstance(image, Image.Image)
+            return image
     except (UnidentifiedImageError, OSError) as exc:
         raise PortraitEncodingError("image could not be decoded") from exc
 

@@ -43,6 +43,7 @@ id_ed25519
 *.jks
 *.keystore
 
+
 # 模型文件通过挂载或外部渠道提供
 models/*
 !models/*.governance.yml
@@ -53,17 +54,17 @@ models/*
 .codex-tmp/
 .omx/
 temp_gov_check_probe.txt
+
 # Node.js build output. The console bundle is deployment-generated; the
 # TypeScript SDK dist/ directory is intentionally tracked as a publishable
 # package artifact.
 node_modules/
 package-lock.json
+.pnpm-store/
+frontend/console-next/
 frontend/console-next/dist/
 frontend/console-next/test-results/
-.pnpm-store/
 frontend/console-next/playwright-report/
-# Local-only imported Portrait Hub console reference; Scenara ships frontend/console.
-frontend/console-next/
 frontend/console/dist/
 frontend/console/test-results/
 frontend/console/playwright-report/
@@ -74,3 +75,8 @@ sdk/python/*.egg-info/
 
 # Java build output
 sdk/java/target/
+
+# Local scan results and patches
+gitleaks-results.json
+*.patch
+repository-contracts-*.zip

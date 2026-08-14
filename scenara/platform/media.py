@@ -23,11 +23,12 @@ def _decode_image(data: bytes) -> DecodedImage:
         with Image.open(BytesIO(data)) as opened:
             opened.verify()
         with Image.open(BytesIO(data)) as opened:
-            image = ImageOps.exif_transpose(opened).convert("RGB")
+            transposed = ImageOps.exif_transpose(opened)
+            image = (transposed if transposed is not None else opened).convert("RGB")
             width, height = image.size
             if width <= 0 or height <= 0 or width * height > 80_000_000:
                 raise PipelineError("image dimensions exceed the configured safety limit")
-            return DecodedImage(image=image, width=width, height=height, format=str(opened.format or "unknown").lower())
+            return DecodedImage(image=image, width=width, height=height, format=(opened.format or "unknown").lower())
     except PipelineError:
         raise
     except (Image.DecompressionBombError, UnidentifiedImageError, OSError, ValueError) as exc:
