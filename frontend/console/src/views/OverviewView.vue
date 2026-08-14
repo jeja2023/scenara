@@ -144,7 +144,7 @@ useRefresh(refresh);
   <section class="page overview-page">
     <div class="overview-hero">
       <div class="hero-title">
-        <h1>工作台总览</h1>
+        <strong class="hero-heading">工作台总览</strong>
         <p>聚合全局核心指标与各领域最新运行动态。</p>
       </div>
       <RouterLink class="button primary overview-action" to="/parse">

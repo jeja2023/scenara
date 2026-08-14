@@ -109,8 +109,8 @@ useRefresh(refresh);
             ><span>执行结果</span
             ><select v-model="filters.outcome" @change="refresh">
               <option value="">全部结果</option>
-              <option value="success">成功 (success)</option>
-              <option value="failure">失败 (failure)</option>
+              <option value="success">成功</option>
+              <option value="failure">失败</option>
             </select></label
           >
           <div class="filter-actions">

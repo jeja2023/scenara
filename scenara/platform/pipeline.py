@@ -185,6 +185,10 @@ class PipelineDefinition(BaseModel):
     def definition_sha256(self) -> str:
         payload = self.model_dump(mode="json", exclude={"status"})
         payload["allowed_parameters"] = sorted(self.allowed_parameters)
+        if "parameter_schema" in payload and isinstance(payload["parameter_schema"], dict):
+            for param in payload["parameter_schema"].values():
+                if isinstance(param, dict) and "media_kinds" in param and isinstance(param["media_kinds"], (list, set)):
+                    param["media_kinds"] = sorted(param["media_kinds"])
         encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
         return hashlib.sha256(encoded).hexdigest()
 

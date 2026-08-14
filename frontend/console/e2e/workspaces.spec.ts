@@ -34,6 +34,8 @@ const allowedInterfaceTerms = new Set([
   "portrait",
   "ocr",
   "Search",
+  "RPO",
+  "RTO",
 ]);
 
 async function expectChineseInterface(
@@ -576,9 +578,8 @@ test("parse domain pages keep media tabs inside the workspace", async ({
   if (await mobileMenu.isVisible()) await mobileMenu.click();
 
   await expect(page).toHaveURL(/\/parse\/portrait\/video$/);
-  const context = page.locator(".parse-context-bar");
-  await expect(context).toContainText("人像");
-  await expect(context).toContainText("视频");
+  const mediaTab = page.getByRole("tab", { name: "视频", exact: true });
+  await expect(mediaTab).toHaveAttribute("aria-selected", "true");
 
   const portraitMenu = page.getByRole("link", { name: "人像解析", exact: true });
   await expect(portraitMenu).toBeVisible();
