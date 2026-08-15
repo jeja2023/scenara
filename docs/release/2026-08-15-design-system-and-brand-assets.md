@@ -1,0 +1,140 @@
+# 前端设计系统与品牌资产修订说明
+
+**日期：** 2026-08-15  
+**文档状态：** 已记录，待按整改清单实施前端主题工程化  
+**适用仓库：** `scenara`  
+**上位规范：** [景枢平台总体开发规范.md](../../景枢平台总体开发规范.md) 1.2.1  
+**关联 ADR：** [0004-logo-geometry-alignment.md](../adr/0004-logo-geometry-alignment.md)
+
+## 1. 修订范围
+
+本次修订包含四类内容：
+
+1. 总体开发规范新增统一前端设计系统和四个平台主题规则。
+2. Core 优化清单增加前端设计令牌、平台主题、响应式、无障碍和视觉回归整改项。
+3. Data 拆分指南明确 Dataset、Annotation、Quality 和 Lineage 页面继续接入统一 Console，不复制前端入口。
+4. 景枢 Logo 全部 SVG 变体完成几何中心校正和曲面带间距调整。
+
+本次不改变 API、数据库、事件、SDK、权限模型、运行时行为或应用软件版本号。`0.3.0-dev.21` 仍为当前开发版本。
+
+## 2. 统一前端设计系统
+
+### 2.1 统一边界
+
+Core 提供共享 Console、登录、导航、IAM、审计、API Gateway 和设计系统。Data、Model、Contracts 通过路由模块、产品目录和正式 API 接入。平台差异只通过受控主题强调色、图表序列色和领域信息结构表达。
+
+禁止：
+
+```text
+复制第二套登录、导航、IAM 或组件库
+以 Logo 蓝紫青渐变作为大面积页面、导航或按钮背景
+在业务组件内新增未登记颜色
+用颜色单独表达成功、失败、警告或权限状态
+在 Data/Model 页面直接连接各自部署地址
+```
+
+### 2.2 平台主题
+
+| 平台 | `data-platform` | 强调色 | 视觉定位 |
+| --- | --- | --- | --- |
+| Core | `core` | `#087682` | 稳定、克制、实时的生产控制面 |
+| Data | `data` | `#2F6B8A` | 清晰、可追溯、信息密集的数据治理 |
+| Model | `model` | `#6256A8` | 可比较、可复现的实验和模型研发 |
+| Contracts | `contracts` | `#53636A` | 精确、文档化、开发者友好的契约中心 |
+
+主题只能覆盖 `--color-accent`、`--color-accent-hover`、`--color-accent-soft` 和必要的图表序列色。字体、布局、间距、圆角、导航结构、成功/警告/危险语义色保持统一。
+
+### 2.3 设计令牌和布局基线
+
+必须建立并逐页迁移以下语义令牌：
+
+```text
+--color-bg / --color-surface / --color-surface-muted
+--color-text / --color-text-muted
+--color-border / --color-border-strong
+--color-accent / --color-accent-hover / --color-accent-soft
+--color-success / --color-warning / --color-danger / --color-info
+--color-sidebar / --font-sans / --font-mono
+--space-1 ... --space-8 / --radius-sm / --radius-md
+```
+
+页面最大内容宽度为 `1420px`，桌面侧栏约 `232px`，顶栏约 `58px`，间距使用 4px 基数，控件圆角 `4-6px`，面板圆角不超过 `8px`。新建和重构界面采用 WCAG 2.2 AA，存量界面至少保持 WCAG 2.1 AA。
+
+### 2.4 视口和验收
+
+每个新增主题或关键路由至少验证：
+
+```text
+1440x900
+1280x800
+768x1024
+390x844
+```
+
+必须提供桌面/移动截图、键盘导航、focus-visible、颜色对比度、加载、空、错误、禁用和权限拒绝状态证据。移动端主要触控目标不小于 `44x44px`，表格允许横向滚动但不得遮挡主要操作。
+
+## 3. Core 前端整改项
+
+| 编号 | 优先级 | 内容 | 当前状态 | 完成证据 |
+| --- | --- | --- | --- | --- |
+| CORE-015 | P1 | 设计令牌收敛 | `styles.css` 和 Vue 页面仍有旧变量及硬编码颜色 | 令牌清单、颜色扫描、组件回归 |
+| CORE-016 | P1 | 平台主题绑定 | 尚无根节点 `data-platform` 和路由平台元数据 | 路由映射测试、主题截图 |
+| CORE-017 | P1 | 响应式与无障碍 | 缺跳到主内容入口，部分移动图标控件小于 44px，明暗色声明不一致 | 四视口、键盘、焦点、对比度测试 |
+| CORE-018 | P2 | 视觉回归证据 | 当前 E2E 主要验证行为，缺主题/布局截图门禁 | Playwright 截图、溢出检查、发布归档 |
+
+未完成上述整改前，不得把前端主题整改标记为 `production_ready`；可继续作为已知限制的开发版发布。
+
+## 4. Logo 几何基线
+
+### 4.1 最终几何
+
+Logo 使用 `64 x 64` 视图框，中心轴为 `x = 32`：
+
+```text
+中心四向星：几何中心 (32, 32)
+左侧/上方曲面带：translate(0 -3)
+右侧/下方曲面带：translate(0 3) rotate(180 32 32)
+```
+
+左侧/上方与右侧/下方使用同一母路径，确保曲率、角度和外轮廓一致。中心星和中心镂空保持正中，不随曲面带移动。最终上下各 3 个网格单位的偏移用于解决小尺寸图标中两侧曲面贴近的问题。
+
+### 4.2 受影响资产
+
+```text
+docs/brand/assets/scenara-mark.svg
+docs/brand/assets/scenara-mark-inverse.svg
+docs/brand/assets/scenara-mark-mono.svg
+docs/brand/assets/scenara-app-icon.svg
+docs/brand/assets/scenara-wordmark-horizontal-en.svg
+docs/brand/assets/scenara-wordmark-horizontal-zh.svg
+docs/brand/assets/scenara-wordmark-vertical.svg
+frontend/console/src/assets/scenara-mark.svg
+frontend/console/public/favicon.svg
+```
+
+所有变体只改变渐变亮度、背景或文字组合，不重新绘制几何。业务页面不得直接复制路径；新增 Logo 变体必须从标准源文件派生并更新 ADR。
+
+## 5. 品牌使用规则同步
+
+- 浅色背景使用 `scenara-mark.svg`，深色背景使用 `scenara-mark-inverse.svg`。
+- 单色使用 `scenara-mark-mono.svg` 的 `currentColor`，不得自行替换路径。
+- 应用图标保留固定午夜色背景；其他页面不得额外套用背景容器。
+- Logo 全彩渐变仅用于 Logo、应用图标和正式品牌展示区域，不扩展为平台主色。
+- 最小数字尺寸、留白、横竖字标尺寸和品牌口号使用规则继续以资产 README 为准。
+
+## 6. 验证记录
+
+- 9 个 SVG 变体均通过 XML 解析。
+- 每个变体均包含一处 `translate(0 -3)` 和一处 `translate(0 3) rotate(180 32 32)`；单色版使用 `currentColor`。
+- 中心星路径无额外平移。
+- Console `npm run build` 通过，Vite 成功处理 1852 个模块。
+- `git diff --check` 通过。
+- 本地静态浏览器渲染确认 Logo 可正常显示；浏览器环境不支持 `getBBox()`，因此未生成自动像素边界数值，几何校验以 SVG 变换和实际渲染结果为准。
+
+## 7. 后续实施顺序
+
+1. 抽取 `frontend/console/src/styles.css` 的新语义令牌并保留旧变量兼容映射。
+2. 在路由元数据登记平台归属，由根布局设置唯一 `data-platform`。
+3. 逐页收敛硬编码颜色和状态表达，补齐键盘、焦点、响应式和 reduced-motion 支持。
+4. 为 Core、Data、Model、Contracts 关键页面增加四视口视觉回归。
+5. 在 Data 远程代理切流前，先完成 Dataset/Annotation 页面主题映射和兼容测试。
