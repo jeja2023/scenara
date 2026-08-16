@@ -1,6 +1,6 @@
 # Scenara 人像智能基础平台长期战略
 
-适用版本：`0.3.0-dev.21`。本文是景枢人像 AI 方向的长期技术战略，定义平台演进目标、六大核心模块、三项核心资产以及各阶段的门禁与现状差距。本文是战略意图文件，不是已发布能力清单。能力成熟度以 `model-capabilities.yml` 和 [实现矩阵](../release/IMPLEMENTATION_MATRIX.md) 为准。
+适用版本：`0.3.0-dev.22`。本文是景枢人像 AI 方向的长期技术战略，定义平台演进目标、六大核心模块、三项核心资产以及各阶段的门禁与现状差距。本文是战略意图文件，不是已发布能力清单。能力成熟度以 `model-capabilities.yml` 和 [实现矩阵](../release/IMPLEMENTATION_MATRIX.md) 为准。
 
 ---
 
@@ -23,8 +23,8 @@
 
 | 模块 | 推荐开源方案 | 战略价值 | 当前状态 |
 | --- | --- | --- | --- |
-| 数据治理 | FiftyOne · LakeFS · DVC | 建立高质量、可追溯的数据资产 | 🔴 接口预留，未建设 |
-| 标注平台 | CVAT · Label Studio | 支持图像、视频、多模态标注闭环 | 🔴 契约到位，无工具集成 |
+| 数据治理 | FiftyOne · LakeFS · DVC | 建立高质量、可追溯的数据资产 | 🟡 Core 已具备远程接入、迁移和契约；Data 原生治理工具未建设 |
+| 标注平台 | CVAT · Label Studio | 支持图像、视频、多模态标注闭环 | 🟡 Core 已具备远程接入与任务契约；工具集成未建设 |
 | 模型训练 | OpenMMLab · PyTorch Lightning | 统一训练框架，覆盖检测/识别/姿态等任务 | 🟡 平台侧契约就绪，训练侧在 `scenara-model` 独立仓库 |
 | 人像算法 | InsightFace · SCRFD · RTMPose · FastReID | 构建完整人像 AI 能力矩阵 | 🟡 7 项中 2 项就绪，4 项 fallback，1 项 placeholder |
 | 向量检索 | Milvus · Qdrant | 支撑海量人像检索、聚类和跨摄像头关联 | 🟡 pgvector 可用；Qdrant 已有旧层实现；Milvus 未建 |
@@ -49,9 +49,9 @@
 - 标注血缘：从原始媒体 → 标注 → 训练集 → 模型制品全链路可追溯
 - Embedding 版本管理：特征空间升级时保留历史向量的迁移路径
 
-**平台侧已有**：`HardSampleManifest` 和 `DatasetVersionReference` 契约（[contracts/repository/v1.0.0/](../../contracts/repository/v1.0.0/)）；`scenara-data` 拆分门禁定义（见 [仓库拓扑](./REPOSITORY_TOPOLOGY.md)）。
+**平台侧已有**：`HardSampleManifest` 和 `DatasetVersionReference` 契约（[contracts/repository/v1.0.0/](../../contracts/repository/v1.0.0/)）；Core 的远程 Data 客户端、带校验和的迁移导出和切流门禁（见 [Data 切流操作说明](./DATA_PLATFORM_CUTOVER.md)）。
 
-**建设门禁**：`scenara-data` 独立仓库需满足仓库拓扑文件定义的四项门禁后建立，不得提前以目录搬迁冒充数据平台建设。
+**建设门禁**：独立 `scenara-data` 服务必须在自己的持久化边界中完成导入、备份恢复、数据质量和授权职责；正式切流前通过仓库拓扑和 Data 切流文档定义的兼容、幂等、影子读和回滚门禁。
 
 ---
 
@@ -189,7 +189,7 @@
 - 质量门禁：分辨率、标注一致性、数据分布自动检验
 - 难例闭环：平台运行结果 → 反馈 → 审批 → 标注 → 数据湖 → 训练
 
-**当前状态**：约 3%。`HardSampleManifest` 和 `DatasetVersionReference` 契约已定义；数据湖本体、版本管理工具链、质量标签体系均未建设。`scenara-data` 独立仓库在门禁满足后建立。
+**当前状态**：Core 已完成 `HardSampleManifest` 远程交接、`DatasetVersionReference` 查询入口和可校验迁移包；数据湖本体、版本管理工具链、质量标签体系仍由独立 Data 服务建设并在切流验收后承担。
 
 ---
 
@@ -276,9 +276,9 @@ Intelligence Engine █░░░  ~10%
 
 ### 阶段 1.1 → 2.0：数据治理与标注平台
 
-**触发条件**：`scenara-data` 拆分门禁全部满足（见 [仓库拓扑](./REPOSITORY_TOPOLOGY.md)）。
+**触发条件**：独立 `scenara-data` 服务完成迁移导入、影子读、备份恢复、Hard Sample 幂等接收和回滚演练（见 [Data 切流操作说明](./DATA_PLATFORM_CUTOVER.md)）。
 
-- 建立 `scenara-data` 独立仓库，接入 FiftyOne 数据集可视化
+- 部署并验收 `scenara-data` 独立服务，接入 FiftyOne 数据集可视化
 - LakeFS 数据集版本管理，与 `DatasetVersionReference` 契约对接
 - CVAT / Label Studio 标注工作流，与平台反馈导出闭环
 - DVC 训练数据与模型制品双向版本绑定

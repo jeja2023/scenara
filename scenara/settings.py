@@ -30,6 +30,11 @@ class Settings:
     state_backend: str
     object_backend: str
     queue_backend: str
+    data_platform_mode: str
+    data_platform_url: str
+    data_platform_service_token: str
+    data_platform_timeout_seconds: float
+    data_platform_max_retries: int
     data_dir: Path
     postgres_dsn: str
     redis_url: str
@@ -90,6 +95,12 @@ class Settings:
         return self.profile in {"prod", "production"}
 
     def validate(self) -> None:
+        if self.data_platform_mode not in {"local", "http"}:
+            raise RuntimeError("SCENARA_DATA_PLATFORM_MODE must be local or http")
+        if self.data_platform_mode == "http" and not self.data_platform_url:
+            raise RuntimeError("SCENARA_DATA_PLATFORM_URL is required when SCENARA_DATA_PLATFORM_MODE=http")
+        if self.data_platform_timeout_seconds <= 0:
+            raise RuntimeError("SCENARA_DATA_PLATFORM_TIMEOUT_SECONDS must be positive")
         if bool(self.s3_access_key) != bool(self.s3_secret_key):
             raise RuntimeError("SCENARA_S3_ACCESS_KEY and SCENARA_S3_SECRET_KEY must be configured together")
         if self.s3_session_token and not self.s3_access_key:
@@ -117,6 +128,12 @@ class Settings:
             errors.append("SCENARA_OBJECT_BACKEND must be s3")
         if self.queue_backend != "redis":
             errors.append("SCENARA_QUEUE_BACKEND must be redis")
+        if self.data_platform_mode != "http":
+            errors.append("SCENARA_DATA_PLATFORM_MODE must be http")
+        if not self.data_platform_url:
+            errors.append("SCENARA_DATA_PLATFORM_URL is required")
+        if not self.data_platform_service_token:
+            errors.append("SCENARA_DATA_PLATFORM_SERVICE_TOKEN is required")
         if not self.postgres_dsn:
             errors.append("SCENARA_POSTGRES_DSN is required")
         if not self.redis_url:
@@ -144,6 +161,11 @@ def load_settings() -> Settings:
         state_backend=os.getenv("SCENARA_STATE_BACKEND", "memory").strip().lower(),
         object_backend=os.getenv("SCENARA_OBJECT_BACKEND", "local").strip().lower(),
         queue_backend=os.getenv("SCENARA_QUEUE_BACKEND", "inline").strip().lower(),
+        data_platform_mode=os.getenv("SCENARA_DATA_PLATFORM_MODE", "local").strip().lower(),
+        data_platform_url=os.getenv("SCENARA_DATA_PLATFORM_URL", "").strip().rstrip("/"),
+        data_platform_service_token=os.getenv("SCENARA_DATA_PLATFORM_SERVICE_TOKEN", "").strip(),
+        data_platform_timeout_seconds=max(0.1, float(os.getenv("SCENARA_DATA_PLATFORM_TIMEOUT_SECONDS", "10"))),
+        data_platform_max_retries=max(0, min(5, int(os.getenv("SCENARA_DATA_PLATFORM_MAX_RETRIES", "2")))),
         data_dir=Path(os.getenv("SCENARA_DATA_DIR", "runtime-state")).resolve(),
         postgres_dsn=os.getenv("SCENARA_POSTGRES_DSN", "").strip(),
         redis_url=os.getenv("SCENARA_REDIS_URL", "").strip(),

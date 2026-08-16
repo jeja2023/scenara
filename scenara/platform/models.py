@@ -67,6 +67,9 @@ class PrincipalContext(StrictModel):
     # 已认证凭据始终提供明确且非空的集合，因此显式空集合表示该凭据没有访问权限。
     scopes: frozenset[str] = Field(default_factory=lambda: frozenset({"*"}))
     product_ids: frozenset[str] = Field(default_factory=lambda: frozenset({"*"}))
+    # Set at the API gateway boundary and forwarded to specialist services.
+    request_id: str | None = Field(default=None, max_length=128)
+    traceparent: str | None = Field(default=None, max_length=512)
 
 
 class MediaTechnicalMetadata(StrictModel):

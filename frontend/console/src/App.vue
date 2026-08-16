@@ -31,6 +31,11 @@ import type { DomainManifest } from "./types";
 const route = useRoute();
 const router = useRouter();
 const isAuthRoute = computed(() => route.meta.layout === "auth");
+const activePlatform = computed(() =>
+  ["core", "data", "model", "contracts"].includes(String(route.meta.platform))
+    ? String(route.meta.platform)
+    : "core",
+);
 const mobileOpen = ref(false);
 const settingsOpen = ref(false);
 const connectionState = ref<"checking" | "online" | "offline">("checking");
@@ -188,7 +193,8 @@ const pageDescription = computed(() => {
 
 <template>
   <RouterView v-if="isAuthRoute" />
-  <div v-else class="shell">
+  <div v-else class="shell" :data-platform="activePlatform">
+    <a class="skip-link" href="#main-content">跳到主内容</a>
     <header class="topbar">
       <button
         class="icon-button mobile-menu"

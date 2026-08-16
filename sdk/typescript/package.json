@@ -1,6 +1,6 @@
 {
   "name": "scenara-sdk",
-  "version": "0.3.0-dev.21",
+  "version": "0.3.0-dev.22",
   "description": "Official TypeScript SDK for the Scenara v1 API",
   "type": "module",
   "main": "dist/index.js",

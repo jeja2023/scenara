@@ -427,6 +427,47 @@ for (const [path, heading, title] of workspaces) {
   });
 }
 
+test("平台主题、跳转入口与规范视口保持可用", async ({ page }, testInfo) => {
+  const viewports = [
+    ["desktop", 1440, 900],
+    ["laptop", 1280, 800],
+    ["tablet", 768, 1024],
+    ["mobile", 390, 844],
+  ] as const;
+
+  for (const [name, width, height] of viewports) {
+    await page.setViewportSize({ width, height });
+    await page.goto("datasets");
+    await expect(page.locator(".shell")).toHaveAttribute("data-platform", "data");
+    expect(
+      await page.locator(".shell").evaluate(
+        (element) => getComputedStyle(element).getPropertyValue("--color-accent").trim(),
+      ),
+    ).toBe("#2f6b8a");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+      ),
+    ).toBe(true);
+    const screenshot = await page.screenshot({
+      path: testInfo.outputPath(`dataset-${name}.png`),
+      fullPage: true,
+    });
+    expect(screenshot.byteLength).toBeGreaterThan(5_000);
+  }
+
+  await page.goto("models");
+  await expect(page.locator(".shell")).toHaveAttribute("data-platform", "model");
+  expect(
+    await page.locator(".shell").evaluate(
+      (element) => getComputedStyle(element).getPropertyValue("--color-accent").trim(),
+    ),
+  ).toBe("#6256a8");
+  await page.keyboard.press("Tab");
+  await expect(page.locator(".skip-link")).toBeFocused();
+  await expect(page.locator(".skip-link")).toBeVisible();
+});
+
 test("overview exposes repository ownership without leaking backend copy", async ({
   page,
 }) => {

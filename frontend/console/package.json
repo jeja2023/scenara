@@ -1,6 +1,6 @@
 {
   "name": "@scenara/console",
-  "version": "0.3.0-dev.21",
+  "version": "0.3.0-dev.22",
   "private": true,
   "type": "module",
   "scripts": {

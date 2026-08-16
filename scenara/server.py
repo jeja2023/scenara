@@ -149,6 +149,7 @@ from scenara.platform.control_plane import (
     WorkerHeartbeatRequest,
     WorkerLease,
 )
+from scenara.platform.data_platform import DataPlatformRemoteError
 from scenara.platform.dataset import DatasetConflict, DatasetNotFound
 from scenara.platform.features import FeatureStoreError
 from scenara.platform.feedback import (
@@ -334,7 +335,13 @@ async def principal_context(
             principal_id = "api-token"
             if not all(CONTEXT_ID.fullmatch(value) for value in (tenant_id, project_id, principal_id)):
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid context identifier")
-            return PrincipalContext(tenant_id=tenant_id, project_id=project_id, principal_id=principal_id)
+            return PrincipalContext(
+                tenant_id=tenant_id,
+                project_id=project_id,
+                principal_id=principal_id,
+                request_id=_request_id(request),
+                traceparent=request.headers.get("traceparent"),
+            )
         scheme, _, token = authorization.partition(" ")
         if scheme.lower() != "bearer" or not token:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid bearer token")
@@ -353,7 +360,9 @@ async def principal_context(
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="session tenant mismatch")
             if x_project_id and x_project_id != session_context.project_id:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="session project mismatch")
-            return session_context
+            return session_context.model_copy(
+                update={"request_id": _request_id(request), "traceparent": request.headers.get("traceparent")}
+            )
         if x_principal_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="principal identity is credential-derived"
@@ -362,13 +371,21 @@ async def principal_context(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="credential tenant mismatch")
         if x_project_id and x_project_id != credential.project_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="credential project mismatch")
-        return credential
+        return credential.model_copy(
+            update={"request_id": _request_id(request), "traceparent": request.headers.get("traceparent")}
+        )
     tenant_id = x_tenant_id or settings.default_tenant_id
     project_id = x_project_id or settings.default_project_id
     principal_id = x_principal_id or ("api-token" if settings.auth_required else "anonymous")
     if not all(CONTEXT_ID.fullmatch(value) for value in (tenant_id, project_id, principal_id)):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid context identifier")
-    return PrincipalContext(tenant_id=tenant_id, project_id=project_id, principal_id=principal_id)
+    return PrincipalContext(
+        tenant_id=tenant_id,
+        project_id=project_id,
+        principal_id=principal_id,
+        request_id=_request_id(request),
+        traceparent=request.headers.get("traceparent"),
+    )
 
 
 def create_app(settings: Settings | None = None, *, runtime: Runtime | None = None) -> FastAPI:
@@ -553,6 +570,10 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     @app.exception_handler(DatasetConflict)
     async def dataset_conflict(request: Request, exc: DatasetConflict) -> JSONResponse:
         return error_response(request, 409, "DATASET_CONFLICT", str(exc))
+
+    @app.exception_handler(DataPlatformRemoteError)
+    async def data_platform_error(request: Request, exc: DataPlatformRemoteError) -> JSONResponse:
+        return error_response(request, exc.status_code, exc.code, str(exc), exc.details)
 
     @app.exception_handler(SavedSearchNotFound)
     async def saved_search_not_found(request: Request, exc: SavedSearchNotFound) -> JSONResponse:
@@ -907,7 +928,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[DatasetRecord]:
-        result = await runtime.datasets.create(context, body)
+        result = await runtime.data.create_dataset(context, body)
         return _envelope(request, result)  # type: ignore[return-value]
 
     @app.get("/api/v1/datasets", tags=["Data"])
@@ -917,7 +938,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[DatasetPage]:
-        result = await runtime.datasets.list(context, offset=offset, limit=limit)
+        result = await runtime.data.list_datasets(context, offset=offset, limit=limit)
         return _envelope(request, result)  # type: ignore[return-value]
 
     @app.get("/api/v1/datasets/{dataset_id}", tags=["Data"])
@@ -926,7 +947,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[DatasetRecord]:
-        result = await runtime.datasets.get(context, dataset_id)
+        result = await runtime.data.get_dataset(context, dataset_id)
         return _envelope(request, result)  # type: ignore[return-value]
 
     @app.patch("/api/v1/datasets/{dataset_id}", tags=["Data"])
@@ -936,7 +957,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[DatasetRecord]:
-        result = await runtime.datasets.update(context, dataset_id, body)
+        result = await runtime.data.update_dataset(context, dataset_id, body)
         return _envelope(request, result)  # type: ignore[return-value]
 
     @app.post("/api/v1/datasets/{dataset_id}/versions", status_code=201, tags=["Data"])
@@ -946,7 +967,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[DatasetVersion]:
-        result = await runtime.datasets.create_version(context, dataset_id, body)
+        result = await runtime.data.create_dataset_version(context, dataset_id, body)
         return _envelope(request, result)  # type: ignore[return-value]
 
     @app.get("/api/v1/datasets/{dataset_id}/versions", tags=["Data"])
@@ -957,7 +978,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[DatasetVersionPage]:
-        result = await runtime.datasets.list_versions(context, dataset_id, offset=offset, limit=limit)
+        result = await runtime.data.list_dataset_versions(context, dataset_id, offset=offset, limit=limit)
         return _envelope(request, result)  # type: ignore[return-value]
 
     @app.post("/api/v1/dataset-versions/{version_id}/transition", tags=["Data"])
@@ -967,7 +988,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[DatasetVersion]:
-        result = await runtime.datasets.transition_version(context, version_id, body)
+        result = await runtime.data.transition_dataset_version(context, version_id, body)
         return _envelope(request, result)  # type: ignore[return-value]
 
     @app.post("/api/v1/runs", status_code=202, tags=["Runs"])
@@ -2089,6 +2110,9 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[HardSampleManifest]:
         result = await runtime.feedback.create_manifest(context, body)
+        # Core owns qualification; Data owns idempotent intake and dataset construction.
+        if runtime.settings.data_platform_mode == "http":
+            await runtime.data.submit_hard_sample_manifest(context, result)
         return _envelope(request, result)  # type: ignore[return-value]
 
     @app.get("/api/v1/hard-sample-manifests", tags=["Feedback"])
@@ -2682,13 +2706,13 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[AnnotationTask]:
-        return _envelope(request, await runtime.control_plane.create_annotation_task(context, body))  # type: ignore[return-value]
+        return _envelope(request, await runtime.data.create_annotation_task(context, body))  # type: ignore[return-value]
 
     @app.get("/api/v1/data/annotation-tasks", tags=["Data"])
     async def list_annotation_tasks(
         request: Request, context: PrincipalContext = Depends(principal_context)
     ) -> ApiEnvelope[list[AnnotationTask]]:
-        return _envelope(request, await runtime.control_plane.list_annotation_tasks(context))  # type: ignore[return-value]
+        return _envelope(request, await runtime.data.list_annotation_tasks(context))  # type: ignore[return-value]
 
     @app.post("/api/v1/data/annotation-providers", status_code=201, tags=["Data"])
     async def register_annotation_provider(
@@ -2696,13 +2720,13 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[AnnotationProvider]:
-        return _envelope(request, await runtime.control_plane.register_annotation_provider(context, body))  # type: ignore[return-value]
+        return _envelope(request, await runtime.data.register_annotation_provider(context, body))  # type: ignore[return-value]
 
     @app.get("/api/v1/data/annotation-providers", tags=["Data"])
     async def list_annotation_providers(
         request: Request, context: PrincipalContext = Depends(principal_context)
     ) -> ApiEnvelope[list[AnnotationProvider]]:
-        return _envelope(request, await runtime.control_plane.list_annotation_providers(context))  # type: ignore[return-value]
+        return _envelope(request, await runtime.data.list_annotation_providers(context))  # type: ignore[return-value]
 
     @app.post("/api/v1/data/annotation-providers/{provider_id}/probe", tags=["Data"])
     async def probe_annotation_provider(
@@ -2710,7 +2734,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[AnnotationProvider]:
-        return _envelope(request, await runtime.control_plane.probe_annotation_provider(context, provider_id))  # type: ignore[return-value]
+        return _envelope(request, await runtime.data.probe_annotation_provider(context, provider_id))  # type: ignore[return-value]
 
     @app.post("/api/v1/data/annotation-tasks/{task_id}/review", tags=["Data"])
     async def review_annotation_task(
@@ -2719,7 +2743,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[AnnotationTask]:
-        return _envelope(request, await runtime.control_plane.review_annotation_task(context, task_id, body))  # type: ignore[return-value]
+        return _envelope(request, await runtime.data.review_annotation_task(context, task_id, body))  # type: ignore[return-value]
 
     @app.post("/api/v1/platform/model-metrics", status_code=201, tags=["Model Governance"])
     async def record_model_metric(

@@ -1,6 +1,6 @@
 # Scenara 产品矩阵
 
-适用版本：`0.3.0-dev.21`。本文是产品边界和演进顺序的权威说明，不是所有产品均已发布的销售清单。
+适用版本：`0.3.0-dev.22`。本文是产品边界和演进顺序的权威说明，不是所有产品均已发布的销售清单。
 
 Scenara 是平台母品牌。长期产品矩阵采用三层边界：产品模块、共享入口和底层 AI 数据底座。`Console`、`API`、`SDK` 不作为重复建设的业务产品，而作为所有产品模块共享的控制面和开发者入口。
 
@@ -10,7 +10,7 @@ Scenara 是平台母品牌。长期产品矩阵采用三层边界：产品模块
 | --- | --- | --- | --- |
 | 产品模块 | Scenara Parse | 视觉解析平台，承载媒体、运行、流水线和结构化视觉结果 | 可用，仍受 1.0 生产证据门禁约束 |
 | 产品模块 | Scenara Model | 模型包准入、发布、回滚、部署事件和证据追踪 | 种子能力，不包含训练作业 |
-| 产品模块 | Scenara Data | 媒体、特征、反馈和 Hard Sample Manifest 数据闭环 | 种子能力，还不是完整 Data Hub |
+| 产品模块 | Scenara Data | 数据集、版本、标注、质量、血缘、授权和 Hard Sample 数据闭环；由 Core 统一网关接入 | Core 集成与迁移切流已就绪；完整 Data Hub 取决于独立服务发布与资格证据 |
 | 产品模块 | Scenara Edge | 边缘推理、设备、离线同步和远程下发 | 种子能力，等待 1.0 交付证据 |
 | 产品模块 | Scenara Flow | 运行编排、人工审核和流程自动化 | 种子能力 |
 | 产品模块 | Scenara Search | 跨媒体、跨文档和跨索引检索 | 种子能力 |
@@ -25,7 +25,7 @@ Scenara 是平台母品牌。长期产品矩阵采用三层边界：产品模块
 - 先完成 Scenara 1.0 的合法模型、固定评估集、目标 GPU、离线安装、备份恢复和签署证据。
 - 在拆分产品前，先建设共享 IAM、组织、项目、角色、服务账号、API Key、权限范围、授权、配额、审计和产品目录。
 - `Model` 近期只做模型治理和训练平台契约，不把训练作业、实验跟踪、标注系统直接并入当前仓库。
-- `Data` 先把反馈、难例和数据授权闭环做实，再升级为完整 Data Hub。
+- `Data` 通过独立服务拥有数据治理事实；Core 只负责统一入口、身份上下文传递、迁移和已批准难例交接，再在资格证据满足后扩展为完整 Data Hub。
 - `Index` 已成为统一底座并支撑 `Search` 的文本、人像和来源检索；`Flow` 和 `Search` 稳定后再启动 `Agent`。
 - `Edge` 等 1.0 服务端部署和证据闭环稳定后再启动，避免同时复制 UI、权限、部署和运维工作。
 
@@ -33,7 +33,7 @@ Scenara 是平台母品牌。长期产品矩阵采用三层边界：产品模块
 
 产品矩阵通过 `GET /api/v1/platform/products` 暴露。该接口返回产品名称、层级、成熟度、当前范围、尚未纳入范围、Console 路由、API 路径、依赖关系和下一道门禁。
 
-仓库拓扑通过 `GET /api/v1/platform/repositories` 暴露。当前 `scenara` 是平台集成仓库，已有模型训练仓库映射为 `scenara-model` 专业仓库，`scenara-data` 处于规划拆分状态。拓扑契约同时公开职责、排除职责、跨仓库清单/API/事件和禁止共享数据库、禁止跨仓库源码导入等强制规则。四条正式跨仓库契约由 `GET /api/v1/platform/contracts` 和 `contracts/repository/v1.0.0/` 发布，并由 Schema 摘要、有效示例和向后兼容门禁保护。
+仓库拓扑通过 `GET /api/v1/platform/repositories` 暴露。当前 `scenara` 是平台集成仓库，已有模型训练仓库映射为 `scenara-model` 专业仓库；`scenara-data` 是由 Core 远程客户端接入的独立服务边界。拓扑契约同时公开职责、排除职责、跨仓库清单/API/事件和禁止共享数据库、禁止跨仓库源码导入等强制规则。四条正式跨仓库契约由 `GET /api/v1/platform/contracts` 和 `contracts/repository/v1.0.0/` 发布，并由 Schema 摘要、有效示例和向后兼容门禁保护。
 
 这份目录是战略边界，不代表所有条目已经可生产使用。`available` 表示仓库已有可使用能力；`seed` 表示已有基础闭环但尚未独立产品化；`planned` 表示规划中；`gated` 表示必须等待前置证据或前置产品稳定。
 
@@ -44,7 +44,7 @@ Scenara 是平台母品牌。长期产品矩阵采用三层边界：产品模块
 详细仓库职责见 [`REPOSITORY_TOPOLOGY.md`](./REPOSITORY_TOPOLOGY.md)，认证与安全边界见 [`ACCESS_FOUNDATION.md`](./ACCESS_FOUNDATION.md)。
 
 Parse、Model、Data 三个模块在人像方向的长期演进目标、六大能力模块与三项核心资产见 [`PORTRAIT_INTELLIGENCE_STRATEGY.md`](./PORTRAIT_INTELLIGENCE_STRATEGY.md)，其成熟度与能力就绪度通过 `GET /api/v1/platform/portrait-intelligence` 暴露。该契约是产品矩阵在人像领域的纵向深化，不新增产品条目。
-适用版本：`0.3.0-dev.21`。当前基线已完成经认证 S3 Provider 抽象、对象不可变发布、SHA-256 完整性校验、生命周期治理和预签名直传；同时保留增量结果分片、Stream Session 自动续段、文件流式传输和 SSE/Webhook 增量事件；生产 ANN、语义重排和跨租户联邦仍需后续门禁。
+适用版本：`0.3.0-dev.22`。当前基线已完成经认证 S3 Provider 抽象、对象不可变发布、SHA-256 完整性校验、生命周期治理和预签名直传，并完成 Core 到 Data 的远程客户端、迁移包和统一 Console 主题整改；生产 Data 服务的导入、备份恢复与切流证据，以及 ANN、语义重排和跨租户联邦仍需后续门禁。
 
 ## P0-P2 non-model completion
 

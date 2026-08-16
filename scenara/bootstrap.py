@@ -40,6 +40,7 @@ from scenara.platform.access import AccessRepository, AccessService, MemoryAcces
 from scenara.platform.audit import AuditLogger
 from scenara.platform.control_plane import ControlPlaneService
 from scenara.platform.control_plane_store import ControlPlaneStore, MemoryControlPlaneStore
+from scenara.platform.data_platform import DataPlatformClient, HttpDataPlatformClient, LocalDataPlatformAdapter
 from scenara.platform.dataset import DatasetService
 from scenara.platform.features import FeatureStore, MemoryFeatureStore
 from scenara.platform.feedback import FeedbackRepository, FeedbackService, MemoryFeedbackRepository
@@ -81,7 +82,7 @@ class Runtime:
     portrait: PortraitService
     trajectory: TrajectoryService
     search: SearchService
-    datasets: DatasetService
+    data: DataPlatformClient
     control_plane: ControlPlaneService
     enterprise: EnterpriseService | None
     _session_cleanup_task: asyncio.Task[None] | None = None
@@ -109,6 +110,7 @@ class Runtime:
                 await self._session_cleanup_task
             self._session_cleanup_task = None
         await self.queue.close()
+        await self.data.close()
         await self.models.close()
         await self.objects.close()
         await self.state.close()
@@ -253,7 +255,6 @@ def build_runtime(
         encoder=portrait_encoder,
         objects=objects,
     )
-    datasets = DatasetService(state, policy, audit)
     models = ModelRegistry(production=settings.production, catalog=state)
     webhooks = WebhookService(
         state=state,
@@ -301,6 +302,17 @@ def build_runtime(
     control_plane = ControlPlaneService(
         control_plane_store, policy, audit, indexes=indexes, access=access, audit_store=state
     )
+    local_data = LocalDataPlatformAdapter(DatasetService(state, policy, audit), control_plane)
+    data: DataPlatformClient
+    if settings.data_platform_mode == "http":
+        data = HttpDataPlatformClient(
+            settings.data_platform_url,
+            service_token=settings.data_platform_service_token,
+            timeout_seconds=settings.data_platform_timeout_seconds,
+            max_retries=settings.data_platform_max_retries,
+        )
+    else:
+        data = local_data
     search.profile_resolver = control_plane
     return Runtime(
         settings=settings,
@@ -322,7 +334,7 @@ def build_runtime(
         portrait=portrait,
         trajectory=trajectory,
         search=search,
-        datasets=datasets,
+        data=data,
         control_plane=control_plane,
         enterprise=enterprise,
     )

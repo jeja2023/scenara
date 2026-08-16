@@ -396,7 +396,7 @@ textarea {
   padding: 9px 10px;
   font: inherit;
   color: var(--text);
-  background: #fff;
+  background: var(--surface);
 }
 textarea {
   min-height: 80px;
@@ -411,7 +411,7 @@ textarea {
 .dataset-row,
 .version-row {
   border: 0;
-  background: #fff;
+  background: var(--surface);
   padding: 13px 15px;
   display: flex;
   justify-content: space-between;
@@ -423,7 +423,7 @@ textarea {
   cursor: pointer;
 }
 .dataset-row.selected {
-  background: #edf8f7;
+  background: var(--color-accent-soft);
   box-shadow: inset 3px 0 var(--teal);
 }
 .dataset-row span,
@@ -522,7 +522,7 @@ small {
   padding: 22px;
   color: var(--muted);
   text-align: center;
-  background: #fff;
+  background: var(--surface);
 }
 @media (max-width: 850px) {
   .governance-grid,

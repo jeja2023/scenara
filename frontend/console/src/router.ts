@@ -116,6 +116,7 @@ const routes = [
       description: "数据集中集管理、版本切换与生命周期治理。",
       icon: Database,
       section: "数据与分析",
+      platform: "data",
     },
   },
   {
@@ -216,6 +217,7 @@ const routes = [
       description: "实时模型健康监控与运行参数调优。",
       icon: Boxes,
       section: "AI 引擎与模型",
+      platform: "model",
     },
   },
   {

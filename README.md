@@ -2,7 +2,7 @@
 
 Scenara 是面向企业私有化部署的视觉 AI 中枢平台。平台以版本化数据资产、Run、Pipeline 和 Result 契约接收图片、视频、PDF 与实时流，并通过可安装的 Domain 提供强类型视觉能力。当前版本已把同一人的视频内连续出现、跨视频/跨摄像头长期轨迹、人工确认与长期身份查询串成闭环。
 
-当前产品阶段：`0.3.0-dev.21`（Python 包版本为 `0.3.0.dev21`）
+当前产品阶段：`0.3.0-dev.22`（Python 包版本为 `0.3.0.dev22`）
 
 - 正式领域：Portrait（迁移中）
 - 验证领域：OCR / Document
@@ -15,7 +15,7 @@ Scenara 是面向企业私有化部署的视觉 AI 中枢平台。平台以版�
 
 Scenara 作为平台母品牌，统一规划 Parse、Model、Data、Edge、Flow、Search、Agent、Console、API、SDK 与 Index。当前并非 11 套独立系统：Console、API 和 SDK 是共享入口，Index 是共享底座，产品模块继续复用同一平台内核、IAM、授权、审计和部署栈。
 
-当前版本已提供产品目录、仓库拓扑、正式跨仓库契约、Organization、Project、User、Role、Membership、Service Account、API Key 与 Product Entitlement，并支持平台根令牌、按项目绑定的服务账号 API Key 以及用户名密码登录。完整成熟度、依赖顺序与非目标见 [产品矩阵](docs/strategy/PRODUCT_MATRIX.md)，当前仓库与独立 Model/Data 仓库的分工见 [仓库拓扑](docs/strategy/REPOSITORY_TOPOLOGY.md)，四条可发布契约见 [契约包](contracts/repository/README.md)，认证和授权边界见 [访问底座](docs/strategy/ACCESS_FOUNDATION.md)，人像 AI 长期演进方向见 [人像智能基础平台战略](docs/strategy/PORTRAIT_INTELLIGENCE_STRATEGY.md)，升级影响见 [0.3.0-dev.21 开发版发布说明](docs/release/0.3.0-dev.21.md)。
+当前版本已提供产品目录、仓库拓扑、正式跨仓库契约、Organization、Project、User、Role、Membership、Service Account、API Key 与 Product Entitlement，并支持平台根令牌、按项目绑定的服务账号 API Key 以及用户名密码登录。Core 已通过版本化 Data 客户端接入 Dataset、Version、Annotation 和 Hard Sample 的独立服务边界；完整切流步骤见 [Data 切流操作说明](docs/strategy/DATA_PLATFORM_CUTOVER.md)。完整成熟度、依赖顺序与非目标见 [产品矩阵](docs/strategy/PRODUCT_MATRIX.md)，当前仓库与独立 Model/Data 仓库的分工见 [仓库拓扑](docs/strategy/REPOSITORY_TOPOLOGY.md)，四条可发布契约见 [契约包](contracts/repository/README.md)，认证和授权边界见 [访问底座](docs/strategy/ACCESS_FOUNDATION.md)，人像 AI 长期演进方向见 [人像智能基础平台战略](docs/strategy/PORTRAIT_INTELLIGENCE_STRATEGY.md)，升级影响见 [0.3.0-dev.22 开发版发布说明](docs/release/0.3.0-dev.22.md)。
 
 解析控制台采用“解析 -> 领域”的工作区结构，人像和 OCR 文档分别进入独立领域页面；图片、视频、文档和视频流是页面内部的数据类型标签，例如 `parse/portrait/image` 与 `parse/ocr/document` 仍可作为深链路访问。每个领域工作区内完成上传、参数配置、运行进度、当前结果查看与历史恢复；“数据资产”和“运行”页面分别承担文件/视频流来源管理与运行生命周期管理，新增的“解析结果”页面负责跨领域、跨任务浏览和筛选结果。领域菜单由后端 `DomainManifest` 驱动，新领域接入时不需要重新拆分前端解析流程。
 
@@ -72,7 +72,7 @@ API 默认位于 `http://127.0.0.1:8000`，Console 开发服务器位于 `http:/
 
 ## 仓库边界
 
-本仓库是 Scenara 平台集成仓库，不单独改名为 Scenara Parse。Scenara Parse、Console、API、SDK 及共享平台底座在此统一演进；已有模型训练仓库独立承担 Scenara Model 的训练生产，未来 Scenara Data 在数据集治理门禁成熟后独立建仓。模型准入、发布、部署、回滚以及业务反馈与难例导出仍由本仓库治理，跨仓库禁止共享数据库和源码导入。
+本仓库是 Scenara 平台集成仓库，不单独改名为 Scenara Parse。Scenara Parse、Console、API、SDK 及共享平台底座在此统一演进；已有模型训练仓库独立承担 Scenara Model 的训练生产，Data 的领域服务独立部署。模型准入、发布、部署、回滚以及业务反馈与难例导出仍由本仓库治理，跨仓库禁止共享数据库和源码导入。Dataset、Dataset Version 与 Annotation 的公共路径由 Core 网关通过 `DataPlatformClient` 转发给独立的 `scenara-data` 服务；本地适配器仅用于开发和迁移验证，生产环境必须配置远程 Data 服务。切流和迁移操作见 [Data 平台切流说明](docs/strategy/DATA_PLATFORM_CUTOVER.md)。
 
 模型闭环从 `POST /api/v1/model-packages/admissions` 接收带不可变 SHA-256 引用的正式清单，经证据验证进入发布状态机。激活或回滚按租户、项目和能力切换唯一运行时绑定；每个 Run 在开始时冻结该绑定并写入结果来源。部署状态变化同时持久化为 `ModelDeploymentEvent`，并通过 `model.deployment.changed` Webhook 投递回训练仓库。契约目录由 `GET /api/v1/platform/contracts` 暴露。
 
@@ -83,7 +83,7 @@ API 默认位于 `http://127.0.0.1:8000`，Console 开发服务器位于 `http:/
 ## 授权
 
 源码公开不代表开源授权。除第三方组件另有声明外，本仓库使用 [Scenara Proprietary Source License](LICENSE)。
-Current release baseline: `0.3.0-dev.21` (`0.3.0.dev21` for Python packages).
+Current release baseline: `0.3.0-dev.22` (`0.3.0.dev22` for Python packages).
 
 Object storage is provider-neutral at the platform boundary. MinIO is the
 private-deployment baseline; certified S3-compatible alternatives and the

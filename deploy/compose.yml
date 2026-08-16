@@ -124,7 +124,7 @@ services:
     restart: "no"
 
   api:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.21}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.22}
     build:
       context: ..
     environment: *scenara-environment
@@ -148,7 +148,7 @@ services:
     restart: unless-stopped
 
   batch-worker:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.21}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.22}
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "batch-gpu-1", "--lane", "batch"]
@@ -169,7 +169,7 @@ services:
     restart: unless-stopped
 
   stream-worker:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.21}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.22}
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "stream-gpu-1", "--lane", "stream"]
@@ -190,7 +190,7 @@ services:
     restart: unless-stopped
 
   scheduler:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.21}
+    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.22}
     build:
       context: ..
     command:
