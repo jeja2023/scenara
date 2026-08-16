@@ -24,6 +24,7 @@ async def _run(args: argparse.Namespace) -> int:
             project_id=args.project_id,
             output_dir=args.output.resolve(),
             source_version=__version__,
+            source_bucket=runtime.settings.s3_bucket,
         )
     finally:
         await runtime.close()

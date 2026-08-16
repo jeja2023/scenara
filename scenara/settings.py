@@ -33,6 +33,7 @@ class Settings:
     data_platform_mode: str
     data_platform_url: str
     data_platform_service_token: str
+    data_event_service_token: str
     data_platform_timeout_seconds: float
     data_platform_max_retries: int
     data_dir: Path
@@ -134,6 +135,8 @@ class Settings:
             errors.append("SCENARA_DATA_PLATFORM_URL is required")
         if not self.data_platform_service_token:
             errors.append("SCENARA_DATA_PLATFORM_SERVICE_TOKEN is required")
+        if not self.data_event_service_token:
+            errors.append("SCENARA_DATA_EVENT_SERVICE_TOKEN is required")
         if not self.postgres_dsn:
             errors.append("SCENARA_POSTGRES_DSN is required")
         if not self.redis_url:
@@ -164,6 +167,10 @@ def load_settings() -> Settings:
         data_platform_mode=os.getenv("SCENARA_DATA_PLATFORM_MODE", "local").strip().lower(),
         data_platform_url=os.getenv("SCENARA_DATA_PLATFORM_URL", "").strip().rstrip("/"),
         data_platform_service_token=os.getenv("SCENARA_DATA_PLATFORM_SERVICE_TOKEN", "").strip(),
+        data_event_service_token=os.getenv(
+            "SCENARA_DATA_EVENT_SERVICE_TOKEN",
+            os.getenv("SCENARA_DATA_PLATFORM_SERVICE_TOKEN", ""),
+        ).strip(),
         data_platform_timeout_seconds=max(0.1, float(os.getenv("SCENARA_DATA_PLATFORM_TIMEOUT_SECONDS", "10"))),
         data_platform_max_retries=max(0, min(5, int(os.getenv("SCENARA_DATA_PLATFORM_MAX_RETRIES", "2")))),
         data_dir=Path(os.getenv("SCENARA_DATA_DIR", "runtime-state")).resolve(),

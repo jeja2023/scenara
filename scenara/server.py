@@ -150,6 +150,7 @@ from scenara.platform.control_plane import (
     WorkerLease,
 )
 from scenara.platform.data_platform import DataPlatformRemoteError
+from scenara.platform.data_events import DataEventEnvelope
 from scenara.platform.dataset import DatasetConflict, DatasetNotFound
 from scenara.platform.features import FeatureStoreError
 from scenara.platform.feedback import (
@@ -642,6 +643,35 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         except Exception as exc:
             raise HTTPException(status_code=503, detail="runtime dependency is unavailable") from exc
         return _envelope(request, {"status": "ready", "components": components})  # type: ignore[return-value]
+
+    @app.post("/internal/v1/data/events", include_in_schema=False)
+    async def receive_data_event(
+        body: DataEventEnvelope,
+        authorization: Annotated[str | None, Header()] = None,
+        idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+        tenant_id: Annotated[str | None, Header(alias="X-Scenara-Tenant-Id")] = None,
+        project_id: Annotated[str | None, Header(alias="X-Scenara-Project-Id")] = None,
+    ) -> JSONResponse:
+        scheme, _, credential = (authorization or "").partition(" ")
+        expected = runtime.settings.data_event_service_token
+        if (
+            scheme.lower() != "bearer"
+            or not credential
+            or not expected
+            or not hmac.compare_digest(credential, expected)
+        ):
+            raise HTTPException(status_code=401, detail="invalid Data event service credential")
+        if idempotency_key != body.event_id:
+            raise HTTPException(status_code=400, detail="Idempotency-Key must match event_id")
+        if (tenant_id, project_id) != (body.tenant_id, body.project_id):
+            raise HTTPException(status_code=400, detail="event scope headers must match the event envelope")
+        accepted = await runtime.state.append_external_event_audit(
+            body.audit_event(), body.payload_hash()
+        )
+        return JSONResponse(
+            status_code=202 if accepted else 200,
+            content={"accepted": accepted, "event_id": body.event_id},
+        )
 
     @app.get("/metrics", include_in_schema=False)
     async def metrics(context: PrincipalContext = Depends(principal_context)) -> Response:

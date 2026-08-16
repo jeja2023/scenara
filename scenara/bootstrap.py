@@ -310,6 +310,8 @@ def build_runtime(
             service_token=settings.data_platform_service_token,
             timeout_seconds=settings.data_platform_timeout_seconds,
             max_retries=settings.data_platform_max_retries,
+            source_assets=state,
+            source_bucket=settings.s3_bucket,
         )
     else:
         data = local_data

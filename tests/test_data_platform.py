@@ -150,8 +150,9 @@ async def test_migration_export_contains_checksums_and_scoped_records(developmen
         await runtime.close()
     manifest = json.loads((output / "migration-manifest.json").read_text(encoding="utf-8"))
     assert summary.record_counts["datasets"] == 1
-    assert manifest["scope"] == {"tenant_id": "default", "project_id": "default"}
-    assert set(manifest["files"]) >= {"datasets.jsonl", "dataset-versions.jsonl", "object-references.jsonl"}
+    assert (manifest["tenant_id"], manifest["project_id"]) == ("default", "default")
+    declared_files = {item["file"] for item in manifest["files"]}
+    assert declared_files >= {"datasets.jsonl", "samples.jsonl", "dataset-versions.jsonl", "object-references.jsonl"}
     assert (output / "checksums.txt").read_text(encoding="utf-8").count("\n") == len(summary.files)
 
 
@@ -177,7 +178,30 @@ async def test_core_delivers_approved_hard_sample_to_remote_data_platform(develo
             data_platform_url="https://data.example",
         )
     )
-    runtime.data = HttpDataPlatformClient("https://data.example", client=data_client)
+    class FakeSourceAssets:
+        async def get_asset(self, tenant_id: str, project_id: str, asset_id: str):
+            assert (tenant_id, project_id, asset_id) == (
+                "default",
+                "default",
+                "media#sha256=" + "a" * 64,
+            )
+            return type(
+                "Asset",
+                (),
+                {
+                    "object_key": "media/example.jpg",
+                    "sha256": "a" * 64,
+                    "size_bytes": 123,
+                    "content_type": "image/jpeg",
+                },
+            )()
+
+    runtime.data = HttpDataPlatformClient(
+        "https://data.example",
+        client=data_client,
+        source_assets=FakeSourceAssets(),
+        source_bucket="scenara-media",
+    )
     from scenara.server import create_app
 
     class FakeFeedbackService:
@@ -216,6 +240,7 @@ async def test_core_delivers_approved_hard_sample_to_remote_data_platform(develo
         )
     assert manifest.status_code == 201, manifest.text
     assert len(delivered) == 1
-    assert delivered[0]["manifest_id"] == manifest.json()["data"]["manifest_id"]
+    assert delivered[0]["manifest"]["manifest_id"] == manifest.json()["data"]["manifest_id"]
+    assert delivered[0]["sources"][0]["source_ref"]["key"] == "media/example.jpg"
     await runtime.close()
     await data_client.aclose()

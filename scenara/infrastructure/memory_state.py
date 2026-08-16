@@ -42,6 +42,7 @@ class MemoryStateStore:
         self._results: dict[tuple[str, str, str], ResultReference] = {}
         self._idempotency: dict[tuple[str, str, str], tuple[str, str]] = {}
         self._audits: list[AuditEvent] = []
+        self._external_event_hashes: dict[tuple[str, str, str], str] = {}
         self._object_retention: dict[tuple[str, str, str], ObjectRetentionRecord] = {}
         self._pipelines: dict[tuple[str, str], PipelineDefinition] = {}
         self._model_packages: dict[tuple[str, str], ModelPackageManifest] = {}
@@ -720,6 +721,19 @@ class MemoryStateStore:
     async def append_audit(self, event: AuditEvent) -> None:
         async with self._lock:
             self._audits.append(event)
+
+    async def append_external_event_audit(self, event: AuditEvent, payload_hash: str) -> bool:
+        async with self._lock:
+            event_id = str(event.evidence.get("event_id", ""))
+            key = (event.tenant_id, event.project_id, event_id)
+            previous = self._external_event_hashes.get(key)
+            if previous is not None:
+                if previous != payload_hash:
+                    raise StateConflict("external event id was reused with different content")
+                return False
+            self._external_event_hashes[key] = payload_hash
+            self._audits.append(event)
+            return True
 
     async def audit_events(
         self,

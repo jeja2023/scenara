@@ -179,6 +179,85 @@ def _redis_server_path(runtime_root: Path) -> Path | None:
     return Path(installed) if installed else None
 
 
+def _minio_server_path(runtime_root: Path) -> Path | None:
+    executable = "minio.exe" if os.name == "nt" else "minio"
+    bundled = sorted(runtime_root.glob(f"minio-*/**/{executable}"), reverse=True)
+    if bundled:
+        return bundled[0]
+    installed = shutil.which(executable)
+    return Path(installed) if installed else None
+
+
+def _start_local_minio(env_file: Path, runtime_root: Path) -> subprocess.Popen[bytes] | None:
+    if (_dotenv_value(env_file, "SCENARA_OBJECT_BACKEND") or "local").lower() != "s3":
+        return None
+
+    s3_url = _dotenv_value(env_file, "SCENARA_S3_ENDPOINT_URL") or "http://127.0.0.1:9000"
+    parsed = urlsplit(s3_url)
+    host = parsed.hostname
+    if host is None:
+        raise RuntimeError(f"S3 端点地址无效：{s3_url}")
+    try:
+        port = parsed.port or 9000
+    except ValueError as exc:
+        raise RuntimeError(f"S3 端点端口无效：{s3_url}") from exc
+
+    if _tcp_open(host, port):
+        return None
+    if host.lower() not in {"127.0.0.1", "localhost", "::1"}:
+        return None
+
+    executable = _minio_server_path(runtime_root)
+    if executable is None:
+        raise RuntimeError(
+            f"MinIO 未运行：{host}:{port}；未找到本地 minio，可使用 --local 跳过 S3"
+        )
+
+    data_dir = runtime_root / "minio-data"
+    logs_dir = runtime_root / "logs"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    logs_dir.mkdir(parents=True, exist_ok=True)
+
+    access_key = _dotenv_value(env_file, "SCENARA_S3_ACCESS_KEY") or "minioadmin"
+    secret_key = _dotenv_value(env_file, "SCENARA_S3_SECRET_KEY") or "minioadmin"
+    minio_env = os.environ.copy()
+    minio_env["MINIO_ROOT_USER"] = access_key
+    minio_env["MINIO_ROOT_PASSWORD"] = secret_key
+
+    log_path = logs_dir / f"minio-{port}.log"
+    log_file = open(log_path, "a", encoding="utf-8")
+    command = [
+        str(executable),
+        "server",
+        str(data_dir),
+        "--address",
+        f":{port}",
+        "--console-address",
+        f":{port + 1}",
+    ]
+    process = subprocess.Popen(
+        command,
+        cwd=executable.parent,
+        env=minio_env,
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+    )
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        if _tcp_open(host, port):
+            print(f"MinIO 已自动启动：{host}:{port}（进程 {process.pid}）")
+            return process
+        exit_code = process.poll()
+        if exit_code is not None:
+            raise RuntimeError(
+                f"MinIO 启动失败，状态码：{exit_code}；日志：{log_path}"
+            )
+        time.sleep(0.1)
+
+    _stop(process)
+    raise RuntimeError(f"MinIO 启动超时：{host}:{port}；日志：{log_path}")
+
+
 def _start_local_redis(env_file: Path, runtime_root: Path) -> subprocess.Popen[bytes] | None:
     if (_dotenv_value(env_file, "SCENARA_QUEUE_BACKEND") or "inline").lower() != "redis":
         return None
@@ -299,6 +378,9 @@ def _run(args: argparse.Namespace) -> int:
     workers: list[tuple[str, subprocess.Popen[bytes]]] = []
     try:
         if not args.local:
+            minio = _start_local_minio(env_file, runtime_root)
+            if minio is not None:
+                processes.append(minio)
             redis = _start_local_redis(env_file, runtime_root)
             if redis is not None:
                 processes.append(redis)

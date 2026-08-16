@@ -1118,6 +1118,53 @@ class PostgresStateStore:
                 ),
             )
 
+    async def append_external_event_audit(self, event: AuditEvent, payload_hash: str) -> bool:
+        from psycopg.types.json import Jsonb
+
+        event_id = str(event.evidence.get("event_id", ""))
+        async with self._pool.connection() as conn, conn.transaction():
+            inserted = await conn.execute(
+                """
+                INSERT INTO scenara_external_events
+                    (tenant_id, project_id, event_id, payload_hash, received_at)
+                VALUES (%s, %s, %s, %s, now())
+                ON CONFLICT (tenant_id, project_id, event_id) DO NOTHING
+                RETURNING event_id
+                """,
+                (event.tenant_id, event.project_id, event_id, payload_hash),
+            )
+            if await inserted.fetchone() is None:
+                existing = await conn.execute(
+                    """
+                    SELECT payload_hash FROM scenara_external_events
+                    WHERE tenant_id = %s AND project_id = %s AND event_id = %s
+                    """,
+                    (event.tenant_id, event.project_id, event_id),
+                )
+                row = await existing.fetchone()
+                if row is None or str(row[0]) != payload_hash:
+                    raise StateConflict("external event id was reused with different content")
+                return False
+            await conn.execute(
+                """INSERT INTO scenara_audit_events
+                   (tenant_id, project_id, principal_id, action, resource_type, resource_id,
+                    outcome, request_id, evidence, created_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, to_timestamp(%s))""",
+                (
+                    event.tenant_id,
+                    event.project_id,
+                    event.principal_id,
+                    event.action,
+                    event.resource_type,
+                    event.resource_id,
+                    event.outcome,
+                    event.request_id,
+                    Jsonb(event.evidence),
+                    event.created_at,
+                ),
+            )
+            return True
+
     async def audit_events(
         self,
         tenant_id: str,
