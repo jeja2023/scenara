@@ -42,6 +42,7 @@ vi.mock("../src/api", () => {
     apiStream: vi.fn(async () => new Response("")),
     blobToDataUrl: vi.fn(async () => "data:image/jpeg;base64,cHJldmlldw=="),
     idempotencyKey: vi.fn(() => "test-idempotency"),
+    revokeBlobUrl: vi.fn(() => undefined),
     streamJsonEvents: vi.fn(async function* () {}),
     userFacingError: vi.fn((_error: unknown, fallback: string) => fallback),
   };
@@ -368,7 +369,10 @@ describe("media parse workbench", () => {
       },
     });
     expect(body.parameters).not.toHaveProperty("max_units");
-    expect(wrapper.findAll(".unit-list button")).toHaveLength(1001);
+    const timelineButtons = wrapper.findAll(".unit-list button");
+    expect(timelineButtons.length).toBeGreaterThan(0);
+    expect(timelineButtons.length).toBeLessThanOrEqual(203);
+    expect(wrapper.text()).toContain("frame_1000");
     wrapper.unmount();
   });
 

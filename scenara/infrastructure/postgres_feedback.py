@@ -11,6 +11,7 @@ from scenara.platform.feedback import (
     ModelDeploymentEvent,
     ModelRelease,
     ModelReleaseStatus,
+    utc_epoch,
     validate_release_transition,
 )
 
@@ -109,7 +110,7 @@ class PostgresFeedbackRepository:
                         manifest.dataset_id,
                         manifest.version,
                         manifest.sha256,
-                        manifest.created_at,
+                        utc_epoch(manifest.created_at),
                         Jsonb(manifest.model_dump(mode="json")),
                     ),
                 )
@@ -278,7 +279,7 @@ class PostgresFeedbackRepository:
                     event.event_id,
                     event.model_id,
                     event.version,
-                    event.created_at,
+                    utc_epoch(event.created_at),
                     Jsonb(event.model_dump(mode="json")),
                 ),
             )

@@ -5,7 +5,7 @@ import json
 import re
 import time
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Literal, Protocol, TypedDict
 from uuid import uuid4
@@ -22,6 +22,30 @@ from scenara.platform.store import StateStore
 
 class FeedbackModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+RFC3339_UTC = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$")
+
+
+def utc_rfc3339(moment: float | datetime) -> str:
+    if isinstance(moment, (int, float)):
+        moment = datetime.fromtimestamp(moment, UTC)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    return moment.astimezone(UTC).isoformat(timespec="microseconds").replace("+00:00", "Z")
+
+
+def validate_utc_rfc3339(value: str) -> str:
+    if RFC3339_UTC.fullmatch(value) is None:
+        raise ValueError("跨仓时间字段必须是以 Z 结尾的 UTC RFC3339 字符串")
+    datetime.fromisoformat(value[:-1] + "+00:00")
+    return value
+
+
+def utc_epoch(value: str | float) -> float:
+    if isinstance(value, (int, float)):
+        return float(value)
+    return datetime.fromisoformat(validate_utc_rfc3339(value)[:-1] + "+00:00").timestamp()
 
 
 class VerifiedFeedbackTrace(TypedDict):
@@ -133,7 +157,12 @@ class HardSampleManifest(FeedbackModel):
     items: tuple[HardSampleItem, ...]
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     created_by: str
-    created_at: float
+    created_at: str = Field(pattern=RFC3339_UTC.pattern)
+
+    @field_validator("created_at")
+    @classmethod
+    def created_at_is_utc_rfc3339(cls, value: str) -> str:
+        return validate_utc_rfc3339(value)
 
 
 MODEL_EVIDENCE_REF = re.compile(
@@ -233,7 +262,12 @@ class ModelDeploymentEvent(FeedbackModel):
     reason: str
     operator_id: str
     audit_id: str
-    created_at: float
+    created_at: str = Field(pattern=RFC3339_UTC.pattern)
+
+    @field_validator("created_at")
+    @classmethod
+    def created_at_is_utc_rfc3339(cls, value: str) -> str:
+        return validate_utc_rfc3339(value)
 
 
 class FeedbackError(RuntimeError):
@@ -610,7 +644,7 @@ class FeedbackService:
             items=tuple(items),
             sha256=digest,
             created_by=context.principal_id,
-            created_at=time.time(),
+            created_at=utc_rfc3339(time.time()),
         )
         await self._audit.record(
             context,
@@ -712,7 +746,7 @@ class FeedbackService:
                 reason=body.reason,
                 operator_id=context.principal_id,
                 audit_id=audit.event_id,
-                created_at=time.time(),
+                created_at=utc_rfc3339(time.time()),
             )
         )
         if retired is not None:
@@ -732,7 +766,7 @@ class FeedbackService:
                     reason=f"superseded by {model_id}@{version}",
                     operator_id=context.principal_id,
                     audit_id=audit.event_id,
-                    created_at=time.time(),
+                    created_at=utc_rfc3339(time.time()),
                 )
             )
         return updated
@@ -787,7 +821,7 @@ class FeedbackService:
                 reason=body.reason,
                 operator_id=context.principal_id,
                 audit_id=audit.event_id,
-                created_at=time.time(),
+                created_at=utc_rfc3339(time.time()),
             )
         )
         if retired is not None:
@@ -807,7 +841,7 @@ class FeedbackService:
                     reason=body.reason,
                     operator_id=context.principal_id,
                     audit_id=audit.event_id,
-                    created_at=time.time(),
+                    created_at=utc_rfc3339(time.time()),
                 )
             )
         return updated
@@ -857,7 +891,7 @@ class FeedbackService:
             event_id=event.event_id,
             event_type="model.deployment.changed",
             payload=event.model_dump(mode="json"),
-            created_at=event.created_at,
+            created_at=utc_epoch(event.created_at),
         )
 
     async def _package(self, model_id: str, version: str, sha256: str) -> ModelPackageManifest:
@@ -963,4 +997,6 @@ __all__ = [
     "RollbackModelReleaseRequest",
     "TransitionModelReleaseRequest",
     "validate_release_transition",
+    "utc_epoch",
+    "utc_rfc3339",
 ]

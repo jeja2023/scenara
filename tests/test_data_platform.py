@@ -227,7 +227,7 @@ async def test_core_delivers_approved_hard_sample_to_remote_data_platform(develo
                 ),
                 sha256="c" * 64,
                 created_by=context.principal_id,
-                created_at=1.0,
+                created_at="2026-08-18T00:00:00Z",
             )
 
     runtime.feedback = FakeFeedbackService()  # type: ignore[assignment]

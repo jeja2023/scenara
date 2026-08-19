@@ -378,7 +378,7 @@ class HttpDataPlatformClient:
             )
         sources: list[dict[str, object]] = []
         split = {"train": "train", "validation": "query", "test": "gallery"}[manifest.split]
-        occurred_at = datetime.fromtimestamp(manifest.created_at, UTC).isoformat().replace("+00:00", "Z")
+        occurred_at = manifest.created_at
         for item in manifest.items:
             asset = await self._source_assets.get_asset(context.tenant_id, context.project_id, item.media_ref)
             if asset is None:
@@ -509,6 +509,7 @@ class HttpDataPlatformClient:
                 "sample_ids": request.asset_ids,
                 "metadata": request.labels,
             },
+            idempotency_suffix=f"{dataset_id}:{request.schema_name}:{','.join(request.asset_ids)}",
         )
         if not isinstance(payload, dict):
             raise DataPlatformRemoteError(502, "DATA_PLATFORM_PROTOCOL_ERROR", "annotation task must be an object")

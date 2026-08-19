@@ -9,6 +9,8 @@ const events = ref<AuditEvent[]>([]);
 const total = ref(0);
 const loading = ref(false);
 const error = ref("");
+const offset = ref(0);
+const PAGE_SIZE = 50;
 const filters = reactive({
   action: "",
   resource_type: "",
@@ -21,14 +23,23 @@ function resetFilters(): void {
   filters.resource_type = "";
   filters.principal_id = "";
   filters.outcome = "";
+  offset.value = 0;
   void refresh();
 }
 
 function query(): string {
-  const params = new URLSearchParams({ limit: "200" });
+  const params = new URLSearchParams({
+    limit: String(PAGE_SIZE),
+    offset: String(offset.value),
+  });
   for (const [key, value] of Object.entries(filters))
     if (value.trim()) params.set(key, value.trim());
   return params.toString();
+}
+
+function goToPage(nextOffset: number): void {
+  offset.value = Math.max(0, nextOffset);
+  void refresh();
 }
 
 async function refresh(): Promise<void> {
@@ -40,6 +51,14 @@ async function refresh(): Promise<void> {
     );
     events.value = page.items;
     total.value = page.total;
+    if (page.items.length === 0 && offset.value > 0) {
+      offset.value = Math.max(0, total.value - PAGE_SIZE);
+      const retry = await api<{ items: AuditEvent[]; total: number }>(
+        `/api/v1/audit/events?${query()}`,
+      );
+      events.value = retry.items;
+      total.value = retry.total;
+    }
   } catch (caught) {
     error.value = userFacingError(caught, "审计记录加载失败");
   } finally {
@@ -151,8 +170,11 @@ useRefresh(refresh);
             </tr>
           </thead>
           <tbody>
+            <tr v-if="loading">
+              <td colspan="7" class="empty">正在加载审计记录…</td>
+            </tr>
             <tr v-for="(event, index) in events" :key="event.event_id">
-              <td class="muted">{{ index + 1 }}</td>
+              <td class="muted">{{ offset + index + 1 }}</td>
               <td>{{ formatTime(event.created_at) }}</td>
               <td>
                 <strong>{{ event.action }}</strong
@@ -172,11 +194,30 @@ useRefresh(refresh);
                 <code>{{ JSON.stringify(event.evidence) }}</code>
               </td>
             </tr>
-            <tr v-if="!events.length">
+            <tr v-if="!loading && !events.length">
               <td colspan="7" class="empty">没有匹配的审计事件</td>
             </tr>
           </tbody>
         </table>
+      </div>
+      <div v-if="total > PAGE_SIZE" class="pagination">
+        <button
+          class="button secondary"
+          :disabled="offset === 0 || loading"
+          @click="goToPage(offset - PAGE_SIZE)"
+        >
+          上一页
+        </button>
+        <span class="pagination-info"
+          >{{ offset + 1 }}-{{ Math.min(total, offset + PAGE_SIZE) }} / {{ total }}</span
+        >
+        <button
+          class="button secondary"
+          :disabled="offset + PAGE_SIZE >= total || loading"
+          @click="goToPage(offset + PAGE_SIZE)"
+        >
+          下一页
+        </button>
       </div>
     </section>
   </section>
@@ -193,6 +234,21 @@ useRefresh(refresh);
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 12px 4px;
+}
+.pagination-info {
+  color: var(--muted);
+  font-size: 12px;
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .filter-panel {
   margin-bottom: 16px;

@@ -3,7 +3,7 @@
   "authorized_consumer_repository_ids": [
     "scenara-model"
   ],
-  "created_at": 1785369600.0,
+  "created_at": "2026-08-18T00:00:00Z",
   "dataset_id": "portrait.training",
   "lineage_refs": [
     "https://data.example/lineage/source.json#sha256=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"

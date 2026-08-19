@@ -134,6 +134,8 @@ class IndexStore(Protocol):
 
     async def upsert(self, record: IndexRecord) -> IndexRecord: ...
 
+    async def upsert_many(self, records: list[IndexRecord]) -> list[IndexRecord]: ...
+
     async def get(self, tenant_id: str, project_id: str, record_id: str) -> IndexRecord | None: ...
 
     async def list_records(
@@ -247,6 +249,12 @@ class MemoryIndexStore:
         key = (record.tenant_id, record.project_id, record.record_id)
         self._records[key] = record.model_copy(deep=True)
         return record.model_copy(deep=True)
+
+    async def upsert_many(self, records: list[IndexRecord]) -> list[IndexRecord]:
+        upserted: list[IndexRecord] = []
+        for record in records:
+            upserted.append(await self.upsert(record))
+        return upserted
 
     async def get(self, tenant_id: str, project_id: str, record_id: str) -> IndexRecord | None:
         value = self._records.get((tenant_id, project_id, record_id))

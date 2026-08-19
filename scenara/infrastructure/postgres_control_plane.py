@@ -92,5 +92,54 @@ class PostgresControlPlaneStore(ControlPlaneStore):
                 (kind, tenant_id, project_id, record_id),
             )
 
+    async def adjust_quota_usage(
+        self,
+        tenant_id: str,
+        project_id: str,
+        record_id: str,
+        *,
+        window_seconds: float,
+        now: float,
+        amount: int,
+        limit: int | None,
+    ) -> tuple[dict[str, Any], bool]:
+        from psycopg.types.json import Jsonb
+
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """SELECT document FROM scenara_control_plane_records
+                   WHERE record_type = 'quota_usage' AND tenant_id = %s
+                     AND project_id = %s AND record_id = %s FOR UPDATE""",
+                (tenant_id, project_id, record_id),
+            )
+            row = await cursor.fetchone()
+            started = now
+            used = 0
+            if row is not None:
+                existing = dict(row[0])
+                existing_started = float(existing.get("window_started_at", now))
+                if now < existing_started + window_seconds:
+                    started = existing_started
+                    used = int(existing.get("used", 0))
+            next_used = used + amount
+            allowed = limit is None or next_used <= limit
+            document = {
+                "record_id": record_id,
+                "used": next_used if allowed else used,
+                "window_started_at": started,
+                "updated_at": now,
+            }
+            if allowed:
+                await conn.execute(
+                    """INSERT INTO scenara_control_plane_records
+                       (record_type, tenant_id, project_id, record_id, created_at, updated_at, document)
+                       VALUES ('quota_usage', %s, %s, %s, to_timestamp(%s::double precision),
+                               to_timestamp(%s::double precision), %s)
+                       ON CONFLICT (record_type, tenant_id, project_id, record_id)
+                       DO UPDATE SET updated_at = EXCLUDED.updated_at, document = EXCLUDED.document""",
+                    (tenant_id, project_id, record_id, started, now, Jsonb(document)),
+                )
+            return document, allowed
+
 
 __all__ = ["PostgresControlPlaneStore"]

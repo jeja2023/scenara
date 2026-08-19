@@ -81,7 +81,7 @@ def contract_definitions() -> list[dict[str, Any]]:
         ),
         sha256="0" * 64,
         created_by="service-account:model-feedback-exporter",
-        created_at=1_785_369_600.0,
+        created_at="2026-08-18T00:00:00Z",
     )
     hard_sample = hard_sample.model_copy(update={"sha256": hard_sample_digest(hard_sample.model_dump(mode="json"))})
     return [
@@ -132,7 +132,7 @@ def contract_definitions() -> list[dict[str, Any]]:
                 lineage_refs=(f"https://data.example/lineage/source.json#sha256={lineage_sha}",),
                 authorization_id="grant_training_2026_07",
                 authorized_consumer_repository_ids=("scenara-model",),
-                created_at=1_785_369_600.0,
+                created_at="2026-08-18T00:00:00Z",
             ),
         },
         {
@@ -157,7 +157,7 @@ def contract_definitions() -> list[dict[str, Any]]:
                 reason="qualification passed",
                 operator_id="service-account:model-release-manager",
                 audit_id="aud_contractexample",
-                created_at=1_785_369_600.0,
+                created_at="2026-08-18T00:00:00Z",
             ),
         },
     ]

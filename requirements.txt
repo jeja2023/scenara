@@ -7,6 +7,7 @@ pillow==12.3.0
 pypdfium2==5.4.0
 pydantic==2.13.4
 python-multipart==0.0.32
+python-dotenv==1.2.2
 PyYAML==6.0.3
 cryptography==50.0.0
 httpx==0.28.1

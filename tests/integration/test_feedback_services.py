@@ -98,7 +98,7 @@ async def test_feedback_and_model_release_postgres_persistence() -> None:
             items=(item,),
             sha256="a" * 64,
             created_by="integration",
-            created_at=time.time(),
+            created_at="2026-08-18T00:00:00Z",
         )
         await repository.create_manifest(manifest)
         assert (await repository.list_manifests(tenant_id, project_id))[0].sha256 == "a" * 64
@@ -112,7 +112,7 @@ async def test_feedback_and_model_release_postgres_persistence() -> None:
             runtime_model_id="scenara.portrait/integration",
             package_sha256="b" * 64,
             created_by="integration",
-            created_at=time.time(),
+            created_at="2026-08-18T00:00:00Z",
             updated_at=time.time(),
         )
         await repository.create_release(release)

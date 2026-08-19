@@ -2,7 +2,7 @@
   "action": "transition",
   "audit_id": "aud_contractexample",
   "capability": "person_detection",
-  "created_at": 1785369600.0,
+  "created_at": "2026-08-18T00:00:00Z",
   "event_id": "mde_contractexample",
   "from_status": "approved",
   "model_id": "scenara.portrait.person-detector",

@@ -282,6 +282,7 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 CONTEXT_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
+PRESIGN_UPLOAD_EXPIRY_GRACE_SECONDS = 60
 CONSOLE_DIST = Path(__file__).resolve().parents[1] / "frontend" / "console" / "dist"
 CONSOLE_SECURITY_HEADERS = {
     "Cache-Control": "no-store",
@@ -426,8 +427,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
                 await asyncio.to_thread(handle.write, chunk)
             await asyncio.to_thread(handle.flush)
             return path
-        except BaseException:
-            handle.close()
+        except Exception:
             with suppress(FileNotFoundError):
                 path.unlink()
             raise
@@ -758,7 +758,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         expected_token = upload_token(context, body.upload_id, body, int(body.expires_at))
         if not hmac.compare_digest(expected_token, body.upload_token):
             raise HTTPException(status_code=403, detail="presigned upload token is invalid")
-        if time.time() > body.expires_at + 60:
+        if time.time() > body.expires_at + PRESIGN_UPLOAD_EXPIRY_GRACE_SECONDS:
             raise HTTPException(status_code=410, detail="presigned upload has expired")
         object_key = (
             f"tenants/{context.tenant_id}/projects/{context.project_id}"
@@ -775,22 +775,13 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         path = Path(handle.name)
         try:
             await runtime.objects.get_to_file(object_key, path, expected_sha256=body.sha256)
-            if body.kind == MediaKind.VIDEO:
-                asset = await runtime.runs.create_asset_from_path(
-                    context,
-                    path=str(path),
-                    filename=body.filename,
-                    content_type=body.content_type,
-                    kind=body.kind,
-                )
-            else:
-                asset = await runtime.runs.create_asset(
-                    context,
-                    data=await asyncio.to_thread(path.read_bytes),
-                    filename=body.filename,
-                    content_type=body.content_type,
-                    kind=body.kind,
-                )
+            asset = await runtime.runs.create_asset_from_path(
+                context,
+                path=str(path),
+                filename=body.filename,
+                content_type=body.content_type,
+                kind=body.kind,
+            )
         finally:
             with suppress(FileNotFoundError):
                 path.unlink()

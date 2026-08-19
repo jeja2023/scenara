@@ -30,6 +30,7 @@ const probes = reactive<Record<string, MediaSourceProbe>>({});
 const sourceForm = reactive({ name: "", url: "" });
 const selectedAsset = ref<MediaAsset | null>(null);
 const previewUrl = ref("");
+const previewDialog = ref<HTMLDialogElement | null>(null);
 const kindFilter = ref<AssetKindFilter>("");
 const expandedAssets = reactive<Set<string>>(new Set());
 const selectedForDelete = reactive<Set<string>>(new Set());
@@ -155,6 +156,7 @@ async function preview(asset: MediaAsset): Promise<void> {
     );
     previewUrl.value = await readBlobAsDataUrl(blob);
     selectedAsset.value = asset;
+    previewDialog.value?.showModal();
   } catch (caught) {
     error.value = userFacingError(caught, "文件预览加载失败");
   }
@@ -164,6 +166,7 @@ function closePreview(): void {
   revokePreviewUrl();
   previewUrl.value = "";
   selectedAsset.value = null;
+  previewDialog.value?.close();
 }
 
 async function deleteAsset(asset: MediaAsset): Promise<void> {
@@ -558,7 +561,7 @@ useRefresh(refresh);
       </div>
     </section>
 
-    <dialog :open="!!selectedAsset" class="modal preview-modal">
+    <dialog ref="previewDialog" class="modal preview-modal">
       <div class="modal-header">
         <div>
           <h2>{{ selectedAsset?.filename || selectedAsset?.asset_id }}</h2>

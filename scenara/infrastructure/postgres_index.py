@@ -75,51 +75,61 @@ class PostgresIndexStore:
         return [IndexDefinition.model_validate(row[0]) for row in rows]
 
     async def upsert(self, record: IndexRecord) -> IndexRecord:
+        upserted = await self.upsert_many([record])
+        return upserted[0]
+
+    async def upsert_many(self, records: list[IndexRecord]) -> list[IndexRecord]:
         from psycopg.types.json import Jsonb
 
-        definition = await self.get_index(record.index_id)
-        if definition is None:
-            raise IndexStoreError("index definition does not exist")
-        if record.domain != definition.domain or record.kind != definition.record_kind:
-            raise IndexStoreError("index record does not match its contract")
-        if (
-            definition.vector_dimension is not None
-            and record.vector is not None
-        ):
-            _validate_vector(definition, record.vector)
-        if definition.record_kind.value == "vector" and record.vector is None and record.feature_id is None:
-            raise IndexStoreError("vector index records require a vector or feature reference")
-        if definition.record_kind.value == "text" and not (record.text or "").strip():
-            raise IndexStoreError("text index records require text")
-        async with self._pool.connection() as conn:
-            await conn.execute(
-                """INSERT INTO scenara_index_records
-                (tenant_id, project_id, record_id, index_id, domain, kind,
-                 source_type, source_id, asset_id, run_id, unit_id, object_id,
-                 artifact_id, page_number, pts_ms, feature_id, text, vector,
-                 metadata, status, created_at, expires_at, deleted_at, document)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                        %s, %s, %s, %s, %s, to_timestamp(%s), to_timestamp(%s), to_timestamp(%s), %s)
-                ON CONFLICT (tenant_id, project_id, record_id) DO UPDATE SET
-                  index_id = EXCLUDED.index_id, domain = EXCLUDED.domain, kind = EXCLUDED.kind,
-                  source_type = EXCLUDED.source_type, source_id = EXCLUDED.source_id,
-                  asset_id = EXCLUDED.asset_id, run_id = EXCLUDED.run_id, unit_id = EXCLUDED.unit_id,
-                  object_id = EXCLUDED.object_id, artifact_id = EXCLUDED.artifact_id,
-                  page_number = EXCLUDED.page_number, pts_ms = EXCLUDED.pts_ms,
-                  feature_id = EXCLUDED.feature_id, text = EXCLUDED.text, vector = EXCLUDED.vector,
-                  metadata = EXCLUDED.metadata, status = EXCLUDED.status, created_at = EXCLUDED.created_at,
-                  expires_at = EXCLUDED.expires_at, deleted_at = EXCLUDED.deleted_at,
-                  document = EXCLUDED.document""",
-                (
-                    record.tenant_id, record.project_id, record.record_id, record.index_id, record.domain,
-                    record.kind, record.source.source_type, record.source.source_id, record.source.asset_id,
-                    record.source.run_id, record.source.unit_id, record.source.object_id, record.source.artifact_id,
-                    record.source.page_number, record.source.pts_ms, record.feature_id, record.text,
-                    Jsonb(record.vector) if record.vector is not None else None, Jsonb(record.metadata), record.status,
-                    record.created_at, record.expires_at, record.deleted_at, Jsonb(record.model_dump(mode="json")),
-                ),
-            )
-        return record.model_copy(deep=True)
+        definitions: dict[str, IndexDefinition] = {}
+        for record in records:
+            definition = definitions.get(record.index_id)
+            if definition is None:
+                fetched = await self.get_index(record.index_id)
+                if fetched is None:
+                    raise IndexStoreError("index definition does not exist")
+                definitions[record.index_id] = fetched
+                definition = fetched
+            if record.domain != definition.domain or record.kind != definition.record_kind:
+                raise IndexStoreError("index record does not match its contract")
+            if definition.vector_dimension is not None and record.vector is not None:
+                _validate_vector(definition, record.vector)
+            if definition.record_kind.value == "vector" and record.vector is None and record.feature_id is None:
+                raise IndexStoreError("vector index records require a vector or feature reference")
+            if definition.record_kind.value == "text" and not (record.text or "").strip():
+                raise IndexStoreError("text index records require text")
+        if not records:
+            return []
+        async with self._pool.connection() as conn, conn.transaction():
+            for record in records:
+                await conn.execute(
+                    """INSERT INTO scenara_index_records
+                    (tenant_id, project_id, record_id, index_id, domain, kind,
+                     source_type, source_id, asset_id, run_id, unit_id, object_id,
+                     artifact_id, page_number, pts_ms, feature_id, text, vector,
+                     metadata, status, created_at, expires_at, deleted_at, document)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s, to_timestamp(%s), to_timestamp(%s), to_timestamp(%s), %s)
+                    ON CONFLICT (tenant_id, project_id, record_id) DO UPDATE SET
+                      index_id = EXCLUDED.index_id, domain = EXCLUDED.domain, kind = EXCLUDED.kind,
+                      source_type = EXCLUDED.source_type, source_id = EXCLUDED.source_id,
+                      asset_id = EXCLUDED.asset_id, run_id = EXCLUDED.run_id, unit_id = EXCLUDED.unit_id,
+                      object_id = EXCLUDED.object_id, artifact_id = EXCLUDED.artifact_id,
+                      page_number = EXCLUDED.page_number, pts_ms = EXCLUDED.pts_ms,
+                      feature_id = EXCLUDED.feature_id, text = EXCLUDED.text, vector = EXCLUDED.vector,
+                      metadata = EXCLUDED.metadata, status = EXCLUDED.status, created_at = EXCLUDED.created_at,
+                      expires_at = EXCLUDED.expires_at, deleted_at = EXCLUDED.deleted_at,
+                      document = EXCLUDED.document""",
+                    (
+                        record.tenant_id, record.project_id, record.record_id, record.index_id, record.domain,
+                        record.kind, record.source.source_type, record.source.source_id, record.source.asset_id,
+                        record.source.run_id, record.source.unit_id, record.source.object_id, record.source.artifact_id,
+                        record.source.page_number, record.source.pts_ms, record.feature_id, record.text,
+                        Jsonb(record.vector) if record.vector is not None else None, Jsonb(record.metadata), record.status,
+                        record.created_at, record.expires_at, record.deleted_at, Jsonb(record.model_dump(mode="json")),
+                    ),
+                )
+        return [record.model_copy(deep=True) for record in records]
 
     async def get(self, tenant_id: str, project_id: str, record_id: str) -> IndexRecord | None:
         async with self._pool.connection() as conn:

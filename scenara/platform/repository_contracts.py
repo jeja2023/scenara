@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Literal
 
@@ -10,10 +11,19 @@ CONTRACT_RELEASE_VERSION = "1.0.0"
 CONTRACT_ROOT = Path(__file__).resolve().parents[2] / "contracts" / "repository" / f"v{CONTRACT_RELEASE_VERSION}"
 SHA256 = r"^[0-9a-f]{64}$"
 IMMUTABLE_URI = r"^.+(?:@sha256:|#sha256=)[0-9a-f]{64}$"
+RFC3339_UTC = r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$"
 
 
 class ContractModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+def _validate_utc_rfc3339(value: str) -> str:
+    normalized = value.strip()
+    if re.fullmatch(RFC3339_UTC, normalized) is None:
+        raise ValueError("时间必须是以 Z 结尾的 UTC RFC3339 字符串")
+    datetime.fromisoformat(normalized[:-1] + "+00:00")
+    return normalized
 
 
 class DatasetVersionReference(ContractModel):
@@ -25,7 +35,12 @@ class DatasetVersionReference(ContractModel):
     lineage_refs: tuple[str, ...] = Field(min_length=1, max_length=100)
     authorization_id: str = Field(min_length=1, max_length=256)
     authorized_consumer_repository_ids: tuple[str, ...] = Field(min_length=1, max_length=32)
-    created_at: float
+    created_at: str = Field(pattern=RFC3339_UTC)
+
+    @field_validator("created_at")
+    @classmethod
+    def utc_created_at(cls, value: str) -> str:
+        return _validate_utc_rfc3339(value)
 
     @field_validator("lineage_refs")
     @classmethod

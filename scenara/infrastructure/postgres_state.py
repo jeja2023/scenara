@@ -1326,52 +1326,76 @@ class PostgresStateStore:
             )
             owners = await cursor.fetchall()
             asset_categories: dict[tuple[str, str, str], set[str]] = {}
+            run_result_owners: set[tuple[str, str, str]] = set()
             for tenant_id, project_id, category, owner_type, owner_id in set(owners):
                 if owner_type == "media_asset":
                     asset_categories.setdefault((tenant_id, project_id, owner_id), set()).add(category)
-                if owner_type != "run_result":
-                    continue
+                if owner_type == "run_result":
+                    run_result_owners.add((tenant_id, project_id, owner_id))
+            if run_result_owners:
+                tenants = [key[0] for key in run_result_owners]
+                projects = [key[1] for key in run_result_owners]
+                owner_ids = [key[2] for key in run_result_owners]
                 cursor = await conn.execute(
-                    """SELECT 1 FROM scenara_object_retention
-                       WHERE tenant_id = %s AND project_id = %s AND owner_type = 'run_result'
-                         AND owner_id = %s AND deleted_at IS NULL LIMIT 1""",
-                    (tenant_id, project_id, owner_id),
+                    """SELECT tenant_id, project_id, owner_id
+                       FROM scenara_object_retention
+                       WHERE owner_type = 'run_result' AND deleted_at IS NULL
+                         AND (tenant_id, project_id, owner_id) IN (
+                             SELECT unnest(%s::text[]), unnest(%s::text[]), unnest(%s::text[]))""",
+                    (tenants, projects, owner_ids),
                 )
-                if await cursor.fetchone() is None:
+                remaining = {(row[0], row[1], row[2]) for row in await cursor.fetchall()}
+                to_delete = [key for key in run_result_owners if key not in remaining]
+                if to_delete:
                     await conn.execute(
                         """DELETE FROM scenara_run_results
-                           WHERE tenant_id = %s AND project_id = %s AND run_id = %s""",
-                        (tenant_id, project_id, owner_id),
+                           WHERE (tenant_id, project_id, run_id) IN (
+                               SELECT unnest(%s::text[]), unnest(%s::text[]), unnest(%s::text[]))""",
+                        (
+                            [key[0] for key in to_delete],
+                            [key[1] for key in to_delete],
+                            [key[2] for key in to_delete],
+                        ),
                     )
-            for (tenant_id, project_id, asset_id), categories in asset_categories.items():
+            if asset_categories:
+                tenants = [key[0] for key in asset_categories]
+                projects = [key[1] for key in asset_categories]
+                asset_ids = [key[2] for key in asset_categories]
                 cursor = await conn.execute(
-                    """SELECT document FROM scenara_media_assets
-                       WHERE tenant_id = %s AND project_id = %s AND asset_id = %s FOR UPDATE""",
-                    (tenant_id, project_id, asset_id),
+                    """SELECT tenant_id, project_id, asset_id, document FROM scenara_media_assets
+                       WHERE (tenant_id, project_id, asset_id) IN (
+                           SELECT unnest(%s::text[]), unnest(%s::text[]), unnest(%s::text[]))
+                       FOR UPDATE""",
+                    (tenants, projects, asset_ids),
                 )
-                row = await cursor.fetchone()
-                if row is None:
-                    continue
-                asset = MediaAsset.model_validate(row[0])
-                updates: dict[str, object] = {}
-                if "raw_media" in categories:
-                    updates["original_deleted_at"] = deleted_at
-                if "preview" in categories:
-                    updates.update(
-                        {
-                            "preview_object_key": None,
-                            "preview_content_type": None,
-                            "preview_sha256": None,
-                        }
+                assets = {
+                    (row[0], row[1], row[2]): MediaAsset.model_validate(row[3])
+                    for row in await cursor.fetchall()
+                }
+                for key, categories in asset_categories.items():
+                    asset = assets.get(key)
+                    if asset is None:
+                        continue
+                    tenant_id, project_id, asset_id = key
+                    updates: dict[str, object] = {}
+                    if "raw_media" in categories:
+                        updates["original_deleted_at"] = deleted_at
+                    if "preview" in categories:
+                        updates.update(
+                            {
+                                "preview_object_key": None,
+                                "preview_content_type": None,
+                                "preview_sha256": None,
+                            }
+                        )
+                        if "raw_media" in categories or asset.original_deleted_at is not None:
+                            updates["deleted_at"] = deleted_at
+                    updated = asset.model_copy(update=updates)
+                    await conn.execute(
+                        """UPDATE scenara_media_assets SET document = %s
+                           WHERE tenant_id = %s AND project_id = %s AND asset_id = %s""",
+                        (Jsonb(updated.model_dump(mode="json")), tenant_id, project_id, asset_id),
                     )
-                    if "raw_media" in categories or asset.original_deleted_at is not None:
-                        updates["deleted_at"] = deleted_at
-                updated = asset.model_copy(update=updates)
-                await conn.execute(
-                    """UPDATE scenara_media_assets SET document = %s
-                       WHERE tenant_id = %s AND project_id = %s AND asset_id = %s""",
-                    (Jsonb(updated.model_dump(mode="json")), tenant_id, project_id, asset_id),
-                )
 
     async def get_result_reference(self, tenant_id: str, project_id: str, run_id: str) -> ResultReference | None:
         async with self._pool.connection() as conn:

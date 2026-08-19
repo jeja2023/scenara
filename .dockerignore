@@ -36,3 +36,7 @@ frontend/console-next/dist/
 sdk/typescript/dist/
 *.patch
 gitleaks-results.json
+*.log
+requirements-cpu.txt
+requirements-cpu.lock
+requirements.lock

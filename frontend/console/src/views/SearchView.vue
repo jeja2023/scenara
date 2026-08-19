@@ -15,7 +15,7 @@ import { computed, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { useRouter } from "vue-router";
 
-import { api, apiBlob, apiForm, blobToDataUrl, userFacingError } from "../api";
+import { api, apiBlob, apiForm, blobToDataUrl, revokeBlobUrl, userFacingError } from "../api";
 import { labelDomain, labelMediaKind } from "../labels";
 import type { MediaAsset, MediaKind, SavedSearch } from "../types";
 
@@ -116,17 +116,20 @@ function setFile(event: Event): void {
   error.value = "";
   file.value = selected;
   assetId.value = "";
+  revokeBlobUrl(preview.value);
   preview.value = URL.createObjectURL(selected);
 }
 
 async function setAsset(value: string): Promise<void> {
   assetId.value = value;
   if (!value) {
+    revokeBlobUrl(preview.value);
     preview.value = "";
     return;
   }
   file.value = null;
   try {
+    revokeBlobUrl(preview.value);
     preview.value = await blobToDataUrl(
       await apiBlob(
         `/api/v1/media/assets/${encodeURIComponent(value)}/preview`,
@@ -140,6 +143,7 @@ async function setAsset(value: string): Promise<void> {
 function clearFile(): void {
   file.value = null;
   assetId.value = "";
+  revokeBlobUrl(preview.value);
   preview.value = "";
 }
 

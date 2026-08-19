@@ -54,6 +54,8 @@ x-scenara-enterprise-secrets: &scenara-enterprise-secrets
   - scenara_enterprise_license
   - scenara_enterprise_public_key
 
+x-scenara-image: &scenara-image scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.23}
+
 services:
   postgres:
     image: pgvector/pgvector@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
@@ -128,7 +130,7 @@ services:
     restart: "no"
 
   api:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.22}
+    image: *scenara-image
     build:
       context: ..
     environment: *scenara-environment
@@ -152,7 +154,7 @@ services:
     restart: unless-stopped
 
   batch-worker:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.22}
+    image: *scenara-image
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "batch-gpu-1", "--lane", "batch"]
@@ -173,7 +175,7 @@ services:
     restart: unless-stopped
 
   stream-worker:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.22}
+    image: *scenara-image
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "stream-gpu-1", "--lane", "stream"]
@@ -194,7 +196,7 @@ services:
     restart: unless-stopped
 
   scheduler:
-    image: scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.22}
+    image: *scenara-image
     build:
       context: ..
     command:

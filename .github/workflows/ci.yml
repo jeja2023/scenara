@@ -2,6 +2,8 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 permissions:
@@ -27,7 +29,21 @@ jobs:
           git diff --exit-code -- requirements/production.lock
       - run: python -m ruff check scenara app tests sdk/python scripts
       - run: python -m mypy scenara app sdk/python/scenara_sdk
-      - run: python -m pytest -q --cov=scenara --cov=app --cov=sdk/python/scenara_sdk --cov-report=term --cov-fail-under=60
+      - name: Run unit tests with coverage
+        # The six security regression files are exercised once by the
+        # security-tests job, which owns their junit evidence; exclude them here
+        # so each suite runs exactly once. Integration tests run separately.
+        run: >-
+          python -m pytest -q
+          --ignore=tests/test_security_media.py
+          --ignore=tests/test_platform_extensions.py
+          --ignore=tests/test_platform_kernel.py
+          --ignore=tests/test_portrait_analysis.py
+          --ignore=tests/test_portrait_identity.py
+          --ignore=tests/test_api.py
+          -m "not integration"
+          --cov=scenara --cov=app --cov=sdk/python/scenara_sdk
+          --cov-report=term --cov-fail-under=60
       - run: python scripts/generate_typescript_sdk.py --check
       - run: python scripts/export_openapi.py --check
       - name: Verify and package repository contracts
@@ -62,7 +78,13 @@ jobs:
           name: console-playwright-report
           path: frontend/console/playwright-report
       - name: Build console container stage
-        run: docker build --target console-builder -t scenara-console-builder:ci .
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: console-builder
+          tags: scenara-console-builder:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   integration-services:
     runs-on: ubuntu-24.04

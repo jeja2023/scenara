@@ -295,6 +295,30 @@ const selectedUnit = computed(
   () => result.value?.units[selectedUnitIndex.value] ?? result.value?.units[0],
 );
 const selectedObjects = computed(() => selectedUnit.value?.objects ?? []);
+
+const TIMELINE_WINDOW_SIZE = 100;
+interface TimelineItem {
+  unit: MediaUnitResult | null;
+  index: number;
+  jump?: "start" | "end";
+}
+const timelineItems = computed<TimelineItem[]>(() => {
+  const units = result.value?.units ?? [];
+  if (units.length <= TIMELINE_WINDOW_SIZE * 2 + 1) {
+    return units.map((unit, index) => ({ unit, index }));
+  }
+  const selected = Math.min(selectedUnitIndex.value, units.length - 1);
+  const start = Math.max(0, selected - TIMELINE_WINDOW_SIZE);
+  const end = Math.min(units.length, start + TIMELINE_WINDOW_SIZE * 2 + 1);
+  const items: TimelineItem[] = units
+    .slice(start, end)
+    .map((unit, offset) => ({ unit, index: start + offset }));
+  if (start > 0) items.unshift({ unit: null, index: 0, jump: "start" });
+  if (end < units.length) items.push({ unit: null, index: units.length - 1, jump: "end" });
+  return items;
+});
+
+const resultJson = computed(() => JSON.stringify(result.value, null, 2));
 const mediaMetadata = computed(() => result.value?.media_metadata ?? null);
 const isTerminal = computed(
   () =>
@@ -530,7 +554,12 @@ async function loadResult(runId: string, ignoreMissing = false): Promise<void> {
       return;
     throw caught;
   }
-  const units = [...first.result.units];
+  const existingUnits =
+    result.value?.run_id === runId ? result.value.units : [];
+  let units =
+    existingUnits.length > 0 && existingUnits.length <= first.unit_total
+      ? [...existingUnits, ...first.result.units.slice(existingUnits.length)]
+      : [...first.result.units];
   while (units.length < first.unit_total) {
     const page = await api<ResultPage>(
       `/api/v1/runs/${encodeURIComponent(runId)}/result?unit_offset=${units.length}&unit_limit=${pageSize}`,
@@ -539,6 +568,7 @@ async function loadResult(runId: string, ignoreMissing = false): Promise<void> {
     units.push(...page.result.units);
   }
   if (loadSequence !== resultLoadSequence) return;
+  if (units.length > first.unit_total) units = units.slice(0, first.unit_total);
   const shouldFollowLatest = followLatestUnit.value || !result.value;
   result.value = { ...first.result, units };
   if (shouldFollowLatest && units.length) {
@@ -2121,7 +2151,7 @@ onBeforeUnmount(() => {
           </div>
           <details>
             <summary>原始结果（JSON）</summary>
-            <pre>{{ JSON.stringify(result, null, 2) }}</pre>
+            <pre>{{ resultJson }}</pre>
           </details>
         </div>
         <div v-else class="empty result-empty">
@@ -2152,23 +2182,35 @@ onBeforeUnmount(() => {
           </div>
           <div v-if="result?.units.length" class="unit-list">
             <button
-              v-for="(unit, index) in result.units"
-              :key="unit.unit_id"
-              :class="{ selected: selectedUnitIndex === index }"
-              @click="selectUnit(index)"
+              v-for="item in timelineItems"
+              :key="item.unit ? item.unit.unit_id : `jump-${item.jump}`"
+              :class="{ selected: selectedUnitIndex === item.index }"
+              :title="
+                item.unit
+                  ? undefined
+                  : item.jump === 'start'
+                    ? '跳到首个单元'
+                    : '跳到末尾'
+              "
+              @click="selectUnit(item.index)"
             >
-              <span class="unit-index">{{ index + 1 }}</span>
-              <span
-                ><strong>{{
-                  unit.unit_type === "page"
-                    ? `第 ${unit.page_number} 页`
-                    : formatTime(unit.pts_ms)
-                }}</strong
-                ><small
-                  >{{ unit.width }} × {{ unit.height }} ·
-                  {{ unit.objects.length }} 个对象</small
-                ></span
-              >
+              <template v-if="item.unit">
+                <span class="unit-index">{{ item.index + 1 }}</span>
+                <span
+                  ><strong>{{
+                    item.unit.unit_type === "page"
+                      ? `第 ${item.unit.page_number} 页`
+                      : formatTime(item.unit.pts_ms)
+                  }}</strong
+                  ><small
+                    >{{ item.unit.width }} × {{ item.unit.height }} ·
+                    {{ item.unit.objects.length }} 个对象</small
+                  ></span
+                >
+              </template>
+              <span v-else class="unit-jump">
+                {{ item.jump === "start" ? "首单元" : "末单元" }} ({{ item.index + 1 }})
+              </span>
             </button>
           </div>
           <div v-else class="empty">等待解析单元</div>

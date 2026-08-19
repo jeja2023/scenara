@@ -29,8 +29,9 @@
       "type": "string"
     },
     "created_at": {
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z$",
       "title": "Created At",
-      "type": "number"
+      "type": "string"
     },
     "event_id": {
       "title": "Event Id",

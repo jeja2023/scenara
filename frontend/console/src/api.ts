@@ -1,5 +1,9 @@
 import type { ApiErrorBody, Envelope } from "./types";
 
+export function revokeBlobUrl(value: string): void {
+  if (value.startsWith("blob:")) URL.revokeObjectURL(value);
+}
+
 export interface ConnectionSettings {
   apiBase: string;
   token: string;

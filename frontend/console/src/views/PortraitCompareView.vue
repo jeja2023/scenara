@@ -9,7 +9,7 @@ import {
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 
-import { api, apiBlob, apiForm, blobToDataUrl, userFacingError } from "../api";
+import { api, apiBlob, apiForm, blobToDataUrl, revokeBlobUrl, userFacingError } from "../api";
 import type { MediaAsset } from "../types";
 
 interface PortraitInputSummary {
@@ -94,10 +94,12 @@ function setFile(side: "left" | "right", event: Event): void {
   if (side === "left") {
     leftFile.value = file;
     leftAssetId.value = "";
+    revokeBlobUrl(leftPreview.value);
     leftPreview.value = URL.createObjectURL(file);
   } else {
     rightFile.value = file;
     rightAssetId.value = "";
+    revokeBlobUrl(rightPreview.value);
     rightPreview.value = URL.createObjectURL(file);
   }
 }
@@ -117,10 +119,12 @@ async function setAsset(
     if (side === "left") {
       leftAssetId.value = assetId;
       leftFile.value = null;
+      revokeBlobUrl(leftPreview.value);
       leftPreview.value = preview;
     } else {
       rightAssetId.value = assetId;
       rightFile.value = null;
+      revokeBlobUrl(rightPreview.value);
       rightPreview.value = preview;
     }
   } catch (caught) {
@@ -132,10 +136,12 @@ function clearSide(side: "left" | "right"): void {
   if (side === "left") {
     leftFile.value = null;
     leftAssetId.value = "";
+    revokeBlobUrl(leftPreview.value);
     leftPreview.value = "";
   } else {
     rightFile.value = null;
     rightAssetId.value = "";
+    revokeBlobUrl(rightPreview.value);
     rightPreview.value = "";
   }
 }

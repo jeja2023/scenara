@@ -19,13 +19,13 @@
       "consumer_repository_id": "scenara-data",
       "contract_id": "hard-sample-handoff",
       "example_path": "contracts/repository/v1.0.0/hard-sample-handoff.example.json",
-      "example_sha256": "5ec7637838d31d8e5661986192df1802a3cd52b3022ce6729426d583ccdce096",
+      "example_sha256": "c0d9afcb26af50f638a43b7041761a345d6dce74e0f302022799b45b0e0cbf1e",
       "payload_schema_version": "1.0",
       "payload_type": "HardSampleManifest",
       "producer_repository_id": "scenara",
       "release_version": "1.0.0",
       "schema_path": "contracts/repository/v1.0.0/hard-sample-handoff.schema.json",
-      "schema_sha256": "0e6cd7c7ade6ddd59e9aa73d2623bf222350a9cd7bdebdec57dc1d8c952e087e",
+      "schema_sha256": "040563800bd6b1c561e8d684a8c50be1c8681f59ccda77621f6ce9e33bea52b1",
       "transport": "immutable_manifest"
     },
     {
@@ -33,13 +33,13 @@
       "consumer_repository_id": "scenara-model",
       "contract_id": "dataset-version-input",
       "example_path": "contracts/repository/v1.0.0/dataset-version-input.example.json",
-      "example_sha256": "110a7669a4c2644e5abb0e2026dedfda4e62b6b655315824a516de03dd5b792f",
+      "example_sha256": "b23a069e52f6967c010b3beee2ab892c62d08f5a034df4c632da8cb4fc8cf7d6",
       "payload_schema_version": "1.0",
       "payload_type": "DatasetVersionReference",
       "producer_repository_id": "scenara-data",
       "release_version": "1.0.0",
       "schema_path": "contracts/repository/v1.0.0/dataset-version-input.schema.json",
-      "schema_sha256": "bc700c4ceb0796a1fdf2e317e0e362853931c0f905eff9d0a403d563fcf72ea7",
+      "schema_sha256": "953a83d8ed70e7da1bee193fee9413cc11bdae3fd8f58a4f96e0b26db744f14a",
       "transport": "versioned_api"
     },
     {
@@ -47,13 +47,13 @@
       "consumer_repository_id": "scenara-model",
       "contract_id": "deployment-feedback",
       "example_path": "contracts/repository/v1.0.0/deployment-feedback.example.json",
-      "example_sha256": "9e2e59b0f55b1d1795ddbb872daa74d8922ba971b86fbea8d80691cb78e2af93",
+      "example_sha256": "1501d2aca51feae7fca1068658459c26e1da40b62392347f1d4e637cc5995ce4",
       "payload_schema_version": "1.0",
       "payload_type": "ModelDeploymentEvent",
       "producer_repository_id": "scenara",
       "release_version": "1.0.0",
       "schema_path": "contracts/repository/v1.0.0/deployment-feedback.schema.json",
-      "schema_sha256": "7725aaea1cd3620f74bc1d63ceaebba890d6d48fb7b73e90b82e07f24e049394",
+      "schema_sha256": "33e62bfe0fe6baadb52a710d388212d4ebaad891338e3ce6ec0bfe5ec138645f",
       "transport": "event"
     }
   ],

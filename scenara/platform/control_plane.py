@@ -31,6 +31,9 @@ from scenara.platform.index import IndexStore
 from scenara.platform.models import PrincipalContext, StrictModel
 from scenara.platform.policy import PolicyDenied, PolicyProvider, require_allowed
 
+DEFAULT_BILLING_PERIOD_SECONDS = 2_592_000
+"""Default billing period length (30 days)."""
+
 RecordT = TypeVar("RecordT", bound=StrictModel)
 
 
@@ -206,7 +209,7 @@ class CreateBillingAccountRequest(StrictModel):
     plan_id: str = Field(min_length=2, max_length=128)
     currency: str = Field(default="USD", min_length=3, max_length=3)
     seat_limit: int = Field(default=5, ge=1, le=1_000_000)
-    period_seconds: int = Field(default=2_592_000, ge=86_400, le=31_536_000)
+    period_seconds: int = Field(default=DEFAULT_BILLING_PERIOD_SECONDS, ge=86_400, le=31_536_000)
 
 
 class MeterEvent(StrictModel):
@@ -1204,28 +1207,24 @@ class ControlPlaneService:
         plan = next((item for item in plans if item.enabled), None)
         now = time.time()
         window = plan.window_seconds if plan else 86400
-        existing = await self.store.get("quota_usage", context.tenant_id, context.project_id, body.metric)
-        started = float(existing.get("window_started_at", now)) if existing else now
-        used = int(existing.get("used", 0)) if existing else 0
-        if now >= started + window:
-            started, used = now, 0
         limit = plan.limits.get(body.metric) if plan else None
+        document, allowed = await self.store.adjust_quota_usage(
+            context.tenant_id,
+            context.project_id,
+            body.metric,
+            window_seconds=window,
+            now=now,
+            amount=body.amount,
+            limit=limit,
+        )
+        started = float(document["window_started_at"])
         usage = QuotaUsage(
             metric=body.metric,
-            used=used + body.amount,
+            used=int(document["used"]),
             limit=limit,
             window_started_at=started,
             window_ends_at=started + window,
         )
-        allowed = limit is None or usage.used <= limit
-        if allowed:
-            await self.store.put(
-                "quota_usage",
-                context.tenant_id,
-                context.project_id,
-                body.metric,
-                usage.model_dump(mode="json") | {"record_id": body.metric, "updated_at": now},
-            )
         return QuotaCheckResponse(allowed=allowed, usage=usage)
 
     async def create_billing_account(
@@ -1282,7 +1281,7 @@ class ControlPlaneService:
         usage_key = f"{account.record_id}:{body.metric}"
         usage = await self._get("billing_usage", context.tenant_id, context.project_id, usage_key, BillingUsage)
         period_started = account.period_started_at if now < account.period_ends_at else now
-        period_ends = account.period_ends_at if now < account.period_ends_at else now + 2_592_000
+        period_ends = account.period_ends_at if now < account.period_ends_at else now + DEFAULT_BILLING_PERIOD_SECONDS
         updated_usage = BillingUsage(
             record_id=usage_key,
             tenant_id=context.tenant_id,

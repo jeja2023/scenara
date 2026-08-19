@@ -1,10 +1,6 @@
 import { ref, type Ref } from "vue";
 
-import { apiBlob, blobToDataUrl } from "../api";
-
-function revokeObjectUrl(value: string): void {
-  if (value.startsWith("blob:")) URL.revokeObjectURL(value);
-}
+import { apiBlob, blobToDataUrl, revokeBlobUrl } from "../api";
 
 export function useMediaPreview(file: Ref<File | null>) {
   const mediaUrl = ref("");
@@ -14,9 +10,9 @@ export function useMediaPreview(file: Ref<File | null>) {
   const videoPlaybackFailed = ref(false);
 
   function clearMediaUrl(): void {
-    revokeObjectUrl(mediaUrl.value);
-    revokeObjectUrl(serverPreviewUrl.value);
-    revokeObjectUrl(streamPreviewUrl.value);
+    revokeBlobUrl(mediaUrl.value);
+    revokeBlobUrl(serverPreviewUrl.value);
+    revokeBlobUrl(streamPreviewUrl.value);
     mediaUrl.value = "";
     serverPreviewUrl.value = "";
     streamPreviewUrl.value = "";
@@ -26,10 +22,11 @@ export function useMediaPreview(file: Ref<File | null>) {
 
   async function handleImageError(): Promise<void> {
     if (!file.value || fileDataUrl.value) return;
-    revokeObjectUrl(serverPreviewUrl.value);
+    revokeBlobUrl(serverPreviewUrl.value);
     serverPreviewUrl.value = "";
     try {
       fileDataUrl.value = await blobToDataUrl(file.value);
+      revokeBlobUrl(mediaUrl.value);
       mediaUrl.value = fileDataUrl.value;
     } catch {
       // 即使文件无法解码，解析器仍会返回有用的校验错误。
@@ -49,7 +46,7 @@ export function useMediaPreview(file: Ref<File | null>) {
         `/api/v1/media/assets/${encodeURIComponent(assetId)}/preview`,
       );
       const dataUrl = await blobToDataUrl(blob);
-      revokeObjectUrl(serverPreviewUrl.value);
+      revokeBlobUrl(serverPreviewUrl.value);
       serverPreviewUrl.value = dataUrl;
     } catch {
       // 预览生成属于尽力而为，解析和结果渲染仍可继续使用。
@@ -58,7 +55,7 @@ export function useMediaPreview(file: Ref<File | null>) {
 
   async function loadStreamPreview(sourceId: string): Promise<void> {
     if (!sourceId) {
-      revokeObjectUrl(streamPreviewUrl.value);
+      revokeBlobUrl(streamPreviewUrl.value);
       streamPreviewUrl.value = "";
       return;
     }
@@ -67,10 +64,10 @@ export function useMediaPreview(file: Ref<File | null>) {
         `/api/v1/media/sources/${encodeURIComponent(sourceId)}/preview`,
       );
       const dataUrl = await blobToDataUrl(blob);
-      revokeObjectUrl(streamPreviewUrl.value);
+      revokeBlobUrl(streamPreviewUrl.value);
       streamPreviewUrl.value = dataUrl;
     } catch {
-      revokeObjectUrl(streamPreviewUrl.value);
+      revokeBlobUrl(streamPreviewUrl.value);
       streamPreviewUrl.value = "";
     }
   }

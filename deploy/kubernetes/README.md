@@ -9,8 +9,9 @@ Create a Secret named `scenara-runtime` with the settings referenced by
 
     kubectl apply -k deploy/kubernetes
 
-Set `SCENARA_IMAGE` in an overlay or replace the image in
-`kustomization.yaml`. The API and workers use the same image tag so their
-OpenAPI and persistence contracts stay aligned. The default replica counts,
-resource requests, and HPA values are conservative starting points and require
-load, backup, and failover evidence before a production qualification claim.
+The image tag is defined once in `kustomization.yaml` under `images:` and
+applied to the API and worker deployments, keeping their OpenAPI and persistence
+contracts aligned. Override it in an overlay (for example `newTag: <tag>`).
+The default replica counts, resource requests, and HPA values are conservative
+starting points and require load, backup, and failover evidence before a
+production qualification claim.

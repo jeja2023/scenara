@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "71f9250d991ac305163ba0600e92930dae03a2d4d3f7b12ae7baf93f01ac853c" /** gitleaks:allow - public contract digest */;
+export declare const OPENAPI_SHA256 = "f894bd6818d8f4d40e7b5f39bd57cb42411ff725c13a4e4922d57727fc44d097" /** gitleaks:allow - public contract digest */;
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
@@ -1428,7 +1428,7 @@ export declare namespace OpenApi {
         result_ref: string;
     };
     type HardSampleManifest = {
-        created_at: number;
+        created_at: string;
         created_by: string;
         dataset_id: string;
         items: Array<HardSampleItem>;
@@ -1714,7 +1714,7 @@ export declare namespace OpenApi {
         action: string;
         audit_id: string;
         capability: string;
-        created_at: number;
+        created_at: string;
         event_id: string;
         from_status: (ModelReleaseStatus) | (null);
         model_id: string;

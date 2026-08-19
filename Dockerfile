@@ -5,9 +5,9 @@ WORKDIR /build
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY frontend/console/package.json frontend/console/package.json
 COPY sdk/typescript/package.json sdk/typescript/package.json
+RUN pnpm install --frozen-lockfile
 COPY frontend/console frontend/console
 COPY sdk/typescript sdk/typescript
-RUN pnpm install --frozen-lockfile
 RUN pnpm --filter @scenara/console build
 
 FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04

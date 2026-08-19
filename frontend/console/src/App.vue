@@ -38,6 +38,7 @@ const activePlatform = computed(() =>
 );
 const mobileOpen = ref(false);
 const settingsOpen = ref(false);
+const settingsDialog = ref<HTMLDialogElement | null>(null);
 const connectionState = ref<"checking" | "online" | "offline">("checking");
 const draft = reactive<ConnectionSettings>(loadConnection());
 const domainManifests = ref<DomainManifest[]>([]);
@@ -75,9 +76,10 @@ async function checkConnection(): Promise<void> {
 function openSettings(): void {
   Object.assign(draft, loadConnection());
   settingsOpen.value = true;
-  void nextTick(() =>
-    document.querySelector<HTMLInputElement>("#api-base")?.focus(),
-  );
+  void nextTick(() => {
+    settingsDialog.value?.showModal();
+    document.querySelector<HTMLInputElement>("#api-base")?.focus();
+  });
 }
 
 function applySettings(): void {
@@ -86,6 +88,7 @@ function applySettings(): void {
     { persistAuth: connectionTokenIsPersistent() },
   );
   settingsOpen.value = false;
+  settingsDialog.value?.close();
   void checkConnection();
 }
 
@@ -93,6 +96,7 @@ function logout(): void {
   signOut();
   mobileOpen.value = false;
   settingsOpen.value = false;
+  settingsDialog.value?.close();
   void router.replace({ name: "login" });
 }
 
@@ -291,7 +295,7 @@ const pageDescription = computed(() => {
       <RouterView />
     </main>
 
-    <dialog :open="settingsOpen" class="modal" @close="settingsOpen = false">
+    <dialog ref="settingsDialog" class="modal" @close="settingsOpen = false">
       <form method="dialog" @submit.prevent="applySettings">
         <div class="modal-header">
           <div>

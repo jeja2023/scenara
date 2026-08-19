@@ -1,6 +1,6 @@
 {
   "name": "scenara",
-  "version": "0.3.0-dev.22",
+  "version": "0.3.0-dev.23",
   "private": true,
   "type": "commonjs",
   "packageManager": "pnpm@10.32.1",

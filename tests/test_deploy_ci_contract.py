@@ -134,11 +134,15 @@ def test_production_dependencies_are_hash_locked_everywhere() -> None:
     assert "git diff --exit-code -- requirements/production.lock" in workflow
 
 
-def test_docker_build_copies_workspace_sources_before_installing_dependencies() -> None:
+def test_docker_build_copies_manifests_before_installing_dependencies() -> None:
     dockerfile_lines = DOCKERFILE.read_text(encoding="utf-8").splitlines()
-    source_copy = dockerfile_lines.index("COPY frontend/console frontend/console")
+    manifest_copy = dockerfile_lines.index(
+        "COPY frontend/console/package.json frontend/console/package.json"
+    )
     dependency_install = dockerfile_lines.index("RUN pnpm install --frozen-lockfile")
-    assert source_copy < dependency_install
+    assert manifest_copy < dependency_install
+    source_copy = dockerfile_lines.index("COPY frontend/console frontend/console")
+    assert dependency_install < source_copy
 
 
 def test_default_runtime_model_references_use_cache_key_contract() -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Protocol
 
 from scenara.platform.models import PrincipalContext
@@ -22,6 +23,24 @@ class ControlPlaneStore(Protocol):
 
     async def delete(self, kind: str, tenant_id: str, project_id: str, record_id: str) -> None: ...
 
+    async def adjust_quota_usage(
+        self,
+        tenant_id: str,
+        project_id: str,
+        record_id: str,
+        *,
+        window_seconds: float,
+        now: float,
+        amount: int,
+        limit: int | None,
+    ) -> tuple[dict[str, Any], bool]:
+        """Atomically add ``amount`` to a quota usage record inside its window.
+
+        Returns the resulting usage document and whether the increment was
+        allowed.  A denied increment leaves the stored usage unchanged, so
+        concurrent requests can never overshoot the configured limit.
+        """
+
 
 class SessionAccessResolver(Protocol):
     async def resolve_user_context(self, tenant_id: str, project_id: str, user_id: str) -> PrincipalContext | None: ...
@@ -35,6 +54,7 @@ class MemoryControlPlaneStore:
     def __init__(self) -> None:
         self._records: dict[tuple[str, str, str, str], dict[str, Any]] = {}
         self._session_tokens: dict[str, tuple[str, str, str, str]] = {}
+        self._quota_lock = asyncio.Lock()
 
     async def get(self, kind: str, tenant_id: str, project_id: str, record_id: str) -> dict[str, Any] | None:
         value = self._records.get((kind, tenant_id, project_id, record_id))
@@ -85,6 +105,35 @@ class MemoryControlPlaneStore:
             digest = removed.get("token_sha256")
             if isinstance(digest, str):
                 self._session_tokens.pop(digest, None)
+
+    async def adjust_quota_usage(
+        self,
+        tenant_id: str,
+        project_id: str,
+        record_id: str,
+        *,
+        window_seconds: float,
+        now: float,
+        amount: int,
+        limit: int | None,
+    ) -> tuple[dict[str, Any], bool]:
+        key = ("quota_usage", tenant_id, project_id, record_id)
+        async with self._quota_lock:
+            existing = self._records.get(key)
+            started = now
+            used = 0
+            if existing is not None:
+                existing_started = float(existing.get("window_started_at", now))
+                if now < existing_started + window_seconds:
+                    started = existing_started
+                    used = int(existing.get("used", 0))
+            next_used = used + amount
+            allowed = limit is None or next_used <= limit
+            if allowed:
+                document = {"record_id": record_id, "used": next_used, "window_started_at": started, "updated_at": now}
+                self._records[key] = dict(document)
+                return document, True
+            return {"record_id": record_id, "used": used, "window_started_at": started, "updated_at": now}, False
 
 
 __all__ = [

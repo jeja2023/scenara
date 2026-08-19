@@ -13,6 +13,23 @@ The published contract package is `@scenara/repository-contracts` version `1.0.0
 
 `release-index.json` locks every published manifest by SHA-256. A published directory is immutable; incompatible changes require a new major release, while backward-compatible additions require a new minor release.
 
+## Time fields
+
+The `created_at` field in `hard-sample-handoff`, `dataset-version-input`, and
+`deployment-feedback` is a UTC RFC3339 string. It must end with `Z`; an optional
+fractional second may contain one to six digits. For example:
+
+```json
+{
+  "created_at": "2026-08-18T00:00:00Z"
+}
+```
+
+Consumers must validate this format at the contract boundary. Internal
+database or queue adapters may convert the value to a native timestamp or Unix
+epoch for storage, but must preserve the represented instant and must not
+expose the internal representation in cross-repository payloads.
+
 ## Provider verification
 
 Generate and verify the committed package:

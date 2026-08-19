@@ -8,6 +8,9 @@ from typing import Any
 from scenara.platform.models import RunRecord
 from scenara.platform.queue import RunHandler
 
+RUN_STREAM_MAXLEN = 100_000
+"""Approximate Redis stream length cap for Run submission streams."""
+
 
 class InlineRunQueue:
     def __init__(self) -> None:
@@ -102,7 +105,7 @@ class RedisRunQueue:
                 "run_id": run.run_id,
                 "priority": str(run.priority),
             },
-            maxlen=100_000,
+            maxlen=RUN_STREAM_MAXLEN,
             approximate=True,
         )
 
@@ -128,7 +131,7 @@ class RedisRunQueue:
                         "run_id": run.run_id,
                         "priority": str(run.priority),
                     },
-                    maxlen=100_000,
+                    maxlen=RUN_STREAM_MAXLEN,
                     approximate=True,
                 )
             await pipeline.execute()

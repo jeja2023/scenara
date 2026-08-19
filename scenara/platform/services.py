@@ -793,11 +793,13 @@ class RunService:
 
     async def wait(self, context: PrincipalContext, run_id: str, wait_ms: int) -> RunRecord:
         deadline = asyncio.get_running_loop().time() + wait_ms / 1000
+        delay = 0.05
         while asyncio.get_running_loop().time() < deadline:
             run = await self._get_run(context, run_id)
             if run.status in TERMINAL_RUN_STATUSES:
                 return run
-            await asyncio.sleep(0.02)
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, 1.0)
         return await self._get_run(context, run_id)
 
     async def get_run(self, context: PrincipalContext, run_id: str) -> RunRecord:
@@ -948,7 +950,7 @@ class RunService:
             units = [unit for shard in shard_units for unit in shard]
             if len(units) != reference.unit_count:
                 raise PipelineError("stored result shard count does not match its reference")
-            result = result.model_copy(update={"units": units}, deep=True)
+            result = result.model_copy(update={"units": units})
         return result
 
     async def result_page(
@@ -1006,7 +1008,7 @@ class RunService:
             pages = await asyncio.gather(*(load_selected(entry) for entry in selected))
             units = [unit for page in pages for unit in page]
         return ResultPage(
-            result=result.model_copy(update={"units": units}, deep=True),
+            result=result.model_copy(update={"units": units}),
             unit_offset=unit_offset,
             unit_limit=unit_limit,
             unit_total=total,
@@ -1471,7 +1473,7 @@ class RunService:
                     shard_keys.append(shard_key)
                     shard_sha256.append(hashlib.sha256(shard_document).hexdigest())
                     shard_unit_counts.append(len(units))
-                index_result = result.model_copy(update={"units": []}, deep=True)
+                index_result = result.model_copy(update={"units": []})
             elif len(result.units) > self.result_shard_units:
                 for offset in range(0, len(result.units), self.result_shard_units):
                     units = result.units[offset : offset + self.result_shard_units]
@@ -1493,7 +1495,7 @@ class RunService:
                     shard_keys.append(shard_key)
                     shard_sha256.append(hashlib.sha256(shard_document).hexdigest())
                     shard_unit_counts.append(len(units))
-                index_result = result.model_copy(update={"units": []}, deep=True)
+                index_result = result.model_copy(update={"units": []})
             else:
                 index_result = result
             result_document = index_result.model_dump_json().encode("utf-8")
@@ -1703,8 +1705,8 @@ class RunService:
                     expires_at=index_expires_at,
                 )
             )
-        for record in records:
-            await self.indexes.upsert(record)
+        await self.indexes.upsert_many(records)
+        vector_records: list[IndexRecord] = []
         for hint in result._index_vectors:
             vector_index_id = f"result.{hint.feature_space_id}"
             await self.indexes.create_index(
@@ -1730,7 +1732,7 @@ class RunService:
                 if location[0] is not None:
                     break
             unit_id, page_number, pts_ms, unit_index = location
-            await self.indexes.upsert(
+            vector_records.append(
                 IndexRecord(
                     record_id=f"idxv_{run.run_id}_{hint.object_id}",
                     tenant_id=run.tenant_id,
@@ -1762,6 +1764,7 @@ class RunService:
                     expires_at=index_expires_at,
                 )
             )
+        await self.indexes.upsert_many(vector_records)
 
     async def _discard_partial_result(self, run: RunRecord) -> None:
         try:

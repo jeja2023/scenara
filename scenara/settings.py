@@ -207,7 +207,7 @@ def load_settings() -> Settings:
         default_tenant_id=os.getenv("SCENARA_DEFAULT_TENANT_ID", "default").strip(),
         default_project_id=os.getenv("SCENARA_DEFAULT_PROJECT_ID", "default").strip(),
         bootstrap_admin_username=os.getenv("SCENARA_BOOTSTRAP_ADMIN_USERNAME", "").strip(),
-        bootstrap_admin_password=os.getenv("SCENARA_BOOTSTRAP_ADMIN_PASSWORD", ""),
+        bootstrap_admin_password=os.getenv("SCENARA_BOOTSTRAP_ADMIN_PASSWORD", "").strip(),
         max_image_bytes=max(1, int(os.getenv("SCENARA_MAX_IMAGE_BYTES", str(25 * 1024 * 1024)))),
         max_media_bytes=max(1, int(os.getenv("SCENARA_MAX_MEDIA_BYTES", str(20 * 1024 * 1024 * 1024)))),
         media_sample_interval_ms=max(

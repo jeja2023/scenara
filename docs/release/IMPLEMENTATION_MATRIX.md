@@ -5,18 +5,18 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until reproducible objective evidence is committed.
 
-Current development version: `0.3.0-dev.22` (`0.3.0.dev22` for Python packages).
+Current development version: `0.3.0-dev.23` (`0.3.0.dev23` for Python packages).
 
 ## Release Gate Status
-The `0.3.0-dev.22` engineering baseline retains the certified S3 Provider contract, immutable publication and SHA-256 verification, provider lifecycle/security controls and presigned media transfer. It adds a Core-side Data platform boundary: a typed remote client, identity/trace/idempotency propagation, compatibility mapping, checksummed migration export and an explicit cutover procedure. Console routes now bind controlled Core/Data/Model themes and include responsive and keyboard-accessibility regression coverage. Full implementation and architectural parity checks pass, including tests, linting, typechecking, and production builds.
+The `0.3.0-dev.23` engineering baseline adds a code-quality and release-hardening pass on top of the `0.3.0-dev.22` boundary: performance and reliability fixes (stream wait backoff, deterministic S3 index batching, single-path media upload, deep-copy removal, spooled upload size reporting, idempotent result writing), security fixes (atomic quota checks), quality fixes (scheduler gaps, settings stripping, magic-number extraction), a Docker layer-order fix with a regression contract, `.dockerignore`/dependency hygiene, deployment tag convergence across Compose/Kubernetes, and CI deduplication (security tests run once, non-integration coverage gate). Console adds incremental parse loading, windowed timeline rendering, paginated audit browsing and modal dialogs.
 Formal 1.0 release evidence remains fail-closed until the required evaluation,
 GPU capacity, offline-install, model-rights, integration, security, backup/restore,
-and software-license checks are rerun for `0.3.0-dev.22`. Historical `0.3.0-dev.21`
+and software-license checks are rerun for `0.3.0-dev.23`. Historical `0.3.0-dev.21`
 reports remain archived but are not reused as current-release evidence. This personal
 project does not require named approvers or legal/commercial sign-off records.
 
 ## Implementation Parity Matrix
-The `0.3.0-dev.22` baseline processes finite video and PDF inputs to EOF unless callers
+The `0.3.0-dev.23` baseline processes finite video and PDF inputs to EOF unless callers
 explicitly request a compatibility cap. Continuous streams are archived into linked Run
 segments under one Stream Session, while inference batches publish `result.delta` events
 and append-only Result shards. It also enforces enterprise policy in production, adds indexed and expiring Session
@@ -71,10 +71,14 @@ The `1.0` version must not be published while any box above is unchecked.
 
 ## Current local verification
 
-The Core boundary, version synchronization and Console regression checks were executed on 2026-08-16; earlier release-evidence, browser and decode checks below remain supporting implementation evidence only:
+The optimization and release-hardening regression was executed on 2026-08-19; the Core boundary, version synchronization and Console regression checks were executed on 2026-08-16; earlier release-evidence, browser and decode checks below remain supporting implementation evidence only:
 
 | Check | Result |
 |---|---|
+| Full Python baseline for `0.3.0-dev.23` | 247 passed, 12 skipped, 69.71% coverage (gate 60%); Ruff, compile checks and the `--implementation-only` release gate pass |
+| Security contract suite | 62 passed, 0 skipped; CI runs it once (the coverage job ignores the six security regression files, measured at 65.01% without them) |
+| Console regression for `0.3.0-dev.23` | typecheck, lint, production build and 24 unit tests passed, including the windowed timeline and paginated audit coverage |
+| Compose/Kubernetes tag convergence | `docker compose config` and `kubectl kustomize` resolve every application service to `scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.23}` |
 | Core Data split regression | 20 focused tests passed for the remote client, compatibility states, migration artifact, production configuration and Hard Sample delivery; a preceding full Python baseline passed 242 tests with 12 skipped |
 | Console workspace regression | typecheck, 24 unit tests, production build and four-viewport Playwright checks passed; Data and Model routes expose distinct controlled theme accents without horizontal overflow |
 | `.venv\\Scripts\\python.exe -m pytest -q` | 217 passed, 9 integration tests skipped in 57.55s; includes two-video trajectory ReID and `/api/v1/parse/video` shortcut coverage |

@@ -478,17 +478,6 @@ class TrajectoryService:
         await self._repository.put_camera(camera)
         return camera
 
-    async def _transition_bounds(
-        self, context: PrincipalContext, from_camera: str, to_camera: str
-    ) -> tuple[float, float | None]:
-        transitions = await self._repository.list_transitions(
-            context.tenant_id, context.project_id, from_camera_id=from_camera
-        )
-        for transition in transitions:
-            if transition.to_camera_id == to_camera:
-                return transition.min_seconds, transition.max_seconds
-        return self._default_transition_seconds, None
-
     async def _transition_allows(
         self,
         context: PrincipalContext,
@@ -501,6 +490,17 @@ class TrajectoryService:
         segments, _ = await self._repository.list_segments(
             context.tenant_id, context.project_id, identity_id=identity_id, limit=200
         )
+        if not segments:
+            return True
+        transitions = await self._repository.list_transitions(
+            context.tenant_id, context.project_id
+        )
+        bounds: dict[tuple[str, str], tuple[float, float | None]] = {}
+        for transition in transitions:
+            bounds[(transition.from_camera_id, transition.to_camera_id)] = (
+                transition.min_seconds,
+                transition.max_seconds,
+            )
         for segment in segments:
             if not segment.camera_id or segment.camera_id == camera_id:
                 continue
@@ -508,10 +508,11 @@ class TrajectoryService:
                 return False
             if segment.last_seen_at <= window[0]:
                 gap = window[0] - segment.last_seen_at
-                minimum, maximum = await self._transition_bounds(context, segment.camera_id, camera_id)
+                key = (segment.camera_id, camera_id)
             else:
                 gap = segment.first_seen_at - window[1]
-                minimum, maximum = await self._transition_bounds(context, camera_id, segment.camera_id)
+                key = (camera_id, segment.camera_id)
+            minimum, maximum = bounds.get(key, (self._default_transition_seconds, None))
             if gap < minimum or (maximum is not None and gap > maximum):
                 return False
         return True
