@@ -1,16 +1,10 @@
 <script setup lang="ts">
-import { ArrowRight } from "@lucide/vue";
+import { ArrowRight, Filter, RotateCcw } from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { useRoute, useRouter } from "vue-router";
 import { api, userFacingError } from "../api";
-import {
-  labelDomain,
-  labelPipeline,
-  labelRunError,
-  labelRunStatus,
-  labelTerminationReason,
-} from "../labels";
+import { labelDomain, labelPipeline, labelRunStatus } from "../labels";
 import type { Domain, DomainManifest, Run, RunPage, RunStatus } from "../types";
 
 const runs = ref<Run[]>([]);
@@ -130,6 +124,12 @@ function duration(run: Run): string {
   return `${Math.floor(seconds / 60)} 分 ${Math.round(seconds % 60)} 秒`;
 }
 
+function resetFilters(): void {
+  status.value = "";
+  domain.value = "";
+  void refresh();
+}
+
 onMounted(async () => {
   await refresh();
   scheduleRefresh();
@@ -161,15 +161,13 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <div class="panel filter-panel">
-      <div class="panel-header">
-        <h2>筛选记录</h2>
-        <label class="auto-refresh-label"
-          ><input v-model="autoRefresh" type="checkbox" />自动刷新</label
-        >
-      </div>
-      <div class="panel-body">
-        <div class="toolbar">
+    <section class="panel filter-panel">
+      <div class="panel-body filter-bar">
+        <div class="filter-controls">
+          <div class="filter-heading">
+            <Filter :size="15" />
+            <span>筛选记录</span>
+          </div>
           <select v-model="domain" aria-label="领域筛选" @change="refresh">
             <option value="">全部领域</option>
             <option
@@ -189,19 +187,15 @@ onBeforeUnmount(() => {
             <option value="failed">失败</option>
             <option value="cancelled">已取消</option>
           </select>
-          <button
-            class="button secondary"
-            @click="
-              status = '';
-              domain = '';
-              refresh();
-            "
-          >
-            重置
+          <button class="button secondary" @click="resetFilters">
+            <RotateCcw :size="14" />重置
           </button>
         </div>
+        <label class="auto-refresh-label">
+          <input v-model="autoRefresh" type="checkbox" />自动刷新
+        </label>
       </div>
-    </div>
+    </section>
     <p v-if="error" class="callout error">{{ error }}</p>
 
     <section class="panel runs-panel">
@@ -229,24 +223,22 @@ onBeforeUnmount(() => {
                 <span class="badge" :class="run.status">{{
                   labelRunStatus(run.status)
                 }}</span>
-                <div v-if="run.error_code" class="muted small">
-                  {{ labelRunError(run.error_code) }}
-                </div>
-                <div v-else-if="run.termination_reason" class="muted small">
-                  {{ labelTerminationReason(run.termination_reason) }}
-                </div>
               </td>
               <td class="progress-cell">
-                <div
-                  class="progress-track"
-                  role="progressbar"
-                  :aria-valuenow="progressPercent(run)"
-                  aria-valuemin="0"
-                  aria-valuemax="100"
-                >
-                  <span :style="{ width: `${progressPercent(run)}%` }" />
+                <div class="progress-inline">
+                  <div
+                    class="progress-track"
+                    role="progressbar"
+                    :aria-valuenow="progressPercent(run)"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                  >
+                    <span :style="{ width: `${progressPercent(run)}%` }" />
+                  </div>
+                  <span class="progress-value"
+                    >{{ progressPercent(run) }}%</span
+                  >
                 </div>
-                <small>{{ progressPercent(run) }}%</small>
               </td>
               <td class="truncate">
                 {{ labelPipeline(run.pipeline.pipeline_id) }} ·
@@ -257,7 +249,7 @@ onBeforeUnmount(() => {
               <td>
                 <div class="toolbar compact">
                   <button class="button secondary" @click="openWorkspace(run)">
-                    查看<ArrowRight :size="14" />
+                    查看<ArrowRight :size="12" />
                   </button>
                   <button
                     class="button secondary"
@@ -297,12 +289,88 @@ onBeforeUnmount(() => {
 .filter-panel {
   margin-top: 14px;
 }
+.filter-panel .panel-body {
+  padding: 10px 16px;
+}
+.filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.filter-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.filter-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--color-text);
+  margin-right: 2px;
+  white-space: nowrap;
+}
+.filter-heading svg {
+  color: var(--teal);
+}
+.filter-controls select {
+  width: 170px;
+  min-width: 130px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background-color: var(--color-surface);
+}
+.filter-controls .button {
+  height: 34px;
+  min-height: 34px;
+}
 .runs-panel {
   margin-top: 14px;
 }
+.runs-panel .data-table th {
+  height: 32px;
+  padding: 4px 10px;
+}
+.runs-panel .data-table td {
+  min-height: 34px;
+  padding: 5px 10px;
+  vertical-align: middle;
+}
+.runs-panel .badge {
+  min-height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 20px;
+}
 .compact {
-  gap: 5px;
+  gap: 4px;
   flex-wrap: nowrap;
+}
+.compact .button {
+  min-height: 24px;
+  height: 24px;
+  padding: 0 7px;
+  font-size: 11.5px;
+  font-weight: 550;
+  gap: 4px;
+  border-radius: 4px;
+}
+@media (max-width: 900px) {
+  .filter-controls .button,
+  .filter-controls select,
+  .compact .button {
+    min-height: 44px;
+    height: 44px;
+  }
 }
 .auto-refresh-label {
   display: inline-flex;
@@ -314,6 +382,7 @@ onBeforeUnmount(() => {
   color: var(--muted);
   cursor: pointer;
   user-select: none;
+  white-space: nowrap;
 }
 .auto-refresh-label input[type="checkbox"] {
   width: 15px;
@@ -326,10 +395,17 @@ onBeforeUnmount(() => {
   font-size: 11px;
 }
 .progress-cell {
-  min-width: 92px;
+  min-width: 110px;
+}
+.progress-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .progress-track {
-  height: 6px;
+  flex: 1;
+  min-width: 48px;
+  height: 5px;
   overflow: hidden;
   background: #dfe6e3;
   border-radius: 3px;
@@ -340,11 +416,13 @@ onBeforeUnmount(() => {
   background: var(--teal);
   transition: width 0.2s ease;
 }
-.progress-cell small {
-  display: block;
-  margin-top: 3px;
+.progress-value {
   color: var(--muted);
   font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  min-width: 28px;
+  text-align: right;
+  flex-shrink: 0;
 }
 .spin {
   animation: spin 0.9s linear infinite;

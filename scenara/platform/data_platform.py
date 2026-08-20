@@ -17,6 +17,7 @@ from typing import Any, Protocol
 import httpx
 
 from scenara.platform.control_plane import (
+    AnnotationTaskStatus,
     AnnotationProvider,
     AnnotationTask,
     ControlPlaneService,
@@ -31,7 +32,9 @@ from scenara.platform.models import (
     CreateDatasetVersionRequest,
     DatasetPage,
     DatasetRecord,
+    DatasetStatus,
     DatasetVersion,
+    DatasetVersionStatus,
     DatasetVersionPage,
     PrincipalContext,
     TransitionDatasetVersionRequest,
@@ -661,16 +664,17 @@ def _hard_sample_intake_context(context: PrincipalContext) -> PrincipalContext:
 def _core_annotation_task(payload: object) -> AnnotationTask:
     if not isinstance(payload, dict):
         raise DataPlatformRemoteError(502, "DATA_PLATFORM_PROTOCOL_ERROR", "annotation task payload must be an object")
-    created_at = _epoch(payload.get("created_at"))
-    status = str(payload.get("status", "pending"))
+    payload_map: dict[str, Any] = payload
+    created_at = _epoch(payload_map.get("created_at"))
+    status = str(payload_map.get("status", "pending"))
     return AnnotationTask(
-        record_id=str(payload.get("task_id", "")),
-        tenant_id=str(payload.get("tenant_id", "")),
-        project_id=str(payload.get("project_id", "")),
-        asset_ids=list(payload.get("sample_ids") or []),
-        schema_name=str(payload.get("schema_id", "")),
-        assignee=str(payload["assigned_to"]) if payload.get("assigned_to") is not None else None,
-        status={
+        record_id=str(payload_map.get("task_id", "")),
+        tenant_id=str(payload_map.get("tenant_id", "")),
+        project_id=str(payload_map.get("project_id", "")),
+        asset_ids=[str(item) for item in (payload_map.get("sample_ids") or [])],
+        schema_name=str(payload_map.get("schema_id", "")),
+        assignee=str(payload_map["assigned_to"]) if payload_map.get("assigned_to") is not None else None,
+        status=AnnotationTaskStatus({
             "pending": "queued",
             "assigned": "in_review",
             "in_progress": "in_review",
@@ -678,13 +682,13 @@ def _core_annotation_task(payload: object) -> AnnotationTask:
             "approved": "approved",
             "rejected": "rejected",
             "cancelled": "rejected",
-        }.get(status, "queued"),
-        labels=dict(payload.get("task_metadata") or {}),
-        consistency_score=payload.get("consistency_score"),
-        review_comment=str(payload.get("review_comment") or ""),
-        created_by=str(payload.get("created_by", "")),
+        }.get(status, "queued")),
+        labels=dict(payload_map.get("task_metadata") or {}),
+        consistency_score=float(payload_map["consistency_score"]) if payload_map.get("consistency_score") is not None else None,
+        review_comment=str(payload_map.get("review_comment") or ""),
+        created_by=str(payload_map.get("created_by", "")),
         created_at=created_at,
-        updated_at=_epoch(payload.get("updated_at"), fallback=created_at),
+        updated_at=_epoch(payload_map.get("updated_at"), fallback=created_at),
     )
 
 
@@ -693,35 +697,37 @@ def _core_annotation_provider(payload: object, context: PrincipalContext) -> Ann
         raise DataPlatformRemoteError(
             502, "DATA_PLATFORM_PROTOCOL_ERROR", "annotation provider payload must be an object"
         )
-    created_at = _epoch(payload.get("created_at"))
+    payload_map: dict[str, Any] = payload
+    created_at = _epoch(payload_map.get("created_at"))
     return AnnotationProvider(
-        record_id=str(payload.get("provider_id", "")),
+        record_id=str(payload_map.get("provider_id", "")),
         tenant_id=context.tenant_id,
         project_id=context.project_id,
-        name=str(payload.get("name", "")),
-        kind=str(payload.get("provider_type", "")),
-        endpoint=str(payload.get("endpoint") or "unconfigured://provider"),
-        enabled=bool(payload.get("active", True)),
-        last_health=str(payload.get("health", "unknown")),
+        name=str(payload_map.get("name", "")),
+        kind=str(payload_map.get("provider_type", "")),
+        endpoint=str(payload_map.get("endpoint") or "unconfigured://provider"),
+        enabled=bool(payload_map.get("active", True)),
+        last_health=str(payload_map.get("health", "unknown")),
         created_at=created_at,
-        updated_at=_epoch(payload.get("updated_at"), fallback=created_at),
+        updated_at=_epoch(payload_map.get("updated_at"), fallback=created_at),
     )
 
 
 def _core_dataset(payload: object) -> DatasetRecord:
     if not isinstance(payload, dict):
         raise DataPlatformRemoteError(502, "DATA_PLATFORM_PROTOCOL_ERROR", "dataset payload must be an object")
-    created_at = _epoch(payload.get("created_at"))
+    payload_map: dict[str, Any] = payload
+    created_at = _epoch(payload_map.get("created_at"))
     return DatasetRecord(
-        dataset_id=str(payload.get("dataset_id", "")),
-        tenant_id=str(payload.get("tenant_id", "")),
-        project_id=str(payload.get("project_id", "")),
-        name=str(payload.get("name", "")),
-        description=str(payload.get("description", "")),
-        status=str(payload.get("status", "draft")),
-        metadata=dict(payload.get("dataset_metadata") or payload.get("metadata") or {}),
+        dataset_id=str(payload_map.get("dataset_id", "")),
+        tenant_id=str(payload_map.get("tenant_id", "")),
+        project_id=str(payload_map.get("project_id", "")),
+        name=str(payload_map.get("name", "")),
+        description=str(payload_map.get("description", "")),
+        status=DatasetStatus(str(payload_map.get("status", "draft"))),
+        metadata=dict(payload_map.get("dataset_metadata") or payload_map.get("metadata") or {}),
         created_at=created_at,
-        updated_at=_epoch(payload.get("updated_at"), fallback=created_at),
+        updated_at=_epoch(payload_map.get("updated_at"), fallback=created_at),
     )
 
 
@@ -741,39 +747,40 @@ def _core_dataset_version(payload: object, context: PrincipalContext) -> Dataset
 
     if not isinstance(payload, dict):
         raise DataPlatformRemoteError(502, "DATA_PLATFORM_PROTOCOL_ERROR", "dataset version payload must be an object")
-    if isinstance(payload.get("dataset_version"), dict):
-        payload = payload["dataset_version"]
-    status_raw = payload.get("status")
-    status_value = {"ready": "validated", "archived": "retired"}.get(status_raw, status_raw)
-    checksum = payload.get("manifest_sha256")
+    payload_map: dict[str, Any] = payload
+    if isinstance(payload_map.get("dataset_version"), dict):
+        payload_map = payload_map["dataset_version"]
+    status_raw = str(payload_map.get("status") or "draft")
+    status_value = DatasetVersionStatus({"ready": "validated", "archived": "retired"}.get(status_raw, status_raw))
+    checksum = payload_map.get("manifest_sha256")
     if isinstance(checksum, str):
         checksum = checksum.removeprefix("sha256:")
-    created_at = _epoch(payload.get("created_at"))
+    created_at = _epoch(payload_map.get("created_at"))
     return DatasetVersion(
-        version_id=str(payload.get("dataset_version_id") or payload.get("version_id") or ""),
-        dataset_id=str(payload.get("dataset_id", "")),
+        version_id=str(payload_map.get("dataset_version_id") or payload_map.get("version_id") or ""),
+        dataset_id=str(payload_map.get("dataset_id", "")),
         tenant_id=context.tenant_id,
         project_id=context.project_id,
-        version=str(payload.get("version", "")),
+        version=str(payload_map.get("version", "")),
         status=status_value,
         manifest_sha256=checksum or "0" * 64,
         asset_ids=[],
-        item_count=int(payload.get("sample_count") or 0),
+        item_count=int(payload_map.get("sample_count") or 0),
         quality_score=None,
         lineage=(
-            {"lineage_snapshot_id": payload.get("lineage_snapshot_id")}
-            if payload.get("lineage_snapshot_id")
+            {"lineage_snapshot_id": payload_map.get("lineage_snapshot_id")}
+            if payload_map.get("lineage_snapshot_id")
             else {}
         ),
         annotation_summary=(
-            {"annotation_snapshot_id": payload.get("annotation_snapshot_id")}
-            if payload.get("annotation_snapshot_id")
+            {"annotation_snapshot_id": payload_map.get("annotation_snapshot_id")}
+            if payload_map.get("annotation_snapshot_id")
             else {}
         ),
-        created_by=str(payload.get("created_by") or context.principal_id or "scenara-data"),
+        created_by=str(payload_map.get("created_by") or context.principal_id or "scenara-data"),
         created_at=created_at,
         updated_at=_epoch(
-            payload.get("published_at") or payload.get("archived_at"), fallback=created_at
+            payload_map.get("published_at") or payload_map.get("archived_at"), fallback=created_at
         ),
     )
 

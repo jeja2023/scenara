@@ -7,6 +7,7 @@ import logging
 import os
 import tempfile
 import time
+from datetime import UTC, datetime
 from collections.abc import Sequence
 from contextlib import suppress
 from dataclasses import dataclass
@@ -699,6 +700,12 @@ class RunService:
             tenant_id=context.tenant_id,
             project_id=context.project_id,
             principal_id=context.principal_id,
+            request_id=context.request_id,
+            trace_id=(
+                context.traceparent.split("-")[1]
+                if context.traceparent and len(context.traceparent.split("-")) == 4
+                else uuid4().hex
+            ),
             domain=request.domain,
             pipeline=request.pipeline,
             asset_id=request.asset_id,
@@ -1897,6 +1904,9 @@ class RunService:
             )
 
     async def _event(self, run: RunRecord, event_type: str, payload: dict[str, Any] | None = None) -> RunEvent:
+        created_at = time.time()
+        occurred_at = datetime.fromtimestamp(created_at, UTC).isoformat().replace("+00:00", "Z")
+        trace_id = run.trace_id or uuid4().hex
         return await self.state.append_event(
             run.tenant_id,
             run.project_id,
@@ -1904,9 +1914,16 @@ class RunService:
                 run_id=run.run_id,
                 event_id=1,
                 event_type=event_type,
+                event_version="1.0",
+                occurred_at=occurred_at,
+                producer="scenara",
+                tenant_id=run.tenant_id,
+                project_id=run.project_id,
+                request_id=run.request_id,
+                trace_id=trace_id,
                 status=run.status,
                 payload=payload or {},
-                created_at=time.time(),
+                created_at=created_at,
             ),
         )
 

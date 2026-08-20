@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Eye,
   Play,
+  Plus,
   Trash2,
   Upload,
   Video,
@@ -300,32 +301,12 @@ useRefresh(refresh);
 
 <template>
   <section class="page">
-    <div class="page-header">
-      <div class="toolbar">
-        <button
-          v-if="selectedForDelete.size"
-          class="button danger"
-          @click="deleteSelected"
-        >
-          批量删除 {{ selectedForDelete.size }} 个
-        </button>
-        <label class="button primary file-button"
-          ><Upload :size="16" />{{ uploading ? "上传中" : "上传文件"
-          }}<input
-            type="file"
-            multiple
-            accept="image/*,video/*,.mkv,.avi,.mov,.mp4,.webm,application/pdf,.pdf"
-            :disabled="uploading"
-            @change="upload"
-        /></label>
-      </div>
-    </div>
     <p v-if="error" class="callout error">{{ error }}</p>
     <p v-if="message" class="callout success">{{ message }}</p>
 
-    <section class="panel">
+    <section class="panel asset-panel">
       <div class="panel-header">
-        <div class="header-row">
+        <div class="header-left">
           <h2>文件资产</h2>
           <div class="filter-row">
             <div class="segmented" role="group" aria-label="类型筛选">
@@ -357,6 +338,25 @@ useRefresh(refresh);
             <span class="badge">{{ filteredAssets.length }}</span>
             <span class="size-total">{{ formatBytes(totalSizeBytes) }}</span>
           </div>
+        </div>
+        <div class="header-actions">
+          <button
+            v-if="selectedForDelete.size"
+            class="button danger header-btn"
+            @click="deleteSelected"
+          >
+            <Trash2 :size="13" />批量删除 {{ selectedForDelete.size }} 个
+          </button>
+          <label class="button primary file-button header-btn">
+            <Upload :size="13" />{{ uploading ? "上传中" : "上传文件" }}
+            <input
+              type="file"
+              multiple
+              accept="image/*,video/*,.mkv,.avi,.mov,.mp4,.webm,application/pdf,.pdf"
+              :disabled="uploading"
+              @change="upload"
+            />
+          </label>
         </div>
       </div>
       <div class="table-scroll">
@@ -420,7 +420,7 @@ useRefresh(refresh);
                             ? ChevronDown
                             : ChevronRight
                         "
-                        :size="15"
+                        :size="13"
                       />
                     </button>
                     <button
@@ -429,7 +429,7 @@ useRefresh(refresh);
                       aria-label="预览"
                       @click="preview(asset)"
                     >
-                      <Eye :size="15" />
+                      <Eye :size="13" />
                     </button>
                     <button
                       v-if="asset.kind === 'video'"
@@ -438,10 +438,10 @@ useRefresh(refresh);
                       aria-label="预览视频首帧"
                       @click="preview(asset)"
                     >
-                      <Video :size="15" />
+                      <Video :size="13" />
                     </button>
                     <button class="button secondary" @click="launch(asset)">
-                      <Play :size="14" />解析
+                      <Play :size="12" />解析
                     </button>
                     <button
                       class="icon-button danger-icon"
@@ -449,7 +449,7 @@ useRefresh(refresh);
                       aria-label="删除"
                       @click="deleteAsset(asset)"
                     >
-                      <Trash2 :size="15" />
+                      <Trash2 :size="13" />
                     </button>
                   </div>
                 </td>
@@ -485,27 +485,36 @@ useRefresh(refresh);
 
     <section class="panel source-panel">
       <div class="panel-header">
-        <h2>视频流源</h2>
-        <span class="badge">{{ sources.length }}</span>
+        <div class="header-left">
+          <h2>视频流源</h2>
+          <span class="badge">{{ sources.length }}</span>
+        </div>
       </div>
-      <div class="panel-body source-create">
-        <label
-          ><span>名称</span
-          ><input v-model.trim="sourceForm.name" maxlength="256"
-        /></label>
-        <label
-          ><span>地址</span
-          ><input
+      <div class="source-create-bar">
+        <div class="source-input-group">
+          <span class="field-label">源名称</span>
+          <input
+            v-model.trim="sourceForm.name"
+            maxlength="256"
+            placeholder="例如：主入口监控"
+            @keyup.enter="createSource"
+          />
+        </div>
+        <div class="source-input-group url-group">
+          <span class="field-label">RTSP 地址</span>
+          <input
             v-model.trim="sourceForm.url"
             maxlength="4096"
-            placeholder="rtsp://host/path"
-        /></label>
+            placeholder="rtsp://host:port/path"
+            @keyup.enter="createSource"
+          />
+        </div>
         <button
-          class="button primary"
+          class="button primary source-btn"
           :disabled="!sourceForm.name || !sourceForm.url"
           @click="createSource"
         >
-          登记
+          <Plus :size="13" />登记视频流
         </button>
       </div>
       <div class="table-scroll">
@@ -523,7 +532,7 @@ useRefresh(refresh);
           <tbody>
             <tr v-for="(source, index) in sources" :key="source.source_id">
               <td class="muted">{{ index + 1 }}</td>
-              <td class="mono">{{ source.source_id }}</td>
+              <td class="mono truncate">{{ source.source_id }}</td>
               <td>{{ source.name }}</td>
               <td class="mono truncate">{{ source.masked_url }}</td>
               <td>
@@ -541,16 +550,16 @@ useRefresh(refresh);
                     aria-label="探测连接"
                     @click="probeSource(source)"
                   >
-                    <Activity :size="15" /></button
+                    <Activity :size="13" /></button
                   ><button class="button secondary" @click="launch(source)">
-                    <Play :size="14" />解析</button
+                    <Play :size="12" />解析</button
                   ><button
                     class="icon-button danger-icon"
                     title="删除"
                     aria-label="删除"
                     @click="deleteSource(source)"
                   >
-                    <Trash2 :size="15" />
+                    <Trash2 :size="13" />
                   </button>
                 </div>
               </td>
@@ -595,7 +604,7 @@ useRefresh(refresh);
 </template>
 
 <style scoped>
-.header-row {
+.header-left {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -611,6 +620,19 @@ useRefresh(refresh);
   color: var(--muted);
   font-size: 12px;
 }
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.header-btn {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  gap: 5px;
+  border-radius: 4px;
+}
 .file-button {
   position: relative;
   overflow: hidden;
@@ -621,42 +643,153 @@ useRefresh(refresh);
   opacity: 0;
   cursor: pointer;
 }
+.asset-panel {
+  display: flex;
+  flex-direction: column;
+}
+.asset-panel .table-scroll {
+  height: 380px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
 .source-panel {
-  margin-top: 14px;
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
 }
-.source-create {
-  display: grid;
-  grid-template-columns: minmax(180px, 0.5fr) minmax(280px, 1.5fr) auto;
-  align-items: end;
-  gap: 10px;
+.source-panel .table-scroll {
+  height: 240px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.table-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-table-header);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.table-scroll .empty {
+  height: calc(100% - 34px);
+  min-height: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.source-create-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--surface-soft);
   border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
 }
-.source-create label {
-  display: grid;
-  gap: 5px;
+@media (max-width: 900px) {
+  .header-btn,
+  .source-btn,
+  .source-input-group input {
+    min-height: 44px;
+    height: 44px;
+  }
+  .compact .button,
+  .compact .icon-button {
+    min-height: 44px;
+    height: 44px;
+  }
+  .compact .icon-button {
+    width: 44px;
+    min-width: 44px;
+  }
 }
-.source-create label span {
+.source-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 1 220px;
+}
+.source-input-group.url-group {
+  flex: 1 1 320px;
+}
+.field-label {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.source-input-group input {
+  height: 30px;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 12.5px;
+  border-radius: 4px;
+  border: 1px solid var(--line);
+  background: var(--color-surface);
+  width: 100%;
+}
+.source-btn {
+  height: 30px;
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-radius: 4px;
+}
+.data-table th {
+  height: 32px;
+  padding: 4px 10px;
+}
+.data-table td {
+  min-height: 34px;
+  padding: 5px 10px;
+  vertical-align: middle;
+}
+.data-table .badge {
+  min-height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 20px;
 }
 .compact {
-  gap: 5px;
+  gap: 4px;
   flex-wrap: nowrap;
+}
+.compact .button {
+  min-height: 24px;
+  height: 24px;
+  padding: 0 7px;
+  font-size: 11.5px;
+  font-weight: 550;
+  gap: 4px;
+  border-radius: 4px;
+}
+.compact .icon-button {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border-radius: 4px;
 }
 .danger-icon {
   color: var(--danger);
 }
 .check-col {
-  width: 36px;
-  padding: 0 8px;
+  width: 32px;
+  padding: 0 6px;
+  text-align: center;
 }
 .selected-row td {
-  background: #f0f9f6;
+  background: var(--color-selection);
 }
 .metadata-row td {
-  padding: 10px 14px 12px;
-  background: #f8faf9;
+  padding: 8px 12px;
+  background: var(--surface-soft);
   border-top: 1px solid var(--line);
 }
 .metadata-list {
@@ -700,8 +833,13 @@ useRefresh(refresh);
   }
 }
 @media (max-width: 760px) {
-  .source-create {
-    grid-template-columns: 1fr;
+  .source-create-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .source-input-group,
+  .source-input-group.url-group {
+    flex: 1 1 auto;
   }
 }
 </style>

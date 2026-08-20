@@ -19,7 +19,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: api
-          image: scenara-api:0.3.0-dev.23
+          image: scenara-api:0.3.0-dev.24
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

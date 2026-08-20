@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 import os
 from pathlib import Path
 
@@ -142,6 +143,29 @@ async def test_webhook_failure_preserves_transport_error() -> None:
             max_attempts=1,
             transport=httpx.MockTransport(fail),
         )
+
+
+@pytest.mark.asyncio
+async def test_webhook_uses_the_platform_event_envelope() -> None:
+    received: dict[str, object] = {}
+
+    def capture(request: httpx.Request) -> httpx.Response:
+        received.update(json.loads(request.content))
+        return httpx.Response(204)
+
+    endpoint = WebhookEndpoint("hook", "https://1.1.1.1/events", "secret", frozenset({"run.completed"}))
+    await WebhookDeliveryService().deliver(
+        endpoint,
+        "evt-1",
+        "run.completed",
+        {"tenant_id": "tenant-a", "project_id": "project-a", "request_id": "req-1", "trace_id": "trace-1"},
+        transport=httpx.MockTransport(capture),
+    )
+    assert received["event_version"] == "1.0"
+    assert received["producer"] == "scenara"
+    assert received["tenant_id"] == "tenant-a"
+    assert received["project_id"] == "project-a"
+    assert str(received["occurred_at"]).endswith("Z")
 
 
 def test_pipeline_lifecycle_is_strict() -> None:

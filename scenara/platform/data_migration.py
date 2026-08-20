@@ -275,7 +275,12 @@ async def _all_versions(state: StateStore, tenant_id: str, project_id: str, data
         offset += len(page)
 
 
-def _iso(timestamp: float) -> str:
+def _iso(timestamp: float | str) -> str:
+    if isinstance(timestamp, str):
+        parsed = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            raise ValueError("migration timestamps must include a timezone")
+        return parsed.astimezone(UTC).isoformat().replace("+00:00", "Z")
     return datetime.fromtimestamp(timestamp, UTC).isoformat().replace("+00:00", "Z")
 
 

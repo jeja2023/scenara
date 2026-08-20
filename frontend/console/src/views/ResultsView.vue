@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import {
-  ArrowRight,
+  ExternalLink,
+  Eye,
   FileSearch,
   FileText,
-  Filter,
+  Play,
+  Plus,
+  RotateCcw,
   Search,
   UserRound,
   Video,
@@ -41,6 +44,9 @@ const mediaKind = ref<MediaKind | "">("");
 const total = ref(0);
 const unitTotal = ref(0);
 const selectedUnit = ref<MediaUnitResult | null>(null);
+
+const detailDialog = ref<HTMLDialogElement | null>(null);
+const isDetailOpen = ref(false);
 
 const selectedPayload = computed(() => result.value?.domain_payload ?? null);
 const ocrText = computed(() =>
@@ -120,9 +126,16 @@ async function refresh(): Promise<void> {
     const requestedItem = requestedRun
       ? items.value.find((item) => item.run_id === requestedRun)
       : null;
-    if (requestedItem) await openResult(requestedItem, requestedUnit);
-    else if (!selected.value && items.value[0])
+    if (requestedItem) {
+      const detailIsAlreadyOpen =
+        isDetailOpen.value &&
+        selected.value?.result_id === requestedItem.result_id;
+      if (!detailIsAlreadyOpen) {
+        await showDetail(requestedItem, requestedUnit);
+      }
+    } else if (!selected.value && items.value[0]) {
       await openResult(items.value[0]);
+    }
     if (!items.value.length) {
       result.value = null;
       selectedUnit.value = null;
@@ -140,7 +153,7 @@ async function openResult(item: ResultSummary, unitId = ""): Promise<void> {
   error.value = "";
   try {
     const page = await api<{ result: ResultEnvelope; unit_total: number }>(
-      `/api/v1/runs/${encodeURIComponent(item.run_id)}/result?unit_limit=50`,
+      `/api/v1/runs/${encodeURIComponent(item.run_id)}/result?unit_limit=1000`,
     );
     result.value = page.result;
     unitTotal.value = page.unit_total;
@@ -153,6 +166,35 @@ async function openResult(item: ResultSummary, unitId = ""): Promise<void> {
     error.value = userFacingError(caught, "结果详情加载失败，请稍后重试");
   } finally {
     detailLoading.value = false;
+  }
+}
+
+async function showDetail(item: ResultSummary, unitId = ""): Promise<void> {
+  isDetailOpen.value = true;
+  await openResult(item, unitId);
+  if (detailDialog.value && !detailDialog.value.open) {
+    detailDialog.value.showModal();
+  }
+}
+
+function closeDetail(): void {
+  isDetailOpen.value = false;
+  detailDialog.value?.close();
+}
+
+function onDialogClosed(): void {
+  isDetailOpen.value = false;
+  if (route.query.run || route.query.unit) {
+    const query = { ...route.query };
+    delete query.run;
+    delete query.unit;
+    void router.replace({ query });
+  }
+}
+
+function handleBackdropClick(event: MouseEvent): void {
+  if (event.target === detailDialog.value) {
+    closeDetail();
   }
 }
 
@@ -173,14 +215,6 @@ useRefresh(refresh);
 
 <template>
   <section class="page results-page">
-    <div class="page-header results-header">
-      <div class="toolbar">
-        <button class="button primary" @click="router.push('/parse')">
-          <FileSearch :size="16" />新建解析
-        </button>
-      </div>
-    </div>
-
     <div class="stats result-stats">
       <div class="stat teal">
         <span>结果总数</span><strong>{{ total }}</strong
@@ -214,7 +248,7 @@ useRefresh(refresh);
     <section class="panel result-filter-panel">
       <div class="panel-body result-filters">
         <div class="search-field result-search">
-          <Search :size="16" />
+          <Search :size="15" />
           <input
             v-model.trim="query"
             type="search"
@@ -239,90 +273,156 @@ useRefresh(refresh);
           <option value="document">文档</option>
           <option value="stream">视频流</option>
         </select>
-        <button class="button secondary" @click="clearFilters">
-          <Filter :size="15" />重置
+        <button class="button secondary filter-btn" @click="clearFilters">
+          <RotateCcw :size="13" />重置
+        </button>
+        <button
+          class="button primary filter-btn action-btn"
+          @click="router.push('/parse')"
+        >
+          <Plus :size="14" />新建解析
         </button>
       </div>
     </section>
 
     <p v-if="error" class="callout error">{{ error }}</p>
 
-    <div class="results-browser-layout">
-      <section class="panel result-list-panel">
-        <div class="panel-header">
-          <div>
-            <h2>结果列表</h2>
-            <p>{{ total }} 条结果</p>
-          </div>
-          <span class="badge">按最新解析排序</span>
+    <section class="panel result-table-panel">
+      <div class="panel-header">
+        <div class="list-header-left">
+          <h2>解析结果列表</h2>
+          <span class="badge">{{ total }} 条记录</span>
         </div>
-        <div v-if="items.length" class="result-list">
-          <button
-            v-for="item in items"
-            :key="item.result_id"
-            class="result-list-item"
-            :class="{ selected: selected?.result_id === item.result_id }"
-            @click="openResult(item)"
-          >
-            <span class="result-list-icon"
-              ><component :is="resultIcon(item)" :size="18"
-            /></span>
-            <span class="result-list-main">
-              <strong>{{ resultTitle(item) }}</strong>
-              <small
-                >{{ labelDomain(item.domain) }} ·
-                {{ labelMediaKind(item.media_kind || "") }} ·
-                {{ formatDate(item.created_at) }}</small
-              >
-              <span class="result-list-meta">
-                <span>{{
-                  item.domain === "ocr"
-                    ? `${formatBytesCount(item.ocr_block_count)} 个文本块`
-                    : `${formatBytesCount(item.person_count)} 个人员`
+        <span class="badge muted-badge">按最新解析排序</span>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 50px">序号</th>
+              <th>标识 / 资源名称</th>
+              <th>领域</th>
+              <th>资产类型</th>
+              <th>解析成果概况</th>
+              <th>状态</th>
+              <th>解析时间</th>
+              <th style="text-align: right; width: 140px">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(item, index) in items"
+              :key="item.result_id"
+              :class="{
+                selected:
+                  selected?.result_id === item.result_id && isDetailOpen,
+              }"
+            >
+              <td class="muted">{{ index + 1 }}</td>
+              <td>
+                <div class="result-title-cell">
+                  <component
+                    :is="resultIcon(item)"
+                    :size="15"
+                    class="cell-icon"
+                  />
+                  <strong class="title-text" :title="resultTitle(item)">{{
+                    resultTitle(item)
+                  }}</strong>
+                </div>
+              </td>
+              <td>
+                <span class="badge">{{ labelDomain(item.domain) }}</span>
+              </td>
+              <td>
+                <span class="badge">{{
+                  labelMediaKind(item.media_kind || "")
                 }}</span>
-                <span
-                  >{{ item.unit_count }}
-                  {{ item.media_kind === "document" ? "页" : "个单元" }}</span
-                >
-                <span v-if="item.warning_count" class="warning-text"
-                  >{{ item.warning_count }} 个告警</span
-                >
-              </span>
-            </span>
-            <ArrowRight :size="16" class="result-list-arrow" />
-          </button>
-        </div>
-        <div v-else class="empty result-list-empty">
-          <FileSearch :size="28" />
+              </td>
+              <td>
+                <span class="summary-text">
+                  {{
+                    item.domain === "ocr"
+                      ? `${formatBytesCount(item.ocr_block_count)} 个文本块 · ${item.unit_count} ${item.media_kind === "document" ? "页" : "单元"}`
+                      : `${formatBytesCount(item.person_count)} 个人员 · ${item.unit_count} 单元`
+                  }}
+                </span>
+              </td>
+              <td>
+                <span v-if="item.warning_count" class="badge warning">
+                  {{ item.warning_count }} 个告警
+                </span>
+                <span v-else-if="item.status === 'failed'" class="badge danger">
+                  失败
+                </span>
+                <span v-else class="badge green">已完成</span>
+              </td>
+              <td class="muted time-cell">{{ formatDate(item.created_at) }}</td>
+              <td>
+                <div class="toolbar compact table-actions">
+                  <button
+                    class="button secondary compact-btn detail-btn"
+                    title="查看详情"
+                    aria-label="查看详情"
+                    @click="showDetail(item)"
+                  >
+                    <Eye :size="12" />详情
+                  </button>
+                  <button
+                    class="button secondary compact-btn"
+                    title="回到解析工作台"
+                    aria-label="回到解析工作台"
+                    @click="openWorkspace(item)"
+                  >
+                    <Play :size="12" />处理
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="!items.length" class="empty result-list-empty">
+          <FileSearch :size="32" />
           <strong>还没有匹配的解析结果</strong>
           <span>完成一次解析后，结果会自动出现在这里。</span>
           <button class="button primary" @click="router.push('/parse')">
             开始解析
           </button>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <aside class="result-detail-panel">
-        <section v-if="selected" class="panel result-detail-card">
-          <div class="panel-header">
-            <div>
-              <span class="eyebrow">结果详情</span>
-              <h2>{{ resultTitle(selected) }}</h2>
-              <p>{{ resultDescription }}</p>
-            </div>
-            <button
-              class="icon-button"
-              title="关闭详情"
-              aria-label="关闭详情"
-              @click="
-                selected = null;
-                result = null;
-              "
-            >
-              <X :size="17" />
-            </button>
+    <!-- 详情右侧抽屉 / 弹窗 -->
+    <dialog
+      ref="detailDialog"
+      class="modal result-detail-drawer"
+      @close="onDialogClosed"
+      @click="handleBackdropClick"
+    >
+      <div class="drawer-content" @click.stop>
+        <div class="drawer-header">
+          <div class="detail-header-info">
+            <span class="eyebrow">解析结果详情</span>
+            <h3>{{ selected ? resultTitle(selected) : "" }}</h3>
+            <p v-if="selected" class="detail-description">
+              {{ resultDescription }}
+            </p>
           </div>
-          <div class="panel-body">
+          <button
+            class="icon-button close-btn"
+            title="关闭详情"
+            aria-label="关闭详情"
+            @click="closeDetail"
+          >
+            <X :size="16" />
+          </button>
+        </div>
+
+        <div class="drawer-body">
+          <div v-if="detailLoading" class="empty detail-loading">
+            正在加载结果详情...
+          </div>
+          <template v-else-if="selected">
             <div class="detail-summary-grid">
               <div>
                 <span>领域</span
@@ -342,12 +442,16 @@ useRefresh(refresh);
                 <span>对象数量</span><strong>{{ objectCount }}</strong>
               </div>
             </div>
+
             <div class="detail-actions">
-              <button class="button secondary" @click="openWorkspace(selected)">
-                回到解析工作台
+              <button
+                class="button secondary compact-btn"
+                @click="openWorkspace(selected)"
+              >
+                <ExternalLink :size="13" />回到解析工作台
               </button>
               <button
-                class="button primary"
+                class="button primary compact-btn"
                 @click="
                   router.push({
                     path: '/parse',
@@ -355,13 +459,11 @@ useRefresh(refresh);
                   })
                 "
               >
-                继续处理
+                <Play :size="13" />继续处理
               </button>
             </div>
-            <div v-if="detailLoading" class="empty detail-loading">
-              正在加载结果详情
-            </div>
-            <template v-else-if="result">
+
+            <template v-if="result">
               <textarea
                 v-if="selected.domain === 'ocr'"
                 class="result-text-preview"
@@ -373,7 +475,7 @@ useRefresh(refresh);
                 v-if="selected.domain === 'portrait'"
                 class="result-domain-note"
               >
-                <UserRound :size="17" />
+                <UserRound :size="16" />
                 <span
                   >已识别 {{ selected.person_count }} 个人员、{{
                     selected.face_count
@@ -388,36 +490,36 @@ useRefresh(refresh);
               />
               <div class="result-unit-list">
                 <div class="result-unit-header">
-                  <strong>解析单元</strong
-                  ><span>{{ result.units.length }}</span>
+                  <strong>解析单元（点击切换对应帧/页特征图）</strong
+                  ><span class="badge">{{ result.units.length }}</span>
                 </div>
-                <button
-                  v-for="unit in result.units.slice(0, 8)"
-                  :key="unit.unit_id"
-                  :class="{ selected: selectedUnit?.unit_id === unit.unit_id }"
-                  @click="selectedUnit = unit"
-                >
-                  <span>{{
-                    unit.page_number
-                      ? `第 ${unit.page_number} 页`
-                      : formatUnitPosition(unit)
-                  }}</span>
-                  <small
-                    >{{ labelUnitType(unit.unit_type) }} ·
-                    {{ unit.objects.length }} 个对象</small
+                <div class="unit-button-group">
+                  <button
+                    v-for="unit in result.units"
+                    :key="unit.unit_id"
+                    class="unit-button"
+                    :class="{
+                      selected: selectedUnit?.unit_id === unit.unit_id,
+                    }"
+                    @click="selectedUnit = unit"
                   >
-                </button>
+                    <span>{{
+                      unit.page_number
+                        ? `第 ${unit.page_number} 页`
+                        : formatUnitPosition(unit)
+                    }}</span>
+                    <small
+                      >{{ labelUnitType(unit.unit_type) }} ·
+                      {{ unit.objects.length }} 个对象</small
+                    >
+                  </button>
+                </div>
               </div>
             </template>
-          </div>
-        </section>
-        <section v-else class="panel result-detail-card empty-detail">
-          <FileSearch :size="32" />
-          <strong>选择一条结果</strong>
-          <span>在左侧列表选择结果，查看文本、对象和来源信息。</span>
-        </section>
-      </aside>
-    </div>
+          </template>
+        </div>
+      </div>
+    </dialog>
   </section>
 </template>
 
@@ -425,17 +527,14 @@ useRefresh(refresh);
 .results-page {
   max-width: 1500px;
 }
-.results-header {
-  align-items: flex-end;
+.result-stats {
+  margin-bottom: 14px;
 }
-.eyebrow {
-  display: block;
-  margin-bottom: 5px;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.result-filter-panel {
+  margin-bottom: 16px;
+}
+.result-filter-panel .panel-body {
+  padding: 10px 16px;
 }
 .result-filters {
   display: flex;
@@ -444,182 +543,368 @@ useRefresh(refresh);
   flex-wrap: wrap;
 }
 .result-search {
-  flex: 1 1 320px;
+  flex: 1 1 280px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 0 10px;
+  height: 34px;
+}
+.result-search svg {
+  color: var(--muted);
+  flex-shrink: 0;
 }
 .result-search input {
   min-width: 0;
   width: 100%;
+  border: 0;
+  padding: 0;
+  height: 100%;
+  min-height: 0;
+  background: transparent;
+  font-size: 13px;
 }
-.results-browser-layout {
-  display: grid;
-  grid-template-columns: minmax(360px, 0.85fr) minmax(480px, 1.15fr);
-  gap: 16px;
-  align-items: start;
+.result-search input:focus {
+  outline: none;
+  box-shadow: none;
 }
-.result-list-panel,
-.result-detail-card {
-  min-height: 560px;
+.result-filters select {
+  width: 150px;
+  min-width: 120px;
+  height: 34px;
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background-color: var(--color-surface);
 }
-.result-list {
+.filter-btn {
+  height: 34px;
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  gap: 5px;
+  white-space: nowrap;
+}
+.action-btn {
+  margin-left: auto;
+}
+.result-table-panel {
   display: flex;
   flex-direction: column;
 }
-.result-list-item {
+.result-table-panel .table-scroll {
+  height: 480px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.table-scroll thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-table-header);
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+.list-header-left {
   display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  width: 100%;
-  padding: 15px 18px;
-  border: 0;
-  border-top: 1px solid var(--line);
-  background: transparent;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
+  align-items: center;
+  gap: 10px;
 }
-.result-list-item:hover,
-.result-list-item.selected {
-  background: var(--surface-soft);
+.list-header-left h2 {
+  margin: 0;
+  font-size: 14px;
 }
-.result-list-icon {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  background: var(--accent-soft);
-  color: var(--accent-strong);
-  flex: 0 0 auto;
+.muted-badge {
+  color: var(--muted);
+  font-size: 11px;
 }
-.result-list-main {
-  min-width: 0;
-  flex: 1;
-  display: grid;
-  gap: 4px;
+.data-table th {
+  height: 32px;
+  padding: 4px 10px;
+  font-size: 12px;
 }
-.result-list-main strong {
+.data-table td {
+  min-height: 34px;
+  padding: 5px 10px;
+  vertical-align: middle;
+}
+.data-table tbody tr.selected td {
+  background: var(--color-selection);
+}
+.data-table .badge {
+  min-height: 20px;
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 20px;
+}
+.result-title-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 320px;
+}
+.cell-icon {
+  color: var(--teal);
+  flex-shrink: 0;
+}
+.title-text {
+  font-size: 13px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.result-list-main small {
-  color: var(--text-muted);
-}
-.result-list-meta {
-  display: flex;
-  gap: 12px;
-  color: var(--text-muted);
+.summary-text {
   font-size: 12px;
-  flex-wrap: wrap;
-}
-.warning-text {
-  color: var(--warning);
-}
-.result-list-arrow {
-  margin-top: 9px;
   color: var(--text-muted);
 }
-.result-list-empty,
-.empty-detail {
-  min-height: 480px;
-  display: grid;
-  place-items: center;
-  align-content: center;
+.time-cell {
+  font-size: 12px;
+  white-space: nowrap;
+}
+.table-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+.table-actions .compact-btn {
+  height: 24px;
+  min-height: 24px;
+  padding: 0 7px;
+  font-size: 11.5px;
+  font-weight: 550;
+  gap: 4px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+@media (max-width: 900px) {
+  .filter-btn,
+  .table-actions .compact-btn,
+  .close-btn {
+    min-height: 44px;
+    height: 44px;
+  }
+  .close-btn {
+    width: 44px;
+    min-width: 44px;
+  }
+  .table-actions .compact-btn {
+    padding-inline: 10px;
+  }
+}
+.result-list-empty {
+  height: calc(100% - 34px);
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 10px;
   padding: 36px;
   text-align: center;
 }
-.result-list-empty svg,
-.empty-detail svg {
+.result-list-empty svg {
   color: var(--accent-strong);
 }
-.result-detail-card {
-  position: sticky;
-  top: 78px;
+
+/* Drawer Dialog Styles */
+.result-detail-drawer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(680px, 100vw);
+  max-width: 100vw;
+  height: 100vh;
+  max-height: 100vh;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: var(--color-surface);
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+}
+.result-detail-drawer::backdrop {
+  background: rgba(17, 26, 24, 0.4);
+  backdrop-filter: blur(2px);
+}
+.result-detail-drawer:not([open]) {
+  display: none;
+}
+.drawer-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  background: var(--color-surface);
+}
+.detail-header-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.eyebrow {
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.drawer-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 540px;
+}
+.detail-description {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.close-btn {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: 4px;
+  padding: 0;
+}
+.drawer-body {
+  padding: 18px 20px;
+  overflow-y: auto;
+  flex: 1;
+  scrollbar-width: thin;
 }
 .detail-summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
-  margin-bottom: 16px;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 .detail-summary-grid div {
   display: grid;
-  gap: 4px;
-  padding: 11px;
+  gap: 2px;
+  padding: 8px 10px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 6px;
   background: var(--surface-soft);
 }
 .detail-summary-grid span {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 11px;
+}
+.detail-summary-grid strong {
+  font-size: 13.5px;
 }
 .detail-actions {
   display: flex;
   gap: 8px;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
   flex-wrap: wrap;
 }
 .result-text-preview {
   width: 100%;
-  min-height: 150px;
+  min-height: 120px;
+  max-height: 220px;
   resize: vertical;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-family: var(--font-mono, monospace);
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface-soft);
 }
 .result-domain-note {
   display: flex;
-  gap: 9px;
+  gap: 8px;
   align-items: flex-start;
-  padding: 12px;
+  padding: 10px 12px;
   border: 1px solid var(--line);
-  border-radius: 7px;
+  border-radius: 6px;
   background: var(--surface-soft);
   color: var(--text-muted);
-  margin-bottom: 14px;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+.result-domain-note svg {
+  color: var(--teal);
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 .result-unit-list {
   border-top: 1px solid var(--line);
-  margin-top: 16px;
-  padding-top: 12px;
+  margin-top: 14px;
+  padding-top: 10px;
   display: grid;
   gap: 6px;
 }
 .result-unit-header {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   color: var(--text-muted);
   font-size: 12px;
+  margin-bottom: 2px;
 }
-.result-unit-list button {
+.unit-button-group {
+  display: grid;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding-right: 2px;
+}
+.unit-button {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 12px;
   border: 1px solid transparent;
-  border-radius: 6px;
-  padding: 8px 10px;
+  border-radius: 5px;
+  padding: 6px 10px;
   color: inherit;
   background: transparent;
   text-align: left;
   cursor: pointer;
+  font-size: 12px;
+  transition: all 120ms ease;
 }
-.result-unit-list button:hover,
-.result-unit-list button.selected {
+.unit-button:hover,
+.unit-button.selected {
   border-color: var(--line-strong);
   background: var(--surface-soft);
 }
-.result-unit-list small {
+.unit-button small {
   color: var(--text-muted);
+  font-size: 11px;
 }
 .detail-loading {
-  min-height: 160px;
+  min-height: 140px;
 }
 @media (max-width: 980px) {
-  .results-browser-layout {
-    grid-template-columns: 1fr;
-  }
-  .result-detail-card {
-    position: static;
+  .action-btn {
+    margin-left: 0;
   }
 }
 @media (max-width: 620px) {

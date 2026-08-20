@@ -1013,6 +1013,11 @@ class PostgresStateStore:
         created_at: float,
     ) -> None:
         from psycopg.types.json import Jsonb
+        envelope_payload = dict(payload)
+        envelope_payload.setdefault("tenant_id", tenant_id)
+        envelope_payload.setdefault("project_id", project_id)
+        envelope_payload.setdefault("producer", "scenara")
+        envelope_payload.setdefault("event_version", "1.0")
 
         async with self._pool.connection() as conn, conn.transaction():
             cursor = await conn.execute(
@@ -1030,7 +1035,7 @@ class PostgresStateStore:
                     endpoint_id=endpoint.endpoint_id,
                     event_id=event_id,
                     event_type=event_type,
-                    payload=payload,
+                    payload=envelope_payload,
                     next_attempt_at=created_at,
                     created_at=created_at,
                     updated_at=created_at,

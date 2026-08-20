@@ -622,6 +622,11 @@ class MemoryStateStore:
         payload: dict[str, object],
         created_at: float,
     ) -> None:
+        envelope_payload = dict(payload)
+        envelope_payload.setdefault("tenant_id", tenant_id)
+        envelope_payload.setdefault("project_id", project_id)
+        envelope_payload.setdefault("producer", "scenara")
+        envelope_payload.setdefault("event_version", "1.0")
         for endpoint in self._webhook_subscriptions.values():
             if (
                 endpoint.tenant_id == tenant_id
@@ -636,7 +641,7 @@ class MemoryStateStore:
                     endpoint_id=endpoint.endpoint_id,
                     event_id=event_id,
                     event_type=event_type,
-                    payload=payload,
+                    payload=envelope_payload,
                     next_attempt_at=created_at,
                     created_at=created_at,
                     updated_at=created_at,

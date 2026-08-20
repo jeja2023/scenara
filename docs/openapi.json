@@ -13102,6 +13102,17 @@
             "title": "Project Id",
             "type": "string"
           },
+          "request_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Request Id"
+          },
           "revision": {
             "default": 1,
             "minimum": 1.0,
@@ -13175,6 +13186,17 @@
               }
             ],
             "title": "Termination Reason"
+          },
+          "trace_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trace Id"
           },
           "updated_at": {
             "title": "Updated At",
@@ -15093,7 +15115,7 @@
   "info": {
     "description": "Scenara 景枢视觉 AI 中枢平台",
     "title": "Scenara API",
-    "version": "0.3.0.dev23"
+    "version": "0.3.0.dev24"
   },
   "openapi": "3.1.0",
   "paths": {

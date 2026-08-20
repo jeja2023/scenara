@@ -7,24 +7,33 @@ import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar, Token
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import Request
+from scenara.platform.log_context import (
+    current_request_id as _current_request_id,
+    current_tenant_id as _current_tenant_id,
+    current_traceparent as _current_traceparent,
+    reset_log_context as _reset_log_context,
+    set_log_context as _set_log_context,
+)
 
 
 class JsonLogFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
-        payload = {
-            "level": record.levelname,
-            "logger": record.name,
-            "message": record.getMessage(),
-            "created_at": record.created,
-        }
-        request_id = current_request_id()
-        tenant_id = current_tenant_id()
         traceparent = current_traceparent()
-        if request_id:
-            payload["request_id"] = request_id
+        trace_id = traceparent.split("-")[1] if traceparent and len(traceparent.split("-")) == 4 else None
+        payload = {
+            "timestamp": datetime.fromtimestamp(record.created, timezone.utc).isoformat().replace("+00:00", "Z"),
+            "level": record.levelname,
+            "service": "scenara",
+            "module": record.name,
+            "request_id": current_request_id(),
+            "trace_id": trace_id,
+            "message": record.getMessage(),
+        }
+        tenant_id = current_tenant_id()
         if tenant_id:
             payload["tenant_id"] = tenant_id
         if traceparent:
@@ -85,11 +94,11 @@ def traceparent_from_headers(request: Request) -> str | None:
 
 
 def current_request_id() -> str | None:
-    return REQUEST_ID_CONTEXT.get()
+    return _current_request_id()
 
 
 def current_tenant_id() -> str | None:
-    return TENANT_ID_CONTEXT.get()
+    return _current_tenant_id()
 
 
 def current_scheduling_scope() -> str | None:
@@ -97,7 +106,7 @@ def current_scheduling_scope() -> str | None:
 
 
 def current_traceparent() -> str | None:
-    return TRACEPARENT_CONTEXT.get()
+    return _current_traceparent()
 
 
 def set_log_context(
@@ -106,18 +115,11 @@ def set_log_context(
     tenant_id: str | None = None,
     traceparent: str | None = None,
 ) -> tuple[Token[str | None], Token[str | None], Token[str | None]]:
-    return (
-        REQUEST_ID_CONTEXT.set(request_id),
-        TENANT_ID_CONTEXT.set(tenant_id),
-        TRACEPARENT_CONTEXT.set(traceparent),
-    )
+    return _set_log_context(request_id=request_id, tenant_id=tenant_id, traceparent=traceparent)
 
 
 def reset_log_context(tokens: tuple[Token[str | None], Token[str | None], Token[str | None]]) -> None:
-    request_token, tenant_token, trace_token = tokens
-    REQUEST_ID_CONTEXT.reset(request_token)
-    TENANT_ID_CONTEXT.reset(tenant_token)
-    TRACEPARENT_CONTEXT.reset(trace_token)
+    _reset_log_context(tokens)
 
 
 def log_json(level: int, event: str, **fields: Any) -> None:

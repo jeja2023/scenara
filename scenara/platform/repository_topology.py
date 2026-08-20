@@ -89,7 +89,7 @@ def build_repository_topology() -> RepositoryTopology:
                 repository_id="scenara-data",
                 name="Scenara Data",
                 kind=RepositoryKind.SPECIALIZED_PRODUCT,
-                lifecycle=RepositoryLifecycle.PLANNED,
+                lifecycle=RepositoryLifecycle.EXTERNAL_EXISTING,
                 primary_product_ids=["data"],
                 integration_product_ids=["model", "console", "api", "sdk"],
                 responsibilities=[
@@ -104,8 +104,8 @@ def build_repository_topology() -> RepositoryTopology:
                     "shared_iam_authorization_and_audit",
                 ],
                 next_gate=(
-                    "Create the repository only after datasets, versions, lineage, authorization, and export "
-                    "have stable ownership and contracts."
+                    "Complete data migration shadow verification, immutable dataset version digests, and "
+                    "cutover evidence before accepting production traffic."
                 ),
             ),
         ],

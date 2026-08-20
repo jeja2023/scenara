@@ -54,7 +54,7 @@ x-scenara-enterprise-secrets: &scenara-enterprise-secrets
   - scenara_enterprise_license
   - scenara_enterprise_public_key
 
-x-scenara-image: &scenara-image scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.23}
+x-scenara-image: &scenara-image scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.24}
 
 services:
   postgres:

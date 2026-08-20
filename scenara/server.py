@@ -19,6 +19,13 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Stre
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.staticfiles import StaticFiles
 
+from scenara.platform.log_context import (
+    new_traceparent,
+    normalize_request_id,
+    reset_log_context,
+    set_log_context,
+    traceparent_from_headers,
+)
 from scenara import __version__
 from scenara.api.routers.audit import build_audit_router
 from scenara.bootstrap import Runtime, build_runtime
@@ -150,6 +157,7 @@ from scenara.platform.control_plane import (
     WorkerLease,
 )
 from scenara.platform.data_platform import DataPlatformRemoteError
+from scenara.platform.error_codes import registered_error_code
 from scenara.platform.data_events import DataEventEnvelope
 from scenara.platform.dataset import DatasetConflict, DatasetNotFound
 from scenara.platform.features import FeatureStoreError
@@ -323,6 +331,12 @@ async def principal_context(
 ) -> PrincipalContext:
     runtime: Runtime = request.app.state.runtime
     settings = runtime.settings
+
+    def bind_context(context: PrincipalContext) -> PrincipalContext:
+        request_id = _request_id(request)
+        traceparent = getattr(request.state, "traceparent", None)
+        return context.model_copy(update={"request_id": request_id, "traceparent": traceparent})
+
     if settings.auth_required or authorization:
         expected = f"Bearer {settings.api_token}"
         if not authorization:
@@ -337,13 +351,13 @@ async def principal_context(
             principal_id = "api-token"
             if not all(CONTEXT_ID.fullmatch(value) for value in (tenant_id, project_id, principal_id)):
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid context identifier")
-            return PrincipalContext(
+            return bind_context(PrincipalContext(
                 tenant_id=tenant_id,
                 project_id=project_id,
                 principal_id=principal_id,
                 request_id=_request_id(request),
-                traceparent=request.headers.get("traceparent"),
-            )
+                traceparent=getattr(request.state, "traceparent", None),
+            ))
         scheme, _, token = authorization.partition(" ")
         if scheme.lower() != "bearer" or not token:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid bearer token")
@@ -362,9 +376,7 @@ async def principal_context(
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="session tenant mismatch")
             if x_project_id and x_project_id != session_context.project_id:
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="session project mismatch")
-            return session_context.model_copy(
-                update={"request_id": _request_id(request), "traceparent": request.headers.get("traceparent")}
-            )
+            return bind_context(session_context)
         if x_principal_id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="principal identity is credential-derived"
@@ -373,21 +385,19 @@ async def principal_context(
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="credential tenant mismatch")
         if x_project_id and x_project_id != credential.project_id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="credential project mismatch")
-        return credential.model_copy(
-            update={"request_id": _request_id(request), "traceparent": request.headers.get("traceparent")}
-        )
+        return bind_context(credential)
     tenant_id = x_tenant_id or settings.default_tenant_id
     project_id = x_project_id or settings.default_project_id
     principal_id = x_principal_id or ("api-token" if settings.auth_required else "anonymous")
     if not all(CONTEXT_ID.fullmatch(value) for value in (tenant_id, project_id, principal_id)):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="invalid context identifier")
-    return PrincipalContext(
+    return bind_context(PrincipalContext(
         tenant_id=tenant_id,
         project_id=project_id,
         principal_id=principal_id,
         request_id=_request_id(request),
-        traceparent=request.headers.get("traceparent"),
-    )
+        traceparent=getattr(request.state, "traceparent", None),
+    ))
 
 
 def create_app(settings: Settings | None = None, *, runtime: Runtime | None = None) -> FastAPI:
@@ -474,7 +484,16 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
 
     @app.middleware("http")
     async def request_context(request: Request, call_next: RequestResponseEndpoint) -> Response:
-        request.state.request_id = request.headers.get("X-Request-Id", f"req_{uuid4().hex}")[:128]
+        request.state.request_id = normalize_request_id(request.headers.get("X-Request-Id")) or f"req_{uuid4().hex}"
+        traceparent = traceparent_from_headers(request)
+        if traceparent is None:
+            traceparent = new_traceparent()
+        request.state.traceparent = traceparent
+        log_tokens = set_log_context(
+            request_id=request.state.request_id,
+            tenant_id=request.headers.get("X-Scenara-Tenant-Id") or request.headers.get("X-Tenant-Id"),
+            traceparent=traceparent,
+        )
         started = time.perf_counter()
         status_code = 500
         try:
@@ -489,6 +508,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
                 status_code,
                 time.perf_counter() - started,
             )
+            reset_log_context(log_tokens)
         response.headers["X-Request-Id"] = request.state.request_id
         return response
 
@@ -503,8 +523,10 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     ) -> JSONResponse:
         payload = ApiErrorEnvelope(
             request_id=_request_id(request),
-            error=ApiErrorDetail(code=code, message=message, details=details or {}),
+            error=ApiErrorDetail(code=registered_error_code(code), message=message, details=details or {}),
         )
+        if payload.error.code == "INTERNAL_SERVER_ERROR":
+            payload = payload.model_copy(update={"error": payload.error.model_copy(update={"message": "internal server error"})})
         return JSONResponse(status_code=status_code, content=payload.model_dump(mode="json"))
 
     def enterprise_service() -> EnterpriseService:

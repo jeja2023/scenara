@@ -388,6 +388,8 @@ class RunRecord(StrictModel):
     tenant_id: str
     project_id: str
     principal_id: str = "anonymous"
+    request_id: str | None = None
+    trace_id: str | None = None
     domain: DomainId
     pipeline: PipelineRef
     asset_id: str | None = None
@@ -413,6 +415,13 @@ class RunEvent(StrictModel):
     run_id: str
     event_id: int = Field(ge=1)
     event_type: str
+    event_version: str = "1.0"
+    occurred_at: str | None = None
+    producer: str = "scenara"
+    tenant_id: str | None = None
+    project_id: str | None = None
+    request_id: str | None = None
+    trace_id: str | None = None
     status: RunStatus
     payload: dict[str, Any] = Field(default_factory=dict)
     created_at: float

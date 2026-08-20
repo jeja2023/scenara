@@ -5,18 +5,18 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until reproducible objective evidence is committed.
 
-Current development version: `0.3.0-dev.23` (`0.3.0.dev23` for Python packages).
+Current development version: `0.3.0-dev.24` (`0.3.0.dev24` for Python packages).
 
 ## Release Gate Status
-The `0.3.0-dev.23` engineering baseline adds a code-quality and release-hardening pass on top of the `0.3.0-dev.22` boundary: performance and reliability fixes (stream wait backoff, deterministic S3 index batching, single-path media upload, deep-copy removal, spooled upload size reporting, idempotent result writing), security fixes (atomic quota checks), quality fixes (scheduler gaps, settings stripping, magic-number extraction), a Docker layer-order fix with a regression contract, `.dockerignore`/dependency hygiene, deployment tag convergence across Compose/Kubernetes, and CI deduplication (security tests run once, non-integration coverage gate). Console adds incremental parse loading, windowed timeline rendering, paginated audit browsing and modal dialogs.
+The `0.3.0-dev.24` engineering baseline adds contract and observability hardening on top of the `0.3.0-dev.23` boundary: versioned Run event envelopes for SSE and Webhooks, RFC3339 event timestamps, W3C request tracing, structured log fields, registered public error codes, stricter Data DTO mapping, migration timestamp normalization, frontend semantic color tokens, mobile touch-target corrections, and expanded contract regressions. The previous performance, reliability, Console and deployment convergence work remains part of the current baseline.
 Formal 1.0 release evidence remains fail-closed until the required evaluation,
 GPU capacity, offline-install, model-rights, integration, security, backup/restore,
-and software-license checks are rerun for `0.3.0-dev.23`. Historical `0.3.0-dev.21`
+and software-license checks are rerun for `0.3.0-dev.24`. Historical `0.3.0-dev.21`
 reports remain archived but are not reused as current-release evidence. This personal
 project does not require named approvers or legal/commercial sign-off records.
 
 ## Implementation Parity Matrix
-The `0.3.0-dev.23` baseline processes finite video and PDF inputs to EOF unless callers
+The `0.3.0-dev.24` baseline processes finite video and PDF inputs to EOF unless callers
 explicitly request a compatibility cap. Continuous streams are archived into linked Run
 segments under one Stream Session, while inference batches publish `result.delta` events
 and append-only Result shards. It also enforces enterprise policy in production, adds indexed and expiring Session
@@ -71,14 +71,14 @@ The `1.0` version must not be published while any box above is unchecked.
 
 ## Current local verification
 
-The optimization and release-hardening regression was executed on 2026-08-19; the Core boundary, version synchronization and Console regression checks were executed on 2026-08-16; earlier release-evidence, browser and decode checks below remain supporting implementation evidence only:
+The contract, observability, version and release-hardening regression was executed on 2026-08-20; the Core boundary, version synchronization and Console regression checks were executed on 2026-08-16; earlier release-evidence, browser and decode checks below remain supporting implementation evidence only:
 
 | Check | Result |
 |---|---|
-| Full Python baseline for `0.3.0-dev.23` | 247 passed, 12 skipped, 69.71% coverage (gate 60%); Ruff, compile checks and the `--implementation-only` release gate pass |
+| Full Python baseline for `0.3.0-dev.24` | 249 passed, 12 skipped; Ruff, Mypy, OpenAPI/SDK drift, repository contracts, and implementation/development gates pass |
 | Security contract suite | 62 passed, 0 skipped; CI runs it once (the coverage job ignores the six security regression files, measured at 65.01% without them) |
-| Console regression for `0.3.0-dev.23` | typecheck, lint, production build and 24 unit tests passed, including the windowed timeline and paginated audit coverage |
-| Compose/Kubernetes tag convergence | `docker compose config` and `kubectl kustomize` resolve every application service to `scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.23}` |
+| Console regression for `0.3.0-dev.24` | typecheck, production build and 24 unit tests passed; TypeScript SDK checks passed |
+| Compose/Kubernetes tag convergence | `docker compose config` and `kubectl kustomize` resolve every application service to `scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.24}` |
 | Core Data split regression | 20 focused tests passed for the remote client, compatibility states, migration artifact, production configuration and Hard Sample delivery; a preceding full Python baseline passed 242 tests with 12 skipped |
 | Console workspace regression | typecheck, 24 unit tests, production build and four-viewport Playwright checks passed; Data and Model routes expose distinct controlled theme accents without horizontal overflow |
 | `.venv\\Scripts\\python.exe -m pytest -q` | 217 passed, 9 integration tests skipped in 57.55s; includes two-video trajectory ReID and `/api/v1/parse/video` shortcut coverage |
@@ -88,7 +88,7 @@ The optimization and release-hardening regression was executed on 2026-08-19; th
 | Security contract suite | 61 passed, 0 skipped in 35.52s; SSRF, malicious media, authorization, credential redaction, audit fail-closed and biometric deletion covered |
 | `scripts/local_backup_restore_drill.ps1` | passed; PostgreSQL and MinIO plus nine business-entity classes restored; RPO 3.967s and RTO 5.358s |
 | `pnpm run check` plus Console lint/format checks | passed; 24 Console tests, typecheck, production build, warning-free ESLint, Prettier, and 2 TypeScript SDK contract tests |
-| `npm run console:e2e` | 48 passed across desktop Chrome and Pixel 7 viewports; login redirect, username/password login, all workspaces plus complete image/video/PDF/stream controls, governance workflows and cancellation tracking checked for page errors and horizontal overflow |
+| `npm run console:e2e` | 50 passed across desktop Chrome and mobile Chromium viewports; login, all workspaces, media controls, governance workflows, Chinese copy, ownership topology and horizontal overflow checked |
 | Ruff (including `app/` correctness rules), Mypy, OpenAPI/SDK drift, published repository-contract drift/compatibility, repository gate, implementation release gate | all passed |
 | `python -m pip_audit -r requirements/dev.txt` and `pnpm audit --audit-level high` | no known vulnerabilities in the committed dependency definitions |
 | Deployment script syntax | all `deploy/scripts/*.sh` files passed `bash -n` in a cached Linux container |

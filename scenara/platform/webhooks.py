@@ -5,6 +5,7 @@ import hashlib
 import hmac
 import json
 import time
+from datetime import UTC, datetime
 from dataclasses import dataclass
 from typing import Any
 
@@ -60,8 +61,21 @@ class WebhookDeliveryService:
         await validate_external_url(
             endpoint.url, allowed_schemes=frozenset({"https"}), allow_private=self._allow_private_targets
         )
+        occurred_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
         body = json.dumps(
-            {"event_id": event_id, "event_type": event_type, "data": payload},
+            {
+                "schema_version": "1.0",
+                "event_id": event_id,
+                "event_type": event_type,
+                "event_version": "1.0",
+                "occurred_at": occurred_at,
+                "producer": "scenara",
+                "tenant_id": str(payload.get("tenant_id") or "unknown"),
+                "project_id": str(payload.get("project_id") or "unknown"),
+                "request_id": str(payload.get("request_id") or event_id),
+                "trace_id": str(payload.get("trace_id") or event_id),
+                "data": payload,
+            },
             sort_keys=True,
             separators=(",", ":"),
         ).encode()

@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "f894bd6818d8f4d40e7b5f39bd57cb42411ff725c13a4e4922d57727fc44d097" /** gitleaks:allow - public contract digest */;
+export declare const OPENAPI_SHA256 = "7617245aad0f046ebb2ec992ab8efea910facd62261bdffa606945af1da41a14" /** gitleaks:allow - public contract digest */;
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
@@ -2359,6 +2359,7 @@ export declare namespace OpenApi {
         priority?: number;
         progress?: number;
         project_id: string;
+        request_id?: (string) | (null);
         revision?: number;
         run_id: string;
         source_id?: (string) | (null);
@@ -2368,6 +2369,7 @@ export declare namespace OpenApi {
         stream_session_id?: (string) | (null);
         tenant_id: string;
         termination_reason?: (string) | (null);
+        trace_id?: (string) | (null);
         updated_at: number;
     };
     type RunStatus = "queued" | "running" | "pausing" | "paused" | "completed" | "failed" | "cancelling" | "cancelled";

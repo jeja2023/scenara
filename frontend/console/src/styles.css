@@ -20,6 +20,9 @@
   --color-danger: #b34132;
   --color-info: #2264a6;
   --color-sidebar: #111a18;
+  --color-table-header: #f7f8f8;
+  --color-selection: #f0f9f6;
+  --color-overlay: rgba(17, 26, 24, 0.4);
   --font-sans: Inter, "Segoe UI", "Microsoft YaHei", sans-serif;
   --font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
   --space-1: 4px;

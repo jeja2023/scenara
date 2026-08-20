@@ -250,7 +250,7 @@ const repositorySummaryLabels: Record<string, string> = {
   "scenara-model":
     "现有独立仓库专注模型训练、实验、算力调度、评估与不可变模型制品。",
   "scenara-data":
-    "达到拆分门禁后，独立承载数据集、标注、质量、血缘、授权与导出。",
+    "现有独立仓库专注数据集目录与版本、标注审核、质量血缘、授权与难例数据闭环。",
 };
 
 const repositoryGateLabels: Record<string, string> = {
@@ -258,7 +258,7 @@ const repositoryGateLabels: Record<string, string> = {
   "scenara-model":
     "向平台发布带摘要、模型卡、许可信息和评估证据的不可变模型制品清单。",
   "scenara-data":
-    "数据集、版本、血缘、授权和导出形成稳定归属与契约后再创建独立仓库。",
+    "完成数据迁移影子读核验、不可变版本摘要及服务切流门禁后接入生产流量。",
 };
 
 const repositoryLifecycleLabels: Record<string, string> = {

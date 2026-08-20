@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import replace
 from io import BytesIO
 from pathlib import Path
@@ -230,6 +231,13 @@ async def test_run_event_stream_disables_proxy_buffering(client) -> None:
     assert events.headers["cache-control"] == "no-cache, no-transform"
     assert events.headers["x-accel-buffering"] == "no"
     assert "event: run.queued" in events.text
+    event_data = events.text.split("data: ", 1)[1].split("\n\n", 1)[0]
+    envelope = json.loads(event_data)
+    assert envelope["event_version"] == "1.0"
+    assert envelope["producer"] == "scenara"
+    assert envelope["tenant_id"] == "default"
+    assert envelope["project_id"] == "default"
+    assert envelope["occurred_at"].endswith("Z")
 
 
 @pytest.mark.asyncio
@@ -366,7 +374,7 @@ async def test_platform_repository_topology_exposes_ownership_and_integration_bo
     assert by_id["scenara-model"]["lifecycle"] == "external_existing"
     assert "model_training_jobs" in by_id["scenara-model"]["responsibilities"]
     assert "model_admission_release_and_deployment" in by_id["scenara-model"]["excluded_responsibilities"]
-    assert by_id["scenara-data"]["lifecycle"] == "planned"
+    assert by_id["scenara-data"]["lifecycle"] == "external_existing"
     assert "dataset_catalog_and_versioning" in by_id["scenara-data"]["responsibilities"]
 
     contracts = {item["contract_id"]: item for item in topology["integration_contracts"]}

@@ -36,6 +36,7 @@ const allowedInterfaceTerms = new Set([
   "Search",
   "RPO",
   "RTO",
+  "RTSP",
 ]);
 
 async function expectChineseInterface(
@@ -200,7 +201,7 @@ test.beforeEach(async ({ page }) => {
             repository_id: "scenara-data",
             name: "Scenara Data",
             kind: "specialized_product",
-            lifecycle: "planned",
+            lifecycle: "external_existing",
             current_repository: false,
             primary_product_ids: ["data"],
             integration_product_ids: ["model", "console", "api", "sdk"],

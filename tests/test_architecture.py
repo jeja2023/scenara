@@ -8,6 +8,7 @@ from pathlib import Path
 from pydantic import TypeAdapter
 
 from scenara.platform.models import DomainPayload
+from scenara.platform.error_codes import REGISTERED_ERROR_CODES
 
 
 def test_non_domain_modules_do_not_import_legacy_app() -> None:
@@ -34,6 +35,12 @@ def test_infrastructure_boundary_exists_in_source_manifest() -> None:
     assert "app" in selection
     assert "requirements" in selection
     assert "generated clients" in manifest["excluded"]
+
+
+def test_public_error_codes_are_registered() -> None:
+    server = Path("scenara/server.py").read_text(encoding="utf-8")
+    emitted = set(re.findall(r'error_response\([^\n]*"([A-Z][A-Z0-9_]+)"', server))
+    assert emitted <= REGISTERED_ERROR_CODES
 
 
 def test_platform_kernel_has_no_domain_id_branching() -> None:
