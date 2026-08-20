@@ -39,6 +39,7 @@ python3 -m pip download \
   -r "$repo_root/requirements/production.lock"
 
 cp "$compose_file" "$staging/deploy/compose.yml"
+cp "$repo_root/deploy/compose.enterprise.yml" "$staging/deploy/compose.enterprise.yml"
 cp -R "$repo_root/deploy/scripts" "$staging/deploy/scripts"
 cp -R "$repo_root/migrations" "$staging/migrations"
 cp -R "$repo_root/examples/demo-clients" "$staging/examples"

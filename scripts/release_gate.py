@@ -36,6 +36,7 @@ REQUIRED_IMPLEMENTATION = (
     "sdk/python/scenara_sdk/client.py",
     "sdk/typescript/src/generated.ts",
     "deploy/compose.yml",
+    "deploy/compose.enterprise.yml",
     "deploy/OPERATIONS.md",
     "deploy/scripts/build-offline-bundle.sh",
     "deploy/scripts/install-offline.sh",

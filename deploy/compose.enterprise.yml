@@ -1,0 +1,46 @@
+name: scenara
+
+# Optional enterprise extension. Compose this file together with compose.yml
+# only after providing a signed license and its matching Ed25519 public key.
+services:
+  api:
+    environment:
+      SCENARA_ENTERPRISE_POLICY_REQUIRED: "true"
+      SCENARA_ENTERPRISE_LICENSE_PATH: /run/secrets/scenara_enterprise_license
+      SCENARA_ENTERPRISE_PUBLIC_KEY_PATH: /run/secrets/scenara_enterprise_public_key
+    secrets:
+      - scenara_enterprise_license
+      - scenara_enterprise_public_key
+
+  batch-worker:
+    environment:
+      SCENARA_ENTERPRISE_POLICY_REQUIRED: "true"
+      SCENARA_ENTERPRISE_LICENSE_PATH: /run/secrets/scenara_enterprise_license
+      SCENARA_ENTERPRISE_PUBLIC_KEY_PATH: /run/secrets/scenara_enterprise_public_key
+    secrets:
+      - scenara_enterprise_license
+      - scenara_enterprise_public_key
+
+  stream-worker:
+    environment:
+      SCENARA_ENTERPRISE_POLICY_REQUIRED: "true"
+      SCENARA_ENTERPRISE_LICENSE_PATH: /run/secrets/scenara_enterprise_license
+      SCENARA_ENTERPRISE_PUBLIC_KEY_PATH: /run/secrets/scenara_enterprise_public_key
+    secrets:
+      - scenara_enterprise_license
+      - scenara_enterprise_public_key
+
+  scheduler:
+    environment:
+      SCENARA_ENTERPRISE_POLICY_REQUIRED: "true"
+      SCENARA_ENTERPRISE_LICENSE_PATH: /run/secrets/scenara_enterprise_license
+      SCENARA_ENTERPRISE_PUBLIC_KEY_PATH: /run/secrets/scenara_enterprise_public_key
+    secrets:
+      - scenara_enterprise_license
+      - scenara_enterprise_public_key
+
+secrets:
+  scenara_enterprise_license:
+    file: ${SCENARA_ENTERPRISE_LICENSE_FILE:?set SCENARA_ENTERPRISE_LICENSE_FILE for enterprise mode}
+  scenara_enterprise_public_key:
+    file: ${SCENARA_ENTERPRISE_PUBLIC_KEY_FILE:?set SCENARA_ENTERPRISE_PUBLIC_KEY_FILE for enterprise mode}

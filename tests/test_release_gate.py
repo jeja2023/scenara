@@ -118,7 +118,7 @@ def valid_metadata(evidence_type: str) -> dict[str, object]:
         },
         "software_license": {
             "license_sha256": "set-by-fixture",
-            "license_identifier": "LicenseRef-Scenara-Proprietary-Source-1.0",
+            "license_identifier": "MIT",
             "review_basis": "personal_project_self_review",
             "review_scope": [
                 "compliance",

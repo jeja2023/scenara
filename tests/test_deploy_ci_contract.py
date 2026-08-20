@@ -7,6 +7,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = ROOT / "deploy" / "compose.yml"
+ENTERPRISE_COMPOSE = ROOT / "deploy" / "compose.enterprise.yml"
 DEBUG_COMPOSE = ROOT / "deploy" / "compose.debug.yml"
 WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
 GITATTRIBUTES = ROOT / ".gitattributes"
@@ -120,6 +121,30 @@ def test_production_data_service_images_are_digest_pinned() -> None:
         assert re.fullmatch(r"[^@]+@sha256:[0-9a-f]{64}", image), f"{name} image is not digest-pinned"
 
 
+def test_default_compose_is_personal_mode_without_enterprise_secrets() -> None:
+    document = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
+    assert "secrets" not in document
+    environment = document["x-scenara-environment"]
+    assert environment["SCENARA_ENTERPRISE_POLICY_REQUIRED"] == "${SCENARA_ENTERPRISE_POLICY_REQUIRED:-false}"
+    assert "SCENARA_ENTERPRISE_LICENSE_PATH" not in environment
+    assert "SCENARA_ENTERPRISE_PUBLIC_KEY_PATH" not in environment
+    for service in ("api", "batch-worker", "stream-worker", "scheduler"):
+        assert "secrets" not in document["services"][service]
+
+
+def test_enterprise_compose_is_an_explicit_signed_license_extension() -> None:
+    document = yaml.safe_load(ENTERPRISE_COMPOSE.read_text(encoding="utf-8"))
+    assert set(document["services"]) == {"api", "batch-worker", "stream-worker", "scheduler"}
+    for service in document["services"].values():
+        environment = service["environment"]
+        assert environment["SCENARA_ENTERPRISE_POLICY_REQUIRED"] == "true"
+        assert environment["SCENARA_ENTERPRISE_LICENSE_PATH"] == "/run/secrets/scenara_enterprise_license"
+        assert environment["SCENARA_ENTERPRISE_PUBLIC_KEY_PATH"] == "/run/secrets/scenara_enterprise_public_key"
+        assert service["secrets"] == ["scenara_enterprise_license", "scenara_enterprise_public_key"]
+    assert ":?set SCENARA_ENTERPRISE_LICENSE_FILE" in document["secrets"]["scenara_enterprise_license"]["file"]
+    assert ":?set SCENARA_ENTERPRISE_PUBLIC_KEY_FILE" in document["secrets"]["scenara_enterprise_public_key"]["file"]
+
+
 def test_production_dependencies_are_hash_locked_everywhere() -> None:
     lock = PRODUCTION_LOCK.read_text(encoding="utf-8")
     dockerfile = DOCKERFILE.read_text(encoding="utf-8")
@@ -132,6 +157,7 @@ def test_production_dependencies_are_hash_locked_everywhere() -> None:
     assert "uv pip compile requirements/production.in --python-version 3.12" in workflow
     assert "--python-platform x86_64-manylinux_2_28" in workflow
     assert "git diff --exit-code -- requirements/production.lock" in workflow
+    assert 'cp "$repo_root/deploy/compose.enterprise.yml" "$staging/deploy/compose.enterprise.yml"' in offline_build
 
 
 def test_docker_build_copies_manifests_before_installing_dependencies() -> None:

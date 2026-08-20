@@ -8,7 +8,7 @@ until reproducible objective evidence is committed.
 Current development version: `0.3.0-dev.24` (`0.3.0.dev24` for Python packages).
 
 ## Release Gate Status
-The `0.3.0-dev.24` engineering baseline adds contract and observability hardening on top of the `0.3.0-dev.23` boundary: versioned Run event envelopes for SSE and Webhooks, RFC3339 event timestamps, W3C request tracing, structured log fields, registered public error codes, stricter Data DTO mapping, migration timestamp normalization, frontend semantic color tokens, mobile touch-target corrections, and expanded contract regressions. The previous performance, reliability, Console and deployment convergence work remains part of the current baseline.
+The `0.3.0-dev.24` engineering baseline adds contract and observability hardening on top of the `0.3.0-dev.23` boundary: versioned Run event envelopes for SSE and Webhooks, RFC3339 event timestamps, W3C request tracing, structured log fields, registered public error codes, stricter Data DTO mapping, migration timestamp normalization, frontend semantic color tokens, mobile touch-target corrections, and expanded contract regressions. The previous performance, reliability, Console and deployment convergence work remains part of the current baseline. The repository is MIT-licensed, and the default Compose profile is personal mode; signed enterprise policy remains an opt-in extension.
 Formal 1.0 release evidence remains fail-closed until the required evaluation,
 GPU capacity, offline-install, model-rights, integration, security, backup/restore,
 and software-license checks are rerun for `0.3.0-dev.24`. Historical `0.3.0-dev.21`
@@ -19,7 +19,8 @@ project does not require named approvers or legal/commercial sign-off records.
 The `0.3.0-dev.24` baseline processes finite video and PDF inputs to EOF unless callers
 explicitly request a compatibility cap. Continuous streams are archived into linked Run
 segments under one Stream Session, while inference batches publish `result.delta` events
-and append-only Result shards. It also enforces enterprise policy in production, adds indexed and expiring Session
+and append-only Result shards. Production uses the local personal policy by default; the signed enterprise policy
+provider remains available through the opt-in Compose extension. The baseline also adds indexed and expiring Session
 authentication, paginated/streaming audit access, bulk Result reads, SSE
 fallback control, Console auth-expiry handling, composable/router extraction,
 and `runtime-state/logs/` governance. Portrait video and stream results omit
@@ -59,10 +60,10 @@ real two-video end-to-end coverage. Dataset, Version and Annotation requests now
   reproducible reports exist.
 - [ ] Measured GPU sustained load, burst, VRAM pressure, backpressure, and recovery
   reports exist from the supported target.
-- [x] Repository gates cover secret patterns, model asset policy, proprietary
+- [x] Repository gates cover secret patterns, model asset policy, MIT
   license, provenance, security policy, and legacy brand identifiers. CI also
   generates dependency license inventories and an SBOM.
-- [x] The exact software `LICENSE` text and SPDX identifier are recorded in a
+- [x] The exact MIT `LICENSE` text and SPDX identifier are recorded in a
   self-check report bound to its SHA-256; no legal approval record is required.
 - [x] PostgreSQL + MinIO backup/restore evidence exists and verifies tenants, projects, media, Runs, Results, Pipelines, Models, audit, and biometric records.
 - [ ] Offline installation evidence exists from an isolated blank target host.
@@ -75,7 +76,7 @@ The contract, observability, version and release-hardening regression was execut
 
 | Check | Result |
 |---|---|
-| Full Python baseline for `0.3.0-dev.24` | 249 passed, 12 skipped; Ruff, Mypy, OpenAPI/SDK drift, repository contracts, and implementation/development gates pass |
+| Full Python baseline for `0.3.0-dev.24` | 251 passed, 12 skipped; Ruff, Mypy, OpenAPI/SDK drift, repository contracts, and implementation/development gates pass |
 | Security contract suite | 62 passed, 0 skipped; CI runs it once (the coverage job ignores the six security regression files, measured at 65.01% without them) |
 | Console regression for `0.3.0-dev.24` | typecheck, production build and 24 unit tests passed; TypeScript SDK checks passed |
 | Compose/Kubernetes tag convergence | `docker compose config` and `kubectl kustomize` resolve every application service to `scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.24}` |

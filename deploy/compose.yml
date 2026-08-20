@@ -33,9 +33,8 @@ x-scenara-environment: &scenara-environment
   SCENARA_PRODUCTION_MODELS_REQUIRED: "true"
   SCENARA_OCR_ENGINE_FACTORY: ${SCENARA_OCR_ENGINE_FACTORY:?set SCENARA_OCR_ENGINE_FACTORY}
   SCENARA_SECRET_ENCRYPTION_KEY: ${SCENARA_SECRET_ENCRYPTION_KEY:?set SCENARA_SECRET_ENCRYPTION_KEY}
-  SCENARA_ENTERPRISE_POLICY_REQUIRED: "true"
-  SCENARA_ENTERPRISE_LICENSE_PATH: /run/secrets/scenara_enterprise_license
-  SCENARA_ENTERPRISE_PUBLIC_KEY_PATH: /run/secrets/scenara_enterprise_public_key
+  # Personal mode is the default. Enterprise policy is an opt-in Compose extension.
+  SCENARA_ENTERPRISE_POLICY_REQUIRED: ${SCENARA_ENTERPRISE_POLICY_REQUIRED:-false}
   PYTHONPATH: /opt/scenara/models
   SCENARA_RAW_MEDIA_RETENTION_DAYS: ${SCENARA_RAW_MEDIA_RETENTION_DAYS:-7}
   SCENARA_PREVIEW_RETENTION_DAYS: ${SCENARA_PREVIEW_RETENTION_DAYS:-30}
@@ -49,10 +48,6 @@ x-scenara-environment: &scenara-environment
   SCENARA_TRAJECTORY_MIN_FRAME_COUNT: ${SCENARA_TRAJECTORY_MIN_FRAME_COUNT:-2}
   SCENARA_TRAJECTORY_MAX_TEMPLATES: ${SCENARA_TRAJECTORY_MAX_TEMPLATES:-32}
   SCENARA_TRAJECTORY_DEFAULT_TRANSITION_SECONDS: ${SCENARA_TRAJECTORY_DEFAULT_TRANSITION_SECONDS:-0}
-
-x-scenara-enterprise-secrets: &scenara-enterprise-secrets
-  - scenara_enterprise_license
-  - scenara_enterprise_public_key
 
 x-scenara-image: &scenara-image scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.24}
 
@@ -145,7 +140,6 @@ services:
       - "8000:8000"
     volumes:
       - ../models:/opt/scenara/models:ro
-    secrets: *scenara-enterprise-secrets
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/readyz"]
       interval: 10s
@@ -164,7 +158,6 @@ services:
         condition: service_healthy
     volumes:
       - ../models:/opt/scenara/models:ro
-    secrets: *scenara-enterprise-secrets
     deploy:
       resources:
         reservations:
@@ -185,7 +178,6 @@ services:
         condition: service_healthy
     volumes:
       - ../models:/opt/scenara/models:ro
-    secrets: *scenara-enterprise-secrets
     deploy:
       resources:
         reservations:
@@ -215,16 +207,9 @@ services:
         condition: service_healthy
     volumes:
       - ../models:/opt/scenara/models:ro
-    secrets: *scenara-enterprise-secrets
     restart: unless-stopped
 
 volumes:
   postgres-data:
   redis-data:
   minio-data:
-
-secrets:
-  scenara_enterprise_license:
-    file: ${SCENARA_ENTERPRISE_LICENSE_FILE:-./.env.production.example}
-  scenara_enterprise_public_key:
-    file: ${SCENARA_ENTERPRISE_PUBLIC_KEY_FILE:-./.env.production.example}

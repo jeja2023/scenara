@@ -1,95 +1,23 @@
-SCENARA PROPRIETARY SOURCE LICENSE 1.0
+MIT License
 
-SPDX-License-Identifier: LicenseRef-Scenara-Proprietary-Source-1.0
-Effective date: August 13, 2026
+SPDX-License-Identifier: MIT
 
-Copyright (c) 2026 Scenara. All rights reserved.
+Copyright (c) 2026 Scenara
 
-1. Definitions
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
-"Licensor" means the copyright holder identified in the copyright notice
-above. "Software" means the source code, object code, documentation, examples,
-and other materials distributed with this license, excluding Third-Party
-Materials. "Evaluation Purpose" means internal evaluation, security review,
-and interoperability assessment in a non-production environment.
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
-2. Limited License
-
-Subject to this license, Licensor grants you a limited, non-exclusive,
-non-transferable, non-sublicensable, revocable license to access, reproduce as
-reasonably necessary, and run the Software solely for an Evaluation Purpose.
-You may create internal evaluation reports that describe the Software, provided
-that those reports do not reproduce or disclose a substantial portion of the
-Software.
-
-3. Restrictions
-
-Except where a separate written agreement with Licensor expressly permits it,
-you may not:
-
-(a) use the Software in production or for any commercial purpose;
-(b) modify, adapt, translate, or create derivative works of the Software;
-(c) distribute, publish, sell, rent, lease, sublicense, or otherwise make the
-    Software available to any third party;
-(d) host the Software or provide any service whose operation depends on the
-    Software; or
-(e) remove or alter copyright, license, attribution, or proprietary notices.
-
-No rights are granted by implication, estoppel, or otherwise. Any production,
-commercial, redistribution, modification, or hosting rights require a separate
-written agreement signed by Licensor.
-
-4. Ownership and Reserved Rights
-
-The Software is licensed, not sold. Licensor and its licensors retain all
-right, title, and interest in and to the Software. This license does not grant
-any right to use a name, logo, service mark, trademark, trade dress, patent,
-dataset, model weight, or other intellectual property except for the limited
-copyright license stated in Section 2.
-
-5. Third-Party Materials
-
-Third-party software, model assets, datasets, fonts, media, and other materials
-included with or referenced by the Software ("Third-Party Materials") are
-governed by their respective license terms. This license does not expand,
-replace, or restrict rights granted under those terms. You are responsible for
-identifying and complying with all applicable Third-Party Materials terms.
-
-6. Compliance
-
-You must use the Software in compliance with applicable laws and regulations.
-The Software is not licensed for use with data, media, biometric information,
-or model assets for which you lack the necessary rights or lawful basis.
-
-7. Termination
-
-This license terminates automatically if you breach any of its terms. Upon
-termination, you must stop using the Software and delete all copies under your
-control, except copies that applicable law requires you to retain. Sections 3
-through 10 survive termination.
-
-8. Disclaimer of Warranty
-
-THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE," WITHOUT WARRANTY OF ANY
-KIND, EXPRESS, IMPLIED, OR STATUTORY, INCLUDING WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE, TITLE, NON-INFRINGEMENT, ACCURACY, SECURITY,
-OR UNINTERRUPTED OPERATION. YOU ASSUME ALL RISK ARISING FROM ACCESS TO OR USE OF
-THE SOFTWARE.
-
-9. Limitation of Liability
-
-TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, LICENSOR AND ITS AFFILIATES,
-CONTRIBUTORS, AND SUPPLIERS WILL NOT BE LIABLE FOR ANY DIRECT, INDIRECT,
-INCIDENTAL, SPECIAL, EXEMPLARY, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR FOR ANY
-LOSS OF DATA, PROFITS, REVENUE, BUSINESS, OR GOODWILL, ARISING FROM OR RELATED
-TO THE SOFTWARE OR THIS LICENSE, REGARDLESS OF THE THEORY OF LIABILITY AND EVEN
-IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.
-
-10. General
-
-If any provision of this license is held unenforceable, it will be modified only
-to the minimum extent necessary to make it enforceable, and the remaining
-provisions will remain in effect. A failure to enforce any provision is not a
-waiver. This license is the entire agreement concerning the Evaluation Purpose
-and supersedes prior statements about that purpose, but it does not supersede a
-separate written agreement signed by Licensor.
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

@@ -43,7 +43,7 @@ The release identity binds completed evidence to one full Git commit, applicatio
 
 Evaluation reports must identify a fixed, versioned, rights-cleared dataset, thresholds fixed before execution, and two independent runs within tolerance. Capacity evidence must come from the supported target and include latency percentiles, throughput, error rate, peak VRAM, sustained load, burst, pressure, backpressure, and recovery. Model-rights evidence must record each production model's id, version, artifact SHA-256, license identifier, source URI, and cleared-rights flag. Integration, security, model-rights, software-license, offline-install, and backup reports must include the required objective metadata shown in the example manifest.
 
-Software-license evidence binds the exact `LICENSE` SHA-256 and SPDX identifier and records the sections covered by the personal-project license self-review. This is a terms-completeness check, not external legal advice; it does not claim company legal approval or a controlled approval record.
+Software-license evidence binds the exact MIT `LICENSE` SHA-256 and SPDX identifier and records the sections covered by the personal-project license self-review. This is a terms-completeness check, not external legal advice; it does not claim company legal approval or a controlled approval record.
 
 ## Model release qualification objects
 

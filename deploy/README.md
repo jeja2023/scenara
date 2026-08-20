@@ -8,6 +8,8 @@ The supported 1.0 target is Ubuntu x86_64 with Docker Engine, Docker Compose v2,
 
 Create a deployment environment file from .env.production.example. Replace every example credential. Generate the secret encryption key with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`; the checked-in placeholder is intentionally invalid. Keep the file outside source control.
 
+The default `deploy/compose.yml` is the personal deployment profile. It uses the local policy provider and does not require, read, or mount an enterprise license. The signed enterprise policy implementation remains available as an optional extension. To enable it, set `SCENARA_ENTERPRISE_LICENSE_FILE` and `SCENARA_ENTERPRISE_PUBLIC_KEY_FILE` to readable files and add `-f deploy/compose.enterprise.yml` to each Compose command.
+
 The qualified model package directory must include the private OCR adapter module named by `SCENARA_OCR_ENGINE_FACTORY` (for example `approved_ocr_adapter:create_engine`). Its factory must return a production-ready engine with `model_id`, `version`, `production_ready=true`, `predict`, and the declared layout capabilities. Compose mounts this directory read-only at `/opt/scenara/models` for every process that builds the runtime. The repository does not provide a production OCR adapter.
 
 Validate without starting services:
@@ -17,6 +19,14 @@ Validate without starting services:
 Start an online installation:
 
     docker compose --env-file deploy/.env.production -f deploy/compose.yml up -d --build
+
+For the optional enterprise profile, validate and start with both files:
+
+    docker compose --env-file deploy/.env.production \
+      -f deploy/compose.yml -f deploy/compose.enterprise.yml config --quiet
+
+    docker compose --env-file deploy/.env.production \
+      -f deploy/compose.yml -f deploy/compose.enterprise.yml up -d --build
 
 After the API health check passes, open the bundled Chinese console at `http://<host>:8000/console/`. The same versioned image serves the API and console, so an offline deployment cannot accidentally combine different contract versions.
 

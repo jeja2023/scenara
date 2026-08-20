@@ -148,8 +148,8 @@
     {
       "evidence_type": "software_license",
       "status": "passed",
-      "executed_at": "2026-08-18T09:58:53.308744+00:00",
-      "target": "Scenara 0.3.0-dev.22 repository license text in current checkout",
+      "executed_at": "2026-08-20T00:00:00+08:00",
+      "target": "Scenara 0.3.0-dev.24 MIT repository license text in current checkout",
       "release_identity": {
         "source_commit": null,
         "image_digest": null,
@@ -158,8 +158,8 @@
         "model_set_sha256": null
       },
       "metadata": {
-        "license_sha256": "a4711a0d889bff4a3bf3d06ff7b3cc594d074cbdd79435b70448daa6377e584b",
-        "license_identifier": "LicenseRef-Scenara-Proprietary-Source-1.0",
+        "license_sha256": "9500e4aadb1303a7533914cd888e24803b64af29535780f7c45b8458e443f16b",
+        "license_identifier": "MIT",
         "review_basis": "personal_project_self_review",
         "review_scope": [
           "compliance",
@@ -171,7 +171,7 @@
         ]
       },
       "report": "docs/release/evidence/reports/software-license.json",
-      "sha256": "f5833ff9a9b4b2ad288eb4c6700f356f69dd291098011527a4e6d06f5a28b3be"
+      "sha256": "3fd5d581ecca1aecd419a1a5e65ad3e7267400c3fb11cebf5ffc67f7050c6d19"
     }
   ]
 }

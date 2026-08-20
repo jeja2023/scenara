@@ -82,7 +82,8 @@ API 默认位于 `http://127.0.0.1:8000`，Console 开发服务器位于 `http:/
 
 ## 授权
 
-源码公开不代表开源授权。除第三方组件另有声明外，本仓库使用 [Scenara Proprietary Source License](LICENSE)。
+本仓库采用 [MIT License](LICENSE)，允许个人或组织使用、修改和部署；第三方组件、模型权利、数据集和媒体资产仍受其各自许可及适用法律约束。
+默认 Compose 部署为个人模式，不要求企业许可证。企业签名许可证校验代码保留在 `scenara.enterprise`，通过 `deploy/compose.enterprise.yml` 显式叠加后才启用。
 Current release baseline: `0.3.0-dev.24` (`0.3.0.dev24` for Python packages).
 
 Object storage is provider-neutral at the platform boundary. MinIO is the
