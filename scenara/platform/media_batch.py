@@ -701,9 +701,16 @@ def decode_media(
 ) -> DecodedMedia:
     _check_control(control)
     if media.kind == MediaKind.IMAGE:
-        if media.data is None:
+        data = media.data
+        if data is None and media.file_path:
+            try:
+                with open(media.file_path, "rb") as handle:
+                    data = handle.read()
+            except OSError as exc:
+                raise PipelineError(f"failed to read image file: {exc}") from exc
+        if data is None:
             raise PipelineError("image input is empty")
-        image, image_format = _safe_image(media.data)
+        image, image_format = _safe_image(data)
         image = _downscale(image, frame_max_edge)
         return DecodedMedia(
             kind=media.kind,
@@ -717,9 +724,16 @@ def decode_media(
             ),
         )
     if media.kind == MediaKind.DOCUMENT:
-        if media.data is None:
+        data = media.data
+        if data is None and media.file_path:
+            try:
+                with open(media.file_path, "rb") as handle:
+                    data = handle.read()
+            except OSError as exc:
+                raise PipelineError(f"failed to read document file: {exc}") from exc
+        if data is None:
             raise PipelineError("document input is empty")
-        return _decode_pdf(media.data, page_scale=page_scale, control=control)
+        return _decode_pdf(data, page_scale=page_scale, control=control)
     try:
         strategy = SampleStrategy(sample_strategy)
     except ValueError as exc:
@@ -747,9 +761,16 @@ def decode_media(
 
 def _decode_media_preview(media: MediaInput) -> DecodedMedia:
     if media.kind == MediaKind.DOCUMENT:
-        if media.data is None:
+        data = media.data
+        if data is None and media.file_path:
+            try:
+                with open(media.file_path, "rb") as handle:
+                    data = handle.read()
+            except OSError as exc:
+                raise PipelineError(f"failed to read document file: {exc}") from exc
+        if data is None:
             raise PipelineError("document input is empty")
-        return _decode_pdf(media.data, preview_only=True)
+        return _decode_pdf(data, preview_only=True)
     if media.kind == MediaKind.IMAGE:
         return decode_media(media, sample_interval_ms=1)
     return _decode_video(

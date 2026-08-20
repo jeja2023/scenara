@@ -112,8 +112,8 @@ async def test_feedback_and_model_release_postgres_persistence() -> None:
             runtime_model_id="scenara.portrait/integration",
             package_sha256="b" * 64,
             created_by="integration",
-            created_at="2026-08-18T00:00:00Z",
-            updated_at=time.time(),
+            created_at=now,
+            updated_at=now,
         )
         await repository.create_release(release)
         for target in (
@@ -144,7 +144,7 @@ async def test_feedback_and_model_release_postgres_persistence() -> None:
             reason="integration qualification",
             operator_id="integration",
             audit_id=f"aud_{suffix}",
-            created_at=time.time(),
+            created_at="2026-08-18T00:00:00Z",
         )
         await repository.append_deployment_event(event)
         assert (await repository.list_deployment_events(tenant_id, project_id, 10))[0].event_id == event.event_id
