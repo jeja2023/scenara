@@ -1,6 +1,7 @@
 import logging
 import math
 import os
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -137,9 +138,43 @@ ALLOW_STREAM_URLS = parse_bool_env("ALLOW_STREAM_URLS", False)
 MAX_LOADED_MODELS = parse_int_env("MAX_LOADED_MODELS", 0)
 GPU_QUEUE_LIMIT = parse_int_env("GPU_QUEUE_LIMIT", 1)
 GPU_QUEUE_LIMIT_PER_DEVICE = parse_int_env("GPU_QUEUE_LIMIT_PER_DEVICE", GPU_QUEUE_LIMIT)
-GPU_DEVICE_IDS = [
-    int(item) for item in parse_csv_env("GPU_DEVICE_IDS", os.getenv("CUDA_VISIBLE_DEVICES", "0")) if item.isdigit()
-] or [0]
+
+
+def _default_gpu_device_ids() -> list[int]:
+    """Use an explicit device list when configured, otherwise discover all visible GPUs."""
+    configured = os.getenv("GPU_DEVICE_IDS")
+    if configured is not None and configured.strip():
+        ids = [int(item) for item in parse_csv_env("GPU_DEVICE_IDS", configured) if item.isdigit()]
+        if ids:
+            return ids
+    visible = os.getenv("CUDA_VISIBLE_DEVICES", "").strip()
+    if visible:
+        ids = [int(item) for item in parse_csv_env("CUDA_VISIBLE_DEVICES", visible) if item.isdigit()]
+        if ids:
+            return list(range(len(ids)))
+    device_nodes = []
+    for path in Path("/dev").glob("nvidia[0-9]*"):
+        suffix = path.name.removeprefix("nvidia")
+        if suffix.isdigit():
+            device_nodes.append(int(suffix))
+    if device_nodes:
+        return sorted(set(device_nodes))
+    try:
+        output = subprocess.check_output(
+            ["nvidia-smi", "--query-gpu=index", "--format=csv,noheader,nounits"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+            timeout=2,
+        )
+        ids = [int(item.strip()) for item in output.splitlines() if item.strip().isdigit()]
+        if ids:
+            return ids
+    except (OSError, subprocess.SubprocessError, ValueError):
+        pass
+    return [0]
+
+
+GPU_DEVICE_IDS = _default_gpu_device_ids()
 CPU_FALLBACK_ENABLED = parse_bool_env("CPU_FALLBACK_ENABLED", True)
 # 强制纯 CPU 推理：直接以 CPUExecutionProvider 建会话，跳过 CUDA-first 的探测与回退重建。
 # onnxruntime-gpu 即使在无 CUDA 库的机器上也会把 CUDA 报成“可用”，导致 create_session

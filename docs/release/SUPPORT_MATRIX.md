@@ -6,7 +6,7 @@
 |---|---|
 | 操作系统 | Ubuntu 24.04 LTS x86_64 |
 | 容器运行时 | Docker Engine 27+，Docker Compose v2.29+ |
-| GPU | 单张 NVIDIA GPU，驱动支持 CUDA 12.8，显存不少于 23,000 MiB |
+| GPU | 一张或多张 NVIDIA GPU，驱动支持 CUDA 12.8；默认使用所有可见 GPU，不设固定显存门槛 |
 | 数据库 | PostgreSQL 16 + pgvector |
 | 队列 | Redis 7.4 |
 | 对象存储 | 经认证的 S3 Provider；当前 1.0 私有化基线为 MinIO，其他供应商需通过对象存储兼容测试 |
@@ -16,4 +16,4 @@
 
 ## 实验支持
 
-Kubernetes、多节点高可用、Qdrant、多 GPU 调度及非 Ubuntu 发行版不属于 1.0 正式支持范围。所有支持结论均受严格发布证据门禁约束。
+Kubernetes、多节点高可用、Qdrant 以及非 Ubuntu 发行版不属于 1.0 正式支持范围。所有支持结论均受严格发布证据门禁约束。

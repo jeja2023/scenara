@@ -35,6 +35,7 @@ x-scenara-environment: &scenara-environment
   SCENARA_SECRET_ENCRYPTION_KEY: ${SCENARA_SECRET_ENCRYPTION_KEY:?set SCENARA_SECRET_ENCRYPTION_KEY}
   # Personal mode is the default. Enterprise policy is an opt-in Compose extension.
   SCENARA_ENTERPRISE_POLICY_REQUIRED: ${SCENARA_ENTERPRISE_POLICY_REQUIRED:-false}
+  GPU_DEVICE_IDS: ${GPU_DEVICE_IDS:-}
   PYTHONPATH: /opt/scenara/models
   SCENARA_RAW_MEDIA_RETENTION_DAYS: ${SCENARA_RAW_MEDIA_RETENTION_DAYS:-7}
   SCENARA_PREVIEW_RETENTION_DAYS: ${SCENARA_PREVIEW_RETENTION_DAYS:-30}
@@ -163,7 +164,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              count: all
               capabilities: [gpu]
     restart: unless-stopped
 
@@ -183,7 +184,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              count: all
               capabilities: [gpu]
     restart: unless-stopped
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import app.settings as app_settings
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -121,11 +122,28 @@ def test_production_data_service_images_are_digest_pinned() -> None:
         assert re.fullmatch(r"[^@]+@sha256:[0-9a-f]{64}", image), f"{name} image is not digest-pinned"
 
 
+def test_gpu_workers_expose_all_visible_gpus_by_default() -> None:
+    document = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
+    for service_name in ("batch-worker", "stream-worker"):
+        reservation = document["services"][service_name]["deploy"]["resources"]["reservations"]
+        devices = reservation["devices"]
+        assert devices == [{"driver": "nvidia", "count": "all", "capabilities": ["gpu"]}]
+
+
+def test_legacy_inference_discovers_visible_gpu_count_without_hardcoding_one(monkeypatch) -> None:
+    monkeypatch.setenv("GPU_DEVICE_IDS", "2,4")
+    assert app_settings._default_gpu_device_ids() == [2, 4]
+    monkeypatch.delenv("GPU_DEVICE_IDS")
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "2,4")
+    assert app_settings._default_gpu_device_ids() == [0, 1]
+
+
 def test_default_compose_is_personal_mode_without_enterprise_secrets() -> None:
     document = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
     assert "secrets" not in document
     environment = document["x-scenara-environment"]
     assert environment["SCENARA_ENTERPRISE_POLICY_REQUIRED"] == "${SCENARA_ENTERPRISE_POLICY_REQUIRED:-false}"
+    assert environment["GPU_DEVICE_IDS"] == "${GPU_DEVICE_IDS:-}"
     assert "SCENARA_ENTERPRISE_LICENSE_PATH" not in environment
     assert "SCENARA_ENTERPRISE_PUBLIC_KEY_PATH" not in environment
     for service in ("api", "batch-worker", "stream-worker", "scheduler"):
@@ -225,6 +243,8 @@ def test_offline_installer_records_gpu_memory_without_a_fixed_capacity_gate() ->
     assert 'refusing to overwrite existing result' in installer
     assert "23000" not in installer
     assert "24 GB" not in installer
+    assert "requires exactly one NVIDIA GPU" not in installer
+    assert 'gpu_count=%s' in installer
     assert "check.example_clients=passed" not in installer
     assert "check.core_parse=passed" not in installer
 

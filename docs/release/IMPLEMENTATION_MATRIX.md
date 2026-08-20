@@ -76,7 +76,7 @@ The contract, observability, version and release-hardening regression was execut
 
 | Check | Result |
 |---|---|
-| Full Python baseline for `0.3.0-dev.24` | 251 passed, 12 skipped; Ruff, Mypy, OpenAPI/SDK drift, repository contracts, and implementation/development gates pass |
+| Full Python baseline for `0.3.0-dev.24` | 253 passed, 12 skipped; Ruff, Mypy, OpenAPI/SDK drift, repository contracts, and implementation/development gates pass |
 | Security contract suite | 62 passed, 0 skipped; CI runs it once (the coverage job ignores the six security regression files, measured at 65.01% without them) |
 | Console regression for `0.3.0-dev.24` | typecheck, production build and 24 unit tests passed; TypeScript SDK checks passed |
 | Compose/Kubernetes tag convergence | `docker compose config` and `kubectl kustomize` resolve every application service to `scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.24}` |
@@ -97,9 +97,9 @@ The contract, observability, version and release-hardening regression was execut
 
 Local results do not yet satisfy the measured target-GPU workload, per-model rights
 records, fixed Portrait/OCR evaluation sets, or isolated Ubuntu offline-install
-requirements. The available NVIDIA GPU has 8,192 MiB; that value is recorded as
-descriptive hardware evidence, while qualification depends on the measured workload
-and five required scenario outcomes.
+requirements. GPU count and memory are recorded as descriptive hardware evidence,
+while qualification depends on the measured workload and five required scenario
+outcomes; no fixed GPU-count or memory threshold is imposed by the deployment.
 These items remain unchecked until reproducible objective evidence is recorded.
 
 ## Product matrix gates after 0.3.0

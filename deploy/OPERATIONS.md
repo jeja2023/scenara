@@ -1,6 +1,6 @@
 # Scenara 1.0 运维基线
 
-本文档定义单节点、单 GPU 私有化部署的升级、回滚、探针、指标和告警最低要求。它不能替代目标环境的可复现演练报告。
+本文档定义单节点、多 GPU 私有化部署的升级、回滚、探针、指标和告警最低要求。它不能替代目标环境的可复现演练报告。
 
 ## 数据库升级
 
@@ -60,6 +60,6 @@ The command requires PostgreSQL, S3/MinIO, and Redis backends. It enumerates eve
 ## 已知限制
 
 
-- 仅支持 Ubuntu 24.04 x86_64、Docker Compose、单张可被 `nvidia-smi` 测量的 NVIDIA GPU；显存容量记录在资格报告中，但不是固定 24G 门槛。
+- 支持 Ubuntu 24.04 x86_64、Docker Compose 和一张或多张可被 `nvidia-smi` 测量的 NVIDIA GPU；生产 Compose 默认将所有可见 GPU 提供给 GPU Worker，显存容量记录在资格报告中，但不设固定 GPU 数量或显存门槛。
 - 不提供多节点高可用、跨地域容灾、在线 schema 降级或自动模型训练。
 - 发布仓库当前仍缺目标 GPU、模型权利、固定评估集和隔离离线安装等严格门禁要求的客观证据；缺失时不得声明 1.0 Released。

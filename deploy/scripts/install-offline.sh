@@ -46,14 +46,14 @@ version_ge "$compose_version" "2.29.0" || {
   echo "Scenara 1.0 requires Docker Compose 2.29 or newer" >&2
   exit 2
 }
-gpu_count="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | wc -l)"
-test "$gpu_count" -eq 1 || {
-  echo "Scenara 1.0 requires exactly one NVIDIA GPU" >&2
+gpu_count="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | awk 'NF { count += 1 } END { print count + 0 }')"
+test "$gpu_count" -gt 0 || {
+  echo "Scenara 1.0 requires at least one measurable NVIDIA GPU" >&2
   exit 2
 }
-gpu_memory="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits)"
+gpu_memory="$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits | awk 'NF { total += $1 } END { print total + 0 }')"
 test "$gpu_memory" -gt 0 || {
-  echo "Scenara 1.0 requires a measurable NVIDIA GPU" >&2
+  echo "Scenara 1.0 requires measurable NVIDIA GPU memory" >&2
   exit 2
 }
 cuda_version="$(nvidia-smi | sed -n 's/.*CUDA Version: \([0-9.]*\).*/\1/p' | head -n 1)"
@@ -86,6 +86,7 @@ if [ -n "$result_file" ]; then
     '  "host": {' \
     '    "host_os": "ubuntu",' \
     '    "host_version": "24.04",' \
+    "    \"gpu_count\": $gpu_count," \
     "    \"gpu_memory_mib\": $gpu_memory" \
     '  },' \
     '  "services": {' \
@@ -105,7 +106,7 @@ if [ -n "$result_file" ]; then
   mv "$temporary_result" "$result_file"
   trap - EXIT
 fi
-printf 'offline_install=passed\ngpu_memory_mib=%s\nchecksums_verified=passed\ncheck.health=passed\ncheck.console=passed\n' "$gpu_memory"
+printf 'offline_install=passed\ngpu_count=%s\ngpu_memory_mib=%s\nchecksums_verified=passed\ncheck.health=passed\ncheck.console=passed\n' "$gpu_count" "$gpu_memory"
 for service in api batch-worker stream-worker scheduler postgres redis minio; do
   printf 'service.%s=running\n' "$service"
 done

@@ -2,13 +2,15 @@
 
 升级、恢复式回滚、运行探针、指标和告警基线见 [OPERATIONS.md](OPERATIONS.md)。
 
-The supported 1.0 target is Ubuntu x86_64 with Docker Engine, Docker Compose v2, and exactly one measurable NVIDIA GPU. PostgreSQL/pgvector, Redis, and MinIO are part of the production Compose topology. The data-service images are pinned by manifest digest. Python production dependencies are installed only from `requirements/production.lock` with SHA-256 verification.
+The supported 1.0 target is Ubuntu x86_64 with Docker Engine, Docker Compose v2, and one or more measurable NVIDIA GPUs. PostgreSQL/pgvector, Redis, and MinIO are part of the production Compose topology. The data-service images are pinned by manifest digest. Python production dependencies are installed only from `requirements/production.lock` with SHA-256 verification.
 
 ## Configure
 
 Create a deployment environment file from .env.production.example. Replace every example credential. Generate the secret encryption key with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`; the checked-in placeholder is intentionally invalid. Keep the file outside source control.
 
 The default `deploy/compose.yml` is the personal deployment profile. It uses the local policy provider and does not require, read, or mount an enterprise license. The signed enterprise policy implementation remains available as an optional extension. To enable it, set `SCENARA_ENTERPRISE_LICENSE_FILE` and `SCENARA_ENTERPRISE_PUBLIC_KEY_FILE` to readable files and add `-f deploy/compose.enterprise.yml` to each Compose command.
+
+Both GPU workers request all visible GPUs by default. Leave `GPU_DEVICE_IDS` unset for this behavior; set it explicitly, for example `GPU_DEVICE_IDS=0`, only when you intentionally want application-level scheduling isolation. The legacy inference adapter discovers visible devices from `CUDA_VISIBLE_DEVICES`, NVIDIA device nodes, or `nvidia-smi`.
 
 The qualified model package directory must include the private OCR adapter module named by `SCENARA_OCR_ENGINE_FACTORY` (for example `approved_ocr_adapter:create_engine`). Its factory must return a production-ready engine with `model_id`, `version`, `production_ready=true`, `predict`, and the declared layout capabilities. Compose mounts this directory read-only at `/opt/scenara/models` for every process that builds the runtime. The repository does not provide a production OCR adapter.
 
@@ -49,7 +51,7 @@ Transfer the generated tar archive through the project's controlled channel, ext
       /secure/scenara.env \
       /secure/offline-installer-result.json
 
-The qualified model package directory is mandatory and is copied into the checksummed offline bundle; the repository never supplies or substitutes model weights. The installer verifies Ubuntu 24.04 x86_64, Docker Engine 27+, Docker Compose 2.29+, CUDA 12.8 driver compatibility, and exactly one measurable NVIDIA GPU before loading images. GPU memory is recorded but has no fixed lower or upper qualification limit. It starts Compose with `--no-build --wait`, verifies the dependency readiness endpoint and Chinese console, and rejects any required service that is not running. The optional third argument is written atomically as a schema-version 1.0 JSON result and is never allowed to overwrite an existing file.
+The qualified model package directory is mandatory and is copied into the checksummed offline bundle; the repository never supplies or substitutes model weights. The installer verifies Ubuntu 24.04 x86_64, Docker Engine 27+, Docker Compose 2.29+, CUDA 12.8 driver compatibility, and at least one measurable NVIDIA GPU before loading images. All visible GPUs are exposed to both GPU workers by default; the installer records GPU count and aggregate memory but imposes no fixed GPU-count or memory limit. It starts Compose with `--no-build --wait`, verifies the dependency readiness endpoint and Chinese console, and rejects any required service that is not running. The optional third argument is written atomically as a schema-version 1.0 JSON result and is never allowed to overwrite an existing file.
 
 The builder also writes `scenara-offline-<tag>.release-identity.json` beside the archive. It records the source commit, application image digest, archive SHA-256, OpenAPI SHA-256, and aggregate qualified-model-set SHA-256 required by the strict release manifest. Keep this companion file with the release artifacts.
 
