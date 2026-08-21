@@ -152,16 +152,17 @@ def build_product_catalog(
                 "软删除与保留策略",
                 "保存的检索",
                 "可重建的来源引用",
+                "Qdrant FeatureStore provider adapter with tenant/project filters",
             ],
             not_in_scope_yet=[
-                "ANN 加速",
                 "分布式索引分片",
                 "学习排序重排",
+                "Qdrant 真实集群容量、备份恢复与隔离资格",
             ],
             api_paths=["/api/v1/indexes", "/api/v1/search/text", "/api/v1/search/image"],
             depends_on=["data"],
             next_gate=(
-                "在面向生产前完成 ANN 后端、重建流程和固定排名评估的资格验证。"
+                "在面向生产前完成 Qdrant/pgvector 后端、重建流程和固定排名评估的资格验证。"
             ),
         ),
         ProductCatalogItem(

@@ -30,6 +30,7 @@ from scenara.infrastructure.postgres_access import PostgresAccessRepository
 from scenara.infrastructure.postgres_control_plane import PostgresControlPlaneStore
 from scenara.infrastructure.postgres_enterprise import PostgresEnterpriseRepository
 from scenara.infrastructure.postgres_features import PostgresFeatureStore
+from scenara.infrastructure.qdrant_features import QdrantFeatureStore
 from scenara.infrastructure.postgres_feedback import PostgresFeedbackRepository
 from scenara.infrastructure.postgres_index import PostgresIndexStore
 from scenara.infrastructure.postgres_portrait import PostgresPortraitRepository
@@ -112,6 +113,9 @@ class Runtime:
         await self.queue.close()
         await self.data.close()
         await self.models.close()
+        close_features = getattr(self.features, "close", None)
+        if close_features is not None:
+            await close_features()
         await self.objects.close()
         await self.state.close()
 
@@ -146,7 +150,16 @@ def build_runtime(
         postgres_state = PostgresStateStore(settings.postgres_dsn)
         state: StateStore = postgres_state
         access_repository: AccessRepository = PostgresAccessRepository(postgres_state.pool)
-        features: FeatureStore = PostgresFeatureStore(postgres_state.pool)
+        features: FeatureStore = (
+            QdrantFeatureStore(
+                settings.qdrant_url,
+                api_key=settings.qdrant_api_key,
+                timeout_seconds=settings.qdrant_timeout_seconds,
+                collection_prefix=settings.qdrant_collection_prefix,
+            )
+            if settings.qdrant_url
+            else PostgresFeatureStore(postgres_state.pool)
+        )
         indexes: IndexStore = PostgresIndexStore(postgres_state.pool)
         portrait_repository: PortraitRepository = PostgresPortraitRepository(postgres_state.pool)
         enterprise_repository: EnterpriseRepository = PostgresEnterpriseRepository(postgres_state.pool)

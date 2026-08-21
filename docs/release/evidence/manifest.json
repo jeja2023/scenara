@@ -1,11 +1,11 @@
 {
   "schema_version": "1.2",
-  "release": "0.3.0-dev.24",
+  "release": "0.3.0-dev.25",
   "release_identity": {
     "source_commit": null,
     "image_digest": null,
     "offline_bundle_sha256": null,
-    "openapi_sha256": "23c37522fa08db851694dad751e43a43bf74b6a99c0af8804ed55c769e0881d4",
+    "openapi_sha256": "3b53275e54ab6146cfa11238b85854cf4b4f89f69ea02676ca4c9f610773b1f2",
     "model_set_sha256": null
   },
   "entries": [
@@ -18,7 +18,7 @@
         "source_commit": null,
         "image_digest": null,
         "offline_bundle_sha256": null,
-        "openapi_sha256": "23c37522fa08db851694dad751e43a43bf74b6a99c0af8804ed55c769e0881d4",
+        "openapi_sha256": "3b53275e54ab6146cfa11238b85854cf4b4f89f69ea02676ca4c9f610773b1f2",
         "model_set_sha256": null
       },
       "metadata": {
@@ -44,7 +44,7 @@
         "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/local_backup_restore_drill.ps1 -PostgresContainer scenara-qualification-postgres-1 -DockerNetwork scenara-qualification_default"
       },
       "report": "docs/release/evidence/reports/backup-restore.json",
-      "sha256": "b23772fa7999382405ee4b3eb8471b6aadc8617f1570e0ff22ef59499d92a011"
+      "sha256": "0aa09c5c09581672d17fce7d05f090abaa56e4c43cffe2485d57a7c0200c53ca"
     },
     {
       "evidence_type": "gpu_capacity",
@@ -59,7 +59,7 @@
         "source_commit": null,
         "image_digest": null,
         "offline_bundle_sha256": null,
-        "openapi_sha256": "23c37522fa08db851694dad751e43a43bf74b6a99c0af8804ed55c769e0881d4",
+        "openapi_sha256": "3b53275e54ab6146cfa11238b85854cf4b4f89f69ea02676ca4c9f610773b1f2",
         "model_set_sha256": null
       },
       "metadata": {
@@ -81,7 +81,7 @@
         ]
       },
       "report": "docs/release/evidence/reports/integration-services.json",
-      "sha256": "8f96eff6f10d0ec0b69403c42274ef8e5f0c52cb696f79131cc34eda5642c68a"
+      "sha256": "40a7cb9d525e5d2448539ef4f06f641ad3f0a9b8530332d2b92587309dc0aa57"
     },
     {
       "evidence_type": "model_rights",
@@ -108,7 +108,7 @@
         "source_commit": null,
         "image_digest": null,
         "offline_bundle_sha256": null,
-        "openapi_sha256": "23c37522fa08db851694dad751e43a43bf74b6a99c0af8804ed55c769e0881d4",
+        "openapi_sha256": "3b53275e54ab6146cfa11238b85854cf4b4f89f69ea02676ca4c9f610773b1f2",
         "model_set_sha256": null
       },
       "metadata": {
@@ -143,18 +143,18 @@
         }
       },
       "report": "docs/release/evidence/reports/security-assessment.json",
-      "sha256": "92ea54114f82d08b58f447bcdb1c634054a3cbcc9c02511056495206c7cd0eab"
+      "sha256": "f66a79a2a9e18acad25b02e298e06ce5e961f09c686e77f2cd47ed923ee0818a"
     },
     {
       "evidence_type": "software_license",
       "status": "passed",
       "executed_at": "2026-08-20T00:00:00+08:00",
-      "target": "Scenara 0.3.0-dev.24 MIT repository license text in current checkout",
+      "target": "Scenara 0.3.0-dev.25 MIT repository license text in current checkout",
       "release_identity": {
         "source_commit": null,
         "image_digest": null,
         "offline_bundle_sha256": null,
-        "openapi_sha256": "23c37522fa08db851694dad751e43a43bf74b6a99c0af8804ed55c769e0881d4",
+        "openapi_sha256": "3b53275e54ab6146cfa11238b85854cf4b4f89f69ea02676ca4c9f610773b1f2",
         "model_set_sha256": null
       },
       "metadata": {
@@ -171,7 +171,7 @@
         ]
       },
       "report": "docs/release/evidence/reports/software-license.json",
-      "sha256": "3fd5d581ecca1aecd419a1a5e65ad3e7267400c3fb11cebf5ffc67f7050c6d19"
+      "sha256": "b92a088b051ebddbbb46ac5b4e625ef70fb037e0b0a066c833c38c73eb53b6bb"
     }
   ]
 }

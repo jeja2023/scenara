@@ -493,6 +493,14 @@ def validate_release_transition(
         raise FeedbackConflict(f"invalid model release transition: {current.value} -> {target.value}")
 
 
+def _release_version_key(value: str) -> tuple[object, ...]:
+    """Sort numeric release versions before prerelease labels deterministically."""
+    parts: list[object] = []
+    for token in re.split(r"[.-]", value):
+        parts.append(int(token) if token.isdigit() else token)
+    return tuple(parts)
+
+
 class FeedbackService:
     def __init__(
         self,
@@ -845,6 +853,36 @@ class FeedbackService:
                 )
             )
         return updated
+
+    async def auto_rollback(
+        self,
+        context: PrincipalContext,
+        model_id: str,
+        current_version: str,
+        *,
+        reason: str,
+    ) -> ModelRelease:
+        """Rollback to the newest eligible retired release after a health gate."""
+        releases = await self._repository.list_releases(context.tenant_id, context.project_id)
+        current = next(
+            (item for item in releases if item.model_id == model_id and item.version == current_version),
+            None,
+        )
+        if current is None or current.status != ModelReleaseStatus.ACTIVE:
+            raise FeedbackConflict("automatic rollback requires an active current release")
+        candidates = [
+            item
+            for item in releases
+            if item.model_id == model_id and item.status == ModelReleaseStatus.RETIRED and item.version != current_version
+        ]
+        if not candidates:
+            raise FeedbackConflict("automatic rollback has no retired target")
+        target = max(candidates, key=lambda item: _release_version_key(item.version))
+        return await self.rollback(
+            context,
+            model_id,
+            RollbackModelReleaseRequest(target_version=target.version, reason=reason),
+        )
 
     async def deployment_events(
         self, context: PrincipalContext, limit: int = 100

@@ -54,7 +54,7 @@ x-scenara-environment: &scenara-environment
   SCENARA_TRAJECTORY_MAX_TEMPLATES: ${SCENARA_TRAJECTORY_MAX_TEMPLATES:-32}
   SCENARA_TRAJECTORY_DEFAULT_TRANSITION_SECONDS: ${SCENARA_TRAJECTORY_DEFAULT_TRANSITION_SECONDS:-0}
 
-x-scenara-image: &scenara-image scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.24}
+x-scenara-image: &scenara-image scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.25}
 
 services:
   postgres:

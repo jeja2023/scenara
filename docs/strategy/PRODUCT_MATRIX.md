@@ -1,6 +1,6 @@
 # Scenara 产品矩阵
 
-适用版本：`0.3.0-dev.24`。本文是产品边界和演进顺序的权威说明，不是所有产品均已发布的销售清单。
+适用版本：`0.3.0-dev.25`。本文是产品边界和演进顺序的权威说明，不是所有产品均已发布的销售清单。
 
 Scenara 是平台母品牌。长期产品矩阵采用三层边界：产品模块、共享入口和底层 AI 数据底座。`Console`、`API`、`SDK` 不作为重复建设的业务产品，而作为所有产品模块共享的控制面和开发者入口。
 
@@ -44,7 +44,7 @@ Scenara 是平台母品牌。长期产品矩阵采用三层边界：产品模块
 详细仓库职责见 [`REPOSITORY_TOPOLOGY.md`](./REPOSITORY_TOPOLOGY.md)，认证与安全边界见 [`ACCESS_FOUNDATION.md`](./ACCESS_FOUNDATION.md)。
 
 Parse、Model、Data 三个模块在人像方向的长期演进目标、六大能力模块与三项核心资产见 [`PORTRAIT_INTELLIGENCE_STRATEGY.md`](./PORTRAIT_INTELLIGENCE_STRATEGY.md)，其成熟度与能力就绪度通过 `GET /api/v1/platform/portrait-intelligence` 暴露。该契约是产品矩阵在人像领域的纵向深化，不新增产品条目。
-适用版本：`0.3.0-dev.24`。当前基线已完成经认证 S3 Provider 抽象、对象不可变发布、SHA-256 完整性校验、生命周期治理和预签名直传，并完成 Core 到 Data 的远程客户端、迁移包、统一 Console 主题整改、事件信封和结构化可观测性整改；生产 Data 服务的导入、备份恢复与切流证据，以及 ANN、语义重排和跨租户联邦仍需后续门禁。
+适用版本：`0.3.0-dev.25`。当前基线已完成经认证 S3 Provider 抽象、对象不可变发布、SHA-256 完整性校验、生命周期治理和预签名直传，并完成 Core 到 Data 的远程客户端、迁移包、统一 Console 主题整改、事件信封、结构化可观测性整改和 Qdrant FeatureStore 适配器；生产 Data 服务的导入、备份恢复与切流证据，以及 ANN 真实集群、语义重排和跨租户联邦仍需后续门禁。
 
 ## P0-P2 non-model completion
 

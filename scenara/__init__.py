@@ -1,3 +1,3 @@
 """Scenara enterprise vision parsing platform."""
 
-__version__ = "0.3.0.dev24"
+__version__ = "0.3.0.dev25"

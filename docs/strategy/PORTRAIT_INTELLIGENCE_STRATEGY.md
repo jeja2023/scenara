@@ -1,6 +1,6 @@
 # Scenara 人像智能基础平台长期战略
 
-适用版本：`0.3.0-dev.24`。本文是景枢人像 AI 方向的长期技术战略，定义平台演进目标、六大核心模块、三项核心资产以及各阶段的门禁与现状差距。本文是战略意图文件，不是已发布能力清单。能力成熟度以 `model-capabilities.yml` 和 [实现矩阵](../release/IMPLEMENTATION_MATRIX.md) 为准。
+适用版本：`0.3.0-dev.25`。本文是景枢人像 AI 方向的长期技术战略，定义平台演进目标、六大核心模块、三项核心资产以及各阶段的门禁与现状差距。本文是战略意图文件，不是已发布能力清单。能力成熟度以 `model-capabilities.yml` 和 [实现矩阵](../release/IMPLEMENTATION_MATRIX.md) 为准。
 
 ---
 
@@ -27,8 +27,8 @@
 | 标注平台 | CVAT · Label Studio | 支持图像、视频、多模态标注闭环 | 🟡 Core 已具备远程接入与任务契约；工具集成未建设 |
 | 模型训练 | OpenMMLab · PyTorch Lightning | 统一训练框架，覆盖检测/识别/姿态等任务 | 🟡 平台侧契约就绪，训练侧在 `scenara-model` 独立仓库 |
 | 人像算法 | InsightFace · SCRFD · RTMPose · FastReID | 构建完整人像 AI 能力矩阵 | 🟡 7 项中 2 项就绪，4 项 fallback，1 项 placeholder |
-| 向量检索 | Milvus · Qdrant | 支撑海量人像检索、聚类和跨摄像头关联 | 🟡 pgvector 可用；Qdrant 已有旧层实现；Milvus 未建 |
-| MLOps | MLflow · Triton · Kubernetes | 实现模型生命周期管理与持续迭代 | 🔴 治理链路有，工具链未接入 |
+| 向量检索 | Milvus · Qdrant | 支撑海量人像检索、聚类和跨摄像头关联 | 🟡 pgvector/Qdrant 适配器已实现；Milvus 未建；真实 Qdrant 资格待验收 |
+| MLOps | MLflow · Triton · Kubernetes | 实现模型生命周期管理与持续迭代 | 🟡 MLflow/Triton HTTP 边界和自动回滚已实现；真实集群与 K8s 资格待验收 |
 
 ---
 
@@ -127,7 +127,7 @@
 **工具选型**：
 
 - pgvector — 千万级以下规模的默认后端，随 PostgreSQL 一体部署
-- Qdrant — 中大规模场景的候选后端，尚未实现 `FeatureStore` 适配器
+- Qdrant — 中大规模场景的候选后端，`scenara/infrastructure/qdrant_features.py` 已实现 `FeatureStore` HTTP 适配器
 - Milvus — 超大规模或多模态混合检索场景
 
 **平台侧已有**：
@@ -138,8 +138,8 @@
 
 **演进路径**：
 
-1. 当前：pgvector 覆盖 1.0 单节点场景
-2. 中期：在 `scenara/infrastructure/` 新增 Qdrant `FeatureStore` 适配器
+1. 当前：pgvector 覆盖 1.0 单节点场景；Qdrant provider 已可通过配置切换
+2. 中期：完成 Qdrant 真实服务兼容性、容量、备份恢复和租户隔离验收
 3. 长期：按规模选型，`FeatureStore` 抽象层保证上层代码零修改切换后端
 
 **聚类与关联能力**：跨摄像头 Re-ID 长期轨迹与时间线关联已在 Portrait Intelligence Engine 层实现（`scenara/domains/portrait/trajectory.py`），不在 `FeatureStore` 层实现；无监督全库聚类与身份图谱仍在规划中。
@@ -165,10 +165,10 @@
 
 **缺失项**：
 
-- Triton 推理服务集成（当前为 ONNXRuntime 直接推理）
-- K8s 部署清单与 HPA 配置
-- 实时推理延迟/吞吐监控与告警
-- 模型性能退化自动检测与回滚触发
+- Triton 推理服务集成边界（当前默认仍为 ONNXRuntime 直接推理；真实服务资格待验收）
+- K8s 目标集群兼容性、HPA 压测和滚动发布证据（清单与 HPA 已提供）
+- 实时推理延迟/吞吐监控与告警的目标集群接入
+- 目标集群告警编排与模型性能退化证据
 
 **建设顺序**：1.0 以 ONNXRuntime 单节点为基线；1.1 接入 Triton 提升并发；2.0 建设 K8s 水平扩缩。Kubernetes 和多节点 HA 不属于 1.0 正式支持范围。
 
@@ -233,8 +233,8 @@
 标注平台       ░░░░░░░░░░  ~3%   难例导出已有，标注工具未集成
 模型训练       ████░░░░░░  ~40%  平台侧契约就绪；训练侧状态在 scenara-model
 人像算法       ██░░░░░░░░  ~25%  2/7 能力 ready；5 项 fallback/placeholder
-向量检索       ███░░░░░░░  ~35%  pgvector 可用；Qdrant 旧层已有；大规模未解
-MLOps         ██░░░░░░░░  ~20%  治理链路有；Triton/K8s/MLflow 均未接入
+向量检索       ████░░░░░░  ~45%  pgvector/Qdrant 适配器可用；真实集群资格未解
+MLOps         ███░░░░░░░  ~30%  Triton/MLflow HTTP 边界和自动回滚已实现；集群资格未解
 
 Data Lake      ░░░░░░░░░░  ~3%
 Foundation Model ░░░░░░░  ~0%
@@ -267,9 +267,9 @@ Intelligence Engine █░░░  ~10%
 
 **目标**：生产推理服务能力提升，并在新平台架构中实现 Qdrant 后端。
 
-- 在 [scenara/infrastructure/](../../scenara/infrastructure/) 中实现 Qdrant `FeatureStore` 适配器
-- 接入 Triton Inference Server，替换 ONNXRuntime 直接推理
-- 接入 MLflow，`scenara-model` 实验与 `ModelPackageManifest` 版本绑定
+- Qdrant `FeatureStore` 适配器已落地；在真实 Qdrant 集群完成兼容性、容量、备份恢复和租户隔离验收
+- Triton Inference Server HTTP 适配器已实现；真实部署后替换 ONNXRuntime 直推路径
+- MLflow REST 记录器已实现，`ModelPackageManifest` 可绑定实验 Run
 - 多模态融合检索：face + body embedding 联合评分
 
 ---

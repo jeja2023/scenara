@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "7617245aad0f046ebb2ec992ab8efea910facd62261bdffa606945af1da41a14" /** gitleaks:allow - public contract digest */;
+export declare const OPENAPI_SHA256 = "758e0823af574a3b45e432856edb5ead27fbd3ea6a4f876f18f4f2a5b6317256" /** gitleaks:allow - public contract digest */;
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
@@ -833,6 +833,12 @@ export declare namespace OpenApi {
         tenant_id: string;
         updated_at: number;
         updated_by: string;
+    };
+    type AutoRollbackModelRequest = {
+        capability: string;
+        model_id: string;
+        model_version: string;
+        reason: string;
     };
     type Body_compare_portrait_asset_image_api_v1_portrait_compare_asset_image_post = {
         asset_id: string;

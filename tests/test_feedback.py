@@ -323,6 +323,53 @@ async def test_model_release_lifecycle_activation_and_rollback(feedback_client) 
 
 
 @pytest.mark.asyncio
+async def test_model_health_auto_rollback_is_thresholded_and_audited(feedback_client) -> None:
+    api, runtime = feedback_client
+    await create_release(api, runtime, "1.0.0", "a" * 64)
+    await create_release(api, runtime, "1.1.0", "b" * 64)
+    for index in range(20):
+        metric = await api.post(
+            "/api/v1/platform/model-metrics",
+            json={
+                "record_id": f"metric_{index}",
+                "tenant_id": "default",
+                "project_id": "default",
+                "model_id": "scenara.portrait.release",
+                "model_version": "1.1.0",
+                "capability": "person_detection",
+                "latency_ms": 20,
+                "error_rate": 0.2,
+                "quality_score": 0.9,
+                "created_at": time.time(),
+            },
+        )
+        assert metric.status_code == 201, metric.text
+    health = await api.get(
+        "/api/v1/platform/model-health",
+        params={
+            "model_id": "scenara.portrait.release",
+            "model_version": "1.1.0",
+            "capability": "person_detection",
+        },
+    )
+    assert health.status_code == 200
+    assert health.json()["data"]["rollback_recommended"] is True
+    rolled_back = await api.post(
+        "/api/v1/platform/model-health/auto-rollback",
+        json={
+            "model_id": "scenara.portrait.release",
+            "model_version": "1.1.0",
+            "capability": "person_detection",
+            "reason": "automated health policy threshold",
+        },
+    )
+    assert rolled_back.status_code == 200, rolled_back.text
+    assert rolled_back.json()["data"]["rolled_back"] is True
+    statuses = {item["version"]: item["status"] for item in (await api.get("/api/v1/model-releases")).json()["data"]}
+    assert statuses == {"1.0.0": "active", "1.1.0": "retired"}
+
+
+@pytest.mark.asyncio
 async def test_run_freezes_active_release_and_passes_it_to_runtime(feedback_client, monkeypatch) -> None:
     api, runtime = feedback_client
     await create_release(api, runtime, "1.0.0", "a" * 64)

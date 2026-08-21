@@ -4255,6 +4255,42 @@
         "title": "AuditRetentionPolicy",
         "type": "object"
       },
+      "AutoRollbackModelRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "capability": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Capability",
+            "type": "string"
+          },
+          "model_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Model Id",
+            "type": "string"
+          },
+          "model_version": {
+            "pattern": "^\\d+\\.\\d+\\.\\d+(?:-[a-z0-9.-]+)?$",
+            "title": "Model Version",
+            "type": "string"
+          },
+          "reason": {
+            "maxLength": 2000,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "model_id",
+          "model_version",
+          "capability",
+          "reason"
+        ],
+        "title": "AutoRollbackModelRequest",
+        "type": "object"
+      },
       "Body_compare_portrait_asset_image_api_v1_portrait_compare_asset_image_post": {
         "properties": {
           "asset_id": {
@@ -15115,7 +15151,7 @@
   "info": {
     "description": "Scenara 景枢视觉 AI 中枢平台",
     "title": "Scenara API",
-    "version": "0.3.0.dev24"
+    "version": "0.3.0.dev25"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -25705,6 +25741,113 @@
           }
         },
         "summary": "Model Health",
+        "tags": [
+          "Model Governance"
+        ]
+      }
+    },
+    "/api/v1/platform/model-health/auto-rollback": {
+      "post": {
+        "operationId": "auto_rollback_model_api_v1_platform_model_health_auto_rollback_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "authorization",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-principal-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Principal-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-tenant-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Tenant-Id"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-project-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Project-Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoRollbackModelRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiEnvelope_dict_str__object__"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Auto Rollback Model",
         "tags": [
           "Model Governance"
         ]

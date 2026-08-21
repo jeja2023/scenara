@@ -85,6 +85,7 @@ from scenara.platform.control_plane import (
     AgentMemoryEntry,
     AgentTool,
     AgentTrace,
+    AutoRollbackModelRequest,
     AnnotationProvider,
     AnnotationTask,
     ApproveAgentActionRequest,
@@ -2807,6 +2808,23 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         return _envelope(
             request, await runtime.control_plane.model_health(context, model_id, model_version, capability)
         )  # type: ignore[return-value]
+
+    @app.post("/api/v1/platform/model-health/auto-rollback", tags=["Model Governance"])
+    async def auto_rollback_model(
+        body: AutoRollbackModelRequest,
+        request: Request,
+        context: PrincipalContext = Depends(principal_context),
+    ) -> ApiEnvelope[dict[str, object]]:
+        health = await runtime.control_plane.model_health(context, body.model_id, body.model_version, body.capability)
+        if not health.rollback_recommended:
+            return _envelope(request, {"rolled_back": False, "health": health})  # type: ignore[return-value]
+        release = await runtime.feedback.auto_rollback(
+            context,
+            body.model_id,
+            body.model_version,
+            reason=body.reason,
+        )
+        return _envelope(request, {"rolled_back": True, "health": health, "release": release})  # type: ignore[return-value]
 
     @app.post("/api/v1/search/ranking-profiles", status_code=201, tags=["Search"])
     async def create_search_ranking_profile(

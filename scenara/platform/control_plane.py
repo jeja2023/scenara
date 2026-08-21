@@ -532,6 +532,13 @@ class ModelHealthSnapshot(StrictModel):
     evaluated_at: float
 
 
+class AutoRollbackModelRequest(StrictModel):
+    model_id: str = Field(min_length=1, max_length=128)
+    model_version: str = Field(pattern=r"^\d+\.\d+\.\d+(?:-[a-z0-9.-]+)?$")
+    capability: str = Field(min_length=1, max_length=128)
+    reason: str = Field(min_length=1, max_length=2_000)
+
+
 class FlowNode(StrictModel):
     node_id: str = Field(pattern=r"^[a-z][a-z0-9_.-]{1,63}$")
     kind: FlowNodeKind

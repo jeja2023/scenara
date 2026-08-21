@@ -250,16 +250,17 @@ def build_portrait_intelligence(
                 "Cross-camera Re-ID trajectory service with face + body fusion",
                 "Long-term identity timeline correlation with camera topology constraints",
                 "Human adjudication: confirm, reject, rename, merge, split, biometric deletion",
+                "Qdrant HTTP FeatureStore adapter with tenant/project payload filters",
             ],
             not_in_scope_yet=[
-                "Qdrant infrastructure implementation under scenara/infrastructure/ FeatureStore protocol",
                 "Milvus backend for large-scale or multi-modal hybrid search",
                 "Unsupervised gallery-wide clustering beyond per-run trajectory association",
                 "Gait and appearance modalities in the trajectory fusion score",
+                "Production Qdrant compatibility, capacity, backup/restore, and isolation qualification",
             ],
             next_gate=(
-                "Implement Qdrant under scenara/infrastructure/ using the FeatureStore protocol, "
-                "then extend trajectory fusion beyond face and body modalities."
+                "Qualify the Qdrant provider in a real deployment, then extend trajectory fusion "
+                "beyond face and body modalities."
             ),
         ),
         PortraitModuleItem(
@@ -278,16 +279,17 @@ def build_portrait_intelligence(
                 "Per-model latency, error-rate, throughput, and quality metric points",
                 "p95 health snapshot and degradation/rollback recommendation",
                 "Fail-closed production configuration checks (scenara/settings.py)",
+                "Provider-neutral inference boundary and deployment health evidence",
+                "Triton HTTP inference adapter and MLflow ModelPackageManifest tracking boundary",
+                "Thresholded automatic rollback endpoint with retired-release selection",
             ],
             not_in_scope_yet=[
-                "Triton Inference Server integration (replaces direct ONNXRuntime inference)",
-                "Kubernetes deployment manifests and HPA configuration",
-                "MLflow experiment linkage to ModelPackageManifest",
-                "Automatic active-version rollback execution",
+                "Production Triton/MLflow/Kubernetes compatibility and capacity qualification",
+                "Automatic rollback orchestration from external alert managers",
             ],
             next_gate=(
-                "Qualify 1.0 with ONNXRuntime single-node baseline; "
-                "then connect Triton for 1.1 concurrency improvements."
+                "Qualify 1.0 with ONNXRuntime single-node baseline and target GPU evidence; "
+                "then qualify Triton/MLflow/Kubernetes providers for 1.1 concurrency and operations."
             ),
         ),
     ]
@@ -335,8 +337,7 @@ def build_portrait_intelligence(
             depends_on_modules=["algorithms", "vector_retrieval", "mlops"],
             next_gate=(
                 "Multi-modal fusion (face + body) shipped in the cross-camera trajectory "
-                "service; next migrate Qdrant to the FeatureStore protocol and extend "
-                "fusion to gait and appearance."
+                "service; next qualify the Qdrant provider and extend fusion to gait and appearance."
             ),
         ),
     ]

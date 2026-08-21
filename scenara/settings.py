@@ -39,6 +39,10 @@ class Settings:
     data_dir: Path
     postgres_dsn: str
     redis_url: str
+    qdrant_url: str
+    qdrant_api_key: str
+    qdrant_timeout_seconds: float
+    qdrant_collection_prefix: str
     s3_endpoint_url: str
     s3_public_endpoint_url: str
     s3_region: str
@@ -102,6 +106,8 @@ class Settings:
             raise RuntimeError("SCENARA_DATA_PLATFORM_URL is required when SCENARA_DATA_PLATFORM_MODE=http")
         if self.data_platform_timeout_seconds <= 0:
             raise RuntimeError("SCENARA_DATA_PLATFORM_TIMEOUT_SECONDS must be positive")
+        if self.qdrant_url and self.qdrant_timeout_seconds <= 0:
+            raise RuntimeError("SCENARA_QDRANT_TIMEOUT_SECONDS must be positive")
         if bool(self.s3_access_key) != bool(self.s3_secret_key):
             raise RuntimeError("SCENARA_S3_ACCESS_KEY and SCENARA_S3_SECRET_KEY must be configured together")
         if self.s3_session_token and not self.s3_access_key:
@@ -176,6 +182,11 @@ def load_settings() -> Settings:
         data_dir=Path(os.getenv("SCENARA_DATA_DIR", "runtime-state")).resolve(),
         postgres_dsn=os.getenv("SCENARA_POSTGRES_DSN", "").strip(),
         redis_url=os.getenv("SCENARA_REDIS_URL", "").strip(),
+        qdrant_url=os.getenv("SCENARA_QDRANT_URL", "").strip().rstrip("/"),
+        qdrant_api_key=os.getenv("SCENARA_QDRANT_API_KEY", "").strip(),
+        qdrant_timeout_seconds=max(0.1, float(os.getenv("SCENARA_QDRANT_TIMEOUT_SECONDS", "10"))),
+        qdrant_collection_prefix=os.getenv("SCENARA_QDRANT_COLLECTION_PREFIX", "scenara_features").strip()
+        or "scenara_features",
         s3_endpoint_url=os.getenv("SCENARA_S3_ENDPOINT_URL", "").strip(),
         s3_public_endpoint_url=os.getenv("SCENARA_S3_PUBLIC_ENDPOINT_URL", "").strip(),
         s3_region=os.getenv("SCENARA_S3_REGION", "us-east-1").strip(),
