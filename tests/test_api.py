@@ -19,6 +19,7 @@ from scenara.server import create_app
 class FixedOcrEngine:
     model_id = "test-ocr"
     version = "1.0.0"
+    production_ready = True
 
     def predict(self, image: Any) -> list[dict[str, Any]]:
         assert image.size == (32, 24)
@@ -52,7 +53,7 @@ async def upload_image(api: httpx.AsyncClient) -> str:
         data={"kind": "image"},
     )
     assert response.status_code == 201, response.text
-    return response.json()["data"]["asset_id"]
+    return str(response.json()["data"]["asset_id"])
 
 
 @pytest.mark.asyncio

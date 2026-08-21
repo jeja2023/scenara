@@ -13,6 +13,7 @@ import {
 } from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
+import type { Router } from "vue-router";
 import { useRouter } from "vue-router";
 import { api, apiBlob, userFacingError } from "../api";
 import { labelMediaKind } from "../labels";
@@ -24,7 +25,7 @@ const loading = ref(false);
 const uploading = ref(false);
 const error = ref("");
 const message = ref("");
-const router = useRouter();
+const router: Router = useRouter();
 const assets = ref<MediaAsset[]>([]);
 const sources = ref<MediaSource[]>([]);
 const probes = reactive<Record<string, MediaSourceProbe>>({});

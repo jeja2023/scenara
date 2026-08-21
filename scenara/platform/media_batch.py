@@ -204,7 +204,7 @@ def _safe_image(data: bytes) -> tuple[Image.Image, str]:
             if transposed is None:
                 raise ValueError("image orientation could not be normalized")
             image = transposed.convert("RGB")
-            image_format = str(opened.format or "unknown").lower()
+            image_format = (opened.format or "unknown").lower()
     except (Image.DecompressionBombError, UnidentifiedImageError, OSError, ValueError) as exc:
         raise PipelineError("media is not a valid supported image") from exc
     if image.width <= 0 or image.height <= 0 or image.width * image.height > MAX_PIXELS:
@@ -229,7 +229,7 @@ def _frame_signature(frame: Any) -> Any:
 
 
 def _signature_distance(previous: Any, current: Any) -> float:
-    correlation = float(cv2.compareHist(previous, current, cv2.HISTCMP_CORREL))
+    correlation = cv2.compareHist(previous, current, cv2.HISTCMP_CORREL)
     return max(0.0, min(1.0, 1.0 - correlation))
 
 

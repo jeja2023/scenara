@@ -14,6 +14,7 @@ import {
 } from "@lucide/vue";
 import { computed, onMounted, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
+import type { Router } from "vue-router";
 import { useRoute, useRouter } from "vue-router";
 
 import { api, userFacingError } from "../api";
@@ -29,7 +30,7 @@ import type {
   ResultSummaryPage,
 } from "../types";
 
-const router = useRouter();
+const router: Router = useRouter();
 const route = useRoute();
 const items = ref<ResultSummary[]>([]);
 const domains = ref<DomainManifest[]>([]);
@@ -202,6 +203,14 @@ function openWorkspace(item: ResultSummary): void {
   void router.push({ path: "/parse", query: { run: item.run_id } });
 }
 
+function navigateToParse(runId?: string): void {
+  if (runId) {
+    void router.push({ path: "/parse", query: { run: runId } });
+  } else {
+    void router.push("/parse");
+  }
+}
+
 function clearFilters(): void {
   query.value = "";
   domain.value = "";
@@ -278,7 +287,7 @@ useRefresh(refresh);
         </button>
         <button
           class="button primary filter-btn action-btn"
-          @click="router.push('/parse')"
+          @click="navigateToParse()"
         >
           <Plus :size="14" />新建解析
         </button>
@@ -385,7 +394,7 @@ useRefresh(refresh);
           <FileSearch :size="32" />
           <strong>还没有匹配的解析结果</strong>
           <span>完成一次解析后，结果会自动出现在这里。</span>
-          <button class="button primary" @click="router.push('/parse')">
+          <button class="button primary" @click="navigateToParse()">
             开始解析
           </button>
         </div>
@@ -452,12 +461,7 @@ useRefresh(refresh);
               </button>
               <button
                 class="button primary compact-btn"
-                @click="
-                  router.push({
-                    path: '/parse',
-                    query: { run: selected.run_id },
-                  })
-                "
+                @click="navigateToParse(selected.run_id)"
               >
                 <Play :size="13" />继续处理
               </button>
