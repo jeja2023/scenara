@@ -61,7 +61,7 @@ REQUIRED_IMPLEMENTATION = (
     "frontend/console/playwright.config.ts",
     "frontend/console/e2e/workspaces.spec.ts",
     "tests/test_control_plane.py",
-    "docs/release/0.3.0-dev.25.md",
+    "docs/release/0.3.0-dev.26.md",
     "docs/release/SUPPORT_MATRIX.md",
     "docs/release/EVIDENCE_OWNERS.md",
     "docs/release/evidence/QUALIFICATION_INPUTS.md",

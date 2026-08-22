@@ -382,7 +382,7 @@ async def test_platform_repository_topology_exposes_ownership_and_integration_bo
     assert contracts["model-package-admission"]["producer_repository_id"] == "scenara-model"
     assert contracts["model-package-admission"]["consumer_repository_id"] == "scenara"
     assert contracts["model-package-admission"]["payload_type"] == "ModelPackageManifest"
-    assert contracts["model-package-admission"]["release_version"] == "1.0.0"
+    assert contracts["model-package-admission"]["release_version"] == "1.0.1"
     assert contracts["model-package-admission"]["compatibility"] == "backward"
     assert contracts["model-package-admission"]["schema_path"].endswith("/model-package-admission.schema.json")
     assert contracts["hard-sample-handoff"]["payload_type"] == "HardSampleManifest"
@@ -400,7 +400,7 @@ async def test_repository_contract_catalog_exposes_verified_schema_artifacts(cli
     response = await api.get("/api/v1/platform/contracts")
     assert response.status_code == 200, response.text
     catalog = response.json()["data"]
-    assert catalog["release_version"] == "1.0.0"
+    assert catalog["release_version"] == "1.0.1"
     contracts = {item["contract_id"]: item for item in catalog["contracts"]}
     assert set(contracts) == {
         "dataset-version-input",

@@ -1,6 +1,6 @@
 # Scenara 产品矩阵
 
-适用版本：`0.3.0-dev.25`。本文是产品边界和演进顺序的权威说明，不是所有产品均已发布的销售清单。
+适用版本：`0.3.0-dev.26`。本文是产品边界和演进顺序的权威说明，不是所有产品均已发布的销售清单。
 
 Scenara 是平台母品牌。长期产品矩阵采用三层边界：产品模块、共享入口和底层 AI 数据底座。`Console`、`API`、`SDK` 不作为重复建设的业务产品，而作为所有产品模块共享的控制面和开发者入口。
 
@@ -33,7 +33,7 @@ Scenara 是平台母品牌。长期产品矩阵采用三层边界：产品模块
 
 产品矩阵通过 `GET /api/v1/platform/products` 暴露。该接口返回产品名称、层级、成熟度、当前范围、尚未纳入范围、Console 路由、API 路径、依赖关系和下一道门禁。
 
-仓库拓扑通过 `GET /api/v1/platform/repositories` 暴露。当前 `scenara` 是平台集成仓库，已有模型训练仓库映射为 `scenara-model` 专业仓库；`scenara-data` 是由 Core 远程客户端接入的独立服务边界。拓扑契约同时公开职责、排除职责、跨仓库清单/API/事件和禁止共享数据库、禁止跨仓库源码导入等强制规则。四条正式跨仓库契约由 `GET /api/v1/platform/contracts` 和 `contracts/repository/v1.0.0/` 发布，并由 Schema 摘要、有效示例和向后兼容门禁保护。
+仓库拓扑通过 `GET /api/v1/platform/repositories` 暴露。当前 `scenara` 是平台集成仓库，已有模型训练仓库映射为 `scenara-model` 专业仓库；`scenara-data` 是由 Core 远程客户端接入的独立服务边界。拓扑契约同时公开职责、排除职责、跨仓库清单/API/事件和禁止共享数据库、禁止跨仓库源码导入等强制规则。四条正式跨仓库契约当前由 `GET /api/v1/platform/contracts` 和 `contracts/repository/v1.0.1/` 发布，历史 `v1.0.0` 目录保持不可变，并由 Schema 摘要、有效示例和向后兼容门禁保护。
 
 这份目录是战略边界，不代表所有条目已经可生产使用。`available` 表示仓库已有可使用能力；`seed` 表示已有基础闭环但尚未独立产品化；`planned` 表示规划中；`gated` 表示必须等待前置证据或前置产品稳定。
 
@@ -44,7 +44,7 @@ Scenara 是平台母品牌。长期产品矩阵采用三层边界：产品模块
 详细仓库职责见 [`REPOSITORY_TOPOLOGY.md`](./REPOSITORY_TOPOLOGY.md)，认证与安全边界见 [`ACCESS_FOUNDATION.md`](./ACCESS_FOUNDATION.md)。
 
 Parse、Model、Data 三个模块在人像方向的长期演进目标、六大能力模块与三项核心资产见 [`PORTRAIT_INTELLIGENCE_STRATEGY.md`](./PORTRAIT_INTELLIGENCE_STRATEGY.md)，其成熟度与能力就绪度通过 `GET /api/v1/platform/portrait-intelligence` 暴露。该契约是产品矩阵在人像领域的纵向深化，不新增产品条目。
-适用版本：`0.3.0-dev.25`。当前基线已完成经认证 S3 Provider 抽象、对象不可变发布、SHA-256 完整性校验、生命周期治理和预签名直传，并完成 Core 到 Data 的远程客户端、迁移包、统一 Console 主题整改、事件信封、结构化可观测性整改和 Qdrant FeatureStore 适配器；生产 Data 服务的导入、备份恢复与切流证据，以及 ANN 真实集群、语义重排和跨租户联邦仍需后续门禁。
+适用版本：`0.3.0-dev.26`。当前基线已完成经认证 S3 Provider 抽象、对象不可变发布、SHA-256 完整性校验、生命周期治理和预签名直传，并完成 Core 到 Data 的远程客户端、迁移包、独立 Data 服务开发闭环、四仓库规范审计、事件信封、结构化可观测性整改和 Qdrant FeatureStore 适配器；生产 Data 服务的导入、备份恢复与切流证据，以及 ANN 真实集群、语义重排和跨租户联邦仍需后续门禁。
 
 ## P0-P2 non-model completion
 

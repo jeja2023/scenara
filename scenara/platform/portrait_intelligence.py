@@ -133,8 +133,8 @@ def build_portrait_intelligence(
             ),
             owner_repository_id="scenara-data",
             current_scope=[
-                "HardSampleManifest cross-repository contract (v1.0.0)",
-                "DatasetVersionReference cross-repository contract (v1.0.0)",
+                "HardSampleManifest cross-repository contract (v1.0.1)",
+                "DatasetVersionReference cross-repository contract (v1.0.1)",
                 "Hard-sample export with approval, authorization, and deidentification",
                 "Dataset catalog and version lifecycle",
                 "Asset manifest binding, quality score, and lineage summary",

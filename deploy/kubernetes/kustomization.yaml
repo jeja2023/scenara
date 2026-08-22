@@ -9,4 +9,4 @@ resources:
   - autoscaling.yaml
 images:
   - name: scenara-api
-    newTag: 0.3.0-dev.25
+    newTag: 0.3.0-dev.26

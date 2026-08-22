@@ -20,7 +20,7 @@ from scripts.repository_contracts import (
 def test_published_repository_contracts_match_models_examples_and_digests() -> None:
     files = rendered_files()
     catalog = load_repository_contract_catalog()
-    assert catalog.release_version == "1.0.0"
+    assert catalog.release_version == "1.0.1"
     assert len(catalog.contracts) == 4
     for contract in catalog.contracts:
         schema_name = Path(contract.schema_path).name

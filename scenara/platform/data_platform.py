@@ -368,6 +368,24 @@ class HttpDataPlatformClient:
         self, context: PrincipalContext, version_id: str
     ) -> DatasetVersionReference:
         payload = await self._request(context, "GET", f"/internal/v1/dataset-versions/{version_id}/reference")
+        # Data keeps ``sample_count`` as a compatibility field for the Core
+        # migration UI; validate only the published cross-repository shape.
+        if isinstance(payload, dict):
+            payload = {
+                key: payload[key]
+                for key in (
+                    "schema_version",
+                    "dataset_id",
+                    "version",
+                    "manifest_uri",
+                    "manifest_sha256",
+                    "lineage_refs",
+                    "authorization_id",
+                    "authorized_consumer_repository_ids",
+                    "created_at",
+                )
+                if key in payload
+            }
         return DatasetVersionReference.model_validate(payload)
 
     async def submit_hard_sample_manifest(
