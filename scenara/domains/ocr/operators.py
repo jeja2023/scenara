@@ -24,11 +24,21 @@ class OcrEngine(Protocol):
     production_ready: bool
     version: str
 
-    def predict(self, image: Any) -> list[dict[str, Any]]: ...
+    def predict(
+        self,
+        image: Any,
+        *,
+        min_score: float = 0.0,
+        language_hint: str | None = None,
+    ) -> list[dict[str, Any]]: ...
+
+    def predict_layout(self, image: Any) -> list[dict[str, Any]]: ...
 
 
 class PaddleOcrEngine:
-    model_id = "paddleocr"
+    """开发环境 PaddleOCR 适配器,仅用于本地测试"""
+
+    model_id = "paddleocr-dev"
     production_ready = False
 
     def __init__(self) -> None:
@@ -38,30 +48,47 @@ class PaddleOcrEngine:
         except ImportError as exc:
             raise DomainUnavailable("PaddleOCR is not installed") from exc
         self.version = str(getattr(paddleocr, "__version__", "unknown"))
-        self._engine = PaddleOCR(
-            use_doc_orientation_classify=True, use_doc_unwarping=False, use_textline_orientation=True
-        )
+        self._engine = PaddleOCR(use_angle_cls=True, lang="ch", show_log=False)
 
-    def predict(self, image: Any) -> list[dict[str, Any]]:
+    def predict(
+        self,
+        image: Any,
+        *,
+        min_score: float = 0.0,
+        language_hint: str | None = None,
+    ) -> list[dict[str, Any]]:
         import numpy as np
 
-        predictions = self._engine.predict(np.asarray(image))
+        img_array = np.asarray(image)
+        result = self._engine.ocr(img_array, cls=True)
+
         blocks: list[dict[str, Any]] = []
-        for prediction in predictions:
-            payload = prediction.json if hasattr(prediction, "json") else prediction
-            payload = payload.get("res", payload) if isinstance(payload, dict) else {}
-            texts = payload.get("rec_texts", [])
-            scores = payload.get("rec_scores", [])
-            polygons = payload.get("rec_polys", [])
-            for index, text in enumerate(texts):
-                blocks.append(
-                    {
-                        "text": str(text),
-                        "score": float(scores[index]) if index < len(scores) else None,
-                        "polygon": polygons[index] if index < len(polygons) else [],
-                    }
-                )
+        if not result or not result[0]:
+            return blocks
+
+        for line in result[0]:
+            if not line or len(line) < 2:
+                continue
+            box, (text, score) = line[0], line[1]
+
+            # 应用置信度过滤
+            if score < min_score:
+                continue
+
+            polygon = [[float(p[0]), float(p[1])] for p in box]
+            blocks.append(
+                {
+                    "text": text,
+                    "score": float(score),
+                    "polygon": polygon,
+                    "language": language_hint or "zh",
+                }
+            )
         return blocks
+
+    def predict_layout(self, image: Any) -> list[dict[str, Any]]:
+        """开发版不支持版面分析"""
+        return []
 
 
 OCR_BLOCK_TYPES = {"text", "title", "paragraph", "image", "table"}
@@ -168,11 +195,20 @@ class OcrDocumentOperator:
             self._engine = loaded_engine
         engine = self._engine
         assert engine is not None
+
+        # 提取参数
+        min_score = float(parameters.get("min_score", 0.0))
+        language_hint = parameters.get("language_hint") or None
+        if language_hint:
+            language_hint = str(language_hint).strip() or None
+        layout_required = bool(parameters.get("layout_required", False))
+
+        # 检查生产就绪状态
         production_ready = bool(getattr(engine, "production_ready", False))
         layout_predictor = getattr(engine, "predict_layout", None)
         layout_capabilities = frozenset(getattr(engine, "production_capabilities", ()))
         layout_ready = callable(layout_predictor) and "layout_analysis" in layout_capabilities
-        layout_required = bool(parameters.get("layout_required", True))
+
         if context.production and not production_ready:
             raise DomainUnavailable("OCR engine is not approved for production")
         if context.production and layout_required and not layout_ready:
@@ -183,6 +219,7 @@ class OcrDocumentOperator:
             substitutes.append("ocr_engine")
         if layout_required and not layout_ready:
             substitutes.append("ocr_layout")
+
         models = [
             ModelProvenance(
                 capability="ocr_recognition",
@@ -205,11 +242,18 @@ class OcrDocumentOperator:
         units: list[MediaUnitResult] = []
         reading_order = 0
         processed_units = 0
+        detected_languages: dict[str, int] = {}
 
         def build_result(*, final: bool = False) -> ResultEnvelope:
             warnings = [f"development_substitute:{item}" for item in substitutes]
             if final and decoded.termination_reason:
                 warnings.append(f"media_termination:{decoded.termination_reason}")
+
+            # 确定主要语言
+            dominant_language = None
+            if detected_languages:
+                dominant_language = max(detected_languages, key=detected_languages.get)
+
             return ResultEnvelope(
                 run_id=context.run_id,
                 domain="ocr",
@@ -220,6 +264,7 @@ class OcrDocumentOperator:
                 domain_payload=OcrDomainPayload(
                     text="\n".join(block.text for block in blocks if block.text),
                     blocks=list(blocks),
+                    language=dominant_language,
                 ),
                 models=models,
                 media_metadata=decoded.metadata.model_copy(update={"sampled_units": processed_units}),
@@ -232,32 +277,63 @@ class OcrDocumentOperator:
         try:
             async for chunk, expected_units in decoded.iter_batches(batch_size):
                 for unit in chunk:
-                    raw_blocks = await asyncio.to_thread(engine.predict, unit.image)
+                    # 执行 OCR 识别,传递参数
+                    raw_blocks = await asyncio.to_thread(
+                        engine.predict,
+                        unit.image,
+                        min_score=min_score,
+                        language_hint=language_hint,
+                    )
+
+                    # 执行版面分析(如果需要且支持)
                     regions: list[dict[str, Any]] = []
-                    if callable(layout_predictor):
+                    if layout_required and callable(layout_predictor):
                         predicted = await asyncio.to_thread(layout_predictor, unit.image)
                         if not isinstance(predicted, list):
                             raise TypeError("OCR layout engine must return a list")
                         regions = [item for item in predicted if isinstance(item, dict)]
+
+                    # 合并版面信息
                     ordered_blocks = _merge_layout(raw_blocks, regions)
+
+                    # 构建结果块
                     for block_index, item in enumerate(ordered_blocks):
                         points = [Point(x=point[0], y=point[1]) for point in _polygon(item.get("polygon"))]
                         block_type = str(item.get("block_type", "text"))
                         if block_type not in OCR_BLOCK_TYPES:
                             block_type = "text"
-                        blocks.append(
-                            OcrTextBlock(
-                                block_id=f"{unit.unit_id}_block_{block_index}",
-                                text=str(item.get("text", "")),
-                                score=item.get("score"),
-                                polygon=points,
-                                block_type=cast(
-                                    Literal["text", "title", "paragraph", "image", "table"], block_type
-                                ),
-                                reading_order=reading_order,
-                            )
+
+                        text = str(item.get("text", ""))
+                        score = item.get("score")
+
+                        # 统计语言
+                        lang = item.get("language")
+                        if lang:
+                            detected_languages[lang] = detected_languages.get(lang, 0) + len(text)
+
+                        # 构建 block
+                        ocr_block = OcrTextBlock(
+                            block_id=f"{unit.unit_id}_block_{block_index}",
+                            text=text,
+                            score=score,
+                            polygon=points,
+                            block_type=cast(
+                                Literal["text", "title", "paragraph", "image", "table"], block_type
+                            ),
+                            reading_order=reading_order,
                         )
+
+                        # 添加页码信息(通过扩展字段)
+                        if unit.page_number is not None:
+                            ocr_block.__dict__["page_number"] = unit.page_number
+
+                        # 添加表格结构信息(如果有)
+                        if block_type == "table" and "table_structure" in item:
+                            ocr_block.__dict__["table_structure"] = item["table_structure"]
+
+                        blocks.append(ocr_block)
                         reading_order += 1
+
                     units.append(
                         MediaUnitResult(
                             unit_id=unit.unit_id,

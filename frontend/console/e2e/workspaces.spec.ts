@@ -582,6 +582,71 @@ test("导航栏直接提供人像解析与 OCR 文档解析入口", async ({ pag
   ).toBeVisible();
 });
 
+test("导航栏展示 API 返回的新增领域入口", async ({ page }) => {
+  await page.route("**/api/v1/domains", async (route) => {
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        schema_version: "1.0",
+        request_id: "req-dynamic-domains",
+        data: [
+          {
+            domain_id: "portrait",
+            display_name: "人像",
+            schema_version: "1.0",
+            console_route: "/parse?domain=portrait",
+            capabilities: ["person_detection"],
+            navigation_order: 10,
+          },
+          {
+            domain_id: "ocr",
+            display_name: "OCR 文档",
+            schema_version: "1.0",
+            console_route: "/parse?domain=ocr",
+            capabilities: ["text_recognition"],
+            navigation_order: 20,
+          },
+          {
+            domain_id: "behavior",
+            display_name: "行为识别",
+            schema_version: "1.0",
+            console_route: "/parse?domain=behavior",
+            capabilities: ["action_recognition"],
+            supported_media_kinds: ["video", "stream"],
+            navigation_order: 30,
+          },
+          {
+            domain_id: "fashion",
+            display_name: "服饰风格",
+            schema_version: "1.0",
+            console_route: "/parse?domain=fashion",
+            capabilities: ["clothing_style_detection"],
+            supported_media_kinds: ["image", "video", "stream"],
+            navigation_order: 40,
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.goto("");
+  const mobileMenu = page.locator(".mobile-menu");
+  if (await mobileMenu.isVisible()) await mobileMenu.click();
+
+  const behaviorLink = page.getByRole("link", {
+    name: "行为识别解析",
+    exact: true,
+  });
+  const fashionLink = page.getByRole("link", {
+    name: "服饰风格解析",
+    exact: true,
+  });
+  await expect(behaviorLink).toBeVisible();
+  await expect(fashionLink).toBeVisible();
+  await behaviorLink.click();
+  await expect(page).toHaveURL(/\/parse\/behavior(?:\/video)?$/);
+});
+
 test("parse workbench exposes complete media-mode controls", async ({
   page,
 }) => {

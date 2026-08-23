@@ -490,6 +490,87 @@ class OcrDomainPayload(ExtensibleModel):
     language: str | None = None
 
 
+class BehaviorAction(ExtensibleModel):
+    """单个行为动作识别结果"""
+
+    action_id: str
+    action_type: str = Field(description="行为类型标识,如 fall、fight、run 等")
+    action_label: str = Field(description="行为类型的可读标签")
+    confidence: float = Field(ge=0, le=1, description="置信度分数")
+    start_ms: int = Field(ge=0, description="动作开始时间(毫秒)")
+    end_ms: int = Field(ge=0, description="动作结束时间(毫秒)")
+    track_id: str | None = Field(default=None, description="关联的轨迹 ID")
+    bounding_box: BoundingBox | None = Field(default=None, description="动作主体的边界框")
+
+
+class TemporalSegment(ExtensibleModel):
+    """时序片段"""
+
+    segment_id: str
+    start_ms: int = Field(ge=0)
+    end_ms: int = Field(ge=0)
+    segment_type: str = Field(description="片段类型,如 normal、anomaly、activity 等")
+    confidence: float | None = Field(default=None, ge=0, le=1)
+    description: str = Field(default="")
+
+
+class BehaviorDomainPayload(ExtensibleModel):
+    """行为识别领域结果负载"""
+
+    domain: Literal["behavior"] = "behavior"
+    schema_version: Literal["1.0"] = "1.0"
+    actions: list[BehaviorAction] = Field(default_factory=list, description="识别到的行为动作列表")
+    segments: list[TemporalSegment] = Field(default_factory=list, description="时序片段列表")
+    summary: str = Field(default="", description="行为识别结果摘要")
+
+
+class CosplayDetection(ExtensibleModel):
+    """Cosplay 角色识别结果"""
+
+    detection_id: str
+    character_name: str = Field(description="角色名称,如'路飞'、'初音未来'")
+    series_name: str = Field(description="作品名称,如'海贼王'、'VOCALOID'")
+    confidence: float = Field(ge=0, le=1, description="识别置信度")
+    bounding_box: BoundingBox | None = Field(default=None, description="角色所在区域")
+    attributes: dict[str, Any] = Field(default_factory=dict, description="角色特征(发色、服装特点等)")
+    character_id: str | None = Field(default=None, description="角色唯一标识")
+
+
+class ClothingStyle(ExtensibleModel):
+    """服装风格识别结果"""
+
+    style_id: str
+    style_type: str = Field(description="风格类型标识(jk_uniform, lolita, hanfu, maid等)")
+    style_label: str = Field(description="风格中文标签")
+    confidence: float = Field(ge=0, le=1, description="识别置信度")
+    bounding_box: BoundingBox | None = Field(default=None, description="服装所在区域")
+    sub_category: str | None = Field(default=None, description="子类别(如:水手服JK、甜系Lolita)")
+    attributes: dict[str, Any] = Field(default_factory=dict, description="服装属性(颜色、款式等)")
+
+
+class AccessoryDetection(ExtensibleModel):
+    """配饰识别结果"""
+
+    accessory_id: str
+    accessory_type: str = Field(description="配饰类型(wig, prop, jewelry等)")
+    accessory_label: str = Field(description="配饰中文标签")
+    confidence: float = Field(ge=0, le=1, description="识别置信度")
+    bounding_box: BoundingBox | None = Field(default=None, description="配饰所在区域")
+    color: str | None = Field(default=None, description="主要颜色")
+    material: str | None = Field(default=None, description="材质")
+
+
+class FashionDomainPayload(ExtensibleModel):
+    """服饰风格识别领域结果负载"""
+
+    domain: Literal["fashion"] = "fashion"
+    schema_version: Literal["1.0"] = "1.0"
+    cosplay: list[CosplayDetection] = Field(default_factory=list, description="Cosplay 角色识别结果")
+    clothing_styles: list[ClothingStyle] = Field(default_factory=list, description="服装风格识别结果")
+    accessories: list[AccessoryDetection] = Field(default_factory=list, description="配饰识别结果")
+    summary: str = Field(default="", description="识别结果摘要")
+
+
 class GenericDomainPayload(ExtensibleModel):
     """Fallback payload for a registered domain without a platform model."""
 
@@ -499,7 +580,7 @@ class GenericDomainPayload(ExtensibleModel):
 
 # 保持一方负载的强类型，同时允许插件引入自己的负载结构，
 # 无需修改平台模型联合类型。
-DomainPayload = PortraitDomainPayload | OcrDomainPayload | GenericDomainPayload
+DomainPayload = PortraitDomainPayload | OcrDomainPayload | BehaviorDomainPayload | FashionDomainPayload | GenericDomainPayload
 
 
 class MediaUnitResult(StrictModel):

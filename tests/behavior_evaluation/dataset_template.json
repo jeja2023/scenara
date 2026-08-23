@@ -1,0 +1,123 @@
+{
+  "name": "行为识别基准评估数据集",
+  "version": "1.0.0",
+  "description": "用于评估行为识别引擎在不同场景下的准确率和性能",
+  "license": "MIT",
+  "samples": [
+    {
+      "sample_id": "general_walking_001",
+      "video_path": "videos/general_walking_001.mp4",
+      "ground_truth_actions": [
+        {
+          "action": "walking",
+          "start_frame": 0,
+          "end_frame": 90
+        }
+      ],
+      "fps": 30.0,
+      "category": "general",
+      "metadata": {
+        "duration_seconds": 3,
+        "resolution": "1280x720",
+        "scene": "outdoor"
+      }
+    },
+    {
+      "sample_id": "general_running_001",
+      "video_path": "videos/general_running_001.mp4",
+      "ground_truth_actions": [
+        {
+          "action": "running",
+          "start_frame": 0,
+          "end_frame": 120
+        }
+      ],
+      "fps": 30.0,
+      "category": "general",
+      "metadata": {
+        "duration_seconds": 4,
+        "resolution": "1280x720",
+        "scene": "outdoor"
+      }
+    },
+    {
+      "sample_id": "sports_basketball_001",
+      "video_path": "videos/sports_basketball_001.mp4",
+      "ground_truth_actions": [
+        {
+          "action": "dribbling",
+          "start_frame": 0,
+          "end_frame": 60
+        },
+        {
+          "action": "shooting",
+          "start_frame": 61,
+          "end_frame": 90
+        }
+      ],
+      "fps": 30.0,
+      "category": "sports",
+      "metadata": {
+        "duration_seconds": 3,
+        "resolution": "1920x1080",
+        "sport": "basketball"
+      }
+    },
+    {
+      "sample_id": "anomaly_falling_001",
+      "video_path": "videos/anomaly_falling_001.mp4",
+      "ground_truth_actions": [
+        {
+          "action": "walking",
+          "start_frame": 0,
+          "end_frame": 30
+        },
+        {
+          "action": "falling",
+          "start_frame": 31,
+          "end_frame": 45
+        },
+        {
+          "action": "lying",
+          "start_frame": 46,
+          "end_frame": 90
+        }
+      ],
+      "fps": 30.0,
+      "category": "anomaly",
+      "metadata": {
+        "duration_seconds": 3,
+        "resolution": "1280x720",
+        "anomaly_type": "fall_detection"
+      }
+    },
+    {
+      "sample_id": "multi_person_meeting_001",
+      "video_path": "videos/multi_person_meeting_001.mp4",
+      "ground_truth_actions": [
+        {
+          "action": "sitting",
+          "start_frame": 0,
+          "end_frame": 60
+        },
+        {
+          "action": "talking",
+          "start_frame": 0,
+          "end_frame": 60
+        },
+        {
+          "action": "standing",
+          "start_frame": 61,
+          "end_frame": 90
+        }
+      ],
+      "fps": 30.0,
+      "category": "multi_person",
+      "metadata": {
+        "duration_seconds": 3,
+        "resolution": "1920x1080",
+        "num_persons": 3
+      }
+    }
+  ]
+}

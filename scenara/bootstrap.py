@@ -8,6 +8,12 @@ from dataclasses import dataclass
 from scenara.domains.ocr import OcrPlugin
 from scenara.domains.ocr.factory import load_ocr_engine
 from scenara.domains.ocr.operators import OcrEngine
+from scenara.domains.behavior import BehaviorPlugin
+from scenara.domains.behavior.factory import load_behavior_engine
+from scenara.domains.behavior.operators import BehaviorEngine
+from scenara.domains.fashion import FashionPlugin
+from scenara.domains.fashion.factory import load_fashion_engine
+from scenara.domains.fashion.operators import FashionEngine
 from scenara.domains.portrait import PortraitPlugin
 from scenara.domains.portrait.analysis import PortraitAnalysisBackend
 from scenara.domains.portrait.encoder import RuntimePortraitImageEncoder
@@ -140,11 +146,17 @@ def build_runtime(
     settings: Settings | None = None,
     *,
     ocr_engine: OcrEngine | None = None,
+    behavior_engine: BehaviorEngine | None = None,
+    fashion_engine: FashionEngine | None = None,
     portrait_backend: PortraitAnalysisBackend | None = None,
 ) -> Runtime:
     settings = settings or load_settings()
     if ocr_engine is None and settings.ocr_engine_factory:
         ocr_engine = load_ocr_engine(settings.ocr_engine_factory)
+    if behavior_engine is None and settings.behavior_engine_factory:
+        behavior_engine = load_behavior_engine(settings.behavior_engine_factory)
+    if fashion_engine is None and settings.fashion_engine_factory:
+        fashion_engine = load_fashion_engine(settings.fashion_engine_factory)
     control_plane_store: ControlPlaneStore
     if settings.state_backend == "postgres":
         postgres_state = PostgresStateStore(settings.postgres_dsn)
@@ -239,6 +251,8 @@ def build_runtime(
     plugins = DomainPluginRegistry(pipelines)
     plugins.register(PortraitPlugin(portrait_backend))
     plugins.register(OcrPlugin(ocr_engine))
+    plugins.register(BehaviorPlugin(behavior_engine))
+    plugins.register(FashionPlugin(fashion_engine))
     portrait_encoder = RuntimePortraitImageEncoder(production=settings.production)
     portrait = PortraitService(
         portrait_repository,

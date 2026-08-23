@@ -1,0 +1,62 @@
+{
+  "name": "OCR 基准评估数据集",
+  "version": "1.0.0",
+  "description": "用于评估 PaddleOCR 引擎在不同场景下的准确率和性能",
+  "license": "MIT",
+  "samples": [
+    {
+      "sample_id": "zh_general_001",
+      "image_path": "images/zh_general_001.png",
+      "ground_truth": "这是一段中文文本示例",
+      "language": "zh",
+      "category": "general",
+      "metadata": {
+        "font": "SimSun",
+        "font_size": 14,
+        "orientation": "horizontal"
+      }
+    },
+    {
+      "sample_id": "zh_rotated_001",
+      "image_path": "images/zh_rotated_001.png",
+      "ground_truth": "旋转文本测试",
+      "language": "zh",
+      "category": "rotated",
+      "metadata": {
+        "rotation_angle": 90
+      }
+    },
+    {
+      "sample_id": "en_general_001",
+      "image_path": "images/en_general_001.png",
+      "ground_truth": "This is an English text sample",
+      "language": "en",
+      "category": "general",
+      "metadata": {
+        "font": "Arial",
+        "font_size": 14
+      }
+    },
+    {
+      "sample_id": "zh_table_001",
+      "image_path": "images/zh_table_001.png",
+      "ground_truth": "姓名\t年龄\t城市\n张三\t25\t北京\n李四\t30\t上海",
+      "language": "zh",
+      "category": "table",
+      "metadata": {
+        "rows": 3,
+        "cols": 3
+      }
+    },
+    {
+      "sample_id": "zh_multi_column_001",
+      "image_path": "images/zh_multi_column_001.png",
+      "ground_truth": "第一栏文本内容。第二栏文本内容。",
+      "language": "zh",
+      "category": "multi_column",
+      "metadata": {
+        "columns": 2
+      }
+    }
+  ]
+}

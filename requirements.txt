@@ -11,4 +11,10 @@ python-dotenv==1.2.2
 PyYAML==6.0.3
 cryptography==50.0.0
 httpx==0.28.1
+paddlepaddle-gpu==3.0.0
+paddleocr==2.9.2
+pdfplumber==0.11.5
+paddlevideo==2.5.0
+torch>=2.0.0
+torchvision>=0.15.0
 tzdata==2026.3; sys_platform == "win32"

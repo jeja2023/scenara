@@ -83,6 +83,8 @@ class Settings:
     allow_private_media_sources: bool
     allow_private_webhook_targets: bool
     ocr_engine_factory: str
+    behavior_engine_factory: str
+    fashion_engine_factory: str
     run_artifacts_enabled: bool
     run_artifact_max_crops: int
     run_artifact_crop_max_edge: int
@@ -155,6 +157,10 @@ class Settings:
             errors.append("SCENARA_PRODUCTION_MODELS_REQUIRED must be true")
         if self.production_models_required and not self.ocr_engine_factory:
             errors.append("SCENARA_OCR_ENGINE_FACTORY is required for the approved private OCR adapter")
+        if self.production_models_required and not self.behavior_engine_factory:
+            errors.append("SCENARA_BEHAVIOR_ENGINE_FACTORY is required for the approved private behavior adapter")
+        if self.production_models_required and not self.fashion_engine_factory:
+            errors.append("SCENARA_FASHION_ENGINE_FACTORY is required for the approved private fashion adapter")
         if not self.secret_encryption_key:
             errors.append("SCENARA_SECRET_ENCRYPTION_KEY is required")
         if (self.enterprise_license_path is None) != (self.enterprise_public_key_path is None):
@@ -237,6 +243,8 @@ def load_settings() -> Settings:
         allow_private_media_sources=_bool("SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES", False),
         allow_private_webhook_targets=_bool("SCENARA_ALLOW_PRIVATE_WEBHOOK_TARGETS", False),
         ocr_engine_factory=os.getenv("SCENARA_OCR_ENGINE_FACTORY", "").strip(),
+        behavior_engine_factory=os.getenv("SCENARA_BEHAVIOR_ENGINE_FACTORY", "").strip(),
+        fashion_engine_factory=os.getenv("SCENARA_FASHION_ENGINE_FACTORY", "").strip(),
         run_artifacts_enabled=_bool("SCENARA_RUN_ARTIFACTS_ENABLED", True),
         run_artifact_max_crops=max(0, min(5_000, int(os.getenv("SCENARA_RUN_ARTIFACT_MAX_CROPS", "200")))),
         run_artifact_crop_max_edge=max(

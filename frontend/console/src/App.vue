@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { LogOut, Menu, RefreshCw, Settings, X } from "@lucide/vue";
+import {
+  Activity,
+  FileText,
+  LogOut,
+  Menu,
+  RefreshCw,
+  ScanSearch,
+  Settings,
+  Sparkles,
+  X,
+} from "@lucide/vue";
 import {
   computed,
   nextTick,
@@ -42,8 +52,40 @@ const settingsDialog = ref<HTMLDialogElement | null>(null);
 const connectionState = ref<"checking" | "online" | "offline">("checking");
 const draft = reactive<ConnectionSettings>(loadConnection());
 const domainManifests = ref<DomainManifest[]>([]);
+
+const domainIcons = {
+  behavior: Activity,
+  fashion: Sparkles,
+  ocr: FileText,
+  portrait: ScanSearch,
+};
+
+type NavigationItem =
+  | (typeof routes)[number]
+  | {
+      path: string;
+      name: string;
+      meta: {
+        title: string;
+        description: string;
+        icon: typeof ScanSearch;
+        section: string;
+      };
+    };
+
+function domainConsoleRoute(manifest: DomainManifest): string {
+  const route = manifest.console_route?.trim();
+  // The API still exposes the legacy query route for built-in and installed
+  // domains. Use the path-param route so /parse's portrait redirect cannot
+  // swallow a newly installed domain.
+  if (!route || route.startsWith("/parse?domain=")) {
+    return `/parse/${encodeURIComponent(manifest.domain_id)}`;
+  }
+  return route;
+}
+
 const navigation = computed(() => {
-  const groups = new Map<string, typeof routes>();
+  const groups = new Map<string, NavigationItem[]>();
   for (const item of routes.filter(
     (entry) =>
       !entry.meta?.hideFromNavigation &&
@@ -51,6 +93,58 @@ const navigation = computed(() => {
   )) {
     const section = String(item.meta?.section);
     groups.set(section, [...(groups.get(section) ?? []), item]);
+  }
+
+  const coreItems = groups.get("核心工作区");
+  if (coreItems && domainManifests.value.length) {
+    const staticDomainIds = new Set(
+      coreItems
+        .map((item) => item.path.match(/^\/parse\/([^/:]+)$/u)?.[1])
+        .filter((value): value is string => Boolean(value)),
+    );
+    const installedDomains = [...domainManifests.value]
+      .filter((manifest) => !staticDomainIds.has(manifest.domain_id))
+      .sort(
+        (left, right) =>
+          (left.navigation_order ?? 100) - (right.navigation_order ?? 100) ||
+          labelDomainDisplayName(
+            left.domain_id,
+            left.display_name,
+          ).localeCompare(
+            labelDomainDisplayName(right.domain_id, right.display_name),
+          ),
+      )
+      .map((manifest) => {
+        const domainName = labelDomainDisplayName(
+          manifest.domain_id,
+          manifest.display_name,
+        );
+        return {
+          path: domainConsoleRoute(manifest),
+          name: `domain-${manifest.domain_id}`,
+          meta: {
+            title: domainName.endsWith("解析")
+              ? domainName
+              : `${domainName}解析`,
+            description: labelDomainDescription(
+              manifest.domain_id,
+              manifest.description,
+            ),
+            icon:
+              domainIcons[manifest.domain_id as keyof typeof domainIcons] ??
+              ScanSearch,
+            section: "核心工作区",
+          },
+        } satisfies NavigationItem;
+      });
+
+    // Keep run history after all installed parsing domains in the workbench.
+    const runsIndex = coreItems.findIndex((item) => item.path === "/runs");
+    coreItems.splice(
+      runsIndex < 0 ? coreItems.length : runsIndex,
+      0,
+      ...installedDomains,
+    );
   }
   return groups;
 });

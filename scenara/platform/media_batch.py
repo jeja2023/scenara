@@ -628,44 +628,108 @@ def _decode_pdf(
     data: bytes,
     *,
     page_scale: float = 1.5,
+    max_pages: int | None = None,
+    extract_native_text: bool = True,
     control: ExecutionControl | None = None,
     preview_only: bool = False,
 ) -> DecodedMedia:
+    """
+    解码 PDF 文档
+
+    Args:
+        data: PDF 文件字节数据
+        page_scale: 栅格化缩放比例(0.5-4.0)
+        max_pages: 最大页数限制,超出部分将被截断
+        extract_native_text: 是否尝试提取原生文本层(而非 OCR)
+        control: 执行控制器
+        preview_only: 是否仅解码第一页预览
+
+    Returns:
+        解码后的媒体对象
+    """
     if not data.startswith(b"%PDF-"):
         raise PipelineError("document is not a PDF")
     if not 0.5 <= page_scale <= 4.0:
         raise PipelineError("page_scale must be between 0.5 and 4.0")
+
     try:
         import pypdfium2 as pdfium
 
         document = pdfium.PdfDocument(data)
         page_count = len(document)
+
         if page_count <= 0:
-            raise PipelineError("PDF page count exceeds the safety limit")
+            raise PipelineError("PDF has no pages")
+
+        # 应用页数限制
+        if max_pages is not None and max_pages > 0:
+            page_count = min(page_count, max_pages)
+
+        # 尝试提取原生文本(如果支持)
+        native_text_available = False
+        native_text_by_page: dict[int, str] = {}
+
+        if extract_native_text:
+            try:
+                import pdfplumber
+
+                with pdfplumber.open(BytesIO(data)) as pdf:
+                    for page_num in range(page_count):
+                        if page_num >= len(pdf.pages):
+                            break
+                        page = pdf.pages[page_num]
+                        text = page.extract_text()
+                        if text and text.strip():
+                            native_text_by_page[page_num] = text.strip()
+                            native_text_available = True
+            except Exception:
+                # 如果原生文本提取失败,静默回退到 OCR
+                pass
+
         units: list[DecodedMediaUnit] = []
         page_indexes = range(min(page_count, 1)) if preview_only else range(page_count)
+
         for index in page_indexes:
             _check_control(control)
+
+            # 渲染 PDF 页面为图像
             page = document[index]
             bitmap = page.render(scale=page_scale)
             image = bitmap.to_pil().convert("RGB")
+
             if image.width * image.height > MAX_PIXELS:
                 raise PipelineError("PDF page dimensions exceed the safety limit")
-            units.append(
-                DecodedMediaUnit(
-                    unit_id=f"page_{index + 1}",
-                    unit_type="page",
-                    index=index,
-                    page_number=index + 1,
-                    image=image,
-                )
+
+            unit = DecodedMediaUnit(
+                unit_id=f"page_{index + 1}",
+                unit_type="page",
+                index=index,
+                page_number=index + 1,
+                image=image,
             )
+
+            # 如果有原生文本,附加到 unit(通过扩展字段)
+            if index in native_text_by_page:
+                unit.__dict__["native_text"] = native_text_by_page[index]
+
+            units.append(unit)
+
         document.close()
+
     except PipelineError:
         raise
     except Exception as exc:
         raise PipelineError("PDF could not be decoded safely") from exc
+
     first = units[0] if units else None
+    metadata_dict = {
+        "format": "pdf",
+        "width": first.width if first else 0,
+        "height": first.height if first else 0,
+        "page_count": page_count,
+        "native_text_available": native_text_available,
+    }
+
     return DecodedMedia(
         kind=MediaKind.DOCUMENT,
         units=units,
@@ -676,6 +740,7 @@ def _decode_pdf(
             sampled_units=len(units),
             width=first.width if first else None,
             height=first.height if first else None,
+            **{"native_text_available": native_text_available},
         ),
     )
 

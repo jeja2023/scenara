@@ -1,0 +1,140 @@
+{
+  "name": "服饰风格识别基准评估数据集",
+  "version": "1.0.0",
+  "description": "用于评估服饰识别引擎在不同场景下的准确率和性能",
+  "license": "MIT",
+  "samples": [
+    {
+      "sample_id": "cosplay_miku_001",
+      "image_path": "images/cosplay_miku_001.jpg",
+      "ground_truth": {
+        "cosplay": [
+          {
+            "character_name": "初音未来",
+            "series_name": "VOCALOID"
+          }
+        ],
+        "clothing": [
+          {
+            "style_type": "cosplay",
+            "style_label": "Cosplay服装"
+          }
+        ],
+        "accessories": [
+          {
+            "accessory_type": "wig",
+            "accessory_label": "假发"
+          }
+        ]
+      },
+      "category": "cosplay",
+      "metadata": {
+        "source": "cosplay_event_2024",
+        "quality": "high"
+      }
+    },
+    {
+      "sample_id": "jk_uniform_001",
+      "image_path": "images/jk_uniform_001.jpg",
+      "ground_truth": {
+        "cosplay": [],
+        "clothing": [
+          {
+            "style_type": "jk_uniform",
+            "style_label": "JK制服",
+            "sub_category": "水手服"
+          }
+        ],
+        "accessories": []
+      },
+      "category": "clothing",
+      "metadata": {
+        "source": "street_fashion",
+        "quality": "medium"
+      }
+    },
+    {
+      "sample_id": "lolita_001",
+      "image_path": "images/lolita_001.jpg",
+      "ground_truth": {
+        "cosplay": [],
+        "clothing": [
+          {
+            "style_type": "lolita",
+            "style_label": "洛丽塔",
+            "sub_category": "甜系"
+          }
+        ],
+        "accessories": [
+          {
+            "accessory_type": "hat",
+            "accessory_label": "帽子"
+          }
+        ]
+      },
+      "category": "clothing",
+      "metadata": {
+        "source": "fashion_magazine",
+        "quality": "high"
+      }
+    },
+    {
+      "sample_id": "hanfu_001",
+      "image_path": "images/hanfu_001.jpg",
+      "ground_truth": {
+        "cosplay": [],
+        "clothing": [
+          {
+            "style_type": "hanfu",
+            "style_label": "汉服",
+            "sub_category": "明制"
+          }
+        ],
+        "accessories": [
+          {
+            "accessory_type": "jewelry",
+            "accessory_label": "首饰"
+          }
+        ]
+      },
+      "category": "clothing",
+      "metadata": {
+        "source": "cultural_event",
+        "quality": "high"
+      }
+    },
+    {
+      "sample_id": "mixed_cosplay_clothing_001",
+      "image_path": "images/mixed_001.jpg",
+      "ground_truth": {
+        "cosplay": [
+          {
+            "character_name": "蕾姆",
+            "series_name": "Re:从零开始的异世界生活"
+          }
+        ],
+        "clothing": [
+          {
+            "style_type": "maid",
+            "style_label": "女仆装"
+          }
+        ],
+        "accessories": [
+          {
+            "accessory_type": "wig",
+            "accessory_label": "假发"
+          },
+          {
+            "accessory_type": "prop_item",
+            "accessory_label": "道具物品"
+          }
+        ]
+      },
+      "category": "mixed",
+      "metadata": {
+        "source": "cosplay_event_2024",
+        "quality": "high"
+      }
+    }
+  ]
+}

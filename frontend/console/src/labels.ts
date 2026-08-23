@@ -3,11 +3,15 @@ import type { Domain, RunStatus } from "./types";
 const domainLabels: Record<string, string> = {
   portrait: "人像",
   ocr: "OCR 文档",
+  behavior: "行为识别",
+  fashion: "服饰风格",
 };
 
 const domainDescriptionLabels: Record<string, string> = {
   portrait: "检测人员并分析人像相关的视觉特征。",
   ocr: "从图片、视频和文档中提取文字、版面结构与阅读顺序。",
+  behavior: "识别视频中的人物动作和行为模式,支持50+常见行为类别。",
+  fashion: "识别 Cosplay 角色、服装风格(JK、Lolita、汉服等)和配饰,支持二次元文化和时尚分析。",
 };
 
 const capabilityLabels: Record<string, string> = {
@@ -30,12 +34,22 @@ const capabilityLabels: Record<string, string> = {
   title: "标题",
   paragraph: "段落",
   tracking: "目标跟踪",
+  action_recognition: "动作识别",
+  activity_detection: "活动检测",
+  temporal_segmentation: "时序分割",
+  anomaly_detection: "异常检测",
+  cosplay_recognition: "Cosplay 识别",
+  clothing_style_detection: "服装风格检测",
+  accessory_detection: "配饰识别",
+  fashion_attribute_analysis: "服饰属性分析",
 };
 
 const pipelineLabels: Record<string, string> = {
   "ocr.document": "OCR 文档识别",
   "portrait.analysis": "人像综合分析",
   "portrait.person-detection": "人员检测",
+  "behavior.recognition": "行为识别",
+  "fashion.recognition": "服饰风格识别",
 };
 
 const operatorLabels: Record<string, string> = {
@@ -44,6 +58,8 @@ const operatorLabels: Record<string, string> = {
   "ocr.document-recognition": "文档识别",
   "portrait.full-analysis": "人像综合分析",
   "portrait.person-detection": "人员检测",
+  "behavior.action-recognition": "行为动作识别",
+  "fashion.style-recognition": "服饰风格识别",
 };
 
 const objectTypeLabels: Record<string, string> = {
