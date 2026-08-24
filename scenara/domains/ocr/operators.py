@@ -36,6 +36,39 @@ class OcrEngine(Protocol):
     def predict_layout(self, image: Any) -> list[dict[str, Any]]: ...
 
 
+class DevelopmentOcrEngine:
+    """开发环境 OCR 模拟引擎，当未安装 paddleocr 时提供开发回退"""
+
+    model_id = "ocr-dev"
+    production_ready = False
+    version = "0.1.0"
+
+    def predict(
+        self,
+        image: Any,
+        *,
+        min_score: float = 0.0,
+        language_hint: str | None = None,
+    ) -> list[dict[str, Any]]:
+        width, height = 800, 600
+        if hasattr(image, "size"):
+            width, height = image.size
+        elif hasattr(image, "shape"):
+            height, width = image.shape[:2]
+        return [
+            {
+                "text": "Scenara 景枢 OCR 演示文本（本地未安装 paddleocr，处于开发回退模式）",
+                "score": 0.98,
+                "polygon": [[50.0, 50.0], [float(width - 50), 50.0], [float(width - 50), 100.0], [50.0, 100.0]],
+                "language": language_hint or "zh",
+                "block_type": "text",
+            }
+        ]
+
+    def predict_layout(self, image: Any) -> list[dict[str, Any]]:
+        return []
+
+
 class PaddleOcrEngine:
     """开发环境 PaddleOCR 适配器,仅用于本地测试"""
 
@@ -211,7 +244,10 @@ class OcrDocumentOperator:
         if not isinstance(decoded, DecodedMedia):
             raise TypeError("OCR requires a decoded media batch")
         if self._engine is None:
-            loaded_engine = await asyncio.to_thread(lambda: PaddleOcrEngine())
+            try:
+                loaded_engine = await asyncio.to_thread(lambda: PaddleOcrEngine())
+            except Exception:
+                loaded_engine = DevelopmentOcrEngine()
             self._engine = loaded_engine
         engine = self._engine
         assert engine is not None
