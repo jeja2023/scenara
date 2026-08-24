@@ -82,7 +82,25 @@ class PaddleOcrEngine:
         except ImportError as exc:
             raise DomainUnavailable("PaddleOCR is not installed") from exc
         self.version = str(getattr(paddleocr, "__version__", "unknown"))
-        self._engine = PaddleOCR(use_angle_cls=True, lang="ch", show_log=False)
+
+        from pathlib import Path
+        ocr_dir = Path("models/ocr")
+        det_dir = ocr_dir / "ch_PP-OCRv4_det_infer"
+        rec_dir = ocr_dir / "ch_PP-OCRv4_rec_infer"
+        cls_dir = ocr_dir / "ch_ppocr_mobile_v2.0_cls_infer"
+
+        kwargs: dict[str, Any] = {
+            "use_angle_cls": True,
+            "lang": "ch",
+            "show_log": False,
+        }
+        if det_dir.exists() and rec_dir.exists():
+            kwargs["det_model_dir"] = str(det_dir.resolve())
+            kwargs["rec_model_dir"] = str(rec_dir.resolve())
+            if cls_dir.exists():
+                kwargs["cls_model_dir"] = str(cls_dir.resolve())
+
+        self._engine = PaddleOCR(**kwargs)
 
     def predict(
         self,

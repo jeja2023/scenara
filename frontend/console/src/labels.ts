@@ -42,6 +42,11 @@ const capabilityLabels: Record<string, string> = {
   clothing_style_detection: "服装风格检测",
   accessory_detection: "配饰识别",
   fashion_attribute_analysis: "服饰属性分析",
+  ocr_engine: "OCR 文字识别引擎",
+  ocr_layout: "OCR 版面分析引擎",
+  ocr_recognition: "OCR 文本识别",
+  behavior_engine: "行为识别引擎",
+  fashion_engine: "服饰识别引擎",
 };
 
 const pipelineLabels: Record<string, string> = {
