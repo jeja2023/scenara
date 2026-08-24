@@ -7,6 +7,7 @@ from typing import Any, Literal, Protocol, cast
 
 from scenara.platform.media_batch import DecodedMedia
 from scenara.platform.models import (
+    BoundingBox,
     MediaKind,
     MediaUnitResult,
     ModelProvenance,
@@ -16,6 +17,7 @@ from scenara.platform.models import (
     Point,
     ProvenanceEvidence,
     ResultEnvelope,
+    VisionObject,
 )
 from scenara.platform.pipeline import DomainUnavailable, ExecutionContext, OperatorDefinition
 
@@ -375,6 +377,7 @@ class OcrDocumentOperator:
 
                     # 合并版面信息
                     ordered_blocks = _merge_layout(raw_blocks, regions)
+                    unit_objects: list[VisionObject] = []
 
                     # 构建结果块
                     for block_index, item in enumerate(ordered_blocks):
@@ -391,9 +394,23 @@ class OcrDocumentOperator:
                         if lang:
                             detected_languages[lang] = detected_languages.get(lang, 0) + len(text)
 
+                        # 计算包围盒
+                        left, top, right, bottom = _bounds(item)
+                        bbox = (
+                            BoundingBox(
+                                x=left,
+                                y=top,
+                                width=max(0.0, right - left),
+                                height=max(0.0, bottom - top),
+                            )
+                            if left != float("inf")
+                            else None
+                        )
+
                         # 构建 block
+                        block_id = f"{unit.unit_id}_block_{block_index}"
                         ocr_block = OcrTextBlock(
-                            block_id=f"{unit.unit_id}_block_{block_index}",
+                            block_id=block_id,
                             text=text,
                             score=score,
                             polygon=points,
@@ -412,6 +429,17 @@ class OcrDocumentOperator:
                             ocr_block.__dict__["table_structure"] = item["table_structure"]
 
                         blocks.append(ocr_block)
+
+                        # 构建单元内的 VisionObject，供时间轴与对象明细展示
+                        vision_obj = VisionObject(
+                            object_id=block_id,
+                            object_type=block_type,
+                            score=score,
+                            bbox=bbox,
+                            polygon=points,
+                            attributes={"text": text, "reading_order": reading_order},
+                        )
+                        unit_objects.append(vision_obj)
                         reading_order += 1
 
                     units.append(
@@ -423,6 +451,7 @@ class OcrDocumentOperator:
                             page_number=unit.page_number,
                             width=unit.width,
                             height=unit.height,
+                            objects=unit_objects,
                         )
                     )
                 processed_units += len(chunk)
