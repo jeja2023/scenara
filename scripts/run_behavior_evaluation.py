@@ -19,8 +19,8 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from scenara.domains.behavior.evaluation import BehaviorEvaluator, load_evaluation_dataset
-from scenara.domains.behavior.paddle_production import ProductionPaddleVideoBehaviorEngine
+from scenara.domains.behavior.evaluation import BehaviorEvaluator, load_evaluation_dataset  # noqa: E402
+from scenara.domains.behavior.paddle_production import ProductionPaddleVideoBehaviorEngine  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,

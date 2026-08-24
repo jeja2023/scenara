@@ -1,12 +1,8 @@
 {
   "name": "scenara",
-  "version": "0.3.0-dev.26",
+  "version": "0.3.0-dev.29",
   "private": true,
   "license": "MIT",
-  "type": "commonjs",
-  "packageManager": "pnpm@10.32.1",
-  "description": "Scenara enterprise vision parsing platform",
-  "workspaces": ["frontend/console", "sdk/typescript"],
   "scripts": {
     "check": "npm run console:check && npm run sdk:check",
     "console:check": "npm run typecheck -w @scenara/console && npm run test -w @scenara/console && npm run build -w @scenara/console",

@@ -13,7 +13,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -256,7 +255,7 @@ class FashionEvaluator:
 
         return report
 
-    def _load_image(self, image_path: Path):
+    def _load_image(self, image_path: Path) -> Any | None:
         """加载图像"""
         try:
             from PIL import Image

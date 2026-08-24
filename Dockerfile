@@ -1,4 +1,4 @@
-FROM node:22.22.2-bookworm-slim AS console-builder
+FROM node:22.22.2-bookworm-slim@sha256:868499d55378719bffa87b0ed1f099591823c029b543043c09c2483468e93201 AS console-builder
 
 RUN corepack enable && corepack prepare pnpm@10.32.1 --activate
 WORKDIR /build
@@ -10,7 +10,14 @@ COPY frontend/console frontend/console
 COPY sdk/typescript sdk/typescript
 RUN pnpm --filter @scenara/console build
 
-FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
+FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04@sha256:9175fa92f96de35a8cfb9493f0dfcf9435c7a597e9d95ad41d2cae382a95e3f9
+
+ARG SCENARA_VERSION=0.3.0-dev.29
+ARG SCENARA_SOURCE_COMMIT=unknown
+LABEL org.opencontainers.image.title="Scenara" \
+      org.opencontainers.image.version="${SCENARA_VERSION}" \
+      org.opencontainers.image.revision="${SCENARA_SOURCE_COMMIT}" \
+      org.opencontainers.image.licenses="MIT"
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -18,7 +25,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 python3-pip python3-venv ffmpeg libglib2.0-0 libgl1 curl ca-certificates \
+    && apt-get install -y --no-install-recommends python3 python3-pip python3-venv postgresql-client ffmpeg libglib2.0-0 libgl1 curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/scenara

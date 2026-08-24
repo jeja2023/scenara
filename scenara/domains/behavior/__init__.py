@@ -6,10 +6,12 @@ Behavior Recognition Domain
 
 from __future__ import annotations
 
+from typing import Any
+
 __all__ = ["BehaviorPlugin"]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     if name == "BehaviorPlugin":
         from scenara.domains.behavior.plugin import BehaviorPlugin
 

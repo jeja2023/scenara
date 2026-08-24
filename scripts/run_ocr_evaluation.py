@@ -18,8 +18,8 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from scenara.domains.ocr.evaluation import OcrEvaluator, load_evaluation_dataset
-from scenara.domains.ocr.paddle_production import ProductionPaddleOcrEngine
+from scenara.domains.ocr.evaluation import OcrEvaluator, load_evaluation_dataset  # noqa: E402
+from scenara.domains.ocr.paddle_production import ProductionPaddleOcrEngine  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,

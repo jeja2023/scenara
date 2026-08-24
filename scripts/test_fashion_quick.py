@@ -16,8 +16,8 @@ def test_import() -> bool:
     """测试依赖导入"""
     print("1. 测试依赖导入...")
     try:
-        from PIL import Image
-        print(f"   [PASS] PIL (Pillow)")
+        import PIL
+        print(f"   [PASS] PIL (Pillow) {PIL.__version__}")
     except ImportError as e:
         print(f"   [FAIL] PIL 导入失败: {e}")
         return False
@@ -52,7 +52,6 @@ def test_cosplay_detection() -> bool:
     """测试 Cosplay 识别"""
     print("\n3. 测试 Cosplay 识别...")
     try:
-        import numpy as np
         from PIL import Image
         from scenara.domains.fashion.production import ProductionFashionEngine
 
@@ -66,13 +65,13 @@ def test_cosplay_detection() -> bool:
         )
         results = engine.detect_cosplay(img, min_confidence=0.0)
 
-        print(f"   [PASS] 识别完成")
+        print("   [PASS] 识别完成")
         if results:
             print(f"   [INFO] 检测到 {len(results)} 个 Cosplay 角色")
             for i, item in enumerate(results[:3], 1):
                 print(f"     [{i}] {item['character_name']} ({item['series_name']}) - {item['confidence']:.2f}")
         else:
-            print(f"   [INFO] 未检测到 Cosplay 角色(正常,测试图像)")
+            print("   [INFO] 未检测到 Cosplay 角色(正常,测试图像)")
         return True
     except Exception as e:
         print(f"   [FAIL] Cosplay 识别失败: {e}")
@@ -98,13 +97,13 @@ def test_clothing_detection() -> bool:
         )
         results = engine.detect_clothing_style(img, min_confidence=0.0)
 
-        print(f"   [PASS] 识别完成")
+        print("   [PASS] 识别完成")
         if results:
             print(f"   [INFO] 检测到 {len(results)} 种服装风格")
             for i, item in enumerate(results[:3], 1):
                 print(f"     [{i}] {item['style_label']} - {item['confidence']:.2f}")
         else:
-            print(f"   [INFO] 未检测到服装风格(正常,测试图像)")
+            print("   [INFO] 未检测到服装风格(正常,测试图像)")
         return True
     except Exception as e:
         print(f"   [FAIL] 服装风格识别失败: {e}")
@@ -130,13 +129,13 @@ def test_accessory_detection() -> bool:
         )
         results = engine.detect_accessories(img, min_confidence=0.0)
 
-        print(f"   [PASS] 识别完成")
+        print("   [PASS] 识别完成")
         if results:
             print(f"   [INFO] 检测到 {len(results)} 个配饰")
             for i, item in enumerate(results[:3], 1):
                 print(f"     [{i}] {item['accessory_label']} - {item['confidence']:.2f}")
         else:
-            print(f"   [INFO] 未检测到配饰(正常,测试图像)")
+            print("   [INFO] 未检测到配饰(正常,测试图像)")
         return True
     except Exception as e:
         print(f"   [FAIL] 配饰识别失败: {e}")

@@ -6,7 +6,9 @@ resources:
   - configmap.yaml
   - api.yaml
   - workers.yaml
+  - scheduler.yaml
   - autoscaling.yaml
+  - networkpolicy.yaml
 images:
   - name: scenara-api
-    newTag: 0.3.0-dev.26
+    newTag: 0.3.0-dev.29

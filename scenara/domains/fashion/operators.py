@@ -8,13 +8,11 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections import defaultdict
 from typing import Any, Protocol
 
 from scenara.platform.media_batch import DecodedMedia
 from scenara.platform.models import (
     AccessoryDetection,
-    BoundingBox,
     ClothingStyle,
     CosplayDetection,
     FashionDomainPayload,

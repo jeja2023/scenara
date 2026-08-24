@@ -722,14 +722,6 @@ def _decode_pdf(
         raise PipelineError("PDF could not be decoded safely") from exc
 
     first = units[0] if units else None
-    metadata_dict = {
-        "format": "pdf",
-        "width": first.width if first else 0,
-        "height": first.height if first else 0,
-        "page_count": page_count,
-        "native_text_available": native_text_available,
-    }
-
     return DecodedMedia(
         kind=MediaKind.DOCUMENT,
         units=units,
@@ -740,7 +732,7 @@ def _decode_pdf(
             sampled_units=len(units),
             width=first.width if first else None,
             height=first.height if first else None,
-            **{"native_text_available": native_text_available},
+            native_text_available=native_text_available,
         ),
     )
 

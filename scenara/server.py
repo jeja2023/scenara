@@ -18,6 +18,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, StreamingResponse
 from starlette.middleware.base import RequestResponseEndpoint
 from starlette.staticfiles import StaticFiles
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from scenara.platform.log_context import (
     new_traceparent,
@@ -422,6 +423,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     )
     app.state.runtime = runtime
     app.state.request_metrics = RequestMetrics()
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(runtime.settings.allowed_hosts))
     console_assets = CONSOLE_DIST / "assets"
     if console_assets.is_dir():
         app.mount("/console/assets", StaticFiles(directory=console_assets), name="console-assets")
@@ -511,6 +513,15 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             )
             reset_log_context(log_tokens)
         response.headers["X-Request-Id"] = request.state.request_id
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+        if runtime.settings.hsts_enabled:
+            response.headers.setdefault(
+                "Strict-Transport-Security",
+                f"max-age={runtime.settings.hsts_max_age_seconds}; includeSubDomains",
+            )
         return response
 
     app.include_router(build_audit_router(runtime, principal_context, _envelope))

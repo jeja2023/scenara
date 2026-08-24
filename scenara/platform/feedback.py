@@ -53,6 +53,7 @@ class VerifiedFeedbackTrace(TypedDict):
     media_ref: str
     pipeline_id: str
     pipeline_version: str
+    domain: str
 
 
 class FeedbackKind(StrEnum):
@@ -61,6 +62,11 @@ class FeedbackKind(StrEnum):
     WRONG_ATTRIBUTE = "wrong_attribute"
     WRONG_IDENTITY = "wrong_identity"
     OCR_CORRECTION = "ocr_correction"
+    ACTION_CORRECTION = "action_correction"
+    TEMPORAL_CORRECTION = "temporal_correction"
+    STYLE_CORRECTION = "style_correction"
+    CHARACTER_CORRECTION = "character_correction"
+    ACCESSORY_CORRECTION = "accessory_correction"
 
 
 class FeedbackStatus(StrEnum):
@@ -121,6 +127,7 @@ class FeedbackRecord(FeedbackModel):
     review_notes: str = ""
     created_at: float
     updated_at: float
+    domain: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_.-]{1,63}$")
 
 
 class CreateHardSampleManifestRequest(FeedbackModel):
@@ -143,6 +150,8 @@ class HardSampleItem(FeedbackModel):
     correction: dict[str, Any]
     authorized_for_training: bool = True
     deidentified: bool = True
+    domain: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_.-]{1,63}$")
+    annotation_schema_id: str | None = Field(default=None, min_length=1, max_length=256)
 
 
 class HardSampleManifest(FeedbackModel):
@@ -244,6 +253,7 @@ class ModelRelease(FeedbackModel):
     updated_at: float
     activated_at: float | None = None
     retired_at: float | None = None
+    domain: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_.-]{1,63}$")
 
 
 class ModelDeploymentEvent(FeedbackModel):
@@ -263,6 +273,7 @@ class ModelDeploymentEvent(FeedbackModel):
     operator_id: str
     audit_id: str
     created_at: str = Field(pattern=RFC3339_UTC.pattern)
+    domain: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_.-]{1,63}$")
 
     @field_validator("created_at")
     @classmethod
@@ -283,6 +294,21 @@ class FeedbackConflict(FeedbackError):
 
 
 SENSITIVE_CORRECTION_KEYS = {"base64", "bytes", "crop", "embedding", "embeddings", "image_bytes", "raw_media"}
+ANNOTATION_SCHEMA_BY_DOMAIN = {
+    "portrait": "scenara.portrait.detection.v1",
+    "ocr": "scenara.ocr.document.v1",
+    "behavior": "scenara.behavior.action.v1",
+    "fashion": "scenara.fashion.style.v1",
+}
+FEEDBACK_KIND_DOMAINS: dict[FeedbackKind, frozenset[str]] = {
+    FeedbackKind.WRONG_IDENTITY: frozenset({"portrait"}),
+    FeedbackKind.OCR_CORRECTION: frozenset({"ocr"}),
+    FeedbackKind.ACTION_CORRECTION: frozenset({"behavior"}),
+    FeedbackKind.TEMPORAL_CORRECTION: frozenset({"behavior"}),
+    FeedbackKind.STYLE_CORRECTION: frozenset({"fashion"}),
+    FeedbackKind.CHARACTER_CORRECTION: frozenset({"fashion"}),
+    FeedbackKind.ACCESSORY_CORRECTION: frozenset({"fashion"}),
+}
 
 
 def contains_sensitive_correction(value: Any) -> bool:
@@ -545,6 +571,9 @@ class FeedbackService:
     async def create(self, context: PrincipalContext, body: CreateFeedbackRequest) -> FeedbackRecord:
         await require_allowed(self._policy, context, "feedback.create", "feedback")
         trace = await self._verified_trace(context, body)
+        allowed_domains = FEEDBACK_KIND_DOMAINS.get(body.kind)
+        if allowed_domains is not None and trace["domain"] not in allowed_domains:
+            raise FeedbackConflict(f"{body.kind.value} feedback is not valid for domain {trace['domain']}")
         now = time.time()
         record = FeedbackRecord(
             feedback_id=f"fbk_{uuid4().hex}",
@@ -628,8 +657,13 @@ class FeedbackService:
                     pipeline_id=record.pipeline_id,
                     pipeline_version=record.pipeline_version,
                     correction=record.correction,
+                    domain=record.domain,
+                    annotation_schema_id=ANNOTATION_SCHEMA_BY_DOMAIN.get(record.domain or ""),
                 )
             )
+        domains = {item.domain for item in items if item.domain is not None}
+        if len(domains) > 1:
+            raise FeedbackConflict("a hard-sample manifest cannot mix multiple domains")
         payload = {
             "schema_version": "1.0",
             "dataset_id": body.dataset_id,
@@ -683,6 +717,7 @@ class FeedbackService:
             created_by=context.principal_id,
             created_at=now,
             updated_at=now,
+            domain=package.domain,
             **body.model_dump(),
         )
         await self._audit.record(
@@ -755,6 +790,7 @@ class FeedbackService:
                 operator_id=context.principal_id,
                 audit_id=audit.event_id,
                 created_at=utc_rfc3339(time.time()),
+                domain=updated.domain,
             )
         )
         if retired is not None:
@@ -775,6 +811,7 @@ class FeedbackService:
                     operator_id=context.principal_id,
                     audit_id=audit.event_id,
                     created_at=utc_rfc3339(time.time()),
+                    domain=retired.domain,
                 )
             )
         return updated
@@ -830,6 +867,7 @@ class FeedbackService:
                 operator_id=context.principal_id,
                 audit_id=audit.event_id,
                 created_at=utc_rfc3339(time.time()),
+                domain=updated.domain,
             )
         )
         if retired is not None:
@@ -850,6 +888,7 @@ class FeedbackService:
                     operator_id=context.principal_id,
                     audit_id=audit.event_id,
                     created_at=utc_rfc3339(time.time()),
+                    domain=retired.domain,
                 )
             )
         return updated
@@ -1012,6 +1051,7 @@ class FeedbackService:
             "media_ref": media_ref,
             "pipeline_id": run.pipeline.pipeline_id,
             "pipeline_version": run.pipeline.version,
+            "domain": result.domain,
         }
 
 

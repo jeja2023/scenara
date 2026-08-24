@@ -129,6 +129,11 @@ const feedbackKindLabels: Record<string, string> = {
   wrong_attribute: "属性错误",
   wrong_identity: "身份匹配错误",
   ocr_correction: "文字更正",
+  action_correction: "动作更正",
+  temporal_correction: "时序区间更正",
+  style_correction: "服装风格更正",
+  character_correction: "角色更正",
+  accessory_correction: "配饰更正",
 };
 
 const feedbackStatusLabels: Record<string, string> = {

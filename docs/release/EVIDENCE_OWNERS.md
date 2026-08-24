@@ -10,6 +10,8 @@ Scenara is currently a personal development project. The evidence contract there
 | `software_license` | Hash, identify, and self-review the repository `LICENSE` | Exact `LICENSE` SHA-256, SPDX identifier, and terms-completeness review scope; no external legal approval claim |
 | `portrait_evaluation` | Run the fixed portrait evaluation | Versioned rights-cleared dataset, fixed thresholds, two runs within tolerance |
 | `ocr_evaluation` | Run the fixed OCR evaluation | Versioned rights-cleared dataset, fixed thresholds, two runs within tolerance |
+| `behavior_evaluation` | Run the fixed behavior evaluation | Versioned rights-cleared video dataset, action F1, temporal IoU, two runs within tolerance |
+| `fashion_evaluation` | Run the fixed fashion evaluation | Versioned rights-cleared dataset, classification F1, detection mAP, two runs within tolerance |
 | `gpu_capacity` | Run the capacity workload on the target GPU | Sustained load, burst, VRAM pressure, backpressure, recovery, latency and throughput metrics |
 | `offline_install` | Install on an isolated blank host | Checksums, health, console, example clients, core parse |
 | `backup_restore` | Run the recovery drill | RPO/RTO and verification of all required business entities |

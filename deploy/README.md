@@ -1,36 +1,47 @@
 # Scenara 景枢私有化部署
 
-升级、恢复式回滚、运行探针、指标和告警基线见 [OPERATIONS.md](OPERATIONS.md)。
+升级、恢复式回滚、运行探针、指标和告警基线见 [OPERATIONS.md](OPERATIONS.md)；上线逐项验收见 [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md)。
 
 The supported 1.0 target is Ubuntu x86_64 with Docker Engine, Docker Compose v2, and one or more measurable NVIDIA GPUs. PostgreSQL/pgvector, Redis, and MinIO are part of the production Compose topology. The data-service images are pinned by manifest digest. Python production dependencies are installed only from `requirements/production.lock` with SHA-256 verification.
 
 ## Configure
 
-Create a deployment environment file from .env.production.example. Replace every example credential. Generate the secret encryption key with `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`; the checked-in placeholder is intentionally invalid. Keep the file outside source control.
+Generate a deployment candidate outside the repository, then fill external endpoints, image digest, allowed hosts and approved model factories:
+
+    python scripts/generate_production_env.py --output /secure/scenara.env
+    python scripts/validate_production_config.py --env-file /secure/scenara.env
+
+The validator does not print secret values. On Linux it rejects group/world-readable env files, reused trust-boundary secrets, short credentials, invalid Fernet keys, wildcard Host/proxy trust, unqualified built-in adapters, mutable image references and non-TLS Data URLs unless isolated internal HTTP is explicitly allowed.
 
 The default `deploy/compose.yml` is the personal deployment profile. It uses the local policy provider and does not require, read, or mount an enterprise license. The signed enterprise policy implementation remains available as an optional extension. To enable it, set `SCENARA_ENTERPRISE_LICENSE_FILE` and `SCENARA_ENTERPRISE_PUBLIC_KEY_FILE` to readable files and add `-f deploy/compose.enterprise.yml` to each Compose command.
 
-Both GPU workers request all visible GPUs by default. Leave `GPU_DEVICE_IDS` unset for this behavior; set it explicitly, for example `GPU_DEVICE_IDS=0`, only when you intentionally want application-level scheduling isolation. The legacy inference adapter discovers visible devices from `CUDA_VISIBLE_DEVICES`, NVIDIA device nodes, or `nvidia-smi`.
+Both GPU workers request all visible GPUs by default. A qualified production host should normally pin different `GPU_DEVICE_IDS` per worker through a Compose override; sharing all GPUs is only a starting topology and requires measured concurrency evidence. The legacy inference adapter discovers visible devices from `CUDA_VISIBLE_DEVICES`, NVIDIA device nodes, or `nvidia-smi`.
 
-The qualified model package directory must include the private OCR adapter module named by `SCENARA_OCR_ENGINE_FACTORY` (for example `approved_ocr_adapter:create_engine`). Its factory must return a production-ready engine with `model_id`, `version`, `production_ready=true`, `predict`, and the declared layout capabilities. Compose mounts this directory read-only at `/opt/scenara/models` for every process that builds the runtime. The repository does not provide a production OCR adapter.
+The qualified model package directory must include private OCR, Behavior and Fashion adapter modules named by `SCENARA_OCR_ENGINE_FACTORY`, `SCENARA_BEHAVIOR_ENGINE_FACTORY` and `SCENARA_FASHION_ENGINE_FACTORY`. Each factory must return a qualified engine with immutable model identity, `production_ready=true`, the required inference methods and declared capabilities. Compose mounts this directory read-only at `/opt/scenara/models`. Built-in reference adapters are intentionally rejected by production validation.
 
-Validate without starting services:
+Validate without starting services. The Compose `preflight` one-shot service repeats runtime validation before API startup:
 
-    docker compose --env-file deploy/.env.production -f deploy/compose.yml config --quiet
+    docker compose --env-file /secure/scenara.env -f deploy/compose.yml config --quiet
 
-Start an online installation:
+Build and push the release image in CI, record its digest in `SCENARA_IMAGE_REFERENCE`, then start behind a TLS reverse proxy. Do not use `--build` with a digest-pinned production reference. The default host binding is `127.0.0.1:8000`; direct non-loopback HTTP requires an explicit unsafe override:
 
-    docker compose --env-file deploy/.env.production -f deploy/compose.yml up -d --build
+    docker compose --env-file /secure/scenara.env -f deploy/compose.yml pull
+    docker compose --env-file /secure/scenara.env -f deploy/compose.yml run --rm preflight
+    docker compose --env-file /secure/scenara.env -f deploy/compose.yml run --rm migrate
+    docker compose --env-file /secure/scenara.env -f deploy/compose.yml up -d --no-build --wait
 
 For the optional enterprise profile, validate and start with both files:
 
-    docker compose --env-file deploy/.env.production \
+    docker compose --env-file /secure/scenara.env \
       -f deploy/compose.yml -f deploy/compose.enterprise.yml config --quiet
 
-    docker compose --env-file deploy/.env.production \
-      -f deploy/compose.yml -f deploy/compose.enterprise.yml up -d --build
+    docker compose --env-file /secure/scenara.env \
+      -f deploy/compose.yml -f deploy/compose.enterprise.yml run --rm preflight
 
-After the API health check passes, open the bundled Chinese console at `http://<host>:8000/console/`. The same versioned image serves the API and console, so an offline deployment cannot accidentally combine different contract versions.
+    docker compose --env-file /secure/scenara.env \
+      -f deploy/compose.yml -f deploy/compose.enterprise.yml up -d --no-build --wait
+
+After the API health check passes, open the bundled Chinese console through the configured TLS domain, for example `https://scenara.example.com/console/`. Port 8000 remains loopback-only. The same versioned image serves the API and console, so an offline deployment cannot accidentally combine different contract versions.
 
 Private RTSP/RTMP/HTTP source addresses are rejected by default. Set `SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES=true` only when the deployment network isolates workers from management and metadata endpoints; URL credentials remain encrypted in the configured Secret Store.
 
@@ -47,7 +58,7 @@ On a connected Ubuntu build host:
 Transfer the generated tar archive through the project's controlled channel, extract it, then install on the target:
 
     deploy/scripts/install-offline.sh \
-      /srv/scenara-offline-0.3.0-dev.26 \
+      /srv/scenara-offline-0.3.0-dev.29 \
       /secure/scenara.env \
       /secure/offline-installer-result.json
 

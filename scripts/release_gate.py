@@ -45,12 +45,17 @@ REQUIRED_IMPLEMENTATION = (
     "Dockerfile.data",
     "deploy/compose.enterprise.yml",
     "deploy/OPERATIONS.md",
+    "deploy/PRODUCTION_CHECKLIST.md",
+    "deploy/reverse-proxy/nginx.conf.example",
+    "deploy/kubernetes/ingress.example.yaml",
     "deploy/scripts/build-offline-bundle.sh",
     "deploy/scripts/install-offline.sh",
     "deploy/scripts/migrate.sh",
     "deploy/scripts/backup.sh",
     "deploy/scripts/restore.sh",
     "scripts/prepare_runtime_state.py",
+    "scripts/generate_production_env.py",
+    "scripts/validate_production_config.py",
     "scripts/prepare_release_evidence.py",
     "scripts/record_release_evidence.py",
     "scripts/rebuild_redis_queue.py",
@@ -61,7 +66,7 @@ REQUIRED_IMPLEMENTATION = (
     "frontend/console/playwright.config.ts",
     "frontend/console/e2e/workspaces.spec.ts",
     "tests/test_control_plane.py",
-    "docs/release/0.3.0-dev.26.md",
+    "docs/release/0.3.0-dev.29.md",
     "docs/release/SUPPORT_MATRIX.md",
     "docs/release/EVIDENCE_OWNERS.md",
     "docs/release/evidence/QUALIFICATION_INPUTS.md",
@@ -72,6 +77,8 @@ REQUIRED_EVIDENCE_TYPES = {
     "gpu_capacity",
     "integration_services",
     "model_rights",
+    "behavior_evaluation",
+    "fashion_evaluation",
     "ocr_evaluation",
     "offline_install",
     "portrait_evaluation",
@@ -187,7 +194,7 @@ def _finite_number(value: Any) -> float | None:
 
 def _metadata_errors(evidence_type: str, metadata: dict[str, Any]) -> list[str]:
     errors: list[str] = []
-    if evidence_type in {"portrait_evaluation", "ocr_evaluation"}:
+    if evidence_type in {"portrait_evaluation", "ocr_evaluation", "behavior_evaluation", "fashion_evaluation"}:
         if not metadata.get("dataset_version") or metadata.get("rights_cleared") is not True:
             errors.append(f"{evidence_type}: versioned and rights-cleared dataset evidence is required")
         if not _valid_sha256(metadata.get("dataset_manifest_sha256")):

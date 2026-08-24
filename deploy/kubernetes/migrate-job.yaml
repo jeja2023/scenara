@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: scenara-migrate
+  labels:
+    app.kubernetes.io/name: scenara-migrate
+    app.kubernetes.io/part-of: scenara-platform
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: scenara-migrate
+        app.kubernetes.io/part-of: scenara-platform
+    spec:
+      restartPolicy: OnFailure
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: migrate
+          image: scenara-api:0.3.0-dev.29
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "/opt/scenara/deploy/scripts/migrate.sh"]
+          envFrom:
+            - secretRef:
+                name: scenara-migration
+          env:
+            - name: SCENARA_MIGRATIONS_DIR
+              value: /opt/scenara/migrations
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          volumeMounts:
+            - name: temporary
+              mountPath: /tmp
+      volumes:
+        - name: temporary
+          emptyDir:
+            sizeLimit: 256Mi

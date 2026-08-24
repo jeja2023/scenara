@@ -1,6 +1,6 @@
 # Scenara cross-repository contracts
 
-The published contract package is `@scenara/repository-contracts` version `1.0.0`. It contains one Draft 2020-12 JSON Schema and one valid example for each cross-repository payload, plus a checksummed manifest.
+The current published contract package is `@scenara/repository-contracts` version `1.1.0`. It contains one Draft 2020-12 JSON Schema and one valid example for each cross-repository payload, plus a checksummed manifest.
 
 ## Contracts
 
@@ -10,6 +10,7 @@ The published contract package is `@scenara/repository-contracts` version `1.0.0
 | `deployment-feedback` | `scenara` | `scenara-model` | event / signed webhook |
 | `hard-sample-handoff` | `scenara` | `scenara-data` | immutable manifest |
 | `dataset-version-input` | `scenara-data` | `scenara-model` | versioned API |
+| `domain-annotation-schema` | `scenara-contracts` | `scenara-data` | immutable manifest |
 
 `release-index.json` locks every published manifest by SHA-256. A published directory is immutable; incompatible changes require a new major release, while backward-compatible additions require a new minor release.
 
@@ -52,7 +53,7 @@ Build the deterministic release bundle used by CI:
 ```bash
 python scripts/repository_contracts.py \
   --check \
-  --bundle repository-contracts-1.0.0.zip
+  --bundle repository-contracts-1.1.0.zip
 ```
 
 ## Consumer compatibility
@@ -62,7 +63,7 @@ When preparing a later contract release, run the candidate against the last publ
 ```bash
 python scripts/repository_contracts.py \
   --output-dir contracts/repository/v1.1.0 \
-  --against contracts/repository/v1.0.0 \
+  --against contracts/repository/v1.0.1 \
   --check
 ```
 

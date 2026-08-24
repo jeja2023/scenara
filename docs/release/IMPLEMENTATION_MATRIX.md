@@ -5,19 +5,19 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until reproducible objective evidence is committed.
 
-Current development version: `0.3.0-dev.26` (`0.3.0.dev26` for Python packages).
+Current development version: `0.3.0-dev.29` (`0.3.0.dev29` for Python packages).
 
 ## Release Gate Status
-The `0.3.0-dev.25` engineering baseline adds a provider-neutral Qdrant `FeatureStore` adapter with tenant/project filters, deterministic feature-space metadata, expiry filtering, and contract tests on top of the previous contract and observability hardening. The previous performance, reliability, Console and deployment convergence work remains part of the current baseline. The repository is MIT-licensed, and the default Compose profile is personal mode; signed enterprise policy remains an opt-in extension.
+The `0.3.0-dev.29` engineering baseline adds complete product-grade production hardening, fail-closed security gates, configuration generators and validators, compose/k8s security profiles, and host/HSTS protections.
 Formal 1.0 release evidence remains fail-closed until the required evaluation,
 GPU capacity, offline-install, and model-rights checks are supplied for
-`0.3.0-dev.25`. Existing integration, security, backup/restore, and software-license
-reports are digest-bound to the current OpenAPI contract; historical `0.3.0-dev.21`
-reports remain archived and are not reused as current-release evidence. This personal
+`0.3.0-dev.29`. Existing integration, security, backup/restore, and software-license
+reports are digest-bound to the current OpenAPI contract; historical reports
+remain archived and are not reused as current-release evidence. This personal
 project does not require named approvers or legal/commercial sign-off records.
 
 ## Implementation Parity Matrix
-The `0.3.0-dev.26` baseline processes finite video and PDF inputs to EOF unless callers
+The `0.3.0-dev.29` baseline processes finite video and PDF inputs to EOF unless callers
 explicitly request a compatibility cap. Continuous streams are archived into linked Run
 segments under one Stream Session, while inference batches publish `result.delta` events
 and append-only Result shards. Production uses the local personal policy by default; the signed enterprise policy
@@ -77,10 +77,10 @@ The contract, observability, version and release-hardening regression was execut
 
 | Check | Result |
 |---|---|
-| Full Python baseline for `0.3.0-dev.26` | 265 passed, 12 skipped; Ruff, Mypy, OpenAPI/SDK drift, repository contracts, and implementation/development gates pass |
+| Full Python baseline for `0.3.0-dev.29` | 266 passed, 12 skipped; Ruff, Mypy, OpenAPI/SDK drift, repository contracts, and implementation/development gates pass |
 | Security contract suite | 62 passed, 0 skipped; CI runs it once (the coverage job ignores the six security regression files, measured at 65.01% without them) |
-| Console regression for `0.3.0-dev.26` | typecheck, production build and 24 unit tests passed; TypeScript SDK checks passed |
-| Compose/Kubernetes tag convergence | `docker compose config` and `kubectl kustomize` resolve every application service to `scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.26}` |
+| Console regression for `0.3.0-dev.29` | typecheck, production build and 24 unit tests passed; TypeScript SDK checks passed |
+| Compose/Kubernetes tag convergence | `docker compose config` and `kubectl kustomize` resolve every application service to `scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.29}` |
 | Core Data split regression | Core remote-client tests plus 3 standalone Data service/Core round-trip tests passed; production migration, import, backup/restore and cutover evidence remain gated |
 | Console workspace regression | typecheck, 24 unit tests, production build and four-viewport Playwright checks passed; Data and Model routes expose distinct controlled theme accents without horizontal overflow |
 | `.venv\\Scripts\\python.exe -m pytest -q` | 217 passed, 9 integration tests skipped in 57.55s; includes two-video trajectory ReID and `/api/v1/parse/video` shortcut coverage |

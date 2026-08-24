@@ -47,15 +47,15 @@ jobs:
       - run: python scripts/generate_typescript_sdk.py --check
       - run: python scripts/export_openapi.py --check
       - name: Verify and package repository contracts
-        run: python scripts/repository_contracts.py --check --bundle repository-contracts-1.0.0.zip
+        run: python scripts/repository_contracts.py --check --against contracts/repository/v1.0.1 --bundle repository-contracts-1.1.0.zip
       - run: python scripts/repository_gate.py
       - run: python scripts/release_gate.py --implementation-only
       - name: Validate deployment shell scripts
         run: bash -n deploy/scripts/*.sh
       - uses: actions/upload-artifact@v7
         with:
-          name: repository-contracts-1.0.0
-          path: repository-contracts-1.0.0.zip
+          name: repository-contracts-1.1.0
+          path: repository-contracts-1.1.0.zip
 
   web:
     runs-on: ubuntu-24.04
@@ -99,6 +99,11 @@ jobs:
       SCENARA_DATA_PLATFORM_URL: http://scenara-data:8000
       SCENARA_DATA_PLATFORM_SERVICE_TOKEN: example-data-token
       SCENARA_DATA_EVENT_SERVICE_TOKEN: example-event-token
+      SCENARA_REDIS_PASSWORD: example-integration-redis-password
+      SCENARA_MINIO_ROOT_USER: scenara-integration-root
+      SCENARA_MINIO_ROOT_PASSWORD: example-integration-minio-root-password
+      SCENARA_ALLOWED_HOSTS: localhost,127.0.0.1,testserver
+      SCENARA_ALLOW_INSECURE_INTERNAL_ENDPOINTS: "true"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -117,6 +122,8 @@ jobs:
         # the pytest process never inherits it and tries to import the module.
         env:
           SCENARA_OCR_ENGINE_FACTORY: compose_interpolation_only:create_engine
+          SCENARA_BEHAVIOR_ENGINE_FACTORY: compose_interpolation_only:create_behavior_engine
+          SCENARA_FASHION_ENGINE_FACTORY: compose_interpolation_only:create_fashion_engine
         run: |
           compose=(docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml)
           for attempt in 1 2 3; do
@@ -131,6 +138,8 @@ jobs:
       - name: Apply integration database migrations
         env:
           SCENARA_OCR_ENGINE_FACTORY: compose_interpolation_only:create_engine
+          SCENARA_BEHAVIOR_ENGINE_FACTORY: compose_interpolation_only:create_behavior_engine
+          SCENARA_FASHION_ENGINE_FACTORY: compose_interpolation_only:create_fashion_engine
         run: |
           compose=(docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml)
           for attempt in 1 2 3; do
@@ -143,6 +152,8 @@ jobs:
       - name: Initialize integration object store
         env:
           SCENARA_OCR_ENGINE_FACTORY: compose_interpolation_only:create_engine
+          SCENARA_BEHAVIOR_ENGINE_FACTORY: compose_interpolation_only:create_behavior_engine
+          SCENARA_FASHION_ENGINE_FACTORY: compose_interpolation_only:create_fashion_engine
         run: |
           compose=(docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml)
           for attempt in 1 2 3; do
@@ -157,6 +168,8 @@ jobs:
         if: always()
         env:
           SCENARA_OCR_ENGINE_FACTORY: compose_interpolation_only:create_engine
+          SCENARA_BEHAVIOR_ENGINE_FACTORY: compose_interpolation_only:create_behavior_engine
+          SCENARA_FASHION_ENGINE_FACTORY: compose_interpolation_only:create_fashion_engine
         run: |
           mkdir -p runtime-state/logs
           docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml logs --no-color > runtime-state/logs/integration-services.compose.log
@@ -171,6 +184,8 @@ jobs:
         if: always()
         env:
           SCENARA_OCR_ENGINE_FACTORY: compose_interpolation_only:create_engine
+          SCENARA_BEHAVIOR_ENGINE_FACTORY: compose_interpolation_only:create_behavior_engine
+          SCENARA_FASHION_ENGINE_FACTORY: compose_interpolation_only:create_fashion_engine
         run: docker compose -p scenara-integration -f deploy/compose.yml -f deploy/compose.integration.yml down --volumes --remove-orphans
 
   supply-chain:
@@ -264,6 +279,14 @@ jobs:
       COMPOSE_PROJECT_NAME: scenara-backup-drill
       SCENARA_POSTGRES_PASSWORD: scenara-backup-drill
       SCENARA_API_TOKEN: backup-drill-api-token
+      SCENARA_REDIS_PASSWORD: example-backup-redis-password
+      SCENARA_MINIO_ROOT_USER: scenara-backup-root
+      SCENARA_MINIO_ROOT_PASSWORD: example-backup-minio-root-password
+      SCENARA_S3_ACCESS_KEY: scenara-backup-app
+      SCENARA_ALLOWED_HOSTS: localhost,127.0.0.1
+      SCENARA_ALLOW_INSECURE_INTERNAL_ENDPOINTS: "true"
+      SCENARA_BEHAVIOR_ENGINE_FACTORY: compose_interpolation_only:create_behavior_engine
+      SCENARA_FASHION_ENGINE_FACTORY: compose_interpolation_only:create_fashion_engine
     steps:
       - uses: actions/checkout@v7
         with:

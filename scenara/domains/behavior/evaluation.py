@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import numpy as np
+from numpy.typing import NDArray
 
 logger = logging.getLogger(__name__)
 
@@ -202,7 +202,7 @@ class BehaviorEvaluator:
 
         return report
 
-    def _load_video_frames(self, video_path: Path) -> list[np.ndarray]:
+    def _load_video_frames(self, video_path: Path) -> list[NDArray[Any]]:
         """加载视频帧"""
         try:
             import cv2

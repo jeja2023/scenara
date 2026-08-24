@@ -108,6 +108,24 @@ def build_repository_topology() -> RepositoryTopology:
                     "cutover evidence before accepting production traffic."
                 ),
             ),
+            RepositoryTopologyItem(
+                repository_id="scenara-contracts",
+                name="Scenara Contracts",
+                kind=RepositoryKind.SPECIALIZED_PRODUCT,
+                lifecycle=RepositoryLifecycle.EXTERNAL_EXISTING,
+                responsibilities=[
+                    "capability_and_entity_dictionary",
+                    "cross_repository_schema_publication",
+                    "compatibility_and_digest_governance",
+                ],
+                excluded_responsibilities=[
+                    "business_logic",
+                    "production_inference",
+                    "model_training_jobs",
+                    "dataset_storage",
+                ],
+                next_gate="Continue publishing backward-compatible contract increments before consumer changes.",
+            ),
         ],
         integration_contracts=[
             RepositoryIntegrationContract(
@@ -116,8 +134,8 @@ def build_repository_topology() -> RepositoryTopology:
                 consumer_repository_id="scenara",
                 transport=RepositoryContractTransport.IMMUTABLE_MANIFEST,
                 payload_type="ModelPackageManifest",
-                release_version="1.0.1",
-                schema_path="contracts/repository/v1.0.1/model-package-admission.schema.json",
+                release_version="1.1.0",
+                schema_path="contracts/repository/v1.1.0/model-package-admission.schema.json",
                 invariants=[
                     "sha256_digest_required",
                     "model_card_required",
@@ -132,8 +150,8 @@ def build_repository_topology() -> RepositoryTopology:
                 consumer_repository_id="scenara-data",
                 transport=RepositoryContractTransport.IMMUTABLE_MANIFEST,
                 payload_type="HardSampleManifest",
-                release_version="1.0.1",
-                schema_path="contracts/repository/v1.0.1/hard-sample-handoff.schema.json",
+                release_version="1.1.0",
+                schema_path="contracts/repository/v1.1.0/hard-sample-handoff.schema.json",
                 invariants=[
                     "approved_feedback_only",
                     "authorized_export_required",
@@ -147,8 +165,8 @@ def build_repository_topology() -> RepositoryTopology:
                 consumer_repository_id="scenara-model",
                 transport=RepositoryContractTransport.VERSIONED_API,
                 payload_type="DatasetVersionReference",
-                release_version="1.0.1",
-                schema_path="contracts/repository/v1.0.1/dataset-version-input.schema.json",
+                release_version="1.1.0",
+                schema_path="contracts/repository/v1.1.0/dataset-version-input.schema.json",
                 invariants=[
                     "immutable_dataset_version_required",
                     "lineage_required",
@@ -161,12 +179,26 @@ def build_repository_topology() -> RepositoryTopology:
                 consumer_repository_id="scenara-model",
                 transport=RepositoryContractTransport.EVENT,
                 payload_type="ModelDeploymentEvent",
-                release_version="1.0.1",
-                schema_path="contracts/repository/v1.0.1/deployment-feedback.schema.json",
+                release_version="1.1.0",
+                schema_path="contracts/repository/v1.1.0/deployment-feedback.schema.json",
                 invariants=[
                     "versioned_schema_required",
                     "tenant_project_scope_required",
                     "audit_trace_required",
+                ],
+            ),
+            RepositoryIntegrationContract(
+                contract_id="domain-annotation-schema",
+                producer_repository_id="scenara-contracts",
+                consumer_repository_id="scenara-data",
+                transport=RepositoryContractTransport.IMMUTABLE_MANIFEST,
+                payload_type="DomainAnnotationSchema",
+                release_version="1.1.0",
+                schema_path="contracts/repository/v1.1.0/domain-annotation-schema.schema.json",
+                invariants=[
+                    "versioned_schema_id_required",
+                    "domain_and_task_required",
+                    "payload_schema_required",
                 ],
             ),
         ],

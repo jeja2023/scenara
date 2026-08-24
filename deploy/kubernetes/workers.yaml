@@ -7,6 +7,8 @@ metadata:
     app.kubernetes.io/part-of: scenara-platform
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: scenara-batch-worker
@@ -16,10 +18,18 @@ spec:
         app.kubernetes.io/name: scenara-batch-worker
         app.kubernetes.io/part-of: scenara-platform
     spec:
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: worker
-          image: scenara-api:0.3.0-dev.26
+          image: scenara-api:0.3.0-dev.29
           imagePullPolicy: IfNotPresent
           command: ["python3", "-m", "scenara.worker", "--consumer", "batch-k8s", "--lane", "batch"]
           envFrom:
@@ -27,13 +37,38 @@ spec:
                 name: scenara-runtime
             - secretRef:
                 name: scenara-runtime
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
           resources:
             requests:
               cpu: 500m
               memory: 1Gi
+              nvidia.com/gpu: "1"
             limits:
               cpu: "4"
               memory: 8Gi
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: temporary
+              mountPath: /tmp
+            - name: runtime-state
+              mountPath: /opt/scenara/runtime-state
+            - name: qualified-models
+              mountPath: /opt/scenara/models
+              readOnly: true
+      volumes:
+        - name: temporary
+          emptyDir:
+            sizeLimit: 4Gi
+        - name: runtime-state
+          emptyDir:
+            sizeLimit: 512Mi
+        - name: qualified-models
+          persistentVolumeClaim:
+            claimName: scenara-qualified-models
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -44,6 +79,8 @@ metadata:
     app.kubernetes.io/part-of: scenara-platform
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app.kubernetes.io/name: scenara-realtime-worker
@@ -53,21 +90,54 @@ spec:
         app.kubernetes.io/name: scenara-realtime-worker
         app.kubernetes.io/part-of: scenara-platform
     spec:
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: worker
-          image: scenara-api:0.3.0-dev.26
+          image: scenara-api:0.3.0-dev.29
           imagePullPolicy: IfNotPresent
-          command: ["python3", "-m", "scenara.worker", "--consumer", "realtime-k8s", "--lane", "realtime"]
+          command: ["python3", "-m", "scenara.worker", "--consumer", "stream-k8s", "--lane", "stream"]
           envFrom:
             - configMapRef:
                 name: scenara-runtime
             - secretRef:
                 name: scenara-runtime
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
           resources:
             requests:
               cpu: 500m
               memory: 1Gi
+              nvidia.com/gpu: "1"
             limits:
               cpu: "4"
               memory: 8Gi
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: temporary
+              mountPath: /tmp
+            - name: runtime-state
+              mountPath: /opt/scenara/runtime-state
+            - name: qualified-models
+              mountPath: /opt/scenara/models
+              readOnly: true
+      volumes:
+        - name: temporary
+          emptyDir:
+            sizeLimit: 4Gi
+        - name: runtime-state
+          emptyDir:
+            sizeLimit: 512Mi
+        - name: qualified-models
+          persistentVolumeClaim:
+            claimName: scenara-qualified-models

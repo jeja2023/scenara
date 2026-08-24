@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import time
 from typing import Any, Literal, Protocol, cast
 
@@ -164,6 +165,25 @@ def _merge_layout(
     return sorted(merged, key=lambda item: (_bounds(item)[1], _bounds(item)[0]))
 
 
+def _predict_blocks(
+    engine: OcrEngine,
+    image: Any,
+    *,
+    min_score: float,
+    language_hint: str | None,
+) -> list[dict[str, Any]]:
+    """Call both the 1.0 bare-image adapter and the extended OCR adapter safely."""
+    parameters = inspect.signature(engine.predict).parameters.values()
+    accepts_kwargs = any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters)
+    names = {parameter.name for parameter in parameters}
+    options: dict[str, Any] = {}
+    if accepts_kwargs or "min_score" in names:
+        options["min_score"] = min_score
+    if accepts_kwargs or "language_hint" in names:
+        options["language_hint"] = language_hint
+    return engine.predict(image, **options)
+
+
 class OcrDocumentOperator:
     definition = OperatorDefinition(
         operator_id="ocr.document-recognition",
@@ -252,7 +272,7 @@ class OcrDocumentOperator:
             # 确定主要语言
             dominant_language = None
             if detected_languages:
-                dominant_language = max(detected_languages, key=detected_languages.get)
+                dominant_language = max(detected_languages, key=lambda language: detected_languages[language])
 
             return ResultEnvelope(
                 run_id=context.run_id,
@@ -279,7 +299,8 @@ class OcrDocumentOperator:
                 for unit in chunk:
                     # 执行 OCR 识别,传递参数
                     raw_blocks = await asyncio.to_thread(
-                        engine.predict,
+                        _predict_blocks,
+                        engine,
                         unit.image,
                         min_score=min_score,
                         language_hint=language_hint,

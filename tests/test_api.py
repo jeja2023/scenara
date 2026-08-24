@@ -76,6 +76,25 @@ async def test_operational_probes_and_metrics_report_runtime_health(client) -> N
 
 
 @pytest.mark.asyncio
+async def test_host_allowlist_and_security_headers(development_settings) -> None:
+    settings = replace(
+        development_settings,
+        allowed_hosts=("scenara.example.com",),
+        hsts_enabled=True,
+        hsts_max_age_seconds=31_536_000,
+    )
+    app = create_app(runtime=build_runtime(settings))
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://scenara.example.com") as api:
+        response = await api.get("/livez")
+        assert response.status_code == 200
+        assert response.headers["strict-transport-security"] == "max-age=31536000; includeSubDomains"
+        assert response.headers["x-frame-options"] == "DENY"
+        assert response.headers["referrer-policy"] == "no-referrer"
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://evil.example") as api:
+        assert (await api.get("/livez")).status_code == 400
+
+
+@pytest.mark.asyncio
 async def test_readiness_fails_when_a_required_backend_is_unavailable(client, monkeypatch: pytest.MonkeyPatch) -> None:
     api, runtime = client
 
@@ -280,7 +299,7 @@ def test_openapi_exposes_domain_union(development_settings) -> None:
     components = schema["components"]["schemas"]
     result_schema = components["ResultEnvelope"]
     domain_payload = result_schema["properties"]["domain_payload"]
-    assert len(domain_payload["anyOf"]) == 3
+    assert len(domain_payload["anyOf"]) == 5
 
 
 @pytest.mark.asyncio
@@ -299,8 +318,10 @@ async def test_pipeline_and_model_catalog_endpoints_use_state_store(client) -> N
         "ocr.document",
         "portrait.analysis",
         "portrait.person-detection",
+        "behavior.recognition",
+        "fashion.recognition",
     }
-    assert len(await runtime.state.list_pipeline_definitions()) == 3
+    assert len(await runtime.state.list_pipeline_definitions()) == 5
     ocr_pipeline = next(item for item in pipelines.json()["data"] if item["pipeline_id"] == "ocr.document")
     assert ocr_pipeline["parameter_schema"]["layout_required"]["control"] == "boolean"
     models = await api.get("/api/v1/models")
@@ -355,7 +376,7 @@ async def test_platform_repository_topology_exposes_ownership_and_integration_bo
     assert topology["current_repository_id"] == "scenara"
 
     by_id = {item["repository_id"]: item for item in topology["repositories"]}
-    assert set(by_id) == {"scenara", "scenara-data", "scenara-model"}
+    assert set(by_id) == {"scenara", "scenara-contracts", "scenara-data", "scenara-model"}
     assert by_id["scenara"]["current_repository"] is True
     assert set(by_id["scenara"]["primary_product_ids"]) == {
         "agent",
@@ -377,12 +398,13 @@ async def test_platform_repository_topology_exposes_ownership_and_integration_bo
     assert "model_admission_release_and_deployment" in by_id["scenara-model"]["excluded_responsibilities"]
     assert by_id["scenara-data"]["lifecycle"] == "external_existing"
     assert "dataset_catalog_and_versioning" in by_id["scenara-data"]["responsibilities"]
+    assert "cross_repository_schema_publication" in by_id["scenara-contracts"]["responsibilities"]
 
     contracts = {item["contract_id"]: item for item in topology["integration_contracts"]}
     assert contracts["model-package-admission"]["producer_repository_id"] == "scenara-model"
     assert contracts["model-package-admission"]["consumer_repository_id"] == "scenara"
     assert contracts["model-package-admission"]["payload_type"] == "ModelPackageManifest"
-    assert contracts["model-package-admission"]["release_version"] == "1.0.1"
+    assert contracts["model-package-admission"]["release_version"] == "1.1.0"
     assert contracts["model-package-admission"]["compatibility"] == "backward"
     assert contracts["model-package-admission"]["schema_path"].endswith("/model-package-admission.schema.json")
     assert contracts["hard-sample-handoff"]["payload_type"] == "HardSampleManifest"
@@ -400,13 +422,14 @@ async def test_repository_contract_catalog_exposes_verified_schema_artifacts(cli
     response = await api.get("/api/v1/platform/contracts")
     assert response.status_code == 200, response.text
     catalog = response.json()["data"]
-    assert catalog["release_version"] == "1.0.1"
+    assert catalog["release_version"] == "1.1.0"
     contracts = {item["contract_id"]: item for item in catalog["contracts"]}
     assert set(contracts) == {
         "dataset-version-input",
         "deployment-feedback",
         "hard-sample-handoff",
         "model-package-admission",
+        "domain-annotation-schema",
     }
     assert all(len(item["schema_sha256"]) == 64 for item in contracts.values())
 

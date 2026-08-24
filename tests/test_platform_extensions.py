@@ -19,6 +19,7 @@ from scenara.platform.model_runtime import (
     AdapterHealth,
     ModelMetadata,
     ModelPackageManifest,
+    ModelArtifactFile,
     ModelRegistry,
     RuntimeModelBinding,
     runtime_binding_scope,
@@ -267,6 +268,49 @@ async def test_model_registry_persists_verified_package_in_catalog(tmp_path: Pat
     registry = ModelRegistry(production=True, catalog=catalog)
     await registry.install(package, artifact, _Adapter())
     assert await catalog.list_model_packages() == [package]
+
+
+@pytest.mark.asyncio
+async def test_model_registry_verifies_multifile_bundle_before_loading(tmp_path: Path) -> None:
+    import hashlib
+
+    bundle = tmp_path / "behavior-bundle"
+    weights = bundle / "models" / "pptsm.pdparams"
+    weights.parent.mkdir(parents=True)
+    weights.write_bytes(b"behavior-weights")
+    bundle_manifest = bundle / "bundle-manifest.json"
+    bundle_manifest.write_bytes(b'{"schema_version":"1.0"}\n')
+    manifest_digest = hashlib.sha256(bundle_manifest.read_bytes()).hexdigest()
+    package = ModelPackageManifest(
+        model_id="scenara.behavior.action-recognizer",
+        version="1.0.0",
+        capability="action_recognition",
+        adapter="paddlevideo",
+        runtime_model_id="scenara.behavior/action_recognizer_v1",
+        sha256=manifest_digest,
+        source_uri=f"internal://behavior-bundle#sha256={manifest_digest}",
+        license_id="Apache-2.0",
+        model_card=f"internal://model-card.yml#sha256={'b' * 64}",
+        evaluation_evidence=(f"internal://evaluation.json#sha256={'c' * 64}",),
+        vram_mb=6144,
+        regression_samples=("behavior-regression-v1",),
+        production_ready=True,
+        domain="behavior",
+        artifact_format="bundle",
+        artifact_files=(
+            ModelArtifactFile(
+                path="models/pptsm.pdparams",
+                sha256=hashlib.sha256(weights.read_bytes()).hexdigest(),
+                size_bytes=weights.stat().st_size,
+                media_type="application/octet-stream",
+            ),
+        ),
+    )
+    registry = ModelRegistry(production=True)
+    await registry.install(package, bundle, _Adapter())
+    weights.write_bytes(b"tampered")
+    with pytest.raises(Exception, match="size does not match|checksum does not match"):
+        await ModelRegistry(production=True).install(package, bundle, _Adapter())
 
 
 @pytest.mark.asyncio

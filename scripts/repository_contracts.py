@@ -22,10 +22,11 @@ from scenara.platform.feedback import (  # noqa: E402
     ModelDeploymentEvent,
     ModelReleaseStatus,
 )
-from scenara.platform.model_runtime import ModelPackageManifest  # noqa: E402
+from scenara.platform.model_runtime import ModelArtifactFile, ModelPackageManifest  # noqa: E402
 from scenara.platform.repository_contracts import (  # noqa: E402
     CONTRACT_RELEASE_VERSION,
     DatasetVersionReference,
+    DomainAnnotationSchema,
 )
 
 CONTRACT_DIR = ROOT / "contracts" / "repository" / f"v{CONTRACT_RELEASE_VERSION}"
@@ -77,6 +78,8 @@ def contract_definitions() -> list[dict[str, Any]]:
                 pipeline_id="portrait.person-detection",
                 pipeline_version="0.1.0",
                 correction={"label": "person", "bbox": [1, 2, 30, 40]},
+                domain="portrait",
+                annotation_schema_id="scenara.portrait.detection.v1",
             ),
         ),
         sha256="0" * 64,
@@ -93,19 +96,29 @@ def contract_definitions() -> list[dict[str, Any]]:
             "consumer_repository_id": "scenara",
             "transport": "immutable_manifest",
             "example": ModelPackageManifest(
-                model_id="scenara.portrait.person-detector",
+                model_id="scenara.behavior.action-recognizer",
                 version="1.0.0",
-                capability="person_detection",
-                adapter="yolo",
-                runtime_model_id="scenara.portrait/person_detector_v1",
+                capability="action_recognition",
+                adapter="paddlevideo",
+                runtime_model_id="scenara.behavior/action_recognizer_v1",
                 sha256=artifact_sha,
                 source_uri=f"oci://registry.example/scenara/person-detector@sha256:{artifact_sha}",
                 license_id="LicenseRef-Proprietary-Approved",
                 model_card=f"https://artifacts.example/model-card.json#sha256={card_sha}",
                 evaluation_evidence=(f"https://artifacts.example/evaluation.json#sha256={evidence_sha}",),
-                vram_mb=4096,
-                regression_samples=("portrait-regression-v1",),
+                vram_mb=6144,
+                regression_samples=("behavior-regression-v1",),
                 production_ready=True,
+                domain="behavior",
+                artifact_format="bundle",
+                artifact_files=(
+                    ModelArtifactFile(
+                        path="models/pptsm.pdparams",
+                        sha256="f" * 64,
+                        size_bytes=1048576,
+                        media_type="application/octet-stream",
+                    ),
+                ),
             ),
         },
         {
@@ -125,7 +138,7 @@ def contract_definitions() -> list[dict[str, Any]]:
             "consumer_repository_id": "scenara-model",
             "transport": "versioned_api",
             "example": DatasetVersionReference(
-                dataset_id="portrait.training",
+                dataset_id="behavior.training",
                 version="2.1.0",
                 manifest_uri=f"https://data.example/manifests/2.1.0.json#sha256={manifest_sha}",
                 manifest_sha256=manifest_sha,
@@ -133,6 +146,46 @@ def contract_definitions() -> list[dict[str, Any]]:
                 authorization_id="grant_training_2026_07",
                 authorized_consumer_repository_ids=("scenara-model",),
                 created_at="2026-08-18T00:00:00Z",
+                domain="behavior",
+                annotation_schema_ids=("scenara.behavior.action.v1",),
+            ),
+        },
+        {
+            "contract_id": "domain-annotation-schema",
+            "payload_type": "DomainAnnotationSchema",
+            "model": DomainAnnotationSchema,
+            "producer_repository_id": "scenara-contracts",
+            "consumer_repository_id": "scenara-data",
+            "transport": "immutable_manifest",
+            "example": DomainAnnotationSchema(
+                schema_id="scenara.behavior.action.v1",
+                version="1.0.0",
+                domain="behavior",
+                task_type="action_recognition",
+                supported_media_kinds=("video", "stream"),
+                payload_schema={
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "required": ["actions"],
+                    "properties": {
+                        "actions": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "required": ["action_type", "start_ms", "end_ms"],
+                                "properties": {
+                                    "action_type": {"type": "string", "minLength": 1},
+                                    "start_ms": {"type": "integer", "minimum": 0},
+                                    "end_ms": {"type": "integer", "minimum": 0},
+                                    "track_id": {"type": ["string", "null"]},
+                                },
+                                "additionalProperties": True,
+                            },
+                        }
+                    },
+                    "additionalProperties": False,
+                },
+                quality_rules=("non_empty_actions", "valid_temporal_range"),
             ),
         },
         {

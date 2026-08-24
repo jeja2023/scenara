@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "758e0823af574a3b45e432856edb5ead27fbd3ea6a4f876f18f4f2a5b6317256" /** gitleaks:allow - public contract digest */;
+export declare const OPENAPI_SHA256 = "55d120064464faea4ecf92708009050fe386c575a9f98654e8be409307ce5304" /** gitleaks:allow - public contract digest */;
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
@@ -21,6 +21,16 @@ export declare namespace OpenApi {
         tenant_id: string;
     };
     type AccessId = string;
+    type AccessoryDetection = {
+        accessory_id: string;
+        accessory_label: string;
+        accessory_type: string;
+        bounding_box?: (BoundingBox) | (null);
+        color?: (string) | (null);
+        confidence: number;
+        material?: (string) | (null);
+        [key: string]: unknown;
+    };
     type AcknowledgeEdgeDeploymentRequest = {
         applied?: boolean;
         error?: (string) | (null);
@@ -840,6 +850,25 @@ export declare namespace OpenApi {
         model_version: string;
         reason: string;
     };
+    type BehaviorAction = {
+        action_id: string;
+        action_label: string;
+        action_type: string;
+        bounding_box?: (BoundingBox) | (null);
+        confidence: number;
+        end_ms: number;
+        start_ms: number;
+        track_id?: (string) | (null);
+        [key: string]: unknown;
+    };
+    type BehaviorDomainPayload = {
+        actions?: Array<BehaviorAction>;
+        domain?: "behavior";
+        schema_version?: "1.0";
+        segments?: Array<TemporalSegment>;
+        summary?: string;
+        [key: string]: unknown;
+    };
     type Body_compare_portrait_asset_image_api_v1_portrait_compare_asset_image_post = {
         asset_id: string;
         feature_space_id?: (string) | (null);
@@ -941,6 +970,18 @@ export declare namespace OpenApi {
         min_seconds?: number;
         to_camera_id: string;
     };
+    type ClothingStyle = {
+        attributes?: {
+            [key: string]: unknown;
+        };
+        bounding_box?: (BoundingBox) | (null);
+        confidence: number;
+        style_id: string;
+        style_label: string;
+        style_type: string;
+        sub_category?: (string) | (null);
+        [key: string]: unknown;
+    };
     type CompleteMediaUploadRequest = {
         content_type: string;
         expires_at: number;
@@ -950,6 +991,18 @@ export declare namespace OpenApi {
         size_bytes: number;
         upload_id: string;
         upload_token: string;
+    };
+    type CosplayDetection = {
+        attributes?: {
+            [key: string]: unknown;
+        };
+        bounding_box?: (BoundingBox) | (null);
+        character_id?: (string) | (null);
+        character_name: string;
+        confidence: number;
+        detection_id: string;
+        series_name: string;
+        [key: string]: unknown;
     };
     type CreateAgentEvaluationRequest = {
         policy_violation_count?: number;
@@ -1334,7 +1387,16 @@ export declare namespace OpenApi {
             [key: string]: unknown;
         };
     };
-    type FeedbackKind = "false_positive" | "false_negative" | "wrong_attribute" | "wrong_identity" | "ocr_correction";
+    type FashionDomainPayload = {
+        accessories?: Array<AccessoryDetection>;
+        clothing_styles?: Array<ClothingStyle>;
+        cosplay?: Array<CosplayDetection>;
+        domain?: "fashion";
+        schema_version?: "1.0";
+        summary?: string;
+        [key: string]: unknown;
+    };
+    type FeedbackKind = "false_positive" | "false_negative" | "wrong_attribute" | "wrong_identity" | "ocr_correction" | "action_correction" | "temporal_correction" | "style_correction" | "character_correction" | "accessory_correction";
     type FeedbackRecord = {
         authorized_for_training: boolean;
         correction: {
@@ -1342,6 +1404,7 @@ export declare namespace OpenApi {
         };
         created_at: number;
         deidentified: boolean;
+        domain?: (string) | (null);
         feedback_id: string;
         kind: FeedbackKind;
         media_ref: string;
@@ -1419,11 +1482,13 @@ export declare namespace OpenApi {
         detail?: Array<ValidationError>;
     };
     type HardSampleItem = {
+        annotation_schema_id?: (string) | (null);
         authorized_for_training?: boolean;
         correction: {
             [key: string]: unknown;
         };
         deidentified?: boolean;
+        domain?: (string) | (null);
         feedback_id: string;
         kind: FeedbackKind;
         media_ref: string;
@@ -1679,6 +1744,7 @@ export declare namespace OpenApi {
         frames_read?: (number) | (null);
         height?: (number) | (null);
         keyframe_count?: (number) | (null);
+        native_text_available?: (boolean) | (null);
         page_count?: (number) | (null);
         reconnect_count?: (number) | (null);
         sample_end_ms?: (number) | (null);
@@ -1716,11 +1782,18 @@ export declare namespace OpenApi {
         source_identity_ids: Array<string>;
         target_identity_id: string;
     };
+    type ModelArtifactFile = {
+        media_type: string;
+        path: string;
+        sha256: string;
+        size_bytes: number;
+    };
     type ModelDeploymentEvent = {
         action: string;
         audit_id: string;
         capability: string;
         created_at: string;
+        domain?: (string) | (null);
         event_id: string;
         from_status: (ModelReleaseStatus) | (null);
         model_id: string;
@@ -1761,11 +1834,16 @@ export declare namespace OpenApi {
     };
     type ModelPackageManifest = {
         adapter: string;
+        artifact_files?: Array<ModelArtifactFile>;
+        artifact_format?: "onnx" | "paddle" | "pytorch" | "bundle";
         capability: string;
+        domain?: (string) | (null);
         evaluation_evidence: Array<string>;
+        input_schema?: (string) | (null);
         license_id: string;
         model_card: string;
         model_id: string;
+        output_schema?: (string) | (null);
         production_ready?: boolean;
         regression_samples: Array<string>;
         runtime_model_id: string;
@@ -1787,6 +1865,7 @@ export declare namespace OpenApi {
         capability: string;
         created_at: number;
         created_by: string;
+        domain?: (string) | (null);
         evidence_refs?: Array<string>;
         model_id: string;
         package_sha256: string;
@@ -2268,7 +2347,7 @@ export declare namespace OpenApi {
         asset_id?: (string) | (null);
         created_at: number;
         domain: DomainId;
-        domain_payload: (PortraitDomainPayload) | (OcrDomainPayload) | (GenericDomainPayload);
+        domain_payload: (PortraitDomainPayload) | (OcrDomainPayload) | (BehaviorDomainPayload) | (FashionDomainPayload) | (GenericDomainPayload);
         media_metadata?: MediaTechnicalMetadata;
         models?: Array<ModelProvenance>;
         pipeline: PipelineRef;
@@ -2554,6 +2633,15 @@ export declare namespace OpenApi {
         queue_backend: string;
         state_backend: string;
         version: string;
+    };
+    type TemporalSegment = {
+        confidence?: (number) | (null);
+        description?: string;
+        end_ms: number;
+        segment_id: string;
+        segment_type: string;
+        start_ms: number;
+        [key: string]: unknown;
     };
     type TimelineEntry = {
         camera_id: string;

@@ -97,6 +97,7 @@ class MediaTechnicalMetadata(StrictModel):
     stream_segment_duration_ms: int | None = Field(default=None, ge=1_000)
     stream_segment_index: int | None = Field(default=None, ge=0)
     timestamp_source: Literal["decoder_pts", "position_msec", "monotonic_clock"] | None = None
+    native_text_available: bool | None = None
 
 
 class MediaAsset(StrictModel):
@@ -502,6 +503,12 @@ class BehaviorAction(ExtensibleModel):
     track_id: str | None = Field(default=None, description="关联的轨迹 ID")
     bounding_box: BoundingBox | None = Field(default=None, description="动作主体的边界框")
 
+    @model_validator(mode="after")
+    def valid_time_range(self) -> BehaviorAction:
+        if self.end_ms < self.start_ms:
+            raise ValueError("behavior action end_ms must not precede start_ms")
+        return self
+
 
 class TemporalSegment(ExtensibleModel):
     """时序片段"""
@@ -512,6 +519,12 @@ class TemporalSegment(ExtensibleModel):
     segment_type: str = Field(description="片段类型,如 normal、anomaly、activity 等")
     confidence: float | None = Field(default=None, ge=0, le=1)
     description: str = Field(default="")
+
+    @model_validator(mode="after")
+    def valid_time_range(self) -> TemporalSegment:
+        if self.end_ms < self.start_ms:
+            raise ValueError("temporal segment end_ms must not precede start_ms")
+        return self
 
 
 class BehaviorDomainPayload(ExtensibleModel):

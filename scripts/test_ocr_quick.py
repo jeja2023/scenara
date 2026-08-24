@@ -31,7 +31,7 @@ def test_import() -> bool:
 
     try:
         import pdfplumber
-        print(f"   ✓ pdfplumber")
+        print(f"   ✓ pdfplumber {pdfplumber.__version__}")
     except ImportError as e:
         print(f"   ✗ pdfplumber 导入失败: {e}")
         return False
@@ -71,7 +71,7 @@ def test_ocr_prediction() -> bool:
         try:
             # 尝试使用中文字体
             font = ImageFont.truetype("simhei.ttf", 32)
-        except:
+        except OSError:
             # 回退到默认字体
             font = ImageFont.load_default()
 

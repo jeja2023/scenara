@@ -18,7 +18,7 @@ if str(ROOT) not in sys.path:
 from scripts.release_gate import REQUIRED_EVIDENCE_TYPES, validate_entry  # noqa: E402
 
 
-EVALUATION_TYPES = {"portrait_evaluation", "ocr_evaluation"}
+EVALUATION_TYPES = {"portrait_evaluation", "ocr_evaluation", "behavior_evaluation", "fashion_evaluation"}
 GPU_SCENARIOS = {"sustained_load", "burst", "vram_pressure", "backpressure", "recovery"}
 OFFLINE_SERVICES = {"api", "batch-worker", "stream-worker", "scheduler", "postgres", "redis", "minio"}
 QUALIFICATION_EVIDENCE_TYPES = EVALUATION_TYPES | {

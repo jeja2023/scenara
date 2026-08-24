@@ -37,7 +37,9 @@ def test_release_version_is_consistent_across_deployment_and_documents() -> None
     compose = yaml.safe_load((ROOT / "deploy/compose.yml").read_text(encoding="utf-8"))
     application_services = ("api", "batch-worker", "stream-worker", "scheduler")
     for service_name in application_services:
-        assert compose["services"][service_name]["image"].endswith(f":${{SCENARA_IMAGE_TAG:-{npm_version}}}")
+        assert compose["services"][service_name]["image"] == (
+            f"${{SCENARA_IMAGE_REFERENCE:-scenara-api:${{SCENARA_IMAGE_TAG:-{npm_version}}}}}"
+        )
 
     assert f"SCENARA_IMAGE_TAG={npm_version}" in (ROOT / "deploy/.env.production.example").read_text(
         encoding="utf-8"

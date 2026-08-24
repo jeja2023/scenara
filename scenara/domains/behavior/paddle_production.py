@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 from PIL import Image
 
 from scenara.platform.pipeline import DomainUnavailable
@@ -80,7 +81,8 @@ class ProductionPaddleVideoBehaviorEngine:
     """
 
     model_id = "paddlevideo-production"
-    production_ready = True
+    production_ready = False
+    qualification_status = "unqualified_reference_adapter"
     version = "2.5.0"
 
     production_capabilities = frozenset([
@@ -112,7 +114,6 @@ class ProductionPaddleVideoBehaviorEngine:
         try:
             import paddle
             from paddlevideo.modeling.framework import build_model
-            from paddlevideo.utils import get_config
         except ImportError as exc:
             raise DomainUnavailable(
                 "PaddleVideo is not installed. "
@@ -145,7 +146,7 @@ class ProductionPaddleVideoBehaviorEngine:
             self._model = build_model(self._config)
             self._model.eval()
         except Exception as exc:
-            logger.warning(f"Failed to build PaddleVideo model, using fallback: {exc}")
+            logger.warning(f"Failed to build PaddleVideo model; adapter remains unqualified: {exc}")
             self._model = None
 
         # 行为类别
@@ -238,7 +239,7 @@ class ProductionPaddleVideoBehaviorEngine:
                 sha256.update(chunk)
         return sha256.hexdigest()
 
-    def _preprocess_frames(self, frames: list[Any]) -> np.ndarray:
+    def _preprocess_frames(self, frames: list[Any]) -> NDArray[np.float32]:
         """预处理帧序列"""
         processed = []
         target_size = (224, 224)  # 标准输入尺寸
@@ -251,7 +252,7 @@ class ProductionPaddleVideoBehaviorEngine:
                 frame = Image.fromarray(np.array(frame))
 
             # 调整尺寸
-            frame = frame.resize(target_size, Image.BILINEAR)
+            frame = frame.resize(target_size, Image.Resampling.BILINEAR)
 
             # 转换为 numpy
             frame_np = np.array(frame).astype(np.float32)
@@ -267,7 +268,7 @@ class ProductionPaddleVideoBehaviorEngine:
         # 转换为 [C, T, H, W] 格式(PaddleVideo 标准格式)
         video_data = np.transpose(video_data, (3, 0, 1, 2))
 
-        return video_data
+        return video_data.astype(np.float32)
 
     def predict(
         self,

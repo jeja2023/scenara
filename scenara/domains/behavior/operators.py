@@ -186,7 +186,7 @@ class BehaviorRecognitionOperator:
                 warnings.append(f"media_termination:{decoded.termination_reason}")
 
             # 生成摘要
-            action_counts = defaultdict(int)
+            action_counts: defaultdict[str, int] = defaultdict(int)
             for action in actions:
                 action_counts[action.action_type] += 1
 
@@ -223,9 +223,6 @@ class BehaviorRecognitionOperator:
                     # 当缓冲区达到窗口大小时,进行推理
                     if len(temporal_buffer) >= 8:  # 至少 8 帧作为一个窗口
                         frames = [item[0] for item in temporal_buffer]
-                        start_pts = temporal_buffer[0][1]
-                        end_pts = temporal_buffer[-1][1]
-
                         # 执行行为识别
                         predictions = await asyncio.to_thread(
                             engine.predict,

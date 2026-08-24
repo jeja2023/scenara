@@ -5,7 +5,6 @@
 """
 
 import subprocess
-import sys
 import time
 
 def kill_port_8000():

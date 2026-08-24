@@ -383,6 +383,8 @@ class HttpDataPlatformClient:
                     "authorization_id",
                     "authorized_consumer_repository_ids",
                     "created_at",
+                    "domain",
+                    "annotation_schema_ids",
                 )
                 if key in payload
             }
@@ -398,7 +400,16 @@ class HttpDataPlatformClient:
                 "Core object metadata is required to hand off hard samples",
             )
         sources: list[dict[str, object]] = []
-        split = {"train": "train", "validation": "query", "test": "gallery"}[manifest.split]
+        split = manifest.split
+        annotation_schema_ids = {
+            item.annotation_schema_id for item in manifest.items if item.annotation_schema_id is not None
+        }
+        if len(annotation_schema_ids) > 1:
+            raise DataPlatformRemoteError(
+                422,
+                "ANNOTATION_SCHEMA_CONFLICT",
+                "hard-sample manifest cannot mix annotation schemas",
+            )
         occurred_at = manifest.created_at
         for item in manifest.items:
             asset = await self._source_assets.get_asset(context.tenant_id, context.project_id, item.media_ref)
@@ -435,7 +446,7 @@ class HttpDataPlatformClient:
                 "schema_version": "1.0",
                 "manifest": manifest.model_dump(mode="json"),
                 "sources": sources,
-                "annotation_schema_id": manifest.label_schema,
+                "annotation_schema_id": next(iter(annotation_schema_ids), manifest.label_schema),
                 "build_version": manifest.version,
                 "publish": False,
             },

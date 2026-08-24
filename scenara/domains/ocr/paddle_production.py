@@ -43,7 +43,8 @@ class ProductionPaddleOcrEngine:
     model_id = "paddleocr-production"
     layout_model_id = "paddleocr-layout"
     table_model_id = "paddleocr-table"
-    production_ready = True
+    production_ready = False
+    qualification_status = "unqualified_reference_adapter"
     version = "2.9.2"
     layout_version = "2.9.2"
     table_version = "2.9.2"
@@ -72,7 +73,6 @@ class ProductionPaddleOcrEngine:
             use_gpu: 是否使用 GPU 加速
         """
         try:
-            import paddleocr
             from paddleocr import PaddleOCR
             from ppstructure import PPStructure
         except ImportError as exc:

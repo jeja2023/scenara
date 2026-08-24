@@ -7,6 +7,11 @@ metadata:
     app.kubernetes.io/part-of: scenara-platform
 spec:
   replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: scenara-api
@@ -16,10 +21,25 @@ spec:
         app.kubernetes.io/name: scenara-api
         app.kubernetes.io/part-of: scenara-platform
     spec:
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: scenara-api
       containers:
         - name: api
-          image: scenara-api:0.3.0-dev.26
+          image: scenara-api:0.3.0-dev.29
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -29,6 +49,18 @@ spec:
                 name: scenara-runtime
             - secretRef:
                 name: scenara-runtime
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 24
           readinessProbe:
             httpGet:
               path: /readyz
@@ -50,6 +82,24 @@ spec:
             limits:
               cpu: "2"
               memory: 2Gi
+          volumeMounts:
+            - name: temporary
+              mountPath: /tmp
+            - name: runtime-state
+              mountPath: /opt/scenara/runtime-state
+            - name: qualified-models
+              mountPath: /opt/scenara/models
+              readOnly: true
+      volumes:
+        - name: temporary
+          emptyDir:
+            sizeLimit: 2Gi
+        - name: runtime-state
+          emptyDir:
+            sizeLimit: 512Mi
+        - name: qualified-models
+          persistentVolumeClaim:
+            claimName: scenara-qualified-models
 ---
 apiVersion: v1
 kind: Service

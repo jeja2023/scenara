@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 from PIL import Image
 
 from scenara.platform.pipeline import DomainUnavailable
@@ -127,7 +128,8 @@ class ProductionFashionEngine:
     """
 
     model_id = "fashion-production"
-    production_ready = True
+    production_ready = False
+    qualification_status = "unqualified_reference_adapter"
     version = "1.0.0"
 
     production_capabilities = frozenset([
@@ -154,7 +156,6 @@ class ProductionFashionEngine:
         """
         try:
             import torch
-            import torchvision
         except ImportError as exc:
             raise DomainUnavailable(
                 "PyTorch is not installed. "
@@ -211,7 +212,7 @@ class ProductionFashionEngine:
                 sha256.update(chunk)
         return sha256.hexdigest()
 
-    def _preprocess_image(self, image: Any, target_size: tuple[int, int] = (224, 224)) -> np.ndarray:
+    def _preprocess_image(self, image: Any, target_size: tuple[int, int] = (224, 224)) -> NDArray[np.float32]:
         """预处理图像"""
         # 转换为 PIL Image
         if isinstance(image, np.ndarray):
@@ -220,7 +221,7 @@ class ProductionFashionEngine:
             image = Image.fromarray(np.array(image))
 
         # 调整尺寸
-        image = image.resize(target_size, Image.BILINEAR)
+        image = image.resize(target_size, Image.Resampling.BILINEAR)
 
         # 转换为 numpy
         image_np = np.array(image).astype(np.float32)
@@ -228,7 +229,7 @@ class ProductionFashionEngine:
         # 归一化
         image_np = (image_np / 255.0 - [0.485, 0.456, 0.406]) / [0.229, 0.224, 0.225]
 
-        return image_np
+        return image_np.astype(np.float32)
 
     def detect_cosplay(
         self,

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import base64
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 def _bool(name: str, default: bool) -> bool:
@@ -22,6 +24,35 @@ def _ratio(name: str, default: float, *, minimum: float = 0.0, maximum: float = 
 def _optional_path(name: str) -> Path | None:
     raw = os.getenv(name, "").strip()
     return Path(raw).resolve() if raw else None
+
+
+def _secret(name: str) -> str:
+    """Load a secret from NAME or NAME_FILE without allowing ambiguous sources."""
+    inline = os.getenv(name, "")
+    file_name = os.getenv(f"{name}_FILE", "").strip()
+    if inline and file_name:
+        raise RuntimeError(f"{name} and {name}_FILE cannot both be configured")
+    if not file_name:
+        return inline.strip()
+    path = Path(file_name)
+    try:
+        value = path.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeError) as exc:
+        raise RuntimeError(f"{name}_FILE must reference a readable UTF-8 secret file") from exc
+    if not value:
+        raise RuntimeError(f"{name}_FILE must not be empty")
+    return value
+
+
+def _csv(name: str, default: str = "") -> tuple[str, ...]:
+    return tuple(item.strip() for item in os.getenv(name, default).split(",") if item.strip())
+
+
+def _valid_fernet_key(value: str) -> bool:
+    try:
+        return len(base64.urlsafe_b64decode(value.encode("ascii"))) == 32
+    except (ValueError, UnicodeError):
+        return False
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +116,10 @@ class Settings:
     ocr_engine_factory: str
     behavior_engine_factory: str
     fashion_engine_factory: str
+    allowed_hosts: tuple[str, ...]
+    hsts_enabled: bool
+    hsts_max_age_seconds: int
+    allow_insecure_internal_endpoints: bool
     run_artifacts_enabled: bool
     run_artifact_max_crops: int
     run_artifact_crop_max_edge: int
@@ -141,6 +176,8 @@ class Settings:
             errors.append("SCENARA_DATA_PLATFORM_MODE must be http")
         if not self.data_platform_url:
             errors.append("SCENARA_DATA_PLATFORM_URL is required")
+        elif urlsplit(self.data_platform_url).scheme != "https" and not self.allow_insecure_internal_endpoints:
+            errors.append("SCENARA_DATA_PLATFORM_URL must use HTTPS unless insecure internal endpoints are explicit")
         if not self.data_platform_service_token:
             errors.append("SCENARA_DATA_PLATFORM_SERVICE_TOKEN is required")
         if not self.data_event_service_token:
@@ -153,6 +190,14 @@ class Settings:
             errors.append("SCENARA_S3_BUCKET is required")
         if not self.auth_required or not self.api_token:
             errors.append("production API authentication is required")
+        elif len(self.api_token) < 32:
+            errors.append("SCENARA_API_TOKEN must contain at least 32 characters")
+        if self.data_platform_service_token and len(self.data_platform_service_token) < 24:
+            errors.append("SCENARA_DATA_PLATFORM_SERVICE_TOKEN must contain at least 24 characters")
+        if self.data_event_service_token and len(self.data_event_service_token) < 24:
+            errors.append("SCENARA_DATA_EVENT_SERVICE_TOKEN must contain at least 24 characters")
+        if self.data_platform_service_token == self.data_event_service_token:
+            errors.append("Data request and event service tokens must be different")
         if not self.production_models_required:
             errors.append("SCENARA_PRODUCTION_MODELS_REQUIRED must be true")
         if self.production_models_required and not self.ocr_engine_factory:
@@ -163,6 +208,12 @@ class Settings:
             errors.append("SCENARA_FASHION_ENGINE_FACTORY is required for the approved private fashion adapter")
         if not self.secret_encryption_key:
             errors.append("SCENARA_SECRET_ENCRYPTION_KEY is required")
+        elif not _valid_fernet_key(self.secret_encryption_key):
+            errors.append("SCENARA_SECRET_ENCRYPTION_KEY must be a valid Fernet key")
+        if not self.allowed_hosts or "*" in self.allowed_hosts:
+            errors.append("SCENARA_ALLOWED_HOSTS must explicitly list production hosts and cannot contain *")
+        if self.bootstrap_admin_password and len(self.bootstrap_admin_password) < 16:
+            errors.append("production bootstrap administrator password must contain at least 16 characters")
         if (self.enterprise_license_path is None) != (self.enterprise_public_key_path is None):
             errors.append("enterprise license and public key paths must be configured together")
         if errors:
@@ -178,18 +229,16 @@ def load_settings() -> Settings:
         queue_backend=os.getenv("SCENARA_QUEUE_BACKEND", "inline").strip().lower(),
         data_platform_mode=os.getenv("SCENARA_DATA_PLATFORM_MODE", "local").strip().lower(),
         data_platform_url=os.getenv("SCENARA_DATA_PLATFORM_URL", "").strip().rstrip("/"),
-        data_platform_service_token=os.getenv("SCENARA_DATA_PLATFORM_SERVICE_TOKEN", "").strip(),
-        data_event_service_token=os.getenv(
-            "SCENARA_DATA_EVENT_SERVICE_TOKEN",
-            os.getenv("SCENARA_DATA_PLATFORM_SERVICE_TOKEN", ""),
-        ).strip(),
+        data_platform_service_token=_secret("SCENARA_DATA_PLATFORM_SERVICE_TOKEN"),
+        data_event_service_token=_secret("SCENARA_DATA_EVENT_SERVICE_TOKEN")
+        or _secret("SCENARA_DATA_PLATFORM_SERVICE_TOKEN"),
         data_platform_timeout_seconds=max(0.1, float(os.getenv("SCENARA_DATA_PLATFORM_TIMEOUT_SECONDS", "10"))),
         data_platform_max_retries=max(0, min(5, int(os.getenv("SCENARA_DATA_PLATFORM_MAX_RETRIES", "2")))),
         data_dir=Path(os.getenv("SCENARA_DATA_DIR", "runtime-state")).resolve(),
-        postgres_dsn=os.getenv("SCENARA_POSTGRES_DSN", "").strip(),
-        redis_url=os.getenv("SCENARA_REDIS_URL", "").strip(),
+        postgres_dsn=_secret("SCENARA_POSTGRES_DSN"),
+        redis_url=_secret("SCENARA_REDIS_URL"),
         qdrant_url=os.getenv("SCENARA_QDRANT_URL", "").strip().rstrip("/"),
-        qdrant_api_key=os.getenv("SCENARA_QDRANT_API_KEY", "").strip(),
+        qdrant_api_key=_secret("SCENARA_QDRANT_API_KEY"),
         qdrant_timeout_seconds=max(0.1, float(os.getenv("SCENARA_QDRANT_TIMEOUT_SECONDS", "10"))),
         qdrant_collection_prefix=os.getenv("SCENARA_QDRANT_COLLECTION_PREFIX", "scenara_features").strip()
         or "scenara_features",
@@ -197,9 +246,9 @@ def load_settings() -> Settings:
         s3_public_endpoint_url=os.getenv("SCENARA_S3_PUBLIC_ENDPOINT_URL", "").strip(),
         s3_region=os.getenv("SCENARA_S3_REGION", "us-east-1").strip(),
         s3_bucket=os.getenv("SCENARA_S3_BUCKET", "").strip(),
-        s3_access_key=os.getenv("SCENARA_S3_ACCESS_KEY", "").strip(),
-        s3_secret_key=os.getenv("SCENARA_S3_SECRET_KEY", "").strip(),
-        s3_session_token=os.getenv("SCENARA_S3_SESSION_TOKEN", "").strip(),
+        s3_access_key=_secret("SCENARA_S3_ACCESS_KEY"),
+        s3_secret_key=_secret("SCENARA_S3_SECRET_KEY"),
+        s3_session_token=_secret("SCENARA_S3_SESSION_TOKEN"),
         s3_verify_tls=_bool("SCENARA_S3_VERIFY_TLS", True),
         s3_ca_bundle=os.getenv("SCENARA_S3_CA_BUNDLE", "").strip(),
         s3_server_side_encryption=os.getenv("SCENARA_S3_SERVER_SIDE_ENCRYPTION", "").strip(),
@@ -219,12 +268,12 @@ def load_settings() -> Settings:
             min(86_400, int(os.getenv("SCENARA_S3_PRESIGN_EXPIRY_SECONDS", "900"))),
         ),
         s3_addressing_style=os.getenv("SCENARA_S3_ADDRESSING_STYLE", "auto").strip().lower(),
-        api_token=os.getenv("SCENARA_API_TOKEN", "").strip(),
+        api_token=_secret("SCENARA_API_TOKEN"),
         auth_required=_bool("SCENARA_AUTH_REQUIRED", profile in {"prod", "production"}),
         default_tenant_id=os.getenv("SCENARA_DEFAULT_TENANT_ID", "default").strip(),
         default_project_id=os.getenv("SCENARA_DEFAULT_PROJECT_ID", "default").strip(),
         bootstrap_admin_username=os.getenv("SCENARA_BOOTSTRAP_ADMIN_USERNAME", "").strip(),
-        bootstrap_admin_password=os.getenv("SCENARA_BOOTSTRAP_ADMIN_PASSWORD", "").strip(),
+        bootstrap_admin_password=_secret("SCENARA_BOOTSTRAP_ADMIN_PASSWORD"),
         max_image_bytes=max(1, int(os.getenv("SCENARA_MAX_IMAGE_BYTES", str(25 * 1024 * 1024)))),
         max_media_bytes=max(1, int(os.getenv("SCENARA_MAX_MEDIA_BYTES", str(20 * 1024 * 1024 * 1024)))),
         media_sample_interval_ms=max(
@@ -238,13 +287,20 @@ def load_settings() -> Settings:
         result_shard_units=max(1, min(10_000, int(os.getenv("SCENARA_RESULT_SHARD_UNITS", "100")))),
         image_wait_timeout_ms=max(0, min(30_000, int(os.getenv("SCENARA_IMAGE_WAIT_TIMEOUT_MS", "10000")))),
         production_models_required=_bool("SCENARA_PRODUCTION_MODELS_REQUIRED", False),
-        secret_encryption_key=os.getenv("SCENARA_SECRET_ENCRYPTION_KEY", "").strip(),
+        secret_encryption_key=_secret("SCENARA_SECRET_ENCRYPTION_KEY"),
         enterprise_policy_required=_bool("SCENARA_ENTERPRISE_POLICY_REQUIRED", False),
         allow_private_media_sources=_bool("SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES", False),
         allow_private_webhook_targets=_bool("SCENARA_ALLOW_PRIVATE_WEBHOOK_TARGETS", False),
         ocr_engine_factory=os.getenv("SCENARA_OCR_ENGINE_FACTORY", "").strip(),
         behavior_engine_factory=os.getenv("SCENARA_BEHAVIOR_ENGINE_FACTORY", "").strip(),
         fashion_engine_factory=os.getenv("SCENARA_FASHION_ENGINE_FACTORY", "").strip(),
+        allowed_hosts=_csv("SCENARA_ALLOWED_HOSTS", "localhost,127.0.0.1,testserver,test,core"),
+        hsts_enabled=_bool("SCENARA_HSTS_ENABLED", profile in {"prod", "production"}),
+        hsts_max_age_seconds=max(
+            0,
+            min(63_072_000, int(os.getenv("SCENARA_HSTS_MAX_AGE_SECONDS", "31536000"))),
+        ),
+        allow_insecure_internal_endpoints=_bool("SCENARA_ALLOW_INSECURE_INTERNAL_ENDPOINTS", False),
         run_artifacts_enabled=_bool("SCENARA_RUN_ARTIFACTS_ENABLED", True),
         run_artifact_max_crops=max(0, min(5_000, int(os.getenv("SCENARA_RUN_ARTIFACT_MAX_CROPS", "200")))),
         run_artifact_crop_max_edge=max(

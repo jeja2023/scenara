@@ -1,5 +1,7 @@
 # Scenara Release Evidence
 
+`manifest.json` 始终对应当前开发发布；上一发布的证据清单按版本归档，例如 `manifest.0.3.0-dev.25.json`。证据不得跨版本自动继承，新版本必须重新记录 source commit、镜像、OpenAPI、模型集合和目标环境身份。
+
 This directory records objective release evidence for the personal Scenara project. It does not require named approvers, approval timestamps, legal approvers, or controlled approval record numbers.
 
 Implementation gate:

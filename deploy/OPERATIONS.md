@@ -19,13 +19,15 @@
 - 修改生产依赖后必须用固定的 uv 版本为 Python 3.12、x86_64 manylinux 目标重新生成锁文件；CI 会再次生成并拒绝任何漂移。
 - PostgreSQL/pgvector、Redis 和 MinIO 镜像在 Compose 中使用 manifest digest。联网发布构建还必须记录 Node、CUDA 基础镜像的实际 digest，并以最终应用镜像 digest 进入发布身份。
 - 离线包摘要、应用镜像 digest、OpenAPI 摘要、模型集合摘要和源提交共同构成发布身份；任一值变化都必须重新执行并记录九类发布证据。
+- 生产配置先运行 `python scripts/validate_production_config.py --env-file /secure/scenara.env`；环境文件保持 `0600`，凭据不跨 PostgreSQL、Redis、MinIO 根账号、应用 S3、Data 双向信任与 API Bootstrap 边界复用。
+- API 默认仅绑定回环地址，由受管 TLS 反向代理提供证书续期、请求体上限、连接/速率限制和访问日志。`SCENARA_ALLOWED_HOSTS` 与 `SCENARA_FORWARDED_ALLOW_IPS` 必须精确到实际域名和代理地址，禁止 `*`。
 
 ## 升级与恢复式回滚
 
 1. 记录当前 commit、镜像 digest、Compose 文件 SHA-256 和数据库迁移版本。
 2. 使用 `deploy/scripts/backup.sh` 生成并验证 PostgreSQL 与 MinIO 备份。
 3. 停止 batch worker、stream worker 和 scheduler，等待正在执行的 Run 到达可恢复状态。
-4. 加载已校验的新镜像和模型包，执行 `docker compose up -d --no-build --wait`。
+4. 加载已校验的新镜像和模型包，先运行 `docker compose run --rm preflight` 和 `docker compose run --rm migrate`，再执行 `docker compose up -d --no-build --wait`。
 5. 检查 `/livez`、`/readyz`、`/console/`、示例客户端和核心 Parse 链路。
 6. 若升级失败，停止全部服务，使用 `deploy/scripts/restore.sh BACKUP --confirm` 恢复数据库和对象，再加载上一镜像及模型包。
 

@@ -302,6 +302,11 @@ useRefresh(refresh);
                 <option value="wrong_attribute">属性错误</option>
                 <option value="wrong_identity">身份匹配错误</option>
                 <option value="ocr_correction">文字更正</option>
+                <option value="action_correction">动作更正</option>
+                <option value="temporal_correction">时序区间更正</option>
+                <option value="style_correction">服装风格更正</option>
+                <option value="character_correction">角色更正</option>
+                <option value="accessory_correction">配饰更正</option>
               </select></label
             >
             <label

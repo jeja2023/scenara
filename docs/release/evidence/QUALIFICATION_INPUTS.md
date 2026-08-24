@@ -20,7 +20,7 @@ evidence or an existing output file.
 
 ## Evaluation Input
 
-Use portrait_evaluation or ocr_evaluation. The dataset manifest contains a
+Use portrait_evaluation, ocr_evaluation, behavior_evaluation, or fashion_evaluation. The dataset manifest contains a
 non-empty dataset_version and rights_cleared set to true. The threshold file
 contains fixed_at, thresholds, and tolerances. Threshold keys end in _min or
 _max; tolerances cover exactly the same metrics. The fixed_at timestamp must

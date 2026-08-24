@@ -18,8 +18,8 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from scenara.domains.fashion.evaluation import FashionEvaluator, load_evaluation_dataset
-from scenara.domains.fashion.production import ProductionFashionEngine
+from scenara.domains.fashion.evaluation import FashionEvaluator, load_evaluation_dataset  # noqa: E402
+from scenara.domains.fashion.production import ProductionFashionEngine  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -103,17 +103,17 @@ def main() -> None:
     print("=" * 80)
     print(f"引擎: {report.engine_id} v{report.engine_version}")
     print(f"样本总数: {report.total_samples}")
-    print(f"\nCosplay 识别:")
+    print("\nCosplay 识别:")
     print(f"  准确率: {report.cosplay_accuracy_avg:.2%}")
     print(f"  精确率: {report.cosplay_precision_avg:.2%}")
     print(f"  召回率: {report.cosplay_recall_avg:.2%}")
-    print(f"\n服装风格识别:")
+    print("\n服装风格识别:")
     print(f"  准确率: {report.clothing_accuracy_avg:.2%}")
     print(f"  精确率: {report.clothing_precision_avg:.2%}")
     print(f"  召回率: {report.clothing_recall_avg:.2%}")
-    print(f"\n配饰识别:")
+    print("\n配饰识别:")
     print(f"  准确率: {report.accessory_accuracy_avg:.2%}")
-    print(f"\n综合指标:")
+    print("\n综合指标:")
     print(f"  F1 分数: {report.overall_f1_avg:.2%}")
     print(f"  平均推理时间: {report.inference_time_avg_ms:.1f} ms")
     print("\n按类别统计:")

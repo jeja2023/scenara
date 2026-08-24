@@ -58,7 +58,15 @@ def provided_variables(job: dict[str, object]) -> set[str]:
 
 
 def test_compose_declares_required_variables() -> None:
-    assert "SCENARA_OCR_ENGINE_FACTORY" in required_compose_variables()
+    assert {
+        "SCENARA_OCR_ENGINE_FACTORY",
+        "SCENARA_BEHAVIOR_ENGINE_FACTORY",
+        "SCENARA_FASHION_ENGINE_FACTORY",
+        "SCENARA_REDIS_PASSWORD",
+        "SCENARA_MINIO_ROOT_USER",
+        "SCENARA_MINIO_ROOT_PASSWORD",
+        "SCENARA_ALLOWED_HOSTS",
+    } <= required_compose_variables()
 
 
 def test_every_compose_job_provides_all_required_variables() -> None:
@@ -88,7 +96,7 @@ def test_compose_runs_all_versioned_migrations_and_checks_readiness() -> None:
     compose = COMPOSE.read_text(encoding="utf-8")
     migration = MIGRATE_SCRIPT.read_text(encoding="utf-8")
     assert '["sh", "/deploy-scripts/migrate.sh"]' in compose
-    assert "for migration in /migrations/*.sql" in migration
+    assert 'for migration in "$SCENARA_MIGRATIONS_DIR"/*.sql' in migration
     assert "scenara_schema_migrations" in migration
     assert "migration did not atomically record its version" in migration
     assert "unsupported migration filename" in migration
@@ -120,6 +128,57 @@ def test_production_data_service_images_are_digest_pinned() -> None:
     for name in ("postgres", "migrate", "redis", "minio", "minio-init"):
         image = str(services[name]["image"])
         assert re.fullmatch(r"[^@]+@sha256:[0-9a-f]{64}", image), f"{name} image is not digest-pinned"
+
+
+def test_compose_hardens_runtime_and_separates_service_credentials() -> None:
+    document = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
+    common = document["x-scenara-service"]
+    assert common["user"] == "10001:10001"
+    assert common["read_only"] is True
+    assert common["cap_drop"] == ["ALL"]
+    assert common["security_opt"] == ["no-new-privileges:true"]
+    assert set(common["networks"]) == {"backend", "egress"}
+    assert document["networks"]["backend"]["internal"] is True
+
+    services = document["services"]
+    assert services["redis"]["environment"]["REDISCLI_AUTH"].startswith("${SCENARA_REDIS_PASSWORD:")
+    assert "--requirepass" in services["redis"]["command"]
+    assert services["minio"]["environment"]["MINIO_ROOT_USER"].startswith("${SCENARA_MINIO_ROOT_USER:")
+    init_env = services["minio-init"]["environment"]
+    assert init_env["ROOT_USER"].startswith("${SCENARA_MINIO_ROOT_USER:")
+    assert init_env["ACCESS_KEY"].startswith("${SCENARA_S3_ACCESS_KEY:")
+    assert services["api"]["depends_on"]["preflight"]["condition"] == "service_completed_successfully"
+    assert services["api"]["ports"] == ["${SCENARA_BIND_ADDRESS:-127.0.0.1}:${SCENARA_HTTP_PORT:-8000}:8000"]
+
+
+def test_kubernetes_foundation_has_security_gpu_migration_and_network_controls() -> None:
+    kustomization = yaml.safe_load((ROOT / "deploy/kubernetes/kustomization.yaml").read_text(encoding="utf-8"))
+    assert {"scheduler.yaml", "networkpolicy.yaml"} <= set(kustomization["resources"])
+    assert "migrate-job.yaml" not in kustomization["resources"]
+    migration_job = yaml.safe_load((ROOT / "deploy/kubernetes/migrate-job.yaml").read_text(encoding="utf-8"))
+    assert migration_job["kind"] == "Job"
+    api = list(yaml.safe_load_all((ROOT / "deploy/kubernetes/api.yaml").read_text(encoding="utf-8")))[0]
+    pod = api["spec"]["template"]["spec"]
+    assert pod["automountServiceAccountToken"] is False
+    assert pod["securityContext"]["runAsNonRoot"] is True
+    container = pod["containers"][0]
+    assert container["securityContext"]["readOnlyRootFilesystem"] is True
+    assert container["securityContext"]["capabilities"]["drop"] == ["ALL"]
+    workers = list(yaml.safe_load_all((ROOT / "deploy/kubernetes/workers.yaml").read_text(encoding="utf-8")))
+    for worker in workers:
+        resources = worker["spec"]["template"]["spec"]["containers"][0]["resources"]
+        assert resources["requests"]["nvidia.com/gpu"] == "1"
+        assert resources["limits"]["nvidia.com/gpu"] == "1"
+
+
+def test_reverse_proxy_example_enforces_tls_and_preserves_streaming() -> None:
+    config = (ROOT / "deploy/reverse-proxy/nginx.conf.example").read_text(encoding="utf-8")
+    assert "ssl_protocols TLSv1.2 TLSv1.3" in config
+    assert "server_tokens off" in config
+    assert "proxy_set_header X-Forwarded-For $remote_addr" in config
+    assert "proxy_request_buffering off" in config
+    assert "proxy_buffering off" in config
+    assert "return 308 https://$host$request_uri" in config
 
 
 def test_gpu_workers_expose_all_visible_gpus_by_default() -> None:
@@ -187,6 +246,13 @@ def test_docker_build_copies_manifests_before_installing_dependencies() -> None:
     assert manifest_copy < dependency_install
     source_copy = dockerfile_lines.index("COPY frontend/console frontend/console")
     assert dependency_install < source_copy
+    dockerfile = DOCKERFILE.read_text(encoding="utf-8")
+    assert "postgresql-client" in dockerfile
+    assert "org.opencontainers.image.revision" in dockerfile
+    dockerfile_data = (ROOT / "Dockerfile.data").read_text(encoding="utf-8")
+    assert re.search(r"^FROM node:[^\s]+@sha256:[0-9a-f]{64}", dockerfile, re.MULTILINE)
+    assert re.search(r"^FROM nvidia/cuda:[^\s]+@sha256:[0-9a-f]{64}", dockerfile, re.MULTILINE)
+    assert re.search(r"^FROM python:[^\s]+@sha256:[0-9a-f]{64}", dockerfile_data, re.MULTILINE)
 
 
 def test_default_runtime_model_references_use_cache_key_contract() -> None:

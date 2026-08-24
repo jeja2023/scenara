@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from enum import StrEnum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -19,6 +19,25 @@ class AdapterHealth(StrEnum):
     READY = "ready"
     DEGRADED = "degraded"
     CLOSED = "closed"
+
+
+class ModelArtifactFile(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(pattern=r"^[^/\\\s][^\\]*$", max_length=512)
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    size_bytes: int = Field(ge=0)
+    media_type: str = Field(min_length=1, max_length=128)
+
+    @field_validator("path")
+    @classmethod
+    def portable_relative_path(cls, value: str) -> str:
+        if "\\" in value:
+            raise ValueError("model artifact paths must use forward slashes")
+        path = PurePosixPath(value)
+        if path.is_absolute() or not path.parts or any(part in {"", ".", ".."} for part in path.parts):
+            raise ValueError("model artifact paths must stay inside the package")
+        return path.as_posix()
 
 
 class ModelPackageManifest(BaseModel):
@@ -38,6 +57,19 @@ class ModelPackageManifest(BaseModel):
     vram_mb: int = Field(ge=0, le=196_608)
     regression_samples: tuple[str, ...] = Field(min_length=1)
     production_ready: bool = False
+    domain: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_.-]{1,63}$")
+    artifact_format: Literal["onnx", "paddle", "pytorch", "bundle"] = "onnx"
+    artifact_files: tuple[ModelArtifactFile, ...] = Field(default_factory=tuple, max_length=1000)
+    input_schema: str | None = Field(
+        default=None,
+        pattern=r"^.+(?:@sha256:|#sha256=)[0-9a-f]{64}$",
+        max_length=2048,
+    )
+    output_schema: str | None = Field(
+        default=None,
+        pattern=r"^.+(?:@sha256:|#sha256=)[0-9a-f]{64}$",
+        max_length=2048,
+    )
 
     @field_validator("source_uri", "model_card")
     @classmethod
@@ -62,6 +94,11 @@ class ModelPackageManifest(BaseModel):
         match = IMMUTABLE_REFERENCE.search(self.source_uri)
         if match is None or match.group(1) != self.sha256:
             raise ValueError("model artifact reference digest must match sha256")
+        paths = [item.path for item in self.artifact_files]
+        if len(paths) != len(set(paths)):
+            raise ValueError("model artifact file paths must be unique")
+        if self.artifact_format == "bundle" and not self.artifact_files:
+            raise ValueError("bundle model packages must enumerate artifact_files")
         return self
 
 
@@ -134,6 +171,25 @@ class ModelRegistryError(RuntimeError):
     pass
 
 
+def _verify_bundle_artifact(package: ModelPackageManifest, artifact: Path) -> None:
+    if not artifact.is_dir():
+        raise ModelRegistryError(f"model artifact bundle does not exist: {artifact}")
+    manifest_path = artifact / "bundle-manifest.json"
+    if not manifest_path.is_file():
+        raise ModelRegistryError("model artifact bundle is missing bundle-manifest.json")
+    if hashlib.sha256(manifest_path.read_bytes()).hexdigest() != package.sha256:
+        raise ModelRegistryError("model artifact bundle manifest checksum does not match its package")
+    root = artifact.resolve()
+    for item in package.artifact_files:
+        candidate = (root / PurePosixPath(item.path)).resolve()
+        if root not in candidate.parents or not candidate.is_file():
+            raise ModelRegistryError(f"model artifact bundle file is unavailable: {item.path}")
+        if candidate.stat().st_size != item.size_bytes:
+            raise ModelRegistryError(f"model artifact bundle file size does not match: {item.path}")
+        if hashlib.sha256(candidate.read_bytes()).hexdigest() != item.sha256:
+            raise ModelRegistryError(f"model artifact bundle file checksum does not match: {item.path}")
+
+
 class ModelRegistry:
     def __init__(self, *, production: bool, catalog: ModelCatalog | None = None) -> None:
         self.production = production
@@ -146,11 +202,14 @@ class ModelRegistry:
         artifact: Path,
         adapter: ModelAdapter,
     ) -> ModelMetadata:
-        if not artifact.is_file():
-            raise ModelRegistryError(f"model artifact does not exist: {artifact}")
-        digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-        if digest != package.sha256:
-            raise ModelRegistryError("model artifact checksum does not match its manifest")
+        if package.artifact_format == "bundle":
+            _verify_bundle_artifact(package, artifact)
+        else:
+            if not artifact.is_file():
+                raise ModelRegistryError(f"model artifact does not exist: {artifact}")
+            digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+            if digest != package.sha256:
+                raise ModelRegistryError("model artifact checksum does not match its manifest")
         if self.production and not package.production_ready:
             raise ModelRegistryError("production rejects a model package that is not approved")
         if self.production and (package.license_id.lower() in {"unknown", "unreviewed"}):
@@ -201,6 +260,7 @@ class ModelRegistry:
 __all__ = [
     "AdapterHealth",
     "ModelAdapter",
+    "ModelArtifactFile",
     "ModelCatalog",
     "ModelMetadata",
     "ModelPackageManifest",

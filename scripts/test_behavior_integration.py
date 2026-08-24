@@ -23,7 +23,7 @@ def test_settings() -> bool:
         os.environ["SCENARA_BEHAVIOR_ENGINE_FACTORY"] = "scenara.domains.behavior.paddle_production:create_production_behavior_engine"
 
         settings = load_settings()
-        print(f"   ✓ 配置加载成功")
+        print("   ✓ 配置加载成功")
         print(f"   ✓ behavior_engine_factory: {settings.behavior_engine_factory}")
         return True
     except Exception as e:
@@ -42,7 +42,7 @@ def test_factory() -> bool:
         factory_path = "scenara.domains.behavior.paddle_production:create_production_behavior_engine"
         engine = load_behavior_engine(factory_path)
 
-        print(f"   ✓ 工厂函数加载成功")
+        print("   ✓ 工厂函数加载成功")
         print(f"   ✓ 引擎: {engine.model_id} v{engine.version}")
         print(f"   ✓ 生产就绪: {engine.production_ready}")
         return True
@@ -68,7 +68,7 @@ def test_plugin_registry() -> bool:
         behavior_plugin = BehaviorPlugin()
         plugins.register(behavior_plugin)
 
-        print(f"   ✓ 插件注册成功")
+        print("   ✓ 插件注册成功")
         print(f"   ✓ 领域 ID: {behavior_plugin.manifest.domain_id}")
         print(f"   ✓ 显示名称: {behavior_plugin.manifest.display_name}")
 
@@ -93,16 +93,13 @@ def test_bootstrap_integration() -> bool:
     print("\n4. 测试 Bootstrap 集成...")
     try:
         # 检查导入
-        from scenara.bootstrap import Runtime
-        from scenara.domains.behavior import BehaviorPlugin
-        from scenara.domains.behavior.factory import load_behavior_engine
 
-        print(f"   ✓ Bootstrap 导入成功")
-        print(f"   ✓ BehaviorPlugin 可用")
-        print(f"   ✓ load_behavior_engine 可用")
+        print("   ✓ Bootstrap 导入成功")
+        print("   ✓ BehaviorPlugin 可用")
+        print("   ✓ load_behavior_engine 可用")
 
         # 注意: 不实际创建 Runtime,因为需要数据库等依赖
-        print(f"   ✓ Runtime 类型定义正确")
+        print("   ✓ Runtime 类型定义正确")
 
         return True
     except Exception as e:
@@ -145,9 +142,9 @@ def test_models() -> bool:
             summary="测试行为识别结果",
         )
 
-        print(f"   ✓ BehaviorAction 创建成功")
-        print(f"   ✓ TemporalSegment 创建成功")
-        print(f"   ✓ BehaviorDomainPayload 创建成功")
+        print("   ✓ BehaviorAction 创建成功")
+        print("   ✓ TemporalSegment 创建成功")
+        print("   ✓ BehaviorDomainPayload 创建成功")
         print(f"   ✓ Payload 序列化: {len(payload.model_dump_json())} 字节")
 
         return True
@@ -166,7 +163,7 @@ def test_operator() -> bool:
 
         operator = BehaviorRecognitionOperator()
 
-        print(f"   ✓ 算子创建成功")
+        print("   ✓ 算子创建成功")
         print(f"   ✓ 算子 ID: {operator.definition.operator_id}")
         print(f"   ✓ 版本: {operator.definition.version}")
         print(f"   ✓ 领域: {operator.definition.domain}")
@@ -185,15 +182,10 @@ def test_evaluation_framework() -> bool:
     """测试评估框架"""
     print("\n7. 测试评估框架...")
     try:
-        from scenara.domains.behavior.evaluation import (
-            BehaviorEvaluator,
-            BehaviorEvaluationSample,
-            BehaviorEvaluationResult,
-        )
 
-        print(f"   ✓ BehaviorEvaluator 可用")
-        print(f"   ✓ BehaviorEvaluationSample 可用")
-        print(f"   ✓ BehaviorEvaluationResult 可用")
+        print("   ✓ BehaviorEvaluator 可用")
+        print("   ✓ BehaviorEvaluationSample 可用")
+        print("   ✓ BehaviorEvaluationResult 可用")
 
         return True
     except Exception as e:

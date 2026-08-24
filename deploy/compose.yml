@@ -9,8 +9,11 @@ x-scenara-environment: &scenara-environment
   SCENARA_DATA_PLATFORM_URL: ${SCENARA_DATA_PLATFORM_URL:?set SCENARA_DATA_PLATFORM_URL}
   SCENARA_DATA_PLATFORM_SERVICE_TOKEN: ${SCENARA_DATA_PLATFORM_SERVICE_TOKEN:?set SCENARA_DATA_PLATFORM_SERVICE_TOKEN}
   SCENARA_DATA_EVENT_SERVICE_TOKEN: ${SCENARA_DATA_EVENT_SERVICE_TOKEN:?set SCENARA_DATA_EVENT_SERVICE_TOKEN}
+  SCENARA_DATA_PLATFORM_TIMEOUT_SECONDS: ${SCENARA_DATA_PLATFORM_TIMEOUT_SECONDS:-10}
+  SCENARA_DATA_PLATFORM_MAX_RETRIES: ${SCENARA_DATA_PLATFORM_MAX_RETRIES:-2}
+  SCENARA_ALLOW_INSECURE_INTERNAL_ENDPOINTS: ${SCENARA_ALLOW_INSECURE_INTERNAL_ENDPOINTS:-false}
   SCENARA_POSTGRES_DSN: postgresql://scenara:${SCENARA_POSTGRES_PASSWORD:?set SCENARA_POSTGRES_PASSWORD}@postgres:5432/scenara
-  SCENARA_REDIS_URL: redis://redis:6379/0
+  SCENARA_REDIS_URL: redis://:${SCENARA_REDIS_PASSWORD:?set SCENARA_REDIS_PASSWORD}@redis:6379/0
   SCENARA_S3_ENDPOINT_URL: http://minio:9000
   SCENARA_S3_PUBLIC_ENDPOINT_URL: ${SCENARA_S3_PUBLIC_ENDPOINT_URL:-}
   SCENARA_S3_REGION: us-east-1
@@ -28,13 +31,23 @@ x-scenara-environment: &scenara-environment
   SCENARA_S3_PRESIGNED_URLS_ENABLED: ${SCENARA_S3_PRESIGNED_URLS_ENABLED:-false}
   SCENARA_S3_PRESIGN_EXPIRY_SECONDS: ${SCENARA_S3_PRESIGN_EXPIRY_SECONDS:-900}
   SCENARA_S3_ADDRESSING_STYLE: ${SCENARA_S3_ADDRESSING_STYLE:-path}
+  SCENARA_QDRANT_URL: ${SCENARA_QDRANT_URL:-}
+  SCENARA_QDRANT_API_KEY: ${SCENARA_QDRANT_API_KEY:-}
+  SCENARA_QDRANT_TIMEOUT_SECONDS: ${SCENARA_QDRANT_TIMEOUT_SECONDS:-10}
+  SCENARA_QDRANT_COLLECTION_PREFIX: ${SCENARA_QDRANT_COLLECTION_PREFIX:-scenara_features}
   SCENARA_AUTH_REQUIRED: "true"
   SCENARA_API_TOKEN: ${SCENARA_API_TOKEN:?set SCENARA_API_TOKEN}
   SCENARA_BOOTSTRAP_ADMIN_USERNAME: ${SCENARA_BOOTSTRAP_ADMIN_USERNAME:-}
   SCENARA_BOOTSTRAP_ADMIN_PASSWORD: ${SCENARA_BOOTSTRAP_ADMIN_PASSWORD:-}
   SCENARA_PRODUCTION_MODELS_REQUIRED: "true"
   SCENARA_OCR_ENGINE_FACTORY: ${SCENARA_OCR_ENGINE_FACTORY:?set SCENARA_OCR_ENGINE_FACTORY}
+  SCENARA_BEHAVIOR_ENGINE_FACTORY: ${SCENARA_BEHAVIOR_ENGINE_FACTORY:?set SCENARA_BEHAVIOR_ENGINE_FACTORY}
+  SCENARA_FASHION_ENGINE_FACTORY: ${SCENARA_FASHION_ENGINE_FACTORY:?set SCENARA_FASHION_ENGINE_FACTORY}
   SCENARA_SECRET_ENCRYPTION_KEY: ${SCENARA_SECRET_ENCRYPTION_KEY:?set SCENARA_SECRET_ENCRYPTION_KEY}
+  SCENARA_ALLOWED_HOSTS: ${SCENARA_ALLOWED_HOSTS:?set SCENARA_ALLOWED_HOSTS}
+  SCENARA_HSTS_ENABLED: ${SCENARA_HSTS_ENABLED:-true}
+  SCENARA_HSTS_MAX_AGE_SECONDS: ${SCENARA_HSTS_MAX_AGE_SECONDS:-31536000}
+  FORWARDED_ALLOW_IPS: ${SCENARA_FORWARDED_ALLOW_IPS:-127.0.0.1}
   # Personal mode is the default. Enterprise policy is an opt-in Compose extension.
   SCENARA_ENTERPRISE_POLICY_REQUIRED: ${SCENARA_ENTERPRISE_POLICY_REQUIRED:-false}
   GPU_DEVICE_IDS: ${GPU_DEVICE_IDS:-}
@@ -44,6 +57,14 @@ x-scenara-environment: &scenara-environment
   SCENARA_STRUCTURED_RESULT_RETENTION_DAYS: ${SCENARA_STRUCTURED_RESULT_RETENTION_DAYS:-180}
   SCENARA_RUN_ARTIFACTS_ENABLED: ${SCENARA_RUN_ARTIFACTS_ENABLED:-true}
   SCENARA_RUN_ARTIFACT_MAX_CROPS: ${SCENARA_RUN_ARTIFACT_MAX_CROPS:-200}
+  SCENARA_RUN_ARTIFACT_CROP_MAX_EDGE: ${SCENARA_RUN_ARTIFACT_CROP_MAX_EDGE:-256}
+  SCENARA_RUN_ARTIFACT_FRAME_MAX_EDGE: ${SCENARA_RUN_ARTIFACT_FRAME_MAX_EDGE:-1920}
+  SCENARA_MAX_IMAGE_BYTES: ${SCENARA_MAX_IMAGE_BYTES:-26214400}
+  SCENARA_MAX_MEDIA_BYTES: ${SCENARA_MAX_MEDIA_BYTES:-21474836480}
+  SCENARA_MEDIA_SAMPLE_INTERVAL_MS: ${SCENARA_MEDIA_SAMPLE_INTERVAL_MS:-1000}
+  SCENARA_STREAM_SEGMENT_DURATION_MS: ${SCENARA_STREAM_SEGMENT_DURATION_MS:-300000}
+  SCENARA_RESULT_SHARD_UNITS: ${SCENARA_RESULT_SHARD_UNITS:-100}
+  SCENARA_IMAGE_WAIT_TIMEOUT_MS: ${SCENARA_IMAGE_WAIT_TIMEOUT_MS:-10000}
   SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES: ${SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES:-false}
   SCENARA_ALLOW_PRIVATE_WEBHOOK_TARGETS: ${SCENARA_ALLOW_PRIVATE_WEBHOOK_TARGETS:-false}
   SCENARA_TRAJECTORY_ENABLED: ${SCENARA_TRAJECTORY_ENABLED:-true}
@@ -54,7 +75,25 @@ x-scenara-environment: &scenara-environment
   SCENARA_TRAJECTORY_MAX_TEMPLATES: ${SCENARA_TRAJECTORY_MAX_TEMPLATES:-32}
   SCENARA_TRAJECTORY_DEFAULT_TRANSITION_SECONDS: ${SCENARA_TRAJECTORY_DEFAULT_TRANSITION_SECONDS:-0}
 
-x-scenara-image: &scenara-image scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.26}
+x-scenara-image: &scenara-image ${SCENARA_IMAGE_REFERENCE:-scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.29}}
+
+x-scenara-service: &scenara-service
+  image: *scenara-image
+  init: true
+  user: "10001:10001"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=2g,mode=1777
+    - /opt/scenara/runtime-state:rw,noexec,nosuid,nodev,size=512m,mode=0700
+  stop_grace_period: 60s
+  logging:
+    driver: json-file
+    options:
+      max-size: 20m
+      max-file: "5"
+  networks: [backend, egress]
 
 services:
   postgres:
@@ -65,11 +104,18 @@ services:
       POSTGRES_PASSWORD: ${SCENARA_POSTGRES_PASSWORD:?set SCENARA_POSTGRES_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    shm_size: 256m
+    pids_limit: 512
+    mem_limit: ${SCENARA_POSTGRES_MEMORY_LIMIT:-4g}
+    cpus: ${SCENARA_POSTGRES_CPU_LIMIT:-2.0}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U scenara -d scenara"]
       interval: 5s
       timeout: 3s
       retries: 20
+      start_period: 10s
+    stop_grace_period: 60s
+    networks: [backend]
     restart: unless-stopped
 
   migrate:
@@ -87,33 +133,59 @@ services:
       - ../migrations:/migrations:ro
       - ./scripts:/deploy-scripts:ro
     command: ["sh", "/deploy-scripts/migrate.sh"]
+    networks: [backend]
     restart: "no"
 
   redis:
     image: redis@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
-    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    environment:
+      REDISCLI_AUTH: ${SCENARA_REDIS_PASSWORD:?set SCENARA_REDIS_PASSWORD}
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "yes",
+        "--appendfsync",
+        "everysec",
+        "--maxmemory-policy",
+        "noeviction",
+        "--requirepass",
+        "${SCENARA_REDIS_PASSWORD:?set SCENARA_REDIS_PASSWORD}",
+      ]
     volumes:
       - redis-data:/data
+    pids_limit: 256
+    mem_limit: ${SCENARA_REDIS_MEMORY_LIMIT:-2g}
+    cpus: ${SCENARA_REDIS_CPU_LIMIT:-1.0}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 20
+      start_period: 5s
+    stop_grace_period: 30s
+    networks: [backend]
     restart: unless-stopped
 
   minio:
     image: minio/minio@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0
     environment:
-      MINIO_ROOT_USER: ${SCENARA_S3_ACCESS_KEY:-scenara}
-      MINIO_ROOT_PASSWORD: ${SCENARA_S3_SECRET_KEY:?set SCENARA_S3_SECRET_KEY}
+      MINIO_ROOT_USER: ${SCENARA_MINIO_ROOT_USER:?set SCENARA_MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${SCENARA_MINIO_ROOT_PASSWORD:?set SCENARA_MINIO_ROOT_PASSWORD}
     command: ["server", "/data", "--console-address", ":9001"]
     volumes:
       - minio-data:/data
+    pids_limit: 512
+    mem_limit: ${SCENARA_MINIO_MEMORY_LIMIT:-4g}
+    cpus: ${SCENARA_MINIO_CPU_LIMIT:-2.0}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
       interval: 5s
       timeout: 3s
       retries: 20
+      start_period: 10s
+    stop_grace_period: 60s
+    networks: [backend]
     restart: unless-stopped
 
   minio-init:
@@ -122,15 +194,43 @@ services:
       minio:
         condition: service_healthy
     environment:
-      ACCESS_KEY: ${SCENARA_S3_ACCESS_KEY:-scenara}
+      ROOT_USER: ${SCENARA_MINIO_ROOT_USER:?set SCENARA_MINIO_ROOT_USER}
+      ROOT_PASSWORD: ${SCENARA_MINIO_ROOT_PASSWORD:?set SCENARA_MINIO_ROOT_PASSWORD}
+      ACCESS_KEY: ${SCENARA_S3_ACCESS_KEY:?set SCENARA_S3_ACCESS_KEY}
       SECRET_KEY: ${SCENARA_S3_SECRET_KEY:?set SCENARA_S3_SECRET_KEY}
+      BUCKET: scenara
     entrypoint: ["/bin/sh", "-c"]
     command:
-      - mc alias set local http://minio:9000 "$${ACCESS_KEY}" "$${SECRET_KEY}" && mc mb --ignore-existing local/scenara
+      - >-
+        mc alias set local http://minio:9000 "$${ROOT_USER}" "$${ROOT_PASSWORD}" &&
+        mc mb --ignore-existing "local/$${BUCKET}" &&
+        (mc admin user info local "$${ACCESS_KEY}" >/dev/null 2>&1 ||
+          mc admin user add local "$${ACCESS_KEY}" "$${SECRET_KEY}") &&
+        printf '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:*"],"Resource":["arn:aws:s3:::%s","arn:aws:s3:::%s/*"]}]}'
+          "$${BUCKET}" "$${BUCKET}" > /tmp/scenara-app-policy.json &&
+        (mc admin policy info local scenara-app >/dev/null 2>&1 ||
+          mc admin policy create local scenara-app /tmp/scenara-app-policy.json) &&
+        mc admin policy attach local scenara-app --user "$${ACCESS_KEY}"
+    networks: [backend]
+    restart: "no"
+
+  preflight:
+    <<: *scenara-service
+    environment:
+      <<: *scenara-environment
+      SCENARA_POSTGRES_PASSWORD: ${SCENARA_POSTGRES_PASSWORD:?set SCENARA_POSTGRES_PASSWORD}
+      SCENARA_REDIS_PASSWORD: ${SCENARA_REDIS_PASSWORD:?set SCENARA_REDIS_PASSWORD}
+      SCENARA_MINIO_ROOT_USER: ${SCENARA_MINIO_ROOT_USER:?set SCENARA_MINIO_ROOT_USER}
+      SCENARA_MINIO_ROOT_PASSWORD: ${SCENARA_MINIO_ROOT_PASSWORD:?set SCENARA_MINIO_ROOT_PASSWORD}
+      SCENARA_BIND_ADDRESS: ${SCENARA_BIND_ADDRESS:-127.0.0.1}
+      SCENARA_ALLOW_DIRECT_HTTP: ${SCENARA_ALLOW_DIRECT_HTTP:-false}
+      SCENARA_IMAGE_REFERENCE: ${SCENARA_IMAGE_REFERENCE:-}
+      SCENARA_FORWARDED_ALLOW_IPS: ${SCENARA_FORWARDED_ALLOW_IPS:-127.0.0.1}
+    command: ["python3", "scripts/validate_production_config.py", "--runtime", "--quiet"]
     restart: "no"
 
   api:
-    image: *scenara-image
+    <<: *scenara-service
     build:
       context: ..
     environment: *scenara-environment
@@ -141,19 +241,25 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      preflight:
+        condition: service_completed_successfully
     ports:
-      - "8000:8000"
+      - "${SCENARA_BIND_ADDRESS:-127.0.0.1}:${SCENARA_HTTP_PORT:-8000}:8000"
     volumes:
       - ../models:/opt/scenara/models:ro
+    pids_limit: 512
+    mem_limit: ${SCENARA_API_MEMORY_LIMIT:-4g}
+    cpus: ${SCENARA_API_CPU_LIMIT:-4.0}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/readyz"]
       interval: 10s
       timeout: 5s
       retries: 12
+      start_period: 30s
     restart: unless-stopped
 
   batch-worker:
-    image: *scenara-image
+    <<: *scenara-service
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "batch-gpu-1", "--lane", "batch"]
@@ -163,6 +269,9 @@ services:
         condition: service_healthy
     volumes:
       - ../models:/opt/scenara/models:ro
+    pids_limit: 1024
+    mem_limit: ${SCENARA_BATCH_WORKER_MEMORY_LIMIT:-16g}
+    cpus: ${SCENARA_BATCH_WORKER_CPU_LIMIT:-8.0}
     deploy:
       resources:
         reservations:
@@ -173,7 +282,7 @@ services:
     restart: unless-stopped
 
   stream-worker:
-    image: *scenara-image
+    <<: *scenara-service
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "stream-gpu-1", "--lane", "stream"]
@@ -183,6 +292,9 @@ services:
         condition: service_healthy
     volumes:
       - ../models:/opt/scenara/models:ro
+    pids_limit: 1024
+    mem_limit: ${SCENARA_STREAM_WORKER_MEMORY_LIMIT:-16g}
+    cpus: ${SCENARA_STREAM_WORKER_CPU_LIMIT:-8.0}
     deploy:
       resources:
         reservations:
@@ -193,7 +305,7 @@ services:
     restart: unless-stopped
 
   scheduler:
-    image: *scenara-image
+    <<: *scenara-service
     build:
       context: ..
     command:
@@ -212,9 +324,17 @@ services:
         condition: service_healthy
     volumes:
       - ../models:/opt/scenara/models:ro
+    pids_limit: 256
+    mem_limit: ${SCENARA_SCHEDULER_MEMORY_LIMIT:-2g}
+    cpus: ${SCENARA_SCHEDULER_CPU_LIMIT:-2.0}
     restart: unless-stopped
 
 volumes:
   postgres-data:
   redis-data:
   minio-data:
+
+networks:
+  backend:
+    internal: true
+  egress:

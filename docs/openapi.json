@@ -126,6 +126,76 @@
         "pattern": "^[a-z][a-z0-9_.-]{1,63}$",
         "type": "string"
       },
+      "AccessoryDetection": {
+        "additionalProperties": true,
+        "description": "配饰识别结果",
+        "properties": {
+          "accessory_id": {
+            "title": "Accessory Id",
+            "type": "string"
+          },
+          "accessory_label": {
+            "description": "配饰中文标签",
+            "title": "Accessory Label",
+            "type": "string"
+          },
+          "accessory_type": {
+            "description": "配饰类型(wig, prop, jewelry等)",
+            "title": "Accessory Type",
+            "type": "string"
+          },
+          "bounding_box": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoundingBox"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "配饰所在区域"
+          },
+          "color": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "主要颜色",
+            "title": "Color"
+          },
+          "confidence": {
+            "description": "识别置信度",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "material": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "材质",
+            "title": "Material"
+          }
+        },
+        "required": [
+          "accessory_id",
+          "accessory_type",
+          "accessory_label",
+          "confidence"
+        ],
+        "title": "AccessoryDetection",
+        "type": "object"
+      },
       "AcknowledgeEdgeDeploymentRequest": {
         "additionalProperties": false,
         "properties": {
@@ -4291,6 +4361,120 @@
         "title": "AutoRollbackModelRequest",
         "type": "object"
       },
+      "BehaviorAction": {
+        "additionalProperties": true,
+        "description": "单个行为动作识别结果",
+        "properties": {
+          "action_id": {
+            "title": "Action Id",
+            "type": "string"
+          },
+          "action_label": {
+            "description": "行为类型的可读标签",
+            "title": "Action Label",
+            "type": "string"
+          },
+          "action_type": {
+            "description": "行为类型标识,如 fall、fight、run 等",
+            "title": "Action Type",
+            "type": "string"
+          },
+          "bounding_box": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoundingBox"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "动作主体的边界框"
+          },
+          "confidence": {
+            "description": "置信度分数",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "end_ms": {
+            "description": "动作结束时间(毫秒)",
+            "minimum": 0.0,
+            "title": "End Ms",
+            "type": "integer"
+          },
+          "start_ms": {
+            "description": "动作开始时间(毫秒)",
+            "minimum": 0.0,
+            "title": "Start Ms",
+            "type": "integer"
+          },
+          "track_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "关联的轨迹 ID",
+            "title": "Track Id"
+          }
+        },
+        "required": [
+          "action_id",
+          "action_type",
+          "action_label",
+          "confidence",
+          "start_ms",
+          "end_ms"
+        ],
+        "title": "BehaviorAction",
+        "type": "object"
+      },
+      "BehaviorDomainPayload": {
+        "additionalProperties": true,
+        "description": "行为识别领域结果负载",
+        "properties": {
+          "actions": {
+            "description": "识别到的行为动作列表",
+            "items": {
+              "$ref": "#/components/schemas/BehaviorAction"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
+          "domain": {
+            "const": "behavior",
+            "default": "behavior",
+            "title": "Domain",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "segments": {
+            "description": "时序片段列表",
+            "items": {
+              "$ref": "#/components/schemas/TemporalSegment"
+            },
+            "title": "Segments",
+            "type": "array"
+          },
+          "summary": {
+            "default": "",
+            "description": "行为识别结果摘要",
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "title": "BehaviorDomainPayload",
+        "type": "object"
+      },
       "Body_compare_portrait_asset_image_api_v1_portrait_compare_asset_image_post": {
         "properties": {
           "asset_id": {
@@ -4978,6 +5162,70 @@
         "title": "CameraTransitionEntry",
         "type": "object"
       },
+      "ClothingStyle": {
+        "additionalProperties": true,
+        "description": "服装风格识别结果",
+        "properties": {
+          "attributes": {
+            "additionalProperties": true,
+            "description": "服装属性(颜色、款式等)",
+            "title": "Attributes",
+            "type": "object"
+          },
+          "bounding_box": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoundingBox"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "服装所在区域"
+          },
+          "confidence": {
+            "description": "识别置信度",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "style_id": {
+            "title": "Style Id",
+            "type": "string"
+          },
+          "style_label": {
+            "description": "风格中文标签",
+            "title": "Style Label",
+            "type": "string"
+          },
+          "style_type": {
+            "description": "风格类型标识(jk_uniform, lolita, hanfu, maid等)",
+            "title": "Style Type",
+            "type": "string"
+          },
+          "sub_category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "子类别(如:水手服JK、甜系Lolita)",
+            "title": "Sub Category"
+          }
+        },
+        "required": [
+          "style_id",
+          "style_type",
+          "style_label",
+          "confidence"
+        ],
+        "title": "ClothingStyle",
+        "type": "object"
+      },
       "CompleteMediaUploadRequest": {
         "additionalProperties": false,
         "properties": {
@@ -5037,6 +5285,70 @@
           "expires_at"
         ],
         "title": "CompleteMediaUploadRequest",
+        "type": "object"
+      },
+      "CosplayDetection": {
+        "additionalProperties": true,
+        "description": "Cosplay 角色识别结果",
+        "properties": {
+          "attributes": {
+            "additionalProperties": true,
+            "description": "角色特征(发色、服装特点等)",
+            "title": "Attributes",
+            "type": "object"
+          },
+          "bounding_box": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BoundingBox"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "角色所在区域"
+          },
+          "character_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "角色唯一标识",
+            "title": "Character Id"
+          },
+          "character_name": {
+            "description": "角色名称,如'路飞'、'初音未来'",
+            "title": "Character Name",
+            "type": "string"
+          },
+          "confidence": {
+            "description": "识别置信度",
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Confidence",
+            "type": "number"
+          },
+          "detection_id": {
+            "title": "Detection Id",
+            "type": "string"
+          },
+          "series_name": {
+            "description": "作品名称,如'海贼王'、'VOCALOID'",
+            "title": "Series Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "detection_id",
+          "character_name",
+          "series_name",
+          "confidence"
+        ],
+        "title": "CosplayDetection",
         "type": "object"
       },
       "CreateAgentEvaluationRequest": {
@@ -7136,13 +7448,68 @@
         "title": "ExecuteFlowRequest",
         "type": "object"
       },
+      "FashionDomainPayload": {
+        "additionalProperties": true,
+        "description": "服饰风格识别领域结果负载",
+        "properties": {
+          "accessories": {
+            "description": "配饰识别结果",
+            "items": {
+              "$ref": "#/components/schemas/AccessoryDetection"
+            },
+            "title": "Accessories",
+            "type": "array"
+          },
+          "clothing_styles": {
+            "description": "服装风格识别结果",
+            "items": {
+              "$ref": "#/components/schemas/ClothingStyle"
+            },
+            "title": "Clothing Styles",
+            "type": "array"
+          },
+          "cosplay": {
+            "description": "Cosplay 角色识别结果",
+            "items": {
+              "$ref": "#/components/schemas/CosplayDetection"
+            },
+            "title": "Cosplay",
+            "type": "array"
+          },
+          "domain": {
+            "const": "fashion",
+            "default": "fashion",
+            "title": "Domain",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "summary": {
+            "default": "",
+            "description": "识别结果摘要",
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "title": "FashionDomainPayload",
+        "type": "object"
+      },
       "FeedbackKind": {
         "enum": [
           "false_positive",
           "false_negative",
           "wrong_attribute",
           "wrong_identity",
-          "ocr_correction"
+          "ocr_correction",
+          "action_correction",
+          "temporal_correction",
+          "style_correction",
+          "character_correction",
+          "accessory_correction"
         ],
         "title": "FeedbackKind",
         "type": "string"
@@ -7166,6 +7533,18 @@
           "deidentified": {
             "title": "Deidentified",
             "type": "boolean"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_.-]{1,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
           },
           "feedback_id": {
             "title": "Feedback Id",
@@ -7561,6 +7940,19 @@
       "HardSampleItem": {
         "additionalProperties": false,
         "properties": {
+          "annotation_schema_id": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation Schema Id"
+          },
           "authorized_for_training": {
             "default": true,
             "title": "Authorized For Training",
@@ -7575,6 +7967,18 @@
             "default": true,
             "title": "Deidentified",
             "type": "boolean"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_.-]{1,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
           },
           "feedback_id": {
             "title": "Feedback Id",
@@ -9162,6 +9566,17 @@
             ],
             "title": "Keyframe Count"
           },
+          "native_text_available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Native Text Available"
+          },
           "page_count": {
             "anyOf": [
               {
@@ -9467,6 +9882,41 @@
         "title": "MergeIdentitiesRequest",
         "type": "object"
       },
+      "ModelArtifactFile": {
+        "additionalProperties": false,
+        "properties": {
+          "media_type": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Media Type",
+            "type": "string"
+          },
+          "path": {
+            "maxLength": 512,
+            "pattern": "^[^/\\\\\\s][^\\\\]*$",
+            "title": "Path",
+            "type": "string"
+          },
+          "sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Sha256",
+            "type": "string"
+          },
+          "size_bytes": {
+            "minimum": 0.0,
+            "title": "Size Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "path",
+          "sha256",
+          "size_bytes",
+          "media_type"
+        ],
+        "title": "ModelArtifactFile",
+        "type": "object"
+      },
       "ModelDeploymentEvent": {
         "additionalProperties": false,
         "properties": {
@@ -9486,6 +9936,18 @@
             "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z$",
             "title": "Created At",
             "type": "string"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_.-]{1,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
           },
           "event_id": {
             "title": "Event Id",
@@ -9731,10 +10193,41 @@
             "title": "Adapter",
             "type": "string"
           },
+          "artifact_files": {
+            "items": {
+              "$ref": "#/components/schemas/ModelArtifactFile"
+            },
+            "maxItems": 1000,
+            "title": "Artifact Files",
+            "type": "array"
+          },
+          "artifact_format": {
+            "default": "onnx",
+            "enum": [
+              "onnx",
+              "paddle",
+              "pytorch",
+              "bundle"
+            ],
+            "title": "Artifact Format",
+            "type": "string"
+          },
           "capability": {
             "pattern": "^[a-z][a-z0-9_.-]{1,127}$",
             "title": "Capability",
             "type": "string"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_.-]{1,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
           },
           "evaluation_evidence": {
             "items": {
@@ -9744,6 +10237,19 @@
             "minItems": 1,
             "title": "Evaluation Evidence",
             "type": "array"
+          },
+          "input_schema": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "pattern": "^.+(?:@sha256:|#sha256=)[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Schema"
           },
           "license_id": {
             "maxLength": 128,
@@ -9761,6 +10267,19 @@
             "pattern": "^[a-z][a-z0-9_.-]{1,127}$",
             "title": "Model Id",
             "type": "string"
+          },
+          "output_schema": {
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "pattern": "^.+(?:@sha256:|#sha256=)[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Schema"
           },
           "production_ready": {
             "default": false,
@@ -9892,6 +10411,18 @@
           "created_by": {
             "title": "Created By",
             "type": "string"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "pattern": "^[a-z][a-z0-9_.-]{1,63}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
           },
           "evidence_refs": {
             "default": [],
@@ -12582,6 +13113,12 @@
                 "$ref": "#/components/schemas/OcrDomainPayload"
               },
               {
+                "$ref": "#/components/schemas/BehaviorDomainPayload"
+              },
+              {
+                "$ref": "#/components/schemas/FashionDomainPayload"
+              },
+              {
                 "$ref": "#/components/schemas/GenericDomainPayload"
               }
             ],
@@ -14282,6 +14819,57 @@
         "title": "SystemStatus",
         "type": "object"
       },
+      "TemporalSegment": {
+        "additionalProperties": true,
+        "description": "时序片段",
+        "properties": {
+          "confidence": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "end_ms": {
+            "minimum": 0.0,
+            "title": "End Ms",
+            "type": "integer"
+          },
+          "segment_id": {
+            "title": "Segment Id",
+            "type": "string"
+          },
+          "segment_type": {
+            "description": "片段类型,如 normal、anomaly、activity 等",
+            "title": "Segment Type",
+            "type": "string"
+          },
+          "start_ms": {
+            "minimum": 0.0,
+            "title": "Start Ms",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "segment_id",
+          "start_ms",
+          "end_ms",
+          "segment_type"
+        ],
+        "title": "TemporalSegment",
+        "type": "object"
+      },
       "TimelineEntry": {
         "additionalProperties": false,
         "description": "时间线上的一次出现。",
@@ -15151,7 +15739,7 @@
   "info": {
     "description": "Scenara 景枢视觉 AI 中枢平台",
     "title": "Scenara API",
-    "version": "0.3.0.dev26"
+    "version": "0.3.0.dev29"
   },
   "openapi": "3.1.0",
   "paths": {

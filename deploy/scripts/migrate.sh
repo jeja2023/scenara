@@ -6,6 +6,7 @@ set -eu
 : "${PGPORT:=5432}"
 : "${PGDATABASE:=scenara}"
 : "${PGUSER:=scenara}"
+: "${SCENARA_MIGRATIONS_DIR:=/migrations}"
 
 psql -v ON_ERROR_STOP=1 <<'SQL'
 CREATE TABLE IF NOT EXISTS scenara_schema_migrations (
@@ -14,7 +15,7 @@ CREATE TABLE IF NOT EXISTS scenara_schema_migrations (
 );
 SQL
 
-for migration in /migrations/*.sql; do
+for migration in "$SCENARA_MIGRATIONS_DIR"/*.sql; do
   test -f "$migration" || continue
   version="$(basename "$migration" .sql)"
   case "$version" in

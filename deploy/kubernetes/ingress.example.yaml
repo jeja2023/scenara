@@ -1,0 +1,29 @@
+# Environment-specific example. Do not apply without replacing host, issuer and annotations.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: scenara-api
+  namespace: scenara
+  annotations:
+    cert-manager.io/cluster-issuer: replace-with-production-issuer
+    nginx.ingress.kubernetes.io/proxy-body-size: 20g
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [scenara.example.com]
+      secretName: scenara-api-tls
+  rules:
+    - host: scenara.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: scenara-api
+                port:
+                  name: http

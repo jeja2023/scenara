@@ -6,10 +6,12 @@ Fashion Recognition Domain
 
 from __future__ import annotations
 
+from typing import Any
+
 __all__ = ["FashionPlugin"]
 
 
-def __getattr__(name: str):
+def __getattr__(name: str) -> Any:
     if name == "FashionPlugin":
         from scenara.domains.fashion.plugin import FashionPlugin
 
