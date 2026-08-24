@@ -153,6 +153,35 @@ class PaddleOcrEngine:
 OCR_BLOCK_TYPES = {"text", "title", "paragraph", "image", "table"}
 
 
+def _format_pts(pts_ms: int | None) -> str:
+    if pts_ms is None:
+        return "00:00.0"
+    total_seconds = max(0, pts_ms) / 1000.0
+    minutes = int(total_seconds // 60)
+    seconds = total_seconds % 60
+    return f"{minutes:02d}:{seconds:04.1f}"
+
+
+def _get_gray_thumb(image: Any, size: tuple[int, int] = (160, 90)) -> Any:
+    import numpy as np
+
+    if hasattr(image, "convert") and hasattr(image, "resize"):
+        try:
+            small = image.convert("L").resize(size)
+            return np.asarray(small, dtype=np.float32)
+        except Exception:
+            pass
+    arr = np.asarray(image)
+    if arr.ndim == 3:
+        gray = 0.299 * arr[:, :, 0] + 0.587 * arr[:, :, 1] + 0.114 * arr[:, :, 2]
+    else:
+        gray = arr
+    h, w = gray.shape[:2]
+    step_y = max(1, h // size[1])
+    step_x = max(1, w // size[0])
+    return gray[::step_y, ::step_x][: size[1], : size[0]].astype(np.float32)
+
+
 def _polygon(value: object) -> list[list[float]]:
     if not isinstance(value, (list, tuple)):
         return []
@@ -283,6 +312,9 @@ class OcrDocumentOperator:
         if language_hint:
             language_hint = str(language_hint).strip() or None
         layout_required = bool(parameters.get("layout_required", False))
+        motion_filter_enabled = bool(parameters.get("motion_filter_enabled", True))
+        motion_threshold = float(parameters.get("motion_threshold", 0.025))
+        deduplicate_text = bool(parameters.get("deduplicate_text", True))
 
         # 检查生产就绪状态
         production_ready = bool(getattr(engine, "production_ready", False))
@@ -321,6 +353,7 @@ class OcrDocumentOperator:
 
         blocks: list[OcrTextBlock] = []
         units: list[MediaUnitResult] = []
+        tracked_texts: list[dict[str, Any]] = []
         reading_order = 0
         processed_units = 0
         detected_languages: dict[str, int] = {}
@@ -335,6 +368,37 @@ class OcrDocumentOperator:
             if detected_languages:
                 dominant_language = max(detected_languages, key=lambda language: detected_languages[language])
 
+            # 构建聚合文本展示（针对视频/时序流或多页文档进行去重与时间戳标记）
+            is_time_series = decoded.kind in {MediaKind.VIDEO, MediaKind.STREAM}
+            if deduplicate_text and is_time_series and tracked_texts:
+                formatted_lines: list[str] = []
+                for track in tracked_texts:
+                    txt = track["text"].strip()
+                    if not txt:
+                        continue
+                    start_t = _format_pts(track["first_pts_ms"])
+                    end_t = _format_pts(track["last_pts_ms"])
+                    if track["first_pts_ms"] != track["last_pts_ms"]:
+                        formatted_lines.append(f"[{start_t} - {end_t}] {txt}")
+                    else:
+                        formatted_lines.append(f"[{start_t}] {txt}")
+                aggregate_text = "\n".join(formatted_lines)
+            elif deduplicate_text and any(u.page_number for u in units) and len(units) > 1 and tracked_texts:
+                formatted_lines = []
+                for track in tracked_texts:
+                    txt = track["text"].strip()
+                    if not txt:
+                        continue
+                    if track["first_page"] != track["last_page"]:
+                        formatted_lines.append(f"[第 {track['first_page']}-{track['last_page']} 页] {txt}")
+                    elif track["first_page"] is not None:
+                        formatted_lines.append(f"[第 {track['first_page']} 页] {txt}")
+                    else:
+                        formatted_lines.append(txt)
+                aggregate_text = "\n".join(formatted_lines)
+            else:
+                aggregate_text = "\n".join(block.text for block in blocks if block.text)
+
             return ResultEnvelope(
                 run_id=context.run_id,
                 domain="ocr",
@@ -343,7 +407,7 @@ class OcrDocumentOperator:
                 source_id=context.source_id,
                 units=list(units),
                 domain_payload=OcrDomainPayload(
-                    text="\n".join(block.text for block in blocks if block.text),
+                    text=aggregate_text,
                     blocks=list(blocks),
                     language=dominant_language,
                 ),
@@ -355,25 +419,51 @@ class OcrDocumentOperator:
             )
 
         batch_size = 1 if decoded.kind == MediaKind.STREAM else 4
+        prev_thumb: Any = None
+        cached_raw_blocks: list[dict[str, Any]] = []
+        cached_regions: list[dict[str, Any]] = []
+        is_time_series = decoded.kind in {MediaKind.VIDEO, MediaKind.STREAM}
+
         try:
+            import numpy as np
+
             async for chunk, expected_units in decoded.iter_batches(batch_size):
                 for unit in chunk:
-                    # 执行 OCR 识别,传递参数
-                    raw_blocks = await asyncio.to_thread(
-                        _predict_blocks,
-                        engine,
-                        unit.image,
-                        min_score=min_score,
-                        language_hint=language_hint,
-                    )
+                    # 动静态画面检测：若画面无显著动态变化，直接复用上一帧识别结果，极速跳过深度推理
+                    is_static_frame = False
+                    curr_thumb = None
+                    if motion_filter_enabled and is_time_series:
+                        curr_thumb = _get_gray_thumb(unit.image)
+                        if prev_thumb is not None and cached_raw_blocks:
+                            diff = float(np.mean(np.abs(curr_thumb - prev_thumb))) / 255.0
+                            if diff < motion_threshold:
+                                is_static_frame = True
 
-                    # 执行版面分析(如果需要且支持)
-                    regions: list[dict[str, Any]] = []
-                    if layout_required and callable(layout_predictor):
-                        predicted = await asyncio.to_thread(layout_predictor, unit.image)
-                        if not isinstance(predicted, list):
-                            raise TypeError("OCR layout engine must return a list")
-                        regions = [item for item in predicted if isinstance(item, dict)]
+                    if is_static_frame and cached_raw_blocks:
+                        raw_blocks = cached_raw_blocks
+                        regions = cached_regions
+                    else:
+                        # 执行真实 OCR 识别
+                        raw_blocks = await asyncio.to_thread(
+                            _predict_blocks,
+                            engine,
+                            unit.image,
+                            min_score=min_score,
+                            language_hint=language_hint,
+                        )
+
+                        # 执行版面分析(如果需要且支持)
+                        regions = []
+                        if layout_required and callable(layout_predictor):
+                            predicted = await asyncio.to_thread(layout_predictor, unit.image)
+                            if not isinstance(predicted, list):
+                                raise TypeError("OCR layout engine must return a list")
+                            regions = [item for item in predicted if isinstance(item, dict)]
+
+                        cached_raw_blocks = raw_blocks
+                        cached_regions = regions
+                        if motion_filter_enabled and is_time_series and curr_thumb is not None:
+                            prev_thumb = curr_thumb
 
                     # 合并版面信息
                     ordered_blocks = _merge_layout(raw_blocks, regions)
@@ -429,6 +519,36 @@ class OcrDocumentOperator:
                             ocr_block.__dict__["table_structure"] = item["table_structure"]
 
                         blocks.append(ocr_block)
+
+                        # 时序文本去重匹配
+                        if deduplicate_text and text.strip():
+                            matched_track = None
+                            for track in reversed(tracked_texts):
+                                if track["text"] == text:
+                                    if (
+                                        (track["last_pts_ms"] is not None and unit.pts_ms is not None and unit.pts_ms - track["last_pts_ms"] <= 4000)
+                                        or (track["last_page"] is not None and unit.page_number is not None and unit.page_number == track["last_page"] + 1)
+                                    ):
+                                        matched_track = track
+                                        break
+                            if matched_track is not None:
+                                matched_track["last_pts_ms"] = unit.pts_ms
+                                matched_track["last_page"] = unit.page_number
+                                matched_track["occurrences"] += 1
+                                if score and score > matched_track["score"]:
+                                    matched_track["score"] = score
+                            else:
+                                tracked_texts.append(
+                                    {
+                                        "text": text,
+                                        "first_pts_ms": unit.pts_ms,
+                                        "last_pts_ms": unit.pts_ms,
+                                        "first_page": unit.page_number,
+                                        "last_page": unit.page_number,
+                                        "score": score or 0.0,
+                                        "occurrences": 1,
+                                    }
+                                )
 
                         # 构建单元内的 VisionObject，供时间轴与对象明细展示
                         vision_obj = VisionObject(

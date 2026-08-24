@@ -105,3 +105,84 @@ async def test_ocr_layout_regions_and_reading_order(development_settings) -> Non
             "ocr_recognition",
             "ocr_layout",
         }
+
+
+@pytest.mark.asyncio
+async def test_ocr_motion_filter_and_temporal_deduplication() -> None:
+    from scenara.domains.ocr.operators import OcrDocumentOperator
+    from scenara.platform.media_batch import DecodedMedia, DecodedMediaUnit
+    from scenara.platform.models import MediaKind, MediaTechnicalMetadata, SampleStrategy
+    from scenara.platform.pipeline import ExecutionContext
+
+    call_count = 0
+
+    class TrackingEngine:
+        model_id = "test-ocr"
+        version = "1.0.0"
+        production_ready = True
+
+        def predict(self, image: Any, **kwargs: Any) -> list[dict[str, Any]]:
+            nonlocal call_count
+            call_count += 1
+            return [
+                {
+                    "text": "静态标语",
+                    "score": 0.98,
+                    "polygon": [[10, 10], [90, 10], [90, 30], [10, 30]],
+                }
+            ]
+
+    operator = OcrDocumentOperator(engine=TrackingEngine())
+    img = Image.new("RGB", (100, 50), "white")
+    units = [
+        DecodedMediaUnit(
+            unit_id=f"frame_{i}",
+            unit_type="frame",
+            index=i,
+            pts_ms=i * 1000,
+            image=img,
+        )
+        for i in range(5)
+    ]
+    decoded = DecodedMedia(
+        kind=MediaKind.VIDEO,
+        metadata=MediaTechnicalMetadata(
+            width=100,
+            height=50,
+            duration_ms=4000,
+            sample_strategy=SampleStrategy.INTERVAL,
+        ),
+        units=units,
+    )
+
+    class DummyContext(ExecutionContext):
+        def __init__(self) -> None:
+            pass
+        run_id = "test_run"
+        pipeline_id = "ocr.document"
+        pipeline_version = "1.0.0"
+        asset_id = "asset_1"
+        source_id = "src_1"
+        production = False
+        async def publish_partial_result(self, res: Any) -> None:
+            pass
+        async def report_progress(self, *args: Any, **kwargs: Any) -> None:
+            pass
+
+    res = await operator.execute(
+        DummyContext(),
+        {"batch": decoded},
+        {"motion_filter_enabled": True, "motion_threshold": 0.025, "deduplicate_text": True},
+    )
+    result = res["result"]
+
+    # 5 帧完全相同的静态画面，模型推理调用次数应该为 1
+    assert call_count == 1
+    # 5 个单元均被完整处理并关联对象
+    assert len(result.units) == 5
+    for unit in result.units:
+        assert len(unit.objects) == 1
+        assert unit.objects[0].attributes["text"] == "静态标语"
+    # 时序去重文本合并了时间跨度
+    assert result.domain_payload.text == "[00:00.0 - 00:04.0] 静态标语"
+
