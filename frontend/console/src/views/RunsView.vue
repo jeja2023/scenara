@@ -391,30 +391,38 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.stats {
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.stat {
+  padding: 8px 12px;
+  min-height: 68px;
+}
 .filter-panel {
-  margin-top: 14px;
+  margin-top: 8px;
 }
 .filter-panel .panel-body {
-  padding: 10px 16px;
+  padding: 6px 12px;
 }
 .filter-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 12px;
   flex-wrap: wrap;
 }
 .filter-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 .filter-heading {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
+  gap: 5px;
+  font-size: 12px;
   font-weight: 650;
   color: var(--color-text);
   margin-right: 2px;
@@ -424,58 +432,75 @@ onBeforeUnmount(() => {
   color: var(--teal);
 }
 .filter-controls select {
-  width: 170px;
-  min-width: 130px;
-  height: 34px;
-  min-height: 34px;
-  padding: 0 10px;
-  font-size: 13px;
+  width: 150px;
+  min-width: 120px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: 4px;
   background-color: var(--color-surface);
 }
 .filter-controls .button {
-  height: 34px;
-  min-height: 34px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
 }
 .runs-panel {
-  margin-top: 14px;
+  margin-top: 8px;
 }
 .runs-panel .data-table th {
-  height: 32px;
-  padding: 4px 10px;
+  height: 26px;
+  padding: 2px 8px;
+  font-size: 11px;
 }
 .runs-panel .data-table td {
-  min-height: 34px;
-  padding: 5px 10px;
+  min-height: 26px;
+  height: 26px;
+  padding: 2px 8px;
+  font-size: 11.5px;
+  line-height: 1.25;
   vertical-align: middle;
 }
 .runs-panel .badge {
-  min-height: 20px;
-  padding: 0 6px;
-  font-size: 11px;
-  line-height: 20px;
+  min-height: 18px;
+  height: 18px;
+  padding: 0 5px;
+  font-size: 10.5px;
+  line-height: 18px;
 }
 .compact {
-  gap: 4px;
+  gap: 3px;
   flex-wrap: nowrap;
 }
 .compact .button {
-  min-height: 24px;
-  height: 24px;
-  padding: 0 7px;
-  font-size: 11.5px;
+  min-height: 20px;
+  height: 20px;
+  padding: 0 5px;
+  font-size: 10.5px;
   font-weight: 550;
-  gap: 4px;
-  border-radius: 4px;
+  gap: 3px;
+  border-radius: 3px;
 }
-@media (max-width: 900px) {
-  .filter-controls .button,
-  .filter-controls select,
-  .compact .button {
-    min-height: 44px;
-    height: 44px;
-  }
+.runs-panel .pagination {
+  padding: 5px 12px;
+}
+.runs-panel .pagination-info {
+  font-size: 11.5px;
+}
+.runs-panel .pagination-btn {
+  height: 24px;
+  min-height: 24px;
+  font-size: 11px;
+  padding: 0 6px;
+}
+.runs-panel .pagination-page-indicator {
+  min-width: 24px;
+  height: 24px;
+  font-size: 11px;
+  padding: 0 4px;
 }
 .auto-refresh-label {
   display: inline-flex;

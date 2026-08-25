@@ -348,7 +348,7 @@ textarea:focus-visible {
 }
 .main-content {
   margin-left: 232px;
-  padding: 82px 24px 36px;
+  padding: 72px 24px 20px;
   min-height: 100vh;
 }
 .mobile-menu,
