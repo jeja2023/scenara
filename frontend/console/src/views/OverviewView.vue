@@ -778,10 +778,75 @@ useRefresh(refresh);
 .overview-page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
+  font-family: var(--font-sans);
+  color: var(--color-text, #17211f);
 }
 
-/* 1. 统计卡片栏 (精简紧凑、左右平衡) */
+/* ========================================================
+   全局面板容器与标题层级规范 (Panel Headers & Typography)
+   ======================================================== */
+.panel {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: var(--radius-md, 8px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* 一级/板块大标题 (H2 Standard) */
+.panel-header h2 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text, #17211f);
+  margin: 0;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+/* 板块副说明文本 (Panel Subtitle) */
+.panel-header p {
+  font-size: 12px;
+  color: var(--muted, #64716d);
+  margin: 3px 0 0;
+  line-height: 1.45;
+}
+
+.header-left h2 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text, #17211f);
+  margin: 0;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.header-left p {
+  font-size: 12px;
+  color: var(--muted, #64716d);
+  margin: 3px 0 0;
+  line-height: 1.45;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ========================================================
+   1. 统计卡片栏 (Stats Metrics Bar)
+   ======================================================== */
 .stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -790,10 +855,10 @@ useRefresh(refresh);
 
 .stat {
   padding: 12px 16px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm, 6px);
   background: #fff;
   border: 1px solid var(--line, #e2e8e6);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -803,7 +868,7 @@ useRefresh(refresh);
 
 .stat:hover {
   transform: translateY(-1px);
-  border-color: #cbd5e1;
+  border-color: var(--line-strong, #b7c2bd);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
 }
 
@@ -814,32 +879,37 @@ useRefresh(refresh);
   min-width: 0;
 }
 
+/* 指标小标题 */
 .stat-title {
   font-size: 12px;
   font-weight: 600;
-  color: var(--muted, #61736e);
+  color: var(--muted, #64716d);
 }
 
+/* 指标大数值 */
 .stat-value {
-  font-size: 21px;
+  font-size: 22px;
   font-weight: 700;
-  color: #17211f;
+  color: var(--color-text, #17211f);
   line-height: 1.2;
   letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
 }
 
+/* 指标辅助说明 */
 .stat-desc {
   font-size: 11px;
   color: #8c9b97;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.35;
 }
 
 .stat-icon-badge {
   width: 36px;
   height: 36px;
-  border-radius: 7px;
+  border-radius: var(--radius-sm, 6px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -875,37 +945,14 @@ useRefresh(refresh);
   border: 1px solid #fef3c7;
 }
 
-/* 2. AI 视觉多领域与模型引擎全景 */
-.ai-engines-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.header-left h2 {
-  font-size: 16px;
-  font-weight: 700;
-  margin: 0;
-  color: #17211f;
-}
-
-.header-left p {
-  margin: 4px 0 0;
-  font-size: 13px;
-  color: var(--muted, #61736e);
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
+/* ========================================================
+   2. AI 视觉多领域与模型引擎全景 (Domain Engine Cards)
+   ======================================================== */
 .toggle-matrix-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 5px 12px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -914,23 +961,23 @@ useRefresh(refresh);
 .engine-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  gap: 12px;
 }
 
 .engine-card {
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 8px;
-  padding: 16px;
+  border-radius: var(--radius-sm, 6px);
+  padding: 14px;
   background: #fff;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   transition: all 160ms ease;
 }
 
 .engine-card:hover {
-  border-color: var(--teal, #0f766e);
-  box-shadow: 0 4px 12px rgba(15, 118, 110, 0.08);
+  border-color: var(--teal, #087682);
+  box-shadow: 0 4px 12px rgba(8, 118, 130, 0.08);
 }
 
 .engine-card-header {
@@ -940,11 +987,11 @@ useRefresh(refresh);
 }
 
 .engine-icon-wrap {
-  width: 34px;
-  height: 34px;
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm, 6px);
   background: var(--teal-soft, #f0fdfa);
-  color: var(--teal, #0f766e);
+  color: var(--teal, #087682);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -958,26 +1005,30 @@ useRefresh(refresh);
   flex-direction: column;
 }
 
+/* 三级标题 / 领域名称 (H3 Standard) */
 .engine-meta strong {
-  font-size: 14px;
-  font-weight: 700;
-  color: #17211f;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text, #17211f);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
 .engine-meta small {
   font-size: 11px;
-  color: var(--muted, #61736e);
+  color: var(--muted, #64716d);
+  line-height: 1.3;
 }
 
+/* 正文描述 (Body Text) */
 .engine-desc {
   font-size: 12px;
-  line-height: 1.45;
+  line-height: 1.5;
   color: #4b5d58;
   margin: 0;
-  min-height: 34px;
+  min-height: 36px;
 }
 
 .engine-models-list {
@@ -1009,17 +1060,18 @@ useRefresh(refresh);
 
 .model-item-name {
   font-weight: 600;
-  color: #17211f;
+  font-size: 11.5px;
+  color: var(--color-text, #17211f);
   min-width: 58px;
   flex-shrink: 0;
 }
 
 .model-item-file {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 10.5px;
-  color: #0f766e;
-  background: #f0fdfa;
-  padding: 1px 5px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--teal, #087682);
+  background: var(--teal-soft, #f0fdfa);
+  padding: 1px 6px;
   border-radius: 3px;
   white-space: nowrap;
   overflow: hidden;
@@ -1028,8 +1080,8 @@ useRefresh(refresh);
 
 /* 矩阵表格区域 */
 .matrix-table-section {
-  margin-top: 8px;
-  padding-top: 16px;
+  margin-top: 4px;
+  padding-top: 14px;
   border-top: 1px solid var(--line, #e2e8e6);
   display: flex;
   flex-direction: column;
@@ -1055,7 +1107,7 @@ useRefresh(refresh);
   gap: 4px;
   background: #f1f5f4;
   padding: 3px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm, 6px);
 }
 
 .matrix-tab-btn {
@@ -1064,7 +1116,7 @@ useRefresh(refresh);
   padding: 4px 12px;
   font-size: 12px;
   font-weight: 600;
-  color: var(--muted, #61736e);
+  color: var(--muted, #64716d);
   border-radius: 4px;
   cursor: pointer;
   transition: all 140ms ease;
@@ -1072,7 +1124,7 @@ useRefresh(refresh);
 
 .matrix-tab-btn.active {
   background: #fff;
-  color: var(--teal, #0f766e);
+  color: var(--teal, #087682);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
@@ -1080,9 +1132,9 @@ useRefresh(refresh);
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 6px;
+  padding: 2px 7px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
 }
 
@@ -1091,7 +1143,14 @@ useRefresh(refresh);
 .domain-pill.behavior { background: #f3e8ff; color: #7e22ce; }
 .domain-pill.fashion { background: #fce7f3; color: #be185d; }
 
+.pi-cap-name strong {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--color-text, #17211f);
+}
+
 .cap-model-code {
+  font-family: var(--font-mono);
   font-size: 11px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
@@ -1100,20 +1159,47 @@ useRefresh(refresh);
   color: #334155;
 }
 
-/* 3. 运行动态与产品体系看板 (垂直纵向排布) */
-.runs-panel, .product-matrix-panel {
+/* ========================================================
+   3. 最近运行动态与表格层级 (Runs Table)
+   ======================================================== */
+.runs-panel, .product-matrix-panel, .repository-topology-panel {
   background: #fff;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 8px;
+  border-radius: var(--radius-md, 8px);
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
-.run-link {
-  color: var(--teal, #0f766e);
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.data-table th {
+  font-size: 11.5px;
   font-weight: 600;
+  color: var(--muted, #64716d);
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line, #e2e8e6);
+  background: #fafbfb;
+}
+
+.data-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--line, #e2e8e6);
+  color: var(--color-text, #17211f);
+  line-height: 1.45;
+}
+
+.run-link {
+  font-family: var(--font-mono);
+  color: var(--teal, #087682);
+  font-weight: 600;
+  font-size: 12px;
   text-decoration: none;
 }
 
@@ -1126,10 +1212,13 @@ useRefresh(refresh);
   align-items: center;
   gap: 4px;
   font-size: 12px;
+  font-weight: 500;
   color: #334155;
 }
 
-/* 产品体系网格化展示 */
+/* ========================================================
+   4. 平台产品体系网格化规范 (Product Matrix Cards)
+   ======================================================== */
 .product-mini-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -1138,7 +1227,7 @@ useRefresh(refresh);
 
 .product-mini-item {
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 6px;
+  border-radius: var(--radius-sm, 6px);
   padding: 12px 14px;
   background: #fafbfb;
   display: flex;
@@ -1148,7 +1237,7 @@ useRefresh(refresh);
 }
 
 .product-mini-item:hover {
-  border-color: var(--teal, #0f766e);
+  border-color: var(--teal, #087682);
   background: #f7fdfb;
 }
 
@@ -1159,26 +1248,31 @@ useRefresh(refresh);
   gap: 8px;
 }
 
+/* 产品卡片标题 (H3 Standard) */
 .product-mini-header strong {
-  font-size: 13px;
-  color: #17211f;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text, #17211f);
 }
 
+/* 产品卡片正文 (Body Text) */
 .product-mini-desc {
-  font-size: 11.5px;
-  color: var(--muted, #61736e);
+  font-size: 12px;
+  color: #4b5d58;
   margin: 0;
-  line-height: 1.35;
+  line-height: 1.45;
 }
 
+/* 产品门禁辅助信息 */
 .product-mini-gate {
-  font-size: 10.5px;
+  font-size: 11px;
   color: #8c9b97;
+  line-height: 1.35;
 }
 
 .product-foundation-bar {
   margin-top: 4px;
-  padding-top: 10px;
+  padding-top: 12px;
   border-top: 1px dashed var(--line, #e2e8e6);
   display: flex;
   flex-direction: column;
@@ -1186,9 +1280,9 @@ useRefresh(refresh);
 }
 
 .foundation-title {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
-  color: var(--muted, #61736e);
+  color: var(--color-text, #17211f);
 }
 
 .foundation-chips {
@@ -1201,33 +1295,30 @@ useRefresh(refresh);
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 2px 8px;
+  padding: 3px 8px;
   border: 1px solid var(--line, #e2e8e6);
   border-radius: 4px;
   background: #fff;
-  font-size: 11px;
+  font-size: 11.5px;
 }
 
-/* 4. 仓库拓扑与边界治理 */
-.repository-topology-panel {
-  background: #fff;
-  border: 1px solid var(--line, #e2e8e6);
-  border-radius: 8px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.foundation-chip .chip-name {
+  font-weight: 500;
+  color: #17211f;
 }
 
+/* ========================================================
+   5. 仓库拓扑与边界治理层级规范 (Repository Topology Cards)
+   ======================================================== */
 .repository-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
+  gap: 12px;
 }
 
 .repo-card {
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 6px;
+  border-radius: var(--radius-sm, 6px);
   padding: 14px;
   background: #fafbfa;
   display: flex;
@@ -1236,7 +1327,7 @@ useRefresh(refresh);
 }
 
 .repo-card.current {
-  border-color: var(--teal, #0f766e);
+  border-color: var(--teal, #087682);
   background: #f7fdfb;
 }
 
@@ -1251,29 +1342,36 @@ useRefresh(refresh);
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* 仓库卡片标题 (H3 Standard) */
+.repo-title-wrap strong {
   font-size: 13.5px;
-  color: #17211f;
+  font-weight: 600;
+  color: var(--color-text, #17211f);
 }
 
 .repo-icon {
-  color: var(--teal, #0f766e);
+  color: var(--teal, #087682);
+  flex-shrink: 0;
 }
 
+/* 仓库正文描述 (Body Text) */
 .repo-desc {
   font-size: 12px;
   color: #4b5d58;
   margin: 0;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .repo-responsibilities {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 11px;
-  line-height: 1.35;
+  gap: 5px;
+  font-size: 11.5px;
+  line-height: 1.4;
   background: #fff;
-  padding: 8px;
+  padding: 8px 10px;
   border-radius: 4px;
   border: 1px solid var(--line, #e2e8e6);
 }
@@ -1286,15 +1384,21 @@ useRefresh(refresh);
 .resp-label {
   font-weight: 600;
   flex-shrink: 0;
+  font-size: 11.5px;
 }
 
-.resp-label.plus { color: #0f766e; }
+.resp-label.plus { color: #087682; }
 .resp-label.minus { color: #b45309; }
 
+.resp-text {
+  color: #334155;
+}
+
 .repo-gate-footer {
-  font-size: 10.5px;
+  font-size: 11px;
   color: #8c9b97;
   margin-top: auto;
+  line-height: 1.35;
 }
 
 .topology-rules-bar {
@@ -1314,7 +1418,8 @@ useRefresh(refresh);
 
 .rule-title {
   font-size: 12px;
-  color: #17211f;
+  font-weight: 600;
+  color: var(--color-text, #17211f);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -1334,6 +1439,7 @@ useRefresh(refresh);
   background: #f1f5f4;
   color: #334155;
   border: 1px solid var(--line, #e2e8e6);
+  line-height: 1.4;
 }
 
 .rule-pill.rule-security {
@@ -1342,13 +1448,12 @@ useRefresh(refresh);
   border-color: #fecaca;
 }
 
-/* 响应式适配 */
+/* ========================================================
+   响应式适配 (Responsive)
+   ======================================================== */
 @media (max-width: 1200px) {
   .engine-grid {
     grid-template-columns: repeat(2, 1fr);
-  }
-  .two-column-layout {
-    grid-template-columns: 1fr;
   }
   .repository-grid {
     grid-template-columns: 1fr;
