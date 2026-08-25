@@ -368,16 +368,7 @@ const isDomainScoped = computed(() =>
   Boolean(route.params?.domain || props.initialDomain || domain.value),
 );
 const currentMediaLabel = computed(() => labelMediaKind(mode.value));
-const scopedHistoryRuns = computed(() =>
-  historyRuns.value.filter((item) => {
-    const asset = item.asset_id
-      ? assets.value.find((candidate) => candidate.asset_id === item.asset_id)
-      : null;
-    if (asset) return asset.kind === mode.value;
-    if (item.source_id) return mode.value === "stream";
-    return true;
-  }),
-);
+const scopedHistoryRuns = computed(() => historyRuns.value);
 
 const displayedMediaUrl = computed(
   () => serverPreviewUrl.value || mediaUrl.value,
@@ -496,6 +487,7 @@ function selectDomain(value: Domain): void {
   syncPipelineSelection();
   ensureSupportedMode();
   navigateWorkspace(value, mode.value);
+  void refreshHistory();
 }
 
 function selectFile(event: Event): void {
@@ -1385,6 +1377,9 @@ watch(
     void refreshHistory();
   },
 );
+watch(domain, () => {
+  void refreshHistory();
+});
 watch(pipelineId, () => syncPipelineParameterDefaults());
 watch(selectedUnitIndex, syncSelectedMediaFrame);
 watch(
@@ -1403,7 +1398,9 @@ onMounted(async () => {
   await restoreRouteSelection();
   await refreshHistory();
 });
-useRefresh(refreshWorkspaceResources);
+useRefresh(async () => {
+  await Promise.all([refreshWorkspaceResources(), refreshHistory()]);
+});
 onBeforeUnmount(() => {
   pollGeneration += 1;
   if (sseAbort) {
@@ -2222,7 +2219,7 @@ onBeforeUnmount(() => {
       <div class="panel-header">
         <div>
           <h2>最近运行</h2>
-          <p>{{ currentDomainLabel }} · {{ currentMediaLabel }}</p>
+          <p>{{ currentDomainLabel }} 最近运行记录</p>
         </div>
         <button
           class="button secondary"
@@ -2252,7 +2249,7 @@ onBeforeUnmount(() => {
         </button>
       </div>
       <div v-else class="empty history-empty">
-        {{ loadingHistory ? "正在加载历史运行" : "当前数据类型暂无历史运行" }}
+        {{ loadingHistory ? "正在加载历史运行" : `暂无 ${currentDomainLabel} 历史运行记录` }}
       </div>
     </section>
   </section>
