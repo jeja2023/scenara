@@ -60,6 +60,7 @@ import type {
   Run,
   RunPage,
   TableColumn,
+  VisionObject,
 } from "../types";
 import DataTable from "../components/DataTable.vue";
 import ResultDetailDrawer from "../components/ResultDetailDrawer.vue";
@@ -1094,7 +1095,28 @@ const OVERLAY_COLORS: Record<string, string> = {
   image_region: "#8a63c9",
   table: "#c98a17",
   table_region: "#c98a17",
+  action: "#0284c7",
+  behavior: "#0284c7",
+  clothing: "#db2777",
+  cosplay: "#7c3aed",
+  accessory: "#d97706",
 };
+
+function formatOverlayBadge(item: VisionObject): string {
+  const scoreStr = item.score != null ? ` ${item.score.toFixed(2)}` : "";
+  const attrs = item.attributes as Record<string, unknown> | undefined;
+  if (attrs?.action_label) return `${attrs.action_label}${scoreStr}`;
+  if (attrs?.character_name && attrs?.style_label) return `${attrs.character_name} · ${attrs.style_label}${scoreStr}`;
+  if (attrs?.style_label) return `${attrs.style_label}${scoreStr}`;
+  if (attrs?.character_name) return `${attrs.character_name}${scoreStr}`;
+  if (attrs?.accessory_label) return `${attrs.accessory_label}${scoreStr}`;
+  if (attrs?.text) {
+    const txt = String(attrs.text).trim();
+    return `${txt.slice(0, 10)}${txt.length > 10 ? "…" : ""}${scoreStr}`;
+  }
+  if (item.object_type !== "person") return `${item.object_type}${scoreStr}`;
+  return scoreStr ? scoreStr.trim() : "目标";
+}
 
 function drawOverlay(): void {
   const canvas = overlayCanvas.value;
@@ -1132,22 +1154,20 @@ function drawOverlay(): void {
         item.bbox.width,
         item.bbox.height,
       );
-      if (item.score != null) {
-        const text = item.score.toFixed(2);
-        const width = ctx.measureText(text).width + 6;
-        const height = Math.max(14, stroke * 9);
-        ctx.globalAlpha = 0.85;
-        ctx.fillRect(
-          item.bbox.x,
-          Math.max(height, item.bbox.y) - height,
-          width,
-          height,
-        );
-        ctx.globalAlpha = 1;
-        ctx.fillStyle = "#ffffff";
-        ctx.fillText(text, item.bbox.x + 3, Math.max(height, item.bbox.y) - 2);
-        ctx.fillStyle = color;
-      }
+      const text = formatOverlayBadge(item);
+      const width = ctx.measureText(text).width + 8;
+      const height = Math.max(16, stroke * 9.5);
+      ctx.globalAlpha = 0.88;
+      ctx.fillRect(
+        item.bbox.x,
+        Math.max(height, item.bbox.y) - height,
+        width,
+        height,
+      );
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(text, item.bbox.x + 4, Math.max(height, item.bbox.y) - 3);
+      ctx.fillStyle = color;
     }
   }
 }

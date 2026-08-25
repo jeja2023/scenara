@@ -1,6 +1,6 @@
 {
-  "name": "scenara-sdk",
-  "version": "0.3.0-dev.31",
+  "name": "@scenara/sdk",
+  "version": "0.3.0-dev.32",
   "license": "MIT",
   "description": "Official TypeScript SDK for the Scenara v1 API",
   "type": "module",

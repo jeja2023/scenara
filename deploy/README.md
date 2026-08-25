@@ -52,13 +52,23 @@ The API, batch worker, stream worker, and scheduler share one versioned image. B
 On a connected Ubuntu build host:
 
     SCENARA_COMPOSE_ENV_FILE=deploy/.env.production \
+
+Private RTSP/RTMP/HTTP source addresses are rejected by default. Set `SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES=true` only when the deployment network isolates workers from management and metadata endpoints; URL credentials remain encrypted in the configured Secret Store.
+
+The API, batch worker, stream worker, and scheduler share one versioned image. Batch and real-time runs use separate Redis stream consumer groups.
+
+## Offline bundle
+
+On a connected Ubuntu build host:
+
+    SCENARA_COMPOSE_ENV_FILE=deploy/.env.production \
       SCENARA_MODEL_BUNDLE_DIR=/secure/qualified-model-packages \
       deploy/scripts/build-offline-bundle.sh /srv/scenara-release
 
 Transfer the generated tar archive through the project's controlled channel, extract it, then install on the target:
 
     deploy/scripts/install-offline.sh \
-      /srv/scenara-offline-0.3.0-dev.31 \
+      /srv/scenara-offline-0.3.0-dev.32 \
       /secure/scenara.env \
       /secure/offline-installer-result.json
 

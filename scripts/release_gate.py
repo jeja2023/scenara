@@ -68,6 +68,7 @@ REQUIRED_IMPLEMENTATION = (
     "tests/test_control_plane.py",
     "docs/release/0.3.0-dev.30.md",
     "docs/release/0.3.0-dev.31.md",
+    "docs/release/0.3.0-dev.32.md",
     "docs/release/SUPPORT_MATRIX.md",
     "docs/release/EVIDENCE_OWNERS.md",
     "docs/release/evidence/QUALIFICATION_INPUTS.md",
