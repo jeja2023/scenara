@@ -2224,11 +2224,11 @@ onBeforeUnmount(() => {
 
     <section class="panel history-panel">
       <div class="panel-header">
-        <div>
+        <div class="history-title-group">
           <h2>最近运行</h2>
           <p>{{ currentDomainLabel }} 最近运行记录</p>
         </div>
-        <div class="toolbar compact">
+        <div class="toolbar compact history-toolbar">
           <button
             class="button secondary"
             :disabled="loadingHistory"
@@ -2634,14 +2634,25 @@ onBeforeUnmount(() => {
 .history-panel {
   margin-top: 14px;
 }
-.history-panel .panel-header > div {
+.history-panel .history-title-group {
   display: grid;
   gap: 3px;
+}
+.history-panel .history-title-group h2 {
+  margin: 0;
 }
 .history-panel .panel-header p {
   margin: 0;
   color: var(--muted);
   font-size: 12px;
+}
+.history-toolbar {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  flex-wrap: nowrap !important;
+  gap: 8px !important;
+  margin-left: auto;
 }
 .history-load-btn {
   height: 22px;
