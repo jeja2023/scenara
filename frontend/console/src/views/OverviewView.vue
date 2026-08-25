@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { Activity, AlertCircle, Boxes, Play } from "@lucide/vue";
+import {
+  Activity,
+  AlertCircle,
+  Boxes,
+  FileText,
+  Play,
+  Sparkles,
+  User,
+} from "@lucide/vue";
 import { computed, onMounted, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { api, userFacingError } from "../api";
@@ -379,7 +387,7 @@ useRefresh(refresh);
       <div class="engine-grid">
         <article class="engine-card">
           <div class="engine-card-header">
-            <div class="engine-icon-wrap">🧑</div>
+            <div class="engine-icon-wrap"><User :size="18" /></div>
             <div class="engine-meta">
               <strong>人像视觉分析</strong>
               <small>Portrait Analysis</small>
@@ -410,7 +418,7 @@ useRefresh(refresh);
 
         <article class="engine-card">
           <div class="engine-card-header">
-            <div class="engine-icon-wrap">📄</div>
+            <div class="engine-icon-wrap"><FileText :size="18" /></div>
             <div class="engine-meta">
               <strong>OCR 智能文档</strong>
               <small>Document & Video OCR</small>
@@ -441,7 +449,7 @@ useRefresh(refresh);
 
         <article class="engine-card">
           <div class="engine-card-header">
-            <div class="engine-icon-wrap">🏃</div>
+            <div class="engine-icon-wrap"><Activity :size="18" /></div>
             <div class="engine-meta">
               <strong>行为动作识别</strong>
               <small>Behavior Analysis</small>
@@ -472,7 +480,7 @@ useRefresh(refresh);
 
         <article class="engine-card">
           <div class="engine-card-header">
-            <div class="engine-icon-wrap">👗</div>
+            <div class="engine-icon-wrap"><Sparkles :size="18" /></div>
             <div class="engine-meta">
               <strong>服饰风格识别</strong>
               <small>Fashion & Cosplay</small>
@@ -1030,8 +1038,14 @@ useRefresh(refresh);
   gap: 10px;
 }
 .engine-icon-wrap {
-  font-size: 24px;
-  line-height: 1;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--teal-soft);
+  color: var(--teal);
   flex-shrink: 0;
 }
 .engine-meta {
