@@ -679,6 +679,66 @@ table tbody tr:hover,
   color: var(--muted, #64716d);
   font-size: 11px;
 }
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--line, #e2e8e6);
+  background: #fafbfb;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.pagination-info {
+  color: var(--muted, #64716d);
+  font-size: 12px;
+}
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.pagination-btn {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--graphite, #17211f);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.pagination-btn:hover:not(:disabled) {
+  background: #f4f7f6;
+  border-color: #bcc6c2;
+}
+.pagination-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.pagination-page-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text, #17211f);
+  background: #fff;
+  border: 1px solid var(--line, #e2e8e6);
+}
 .badge {
   display: inline-flex;
   align-items: center;

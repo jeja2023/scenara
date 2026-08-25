@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { Activity, AlertCircle, ArrowRight, CheckCircle2, Filter, Play, RotateCcw } from "@lucide/vue";
+import {
+  Activity,
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  Play,
+  RotateCcw,
+} from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { useRoute, useRouter } from "vue-router";
@@ -7,9 +17,11 @@ import { api, userFacingError } from "../api";
 import { labelDomain, labelPipeline, labelRunStatus } from "../labels";
 import type { Domain, DomainManifest, Run, RunPage, RunStatus } from "../types";
 
+const PAGE_SIZE = 15;
 const runs = ref<Run[]>([]);
 const domains = ref<DomainManifest[]>([]);
 const total = ref(0);
+const offset = ref(0);
 const route = useRoute();
 const router = useRouter();
 const routeStatus =
@@ -36,6 +48,13 @@ const error = ref("");
 const autoRefresh = ref(true);
 let timer: number | null = null;
 
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(total.value / PAGE_SIZE)),
+);
+const currentPage = computed(() =>
+  Math.floor(offset.value / PAGE_SIZE) + 1,
+);
+
 const activeCount = computed(
   () =>
     runs.value.filter(
@@ -52,7 +71,10 @@ const completedCount = computed(
 async function refresh(): Promise<void> {
   loading.value = true;
   error.value = "";
-  const query = new URLSearchParams({ limit: "100" });
+  const query = new URLSearchParams({
+    limit: String(PAGE_SIZE),
+    offset: String(offset.value),
+  });
   if (status.value) query.set("status", status.value);
   if (domain.value) query.set("domain", domain.value);
   try {
@@ -63,10 +85,41 @@ async function refresh(): Promise<void> {
     runs.value = page.items;
     total.value = page.total;
     domains.value = manifests;
+    if (page.items.length === 0 && offset.value > 0) {
+      offset.value = Math.max(0, total.value - PAGE_SIZE);
+      const retry = await api<RunPage>(
+        "/api/v1/runs?" +
+          new URLSearchParams({
+            limit: String(PAGE_SIZE),
+            offset: String(offset.value),
+            ...(status.value ? { status: status.value } : {}),
+            ...(domain.value ? { domain: domain.value } : {}),
+          }).toString(),
+      );
+      runs.value = retry.items;
+      total.value = retry.total;
+    }
   } catch (caught) {
     error.value = userFacingError(caught, "运行记录加载失败，请稍后重试");
   } finally {
     loading.value = false;
+  }
+}
+
+function goToPage(nextOffset: number): void {
+  offset.value = Math.max(0, Math.min(nextOffset, (totalPages.value - 1) * PAGE_SIZE));
+  void refresh();
+}
+
+function prevPage(): void {
+  if (offset.value >= PAGE_SIZE) {
+    goToPage(offset.value - PAGE_SIZE);
+  }
+}
+
+function nextPage(): void {
+  if (offset.value + PAGE_SIZE < total.value) {
+    goToPage(offset.value + PAGE_SIZE);
   }
 }
 
@@ -127,6 +180,12 @@ function duration(run: Run): string {
 function resetFilters(): void {
   status.value = "";
   domain.value = "";
+  offset.value = 0;
+  void refresh();
+}
+
+function onFilterChange(): void {
+  offset.value = 0;
   void refresh();
 }
 
@@ -192,7 +251,7 @@ onBeforeUnmount(() => {
             <Filter :size="15" />
             <span>筛选记录</span>
           </div>
-          <select v-model="domain" aria-label="领域筛选" @change="refresh">
+          <select v-model="domain" aria-label="领域筛选" @change="onFilterChange">
             <option value="">全部领域</option>
             <option
               v-for="item in domains"
@@ -202,7 +261,7 @@ onBeforeUnmount(() => {
               {{ item.display_name }}
             </option>
           </select>
-          <select v-model="status" aria-label="状态筛选" @change="refresh">
+          <select v-model="status" aria-label="状态筛选" @change="onFilterChange">
             <option value="">全部状态</option>
             <option value="queued">排队中</option>
             <option value="running">运行中</option>
@@ -240,7 +299,7 @@ onBeforeUnmount(() => {
           </thead>
           <tbody>
             <tr v-for="(run, index) in runs" :key="run.run_id">
-              <td class="muted">{{ index + 1 }}</td>
+              <td class="muted">{{ offset + index + 1 }}</td>
               <td class="mono truncate">{{ run.run_id }}</td>
               <td>{{ domainLabel(run.domain) }}</td>
               <td>
@@ -304,6 +363,28 @@ onBeforeUnmount(() => {
           </tbody>
         </table>
         <div v-if="!runs.length" class="empty">暂无运行记录</div>
+      </div>
+      <div v-if="total > 0" class="pagination">
+        <span class="pagination-info">
+          显示第 <strong>{{ offset + 1 }}-{{ Math.min(total, offset + PAGE_SIZE) }}</strong> 条，共 <strong>{{ total }}</strong> 条记录
+        </span>
+        <div class="pagination-controls">
+          <button
+            class="pagination-btn"
+            :disabled="offset === 0 || loading"
+            @click="prevPage"
+          >
+            <ChevronLeft :size="14" />上一页
+          </button>
+          <span class="pagination-page-indicator">{{ currentPage }} / {{ totalPages }}</span>
+          <button
+            class="pagination-btn"
+            :disabled="offset + PAGE_SIZE >= total || loading"
+            @click="nextPage"
+          >
+            下一页<ChevronRight :size="14" />
+          </button>
+        </div>
       </div>
     </section>
   </section>

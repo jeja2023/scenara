@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Download, Filter, RotateCcw, Search } from "@lucide/vue";
+import { ChevronLeft, ChevronRight, Download, Filter, RotateCcw, Search } from "@lucide/vue";
 import { onMounted, reactive, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { api, apiBlob, userFacingError } from "../api";
@@ -200,24 +200,27 @@ useRefresh(refresh);
           </tbody>
         </table>
       </div>
-      <div v-if="total > PAGE_SIZE" class="pagination">
-        <button
-          class="button secondary"
-          :disabled="offset === 0 || loading"
-          @click="goToPage(offset - PAGE_SIZE)"
-        >
-          上一页
-        </button>
-        <span class="pagination-info"
-          >{{ offset + 1 }}-{{ Math.min(total, offset + PAGE_SIZE) }} / {{ total }}</span
-        >
-        <button
-          class="button secondary"
-          :disabled="offset + PAGE_SIZE >= total || loading"
-          @click="goToPage(offset + PAGE_SIZE)"
-        >
-          下一页
-        </button>
+      <div v-if="total > 0" class="pagination">
+        <span class="pagination-info">
+          显示第 <strong>{{ offset + 1 }}-{{ Math.min(total, offset + PAGE_SIZE) }}</strong> 条，共 <strong>{{ total }}</strong> 条记录
+        </span>
+        <div class="pagination-controls">
+          <button
+            class="pagination-btn"
+            :disabled="offset === 0 || loading"
+            @click="goToPage(offset - PAGE_SIZE)"
+          >
+            <ChevronLeft :size="14" />上一页
+          </button>
+          <span class="pagination-page-indicator">{{ Math.floor(offset / PAGE_SIZE) + 1 }} / {{ Math.max(1, Math.ceil(total / PAGE_SIZE)) }}</span>
+          <button
+            class="pagination-btn"
+            :disabled="offset + PAGE_SIZE >= total || loading"
+            @click="goToPage(offset + PAGE_SIZE)"
+          >
+            下一页<ChevronRight :size="14" />
+          </button>
+        </div>
       </div>
     </section>
   </section>
@@ -234,17 +237,6 @@ useRefresh(refresh);
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
-}
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 12px 4px;
-}
-.pagination-info {
-  color: var(--muted);
-  font-size: 12px;
 }
 button:disabled {
   opacity: 0.5;
