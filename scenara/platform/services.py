@@ -122,7 +122,6 @@ class RunService:
         allow_private_media_sources: bool = False,
         active_model_resolver: ActiveModelResolver | None = None,
         run_artifacts_enabled: bool = True,
-        run_artifact_max_crops: int = 200,
         run_artifact_crop_max_edge: int = 256,
         run_artifact_frame_max_edge: int = 1920,
         indexes: IndexStore | None = None,
@@ -147,7 +146,6 @@ class RunService:
         self.allow_private_media_sources = allow_private_media_sources
         self.active_model_resolver = active_model_resolver
         self.run_artifacts_enabled = run_artifacts_enabled
-        self.run_artifact_max_crops = run_artifact_max_crops
         self.run_artifact_crop_max_edge = run_artifact_crop_max_edge
         self.run_artifact_frame_max_edge = run_artifact_frame_max_edge
         self.indexes = indexes
@@ -1103,7 +1101,6 @@ class RunService:
             tenant_id=run.tenant_id,
             project_id=run.project_id,
             run_id=run.run_id,
-            max_crops=self.run_artifact_max_crops,
             crop_max_edge=self.run_artifact_crop_max_edge,
             frame_max_edge=self.run_artifact_frame_max_edge,
         )

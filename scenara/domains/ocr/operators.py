@@ -19,6 +19,7 @@ from scenara.platform.models import (
     ResultEnvelope,
     VisionObject,
 )
+from scenara.platform.artifacts import store_object_crop, store_unit_frame
 from scenara.platform.pipeline import DomainUnavailable, ExecutionContext, OperatorDefinition
 
 
@@ -551,6 +552,12 @@ class OcrDocumentOperator:
                                 )
 
                         # 构建单元内的 VisionObject，供时间轴与对象明细展示
+                        crop_artifact_id = await store_object_crop(
+                            getattr(context, "artifacts", None),
+                            unit.image,
+                            bbox=bbox,
+                            polygon=points,
+                        )
                         vision_obj = VisionObject(
                             object_id=block_id,
                             object_type=block_type,
@@ -558,10 +565,16 @@ class OcrDocumentOperator:
                             bbox=bbox,
                             polygon=points,
                             attributes={"text": text, "reading_order": reading_order},
+                            crop_artifact_id=crop_artifact_id,
                         )
                         unit_objects.append(vision_obj)
                         reading_order += 1
 
+                    frame_artifact_id = (
+                        await store_unit_frame(getattr(context, "artifacts", None), unit.image)
+                        if unit_objects or decoded.kind not in {MediaKind.VIDEO, MediaKind.STREAM}
+                        else None
+                    )
                     units.append(
                         MediaUnitResult(
                             unit_id=unit.unit_id,
@@ -572,6 +585,7 @@ class OcrDocumentOperator:
                             width=unit.width,
                             height=unit.height,
                             objects=unit_objects,
+                            frame_artifact_id=frame_artifact_id,
                         )
                     )
                 processed_units += len(chunk)

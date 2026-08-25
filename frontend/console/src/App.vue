@@ -84,15 +84,35 @@ function domainConsoleRoute(manifest: DomainManifest): string {
   return route;
 }
 
+const SECTION_ORDER = [
+  "核心工作区",
+  "智能检索",
+  "数据与分析",
+  "AI 引擎与模型",
+  "平台治理与系统",
+];
+
 const navigation = computed(() => {
-  const groups = new Map<string, NavigationItem[]>();
+  const unorderedGroups = new Map<string, NavigationItem[]>();
   for (const item of routes.filter(
     (entry) =>
       !entry.meta?.hideFromNavigation &&
       typeof entry.meta?.section === "string",
   )) {
     const section = String(item.meta?.section);
-    groups.set(section, [...(groups.get(section) ?? []), item]);
+    unorderedGroups.set(section, [...(unorderedGroups.get(section) ?? []), item]);
+  }
+
+  const groups = new Map<string, NavigationItem[]>();
+  for (const section of SECTION_ORDER) {
+    if (unorderedGroups.has(section)) {
+      groups.set(section, unorderedGroups.get(section)!);
+    }
+  }
+  for (const [section, items] of unorderedGroups) {
+    if (!groups.has(section)) {
+      groups.set(section, items);
+    }
   }
 
   const coreItems = groups.get("核心工作区");

@@ -98,33 +98,6 @@ const routes = [
     },
   },
   {
-    path: "/assets",
-    name: "assets",
-    component: () => import("./views/MediaView.vue"),
-    meta: {
-      title: "数据资产",
-      description: "全局文件与视频流资产治理。",
-      icon: Layers,
-      section: "数据与分析",
-    },
-  },
-  {
-    path: "/datasets",
-    name: "datasets",
-    component: () => import("./views/DatasetView.vue"),
-    meta: {
-      title: "数据集治理",
-      description: "数据集中集管理、版本切换与生命周期治理。",
-      icon: Database,
-      section: "数据与分析",
-      platform: "data",
-    },
-  },
-  {
-    path: "/media",
-    redirect: "/assets",
-  },
-  {
     path: "/runs",
     name: "runs",
     component: () => import("./views/RunsView.vue"),
@@ -142,17 +115,6 @@ const routes = [
   {
     path: "/ocr",
     redirect: "/parse/ocr/document",
-  },
-  {
-    path: "/results",
-    name: "results",
-    component: () => import("./views/ResultsView.vue"),
-    meta: {
-      title: "解析结果",
-      description: "跨领域历史解析结果汇总与按特征检索。",
-      icon: FileCheck,
-      section: "数据与分析",
-    },
   },
   {
     path: "/search",
@@ -186,6 +148,44 @@ const routes = [
       icon: Route,
       section: "智能检索",
     },
+  },
+  {
+    path: "/results",
+    name: "results",
+    component: () => import("./views/ResultsView.vue"),
+    meta: {
+      title: "解析结果",
+      description: "跨领域历史解析结果汇总与按特征检索。",
+      icon: FileCheck,
+      section: "数据与分析",
+    },
+  },
+  {
+    path: "/assets",
+    name: "assets",
+    component: () => import("./views/MediaView.vue"),
+    meta: {
+      title: "数据资产",
+      description: "全局文件与视频流资产治理。",
+      icon: Layers,
+      section: "数据与分析",
+    },
+  },
+  {
+    path: "/datasets",
+    name: "datasets",
+    component: () => import("./views/DatasetView.vue"),
+    meta: {
+      title: "数据集治理",
+      description: "数据集中集管理、版本切换与生命周期治理。",
+      icon: Database,
+      section: "数据与分析",
+      platform: "data",
+    },
+  },
+  {
+    path: "/media",
+    redirect: "/assets",
   },
   {
     path: "/capabilities",

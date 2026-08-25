@@ -3,7 +3,7 @@ import { Cpu, Database, HardDrive, Server } from "@lucide/vue";
 import { computed, onMounted, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { api, userFacingError } from "../api";
-import { labelRuntime, labelVersion } from "../labels";
+import { labelRuntime } from "../labels";
 import DataTable from "../components/DataTable.vue";
 import type { TableColumn } from "../types";
 

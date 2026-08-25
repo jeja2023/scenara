@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
-import { Check, Database, Plus, UploadCloud } from "@lucide/vue";
+import { Check, Plus, UploadCloud } from "@lucide/vue";
 import { api, userFacingError } from "../api";
 import type { DatasetRecord, DatasetVersion, MediaAsset } from "../types";
 

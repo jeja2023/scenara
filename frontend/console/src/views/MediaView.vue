@@ -13,7 +13,7 @@ import {
 } from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
-import type { Router } from "vue-router";
+import { useRouter, type Router } from "vue-router";
 import { api, apiBlob, userFacingError } from "../api";
 import { labelMediaKind } from "../labels";
 import DataTable from "../components/DataTable.vue";

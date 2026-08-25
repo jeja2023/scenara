@@ -20,3 +20,4 @@ def test_env_example_covers_every_runtime_setting_once() -> None:
     assert runtime_names <= set(assignments)
     assert len(assignments) == len(set(assignments))
     assert "SCENARA_MAX_MEDIA_UNITS" not in assignments
+    assert "SCENARA_RUN_ARTIFACT_MAX_CROPS" not in assignments

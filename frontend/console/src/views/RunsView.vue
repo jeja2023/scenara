@@ -47,13 +47,6 @@ const error = ref("");
 const autoRefresh = ref(true);
 let timer: number | null = null;
 
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(total.value / PAGE_SIZE)),
-);
-const currentPage = computed(() =>
-  Math.floor(offset.value / PAGE_SIZE) + 1,
-);
-
 const activeCount = computed(
   () =>
     runs.value.filter(
@@ -102,23 +95,6 @@ async function refresh(): Promise<void> {
     error.value = userFacingError(caught, "运行记录加载失败，请稍后重试");
   } finally {
     loading.value = false;
-  }
-}
-
-function goToPage(nextOffset: number): void {
-  offset.value = Math.max(0, Math.min(nextOffset, (totalPages.value - 1) * PAGE_SIZE));
-  void refresh();
-}
-
-function prevPage(): void {
-  if (offset.value >= PAGE_SIZE) {
-    goToPage(offset.value - PAGE_SIZE);
-  }
-}
-
-function nextPage(): void {
-  if (offset.value + PAGE_SIZE < total.value) {
-    goToPage(offset.value + PAGE_SIZE);
   }
 }
 

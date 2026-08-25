@@ -319,7 +319,6 @@ def build_runtime(
         allow_private_media_sources=settings.allow_private_media_sources,
         active_model_resolver=feedback,
         run_artifacts_enabled=settings.run_artifacts_enabled,
-        run_artifact_max_crops=settings.run_artifact_max_crops,
         run_artifact_crop_max_edge=settings.run_artifact_crop_max_edge,
         run_artifact_frame_max_edge=settings.run_artifact_frame_max_edge,
         indexes=indexes,

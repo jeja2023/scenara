@@ -88,7 +88,6 @@ class RunArtifactSink:
         tenant_id: str,
         project_id: str,
         run_id: str,
-        max_crops: int,
         crop_max_edge: int,
         frame_max_edge: int,
     ) -> None:
@@ -96,7 +95,6 @@ class RunArtifactSink:
         self._tenant_id = tenant_id
         self._project_id = project_id
         self._run_id = run_id
-        self._max_crops = max(0, max_crops)
         self._max_edge: dict[str, int] = {"object_crop": crop_max_edge, "unit_frame": frame_max_edge}
         self._stored: dict[str, int] = {"object_crop": 0, "unit_frame": 0}
         self._artifacts: list[ResultArtifact] = []
@@ -115,9 +113,6 @@ class RunArtifactSink:
             self._warnings.append(warning)
 
     async def store_image(self, image: Image.Image, *, artifact_type: ArtifactType) -> str | None:
-        if artifact_type == "object_crop" and self._stored[artifact_type] >= self._max_crops:
-            self._warn(ARTIFACT_CROP_QUOTA_WARNING)
-            return None
         artifact_id = f"{ARTIFACT_ID_PREFIX[artifact_type]}_{uuid4().hex}"
         object_key = (
             f"tenants/{self._tenant_id}/projects/{self._project_id}"

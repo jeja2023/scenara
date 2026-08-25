@@ -39,7 +39,7 @@ spec:
               app.kubernetes.io/name: scenara-api
       containers:
         - name: api
-          image: scenara-api:0.3.0-dev.30
+          image: scenara-api:0.3.0-dev.31
           imagePullPolicy: IfNotPresent
           ports:
             - name: http

@@ -76,9 +76,10 @@ class RuntimePortraitImageEncoder:
         model_id = str(selected.get("embedding_model_id") or selected.get("model_id") or "unknown")
         model_version = str(selected.get("embedding_model_version") or selected.get("model_version") or "unknown")
         status = str(selected.get("embedding_model_status") or selected.get("model_status") or "unknown")
+        safe_model_id = model_id.replace("/", ".")
         return PortraitEmbedding(
             embedding=[float(value) for value in embedding],
-            feature_space_id=f"portrait.face.{model_id}.{model_version}",
+            feature_space_id=f"portrait.face.{safe_model_id}.{model_version}",
             model_id=model_id,
             model_version=model_version,
             face_count=len(records),

@@ -141,24 +141,12 @@ async def test_artifacts_can_be_disabled(development_settings) -> None:
 
 
 @pytest.mark.asyncio
-async def test_crop_quota_is_reported_as_a_warning(development_settings) -> None:
-    app, _ = build_client(replace(development_settings, run_artifact_max_crops=1))
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as api:
-        result = (await parse_portrait_image(api))["result"]
-        crop_ids = [item["crop_artifact_id"] for item in result["units"][0]["objects"]]
-        assert len([item for item in crop_ids if item]) == 1
-        assert result["units"][0]["frame_artifact_id"]
-        assert "artifact_crop_quota_reached" in result["warnings"]
-
-
-@pytest.mark.asyncio
 async def test_unit_frames_are_not_limited_by_a_per_run_quota(tmp_path) -> None:
     sink = RunArtifactSink(
         LocalObjectStore(tmp_path / "objects"),
         tenant_id="tenant",
         project_id="project",
         run_id="run_unlimited_frames",
-        max_crops=0,
         crop_max_edge=256,
         frame_max_edge=1920,
     )
@@ -168,6 +156,25 @@ async def test_unit_frames_are_not_limited_by_a_per_run_quota(tmp_path) -> None:
 
     assert all(frame_ids)
     assert len(sink.artifacts) == 65
+    assert sink.warnings == []
+
+
+@pytest.mark.asyncio
+async def test_object_crops_are_not_limited_by_any_quota(tmp_path) -> None:
+    sink = RunArtifactSink(
+        LocalObjectStore(tmp_path / "objects"),
+        tenant_id="tenant",
+        project_id="project",
+        run_id="run_unlimited_crops",
+        crop_max_edge=256,
+        frame_max_edge=1920,
+    )
+    crop = Image.new("RGB", (16, 12), "white")
+
+    crop_ids = [await sink.store_image(crop, artifact_type="object_crop") for _ in range(250)]
+
+    assert all(crop_ids)
+    assert len(sink.artifacts) == 250
     assert sink.warnings == []
 
 

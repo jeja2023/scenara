@@ -3,6 +3,14 @@ aliases:
     target: scenara.portrait/yolov8n
   person_reid_default:
     target: scenara.portrait/osnet_ibn_x1_0
+  face_detector_default:
+    target: scenara.portrait/scrfd_10g
+  face_embedding_default:
+    target: scenara.portrait/arcface_r100
+  gait_default:
+    target: scenara.portrait/opengait_gait3d
+  appearance_default:
+    target: scenara.portrait/attribute_reid
 models:
   scenara.portrait/yolov8n:
     task: detection
@@ -57,6 +65,103 @@ models:
       path: osnet_ibn_x1_0.onnx
       model_card: osnet_ibn_x1_0.model-card.yml
       sha256: 13ad83cf00d67359f9d2ec20303b275ccae7e047ab59bd8ffc190805ba859cc6
+    rollout:
+      status: active
+      warmup: false
+  scenara.portrait/attribute_reid:
+    task: appearance
+    type: attribute_reid
+    runtime: onnxruntime
+    version: 1.0.0
+    precision: fp32
+    input:
+      size:
+      - 256
+      - 128
+      layout: nchw
+      dtype: float32
+      color: rgb
+      normalize: imagenet
+    output:
+      format: embedding
+      embedding_normalize: l2
+      embedding_dim: 256
+    artifact:
+      path: attribute_reid.onnx
+      sha256: d277a415f12d921e1590f6ec2ddc31e3bed35fbb38fcd10dc209d9d573f2dbea
+    rollout:
+      status: active
+      warmup: false
+  scenara.portrait/scrfd_10g:
+    task: face_detection
+    type: scrfd
+    runtime: onnxruntime
+    version: 1.0.0
+    precision: fp32
+    input:
+      size:
+      - 640
+      - 640
+      layout: nchw
+      dtype: float32
+      color: rgb
+      normalize: rgb_minus_127p5_div_128
+    output:
+      decoded: false
+      bbox_scale: stride
+      confidence: 0.35
+      iou: 0.45
+      max_detections: 32
+    artifact:
+      path: scrfd_10g.onnx
+      sha256: 5e4447f50245bbd7966bd6c0fa52938c61474a04ec7def48753668a9d8b4ea3a
+    rollout:
+      status: active
+      warmup: false
+  scenara.portrait/arcface_r100:
+    task: face_embedding
+    type: arcface
+    runtime: onnxruntime
+    version: 1.0.0
+    precision: fp32
+    input:
+      size:
+      - 112
+      - 112
+      layout: nchw
+      dtype: float32
+      color: rgb
+      normalize: rgb_minus_127p5_div_128
+    output:
+      format: embedding
+      embedding_normalize: l2
+      metric: cosine
+    artifact:
+      path: arcface_r100.onnx
+      sha256: 9cc6e4a75f0e2bf0b1aed94578f144d15175f357bdc05e815e5c4a02b319eb4f
+    rollout:
+      status: active
+      warmup: false
+  scenara.portrait/opengait_gait3d:
+    task: gait
+    type: opengait
+    runtime: onnxruntime
+    version: 1.0.0
+    precision: fp32
+    input:
+      size:
+      - 64
+      - 44
+      layout: ntchw
+      dtype: float32
+      color: grayscale
+    output:
+      format: embedding
+      embedding_normalize: l2
+      embedding_dim: 256
+    artifact:
+      path: opengait_gait3d.onnx
+      sha256: 0d37e275d68e7819fc9635a4b143f60dfac29f9dc13584fac558e2c4e14e6425
     rollout:
       status: active
       warmup: false

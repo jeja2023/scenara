@@ -263,6 +263,10 @@ def test_default_runtime_model_references_use_cache_key_contract() -> None:
     assert set(models) == {
         "scenara.portrait/yolov8n",
         "scenara.portrait/osnet_ibn_x1_0",
+        "scenara.portrait/scrfd_10g",
+        "scenara.portrait/arcface_r100",
+        "scenara.portrait/attribute_reid",
+        "scenara.portrait/opengait_gait3d",
     }
     assert aliases["person_detector_default"]["target"] in models
     assert aliases["person_reid_default"]["target"] in models

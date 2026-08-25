@@ -1,3 +1,4 @@
-"""Scenara AI perception engine."""
+"""Scenara vision analysis engine."""
+from __future__ import annotations
 
-__version__ = "0.3.0.dev30"
+__version__ = "0.3.0.dev31"

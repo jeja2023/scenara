@@ -17,6 +17,7 @@ from scenara.bootstrap import build_runtime
 from scenara.platform.models import (
     PipelineRef,
     PortraitDomainPayload,
+    PrincipalContext,
     ResultEnvelope,
 )
 from scenara.platform.retention import RetentionScheduler
@@ -521,14 +522,20 @@ async def test_retention_sweep_expires_result_index_and_shards(kernel_client) ->
     assert indexed
     assert all(item.expires_at == pytest.approx(reference.created_at + 180 * 86_400) for item in indexed)
 
+    result_envelope = await runtime.runs.result(
+        PrincipalContext(tenant_id="default", project_id="default", principal_id="default"),
+        run["run_id"],
+    )
+    artifact_keys = [item.object_key for item in result_envelope.artifacts]
+
     deleted = await RetentionScheduler(runtime.state, runtime.objects).sweep(
         before=reference.created_at + 181 * 86_400,
     )
-    assert deleted == len(result_keys) + 2
+    assert deleted == len(result_keys) + len(artifact_keys) + 2
     assert await runtime.indexes.delete_expired(reference.created_at + 181 * 86_400) == len(indexed)
     assert await runtime.indexes.list_records("default", "default", index_id=result_index_id) == []
     assert await runtime.state.get_result_reference("default", "default", run["run_id"]) is None
-    for object_key in result_keys:
+    for object_key in [*result_keys, *artifact_keys]:
         with pytest.raises(FileNotFoundError):
             await runtime.objects.get(object_key)
 

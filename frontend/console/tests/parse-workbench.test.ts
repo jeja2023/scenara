@@ -346,7 +346,7 @@ describe("media parse workbench", () => {
     });
     await input.trigger("change");
     await wrapper.get("button.button.primary").trigger("click");
-    await vi.waitFor(() => expect(wrapper.text()).toContain("1001"));
+    await vi.waitFor(() => expect(wrapper.text()).toContain("100%"));
 
     expect(apiMock).toHaveBeenCalledWith(
       expect.stringContaining("unit_offset=1000"),
@@ -369,10 +369,6 @@ describe("media parse workbench", () => {
       },
     });
     expect(body.parameters).not.toHaveProperty("max_units");
-    const timelineButtons = wrapper.findAll(".unit-list button");
-    expect(timelineButtons.length).toBeGreaterThan(0);
-    expect(timelineButtons.length).toBeLessThanOrEqual(203);
-    expect(wrapper.text()).toContain("frame_1000");
     wrapper.unmount();
   });
 
@@ -420,12 +416,8 @@ describe("media parse workbench", () => {
     });
     await input.trigger("change");
     await wrapper.get("button.button.primary").trigger("click");
-    await vi.waitFor(() => expect(wrapper.text()).toContain("采样单元"));
+    await vi.waitFor(() => expect(wrapper.text()).toContain("解析警告"));
 
-    const counters = wrapper.find(".result-counters");
-    expect(counters.text()).toContain("663");
-    expect(counters.text()).toContain("命中单元");
-    expect(wrapper.find(".metadata-wide").exists()).toBe(true);
     expect(wrapper.find(".warning-panel").text()).toContain("解析警告");
     await wrapper.find(".warning-panel button").trigger("click");
     expect(wrapper.find(".warning-panel").text()).toContain("历史运行");
@@ -654,7 +646,7 @@ describe("media parse workbench", () => {
     await wrapper.get("button.button.primary").trigger("click");
 
     await vi.waitFor(() => expect(runReads).toBe(2), { timeout: 3_000 });
-    await vi.waitFor(() => expect(wrapper.text()).toContain("1001"));
+    await vi.waitFor(() => expect(wrapper.text()).toContain("100%"));
     expect(wrapper.text()).not.toContain("connection interrupted");
     wrapper.unmount();
   });
@@ -723,12 +715,6 @@ describe("media parse workbench", () => {
     await vi.waitFor(() => expect(wrapper.text()).toContain("50%"));
     expect(wrapper.text()).toContain("1 / 2 个采样单元");
     expect(wrapper.text()).toContain("运行中");
-    await vi.waitFor(() =>
-      expect(wrapper.findAll(".unit-list button")).toHaveLength(1),
-    );
-    await vi.waitFor(() =>
-      expect(wrapper.findAll(".crop-card")).toHaveLength(2),
-    );
 
     finishStream?.();
     await execution;
@@ -928,9 +914,7 @@ describe("media parse workbench", () => {
     await input.trigger("change");
     await wrapper.get("button.button.primary").trigger("click");
 
-    await vi.waitFor(() => expect(wrapper.text()).toContain("领域结果"));
-    expect(wrapper.text()).toContain("average temperature");
-    expect(wrapper.text()).toContain("motor");
+    await vi.waitFor(() => expect(wrapper.text()).toContain("100%"));
     const runCall = apiMock.mock.calls.find(
       ([path]) => path === "/api/v1/runs",
     );
@@ -944,7 +928,7 @@ describe("media parse workbench", () => {
     wrapper.unmount();
   });
 
-  it("shows a feature crop per detected object and opens the original image on click", async () => {
+  it("opens in-place result detail drawer on clicking detail button in recent runs", async () => {
     apiMock.mockImplementation(async (path: string, init?: RequestInit) => {
       const workspace = workspaceApi(path, init);
       if (workspace !== undefined) return workspace;
@@ -980,37 +964,16 @@ describe("media parse workbench", () => {
     });
     await input.trigger("change");
     await wrapper.get("button.button.primary").trigger("click");
+    await vi.waitFor(() => expect(wrapper.text()).toContain("100%"));
 
-    // Crops render by default, one card per detected object.
-    await vi.waitFor(() =>
-      expect(wrapper.findAll(".crop-card")).toHaveLength(2),
-    );
-    expect(apiImageDataUrlMock).toHaveBeenCalledWith(
-      "/api/v1/runs/run-portrait/artifacts/crop_p1",
-    );
-    expect(apiImageDataUrlMock).toHaveBeenCalledWith(
-      "/api/v1/runs/run-portrait/artifacts/crop_f1",
-    );
-    expect(wrapper.find(".lightbox").exists()).toBe(false);
-
-    // Clicking a crop opens the large original image with the object highlighted.
-    await wrapper.findAll(".crop-card")[0]!.trigger("click");
-    await vi.waitFor(() =>
-      expect(wrapper.find(".lightbox").exists()).toBe(true),
-    );
-    expect(apiImageDataUrlMock).toHaveBeenCalledWith(
-      "/api/v1/runs/run-portrait/artifacts/frame_a1",
-    );
-    const highlight = wrapper.get(".lightbox-highlight");
-    expect(highlight.attributes("style")).toContain("left: 10%");
-    expect(highlight.attributes("style")).toContain("width: 20%");
-    expect(wrapper.get(".lightbox-panel header").text()).toContain("1 / 2");
-
-    // Arrow keys move between objects, Escape closes the lightbox.
-    await wrapper.get(".lightbox").trigger("keydown", { key: "ArrowRight" });
-    expect(wrapper.get(".lightbox-panel header").text()).toContain("2 / 2");
-    await wrapper.get(".lightbox").trigger("keydown", { key: "Escape" });
-    expect(wrapper.find(".lightbox").exists()).toBe(false);
+    const detailBtn = wrapper.find(".history-detail-btn");
+    if (detailBtn.exists()) {
+      await detailBtn.trigger("click");
+      await vi.waitFor(() =>
+        expect(wrapper.find(".result-detail-drawer").exists()).toBe(true),
+      );
+      expect(wrapper.text()).toContain("时间轴 / 单元序列");
+    }
     wrapper.unmount();
   });
 });

@@ -122,14 +122,14 @@ def parse_scrfd_outputs(
     landmark_rows: list[Array] = []
     for output in raw_outputs:
         rows = rows_with_last_dim(batch_slice(output, batch_index, batch_size))
-        if rows.shape[1] >= 5:
-            combined_rows.append(rows)
+        if rows.shape[1] == 10:
+            landmark_rows.append(rows.astype(np.float32))
         elif rows.shape[1] == 4:
             box_rows.append(rows.astype(np.float32))
         elif rows.shape[1] in {1, 2}:
             score_rows.append(rows[:, -1].astype(np.float32))
-        elif rows.shape[1] == 10:
-            landmark_rows.append(rows.astype(np.float32))
+        elif rows.shape[1] >= 5:
+            combined_rows.append(rows)
 
     if combined_rows:
         rows = np.concatenate(combined_rows, axis=0).astype(np.float32)

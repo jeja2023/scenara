@@ -7,7 +7,7 @@ import "./styles.css";
 const app = createApp(App);
 
 app.config.errorHandler = (error, _instance, info) => {
-  console.error("[scenara] unhandled application error", { info, error });
+  console.error("[scenara] unhandled application error:", error, "info:", info);
 };
 
 app.use(router).mount("#app");

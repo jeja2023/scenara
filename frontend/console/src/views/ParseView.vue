@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import {
   AlertTriangle,
-  ArrowRight,
   ChevronDown,
   ChevronUp,
   Clock3,
-  Download,
+  Eye,
   FileImage,
   FileText,
   Info,
@@ -37,8 +36,6 @@ import {
   streamJsonEvents,
   userFacingError,
 } from "../api";
-import FeatureCropGallery from "../components/FeatureCropGallery.vue";
-import GenericDomainResult from "../components/GenericDomainResult.vue";
 import {
   useDomainCatalog,
   type MediaMode,
@@ -47,35 +44,25 @@ import { useMediaPreview } from "../composables/useMediaPreview";
 import { useRefresh } from "../composables/useRefresh";
 import {
   labelDomain,
-  labelMediaKind,
   labelPipeline,
   labelRunError,
   labelRunStatus,
-  labelSampleStrategy,
   labelTerminationReason,
   labelWarning,
 } from "../labels";
 import type {
   Domain,
   MediaAsset,
-  MediaUnitResult,
   MediaSource,
+  MediaUnitResult,
   ResultEnvelope,
   ResultPage,
   Run,
   RunPage,
-  VisionObject,
-  OcrBlock,
   TableColumn,
 } from "../types";
 import DataTable from "../components/DataTable.vue";
-
-const objectColumns: TableColumn<VisionObject>[] = [
-  { key: "object_id", label: "对象", class: "mono" },
-  { key: "object_type", label: "类型" },
-  { key: "score", label: "置信度" },
-  { key: "bbox", label: "边框 x, y, w, h", class: "mono" },
-];
+import ResultDetailDrawer from "../components/ResultDetailDrawer.vue";
 
 const historyRunColumns: TableColumn<Run>[] = [
   { key: "run_id", label: "任务 ID", class: "mono truncate" },
@@ -283,62 +270,12 @@ const inputReady = computed(() => {
     (mode.value === "image" || samplingValid.value)
   );
 });
-function payloadList<T>(key: string): T[] {
-  const value = result.value?.domain_payload[key];
-  return Array.isArray(value) ? (value as T[]) : [];
-}
 
-const persons = computed(() =>
-  result.value?.domain_payload.domain === "portrait"
-    ? payloadList<VisionObject>("persons")
-    : [],
-);
-const ocrBlocks = computed(() =>
-  result.value?.domain_payload.domain === "ocr"
-    ? payloadList<OcrBlock>("blocks")
-    : [],
-);
-const ocrText = computed(() =>
-  result.value?.domain_payload.domain === "ocr" &&
-  typeof result.value.domain_payload.text === "string"
-    ? result.value.domain_payload.text
-    : "",
-);
-const genericPayload = computed(() => {
-  const payload = result.value?.domain_payload;
-  return payload && !["portrait", "ocr"].includes(payload.domain)
-    ? payload
-    : null;
-});
 const selectedUnit = computed(
   () => result.value?.units[selectedUnitIndex.value] ?? result.value?.units[0],
 );
 const selectedObjects = computed(() => selectedUnit.value?.objects ?? []);
 
-const TIMELINE_WINDOW_SIZE = 100;
-interface TimelineItem {
-  unit: MediaUnitResult | null;
-  index: number;
-  jump?: "start" | "end";
-}
-const timelineItems = computed<TimelineItem[]>(() => {
-  const units = result.value?.units ?? [];
-  if (units.length <= TIMELINE_WINDOW_SIZE * 2 + 1) {
-    return units.map((unit, index) => ({ unit, index }));
-  }
-  const selected = Math.min(selectedUnitIndex.value, units.length - 1);
-  const start = Math.max(0, selected - TIMELINE_WINDOW_SIZE);
-  const end = Math.min(units.length, start + TIMELINE_WINDOW_SIZE * 2 + 1);
-  const items: TimelineItem[] = units
-    .slice(start, end)
-    .map((unit, offset) => ({ unit, index: start + offset }));
-  if (start > 0) items.unshift({ unit: null, index: 0, jump: "start" });
-  if (end < units.length) items.push({ unit: null, index: units.length - 1, jump: "end" });
-  return items;
-});
-
-const resultJson = computed(() => JSON.stringify(result.value, null, 2));
-const mediaMetadata = computed(() => result.value?.media_metadata ?? null);
 const isTerminal = computed(
   () =>
     !!run.value &&
@@ -367,18 +304,6 @@ const warningPanelTitle = computed(() => {
   if (hasInformational && hasActionableWarnings.value) return "解析提示与警告";
   return hasInformational ? "解析提示" : "解析警告";
 });
-const totalObjects = computed(
-  () => result.value?.units.reduce((s, u) => s + u.objects.length, 0) ?? 0,
-);
-const sampledUnitCount = computed(
-  () => mediaMetadata.value?.sampled_units ?? result.value?.units.length ?? 0,
-);
-const resultUnitCount = computed(() => result.value?.units.length ?? 0);
-const hasFilteredResultUnits = computed(
-  () =>
-    (mode.value === "video" || mode.value === "stream") &&
-    sampledUnitCount.value > resultUnitCount.value,
-);
 const hasResult = computed(() => !!result.value);
 const currentDomainLabel = computed(
   () => selectedDomainManifest.value?.display_name || labelDomain(domain.value),
@@ -386,7 +311,6 @@ const currentDomainLabel = computed(
 const isDomainScoped = computed(() =>
   Boolean(route.params?.domain || props.initialDomain || domain.value),
 );
-const currentMediaLabel = computed(() => labelMediaKind(mode.value));
 const scopedHistoryRuns = computed(() => historyRuns.value);
 
 const displayedMediaUrl = computed(
@@ -1027,13 +951,6 @@ function preferredPreviewUnitIndex(units: MediaUnitResult[]): number {
   return Math.max(0, units.length - 1);
 }
 
-function selectUnit(index: number): void {
-  const alreadySelected = selectedUnitIndex.value === index;
-  selectedUnitIndex.value = index;
-  followLatestUnit.value = index >= (result.value?.units.length ?? 1) - 1;
-  if (alreadySelected) syncSelectedMediaFrame();
-}
-
 function syncVideoToSelectedUnit(): void {
   videoFrameUnitId.value = "";
   clearOverlay();
@@ -1173,7 +1090,9 @@ const OVERLAY_COLORS: Record<string, string> = {
   text: "#2f9e7e",
   title: "#ef6c52",
   paragraph: "#4b7bd4",
+  image: "#8a63c9",
   image_region: "#8a63c9",
+  table: "#c98a17",
   table_region: "#c98a17",
 };
 
@@ -1233,85 +1152,11 @@ function drawOverlay(): void {
   }
 }
 
-function exportResult(format: "json" | "csv"): void {
-  const current = result.value;
-  if (!current) return;
-  let blob: Blob;
-  let extension: string;
-  if (format === "json") {
-    blob = new Blob([JSON.stringify(current, null, 2)], {
-      type: "application/json",
-    });
-    extension = "json";
-  } else {
-    const header =
-      "单元标识,单元类型,索引,时间点毫秒,页码,宽,高,对象标识,对象类型,置信度,边框x,边框y,边框宽,边框高";
-    const rows: string[] = [header];
-    for (const unit of current.units) {
-      if (!unit.objects.length) {
-        rows.push(
-          [
-            unit.unit_id,
-            unit.unit_type,
-            unit.index,
-            unit.pts_ms ?? "",
-            unit.page_number ?? "",
-            unit.width,
-            unit.height,
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-            "",
-          ].join(","),
-        );
-        continue;
-      }
-      for (const item of unit.objects) {
-        rows.push(
-          [
-            unit.unit_id,
-            unit.unit_type,
-            unit.index,
-            unit.pts_ms ?? "",
-            unit.page_number ?? "",
-            unit.width,
-            unit.height,
-            item.object_id,
-            item.object_type,
-            item.score?.toFixed(4) ?? "",
-            item.bbox?.x.toFixed(2) ?? "",
-            item.bbox?.y.toFixed(2) ?? "",
-            item.bbox?.width.toFixed(2) ?? "",
-            item.bbox?.height.toFixed(2) ?? "",
-          ].join(","),
-        );
-      }
-    }
-    blob = new Blob(["﻿" + rows.join("\n")], {
-      type: "text/csv;charset=utf-8",
-    });
-    extension = "csv";
-  }
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `scenara-${current.run_id}.${extension}`;
-  link.click();
-  URL.revokeObjectURL(url);
-}
-
 function formatTime(milliseconds?: number | null): string {
   if (milliseconds == null) return "-";
   const seconds = milliseconds / 1000;
   const minutes = Math.floor(seconds / 60);
   return `${String(minutes).padStart(2, "0")}:${(seconds % 60).toFixed(1).padStart(4, "0")}`;
-}
-
-function formatDuration(milliseconds?: number | null): string {
-  return milliseconds == null ? "未知" : formatTime(milliseconds);
 }
 
 function formatRunDate(value: number): string {
@@ -1323,38 +1168,12 @@ function formatRunDate(value: number): string {
   });
 }
 
-function historyMode(runItem: Run): MediaMode {
-  const asset = runItem.asset_id
-    ? assets.value.find((candidate) => candidate.asset_id === runItem.asset_id)
-    : null;
-  return asset?.kind ?? (runItem.source_id ? "stream" : mode.value);
-}
+const detailRunId = ref<string | null>(null);
+const isDetailOpen = ref(false);
 
-function openHistory(runItem: Run): void {
-  void router.push({
-    path: workspacePath(runItem.domain, historyMode(runItem)),
-    query: { run: runItem.run_id },
-  });
-}
-
-function labelTimestampSource(value: string): string {
-  return (
-    {
-      decoder_pts: "解码器时间戳",
-      position_msec: "媒体位置时间戳",
-      monotonic_clock: "单调作业时钟",
-    }[value] ?? "未知"
-  );
-}
-
-function formatBox(
-  item:
-    { x: number; y: number; width: number; height: number } | null | undefined,
-): string {
-  if (!item) return "-";
-  return [item.x, item.y, item.width, item.height]
-    .map((value) => value.toFixed(1))
-    .join(", ");
+function openHistoryDetail(runItem: Run): void {
+  detailRunId.value = runItem.run_id;
+  isDetailOpen.value = true;
 }
 
 watch(
@@ -1432,25 +1251,6 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="page parse-workbench">
-    <div v-if="hasResult" class="page-header">
-      <div class="toolbar">
-        <button
-          class="button secondary"
-          title="导出结构化结果"
-          @click="exportResult('json')"
-        >
-          <Download :size="15" />导出 JSON
-        </button>
-        <button
-          class="button secondary"
-          title="导出对象明细表"
-          @click="exportResult('csv')"
-        >
-          <Download :size="15" />导出 CSV
-        </button>
-      </div>
-    </div>
-
     <div class="workbench-config">
       <div v-if="!isDomainScoped">
         <span class="control-label">解析能力</span>
@@ -1593,9 +1393,9 @@ onBeforeUnmount(() => {
           <Clock3 :size="16" />查看历史运行
         </button>
         <button
-          v-if="hasResult"
+          v-if="hasResult && run"
           class="button secondary"
-          @click="router.push('/results')"
+          @click="openHistoryDetail(run)"
         >
           <FileText :size="16" />查看结构化结果
         </button>
@@ -1817,82 +1617,88 @@ onBeforeUnmount(() => {
           </template>
 
           <template v-else>
-            <label
-              ><span>已登记视频流</span
-              ><select v-model="sourceId" @change="loadStreamPreview(sourceId)">
-                <option value="">登记新视频流</option>
-                <option
-                  v-for="source in sources"
-                  :key="source.source_id"
-                  :value="source.source_id"
-                >
-                  {{ source.name }} · {{ source.masked_url }}
-                </option>
-              </select></label
-            >
-            <button
-              class="icon-button source-refresh"
-              :disabled="loadingSources"
-              title="刷新视频流"
-              aria-label="刷新视频流"
-              @click="refreshSources"
-            >
-              <RefreshCw :size="16" :class="{ spin: loadingSources }" />
-            </button>
+            <div class="library-picker-row">
+              <label>
+                <span>已登记视频流</span>
+                <select v-model="sourceId" @change="loadStreamPreview(sourceId)">
+                  <option value="">登记新视频流</option>
+                  <option
+                    v-for="source in sources"
+                    :key="source.source_id"
+                    :value="source.source_id"
+                  >
+                    {{ source.name }} · {{ source.masked_url }}
+                  </option>
+                </select>
+              </label>
+              <button
+                class="icon-button source-refresh"
+                :disabled="loadingSources"
+                title="刷新视频流"
+                aria-label="刷新视频流"
+                @click="refreshSources"
+              >
+                <RefreshCw :size="16" :class="{ spin: loadingSources }" />
+              </button>
+            </div>
             <template v-if="!sourceId">
-              <label
-                ><span>视频流名称</span
-                ><input
+              <label>
+                <span>视频流名称</span>
+                <input
                   v-model.trim="sourceName"
                   maxlength="256"
                   placeholder="例如：东门摄像头"
-              /></label>
-              <label
-                ><span>视频流地址</span
-                ><input
+                />
+              </label>
+              <label>
+                <span>视频流地址</span>
+                <input
                   v-model.trim="sourceUrl"
                   maxlength="4096"
                   placeholder="rtsp://host/path"
-              /></label>
+                />
+              </label>
             </template>
           </template>
 
           <div v-if="mode === 'document'" class="parameter-grid">
-            <label
-              ><span>渲染倍率</span
-              ><input
+            <label>
+              <span>渲染倍率</span>
+              <input
                 v-model.number="pageScale"
                 type="number"
                 min="0.5"
                 max="4"
                 step="0.5"
-            /></label>
+              />
+            </label>
           </div>
 
           <template v-else-if="mode !== 'image'">
-            <label
-              ><span>采样策略</span>
-              <select v-model="sampleStrategy">
-                <option
-                  v-for="(text, value) in STRATEGY_LABELS"
-                  :key="value"
-                  :value="value"
-                >
-                  {{ text }}
-                </option>
-              </select>
-            </label>
             <div class="parameter-grid">
-              <label
-                ><span>采样间隔（毫秒）</span
-                ><input
+              <label>
+                <span>采样策略</span>
+                <select v-model="sampleStrategy">
+                  <option
+                    v-for="(text, value) in STRATEGY_LABELS"
+                    :key="value"
+                    :value="value"
+                  >
+                    {{ text }}
+                  </option>
+                </select>
+              </label>
+              <label>
+                <span>采样间隔（毫秒）</span>
+                <input
                   v-model.number="sampleIntervalMs"
                   type="number"
                   min="1"
                   max="3600000"
                   step="100"
                   :disabled="sampleStrategy !== 'interval'"
-              /></label>
+                />
+              </label>
             </div>
             <button
               class="button secondary advanced-toggle"
@@ -1904,81 +1710,88 @@ onBeforeUnmount(() => {
               />{{ showAdvanced ? "收起高级参数" : "展开高级参数" }}
             </button>
             <div v-if="showAdvanced" class="parameter-grid">
-              <label
-                ><span>{{
+              <label>
+                <span>{{
                   mode === "stream" ? "开始后跳过（毫秒）" : "起始时间（毫秒）"
-                }}</span
-                ><input
+                }}</span>
+                <input
                   v-model.number="sampleStartMs"
                   type="number"
                   min="0"
                   step="1000"
-              /></label>
-              <label
-                ><span>{{
+                />
+              </label>
+              <label>
+                <span>{{
                   mode === "stream"
                     ? "最大分析时长（毫秒）"
                     : "结束时间（毫秒）"
-                }}</span
-                ><input
+                }}</span>
+                <input
                   v-model.number="sampleEndMs"
                   type="number"
                   min="0"
                   step="1000"
                   placeholder="不限"
-              /></label>
-              <label v-if="sampleStrategy === 'scene_change'"
-                ><span>场景切换阈值</span
-                ><input
+                />
+              </label>
+              <label v-if="sampleStrategy === 'scene_change'">
+                <span>场景切换阈值</span>
+                <input
                   v-model.number="sceneChangeThreshold"
                   type="number"
                   min="0.01"
                   max="1"
                   step="0.05"
-              /></label>
-              <label
-                ><span>帧最大边长（像素）</span
-                ><input
+                />
+              </label>
+              <label>
+                <span>帧最大边长（像素）</span>
+                <input
                   v-model.number="frameMaxEdge"
                   type="number"
                   min="64"
                   max="8192"
                   step="64"
                   placeholder="原始尺寸"
-              /></label>
+                />
+              </label>
               <template v-if="mode === 'stream'">
-                <label
-                  ><span>最大重连次数</span
-                  ><input
+                <label>
+                  <span>最大重连次数</span>
+                  <input
                     v-model.number="maxReconnectAttempts"
                     type="number"
                     min="0"
                     max="20"
-                /></label>
-                <label
-                  ><span>连接超时（毫秒）</span
-                  ><input
+                  />
+                </label>
+                <label>
+                  <span>连接超时（毫秒）</span>
+                  <input
                     v-model.number="connectTimeoutMs"
                     type="number"
                     min="100"
                     max="120000"
                     step="100"
-                /></label>
-                <label
-                  ><span>读取超时（毫秒）</span
-                  ><input
+                  />
+                </label>
+                <label>
+                  <span>读取超时（毫秒）</span>
+                  <input
                     v-model.number="readTimeoutMs"
                     type="number"
                     min="100"
                     max="120000"
                     step="100"
-                /></label>
+                  />
+                </label>
               </template>
             </div>
           </template>
 
           <div v-if="parameterEntries.length" class="domain-parameters">
-            <span class="control-label">领域参数</span>
+            <span class="control-label domain-params-heading">领域参数</span>
             <div class="parameter-grid">
               <label
                 v-for="[key, definition] in parameterEntries"
@@ -2060,168 +1873,6 @@ onBeforeUnmount(() => {
       </ul>
     </section>
 
-    <div class="results-layout">
-      <section class="panel result-summary">
-        <div class="panel-header">
-          <h2>解析结果</h2>
-          <Clock3 v-if="loading" :size="16" class="spin" />
-        </div>
-        <div v-if="result" class="panel-body">
-          <dl class="result-counters">
-            <div>
-              <dt>{{ hasFilteredResultUnits ? "采样单元" : "分析单元" }}</dt>
-              <dd>{{ sampledUnitCount }}</dd>
-            </div>
-            <div v-if="hasFilteredResultUnits">
-              <dt>命中单元</dt>
-              <dd>{{ resultUnitCount }}</dd>
-            </div>
-            <div>
-              <dt>识别对象</dt>
-              <dd>{{ totalObjects || persons.length || ocrBlocks.length }}</dd>
-            </div>
-            <div>
-              <dt>模型</dt>
-              <dd>{{ result.models.length }}</dd>
-            </div>
-          </dl>
-          <dl v-if="mediaMetadata" class="metadata-grid">
-            <div>
-              <dt>画面尺寸</dt>
-              <dd>
-                {{ mediaMetadata.width || selectedUnit?.width }} ×
-                {{ mediaMetadata.height || selectedUnit?.height }}
-              </dd>
-            </div>
-            <div>
-              <dt>时长</dt>
-              <dd>{{ formatDuration(mediaMetadata.duration_ms) }}</dd>
-            </div>
-            <div>
-              <dt>帧率</dt>
-              <dd>{{ mediaMetadata.fps?.toFixed(2) || "未知" }}</dd>
-            </div>
-            <div>
-              <dt>编码</dt>
-              <dd>
-                {{ mediaMetadata.codec || mediaMetadata.format || "未知" }}
-              </dd>
-            </div>
-            <div v-if="mediaMetadata.sample_strategy">
-              <dt>采样策略</dt>
-              <dd>{{ labelSampleStrategy(mediaMetadata.sample_strategy) }}</dd>
-            </div>
-            <div v-if="mediaMetadata.frames_read != null">
-              <dt>读取帧数</dt>
-              <dd>{{ mediaMetadata.frames_read }}</dd>
-            </div>
-            <div v-if="mediaMetadata.reconnect_count != null">
-              <dt>重连次数</dt>
-              <dd>{{ mediaMetadata.reconnect_count }}</dd>
-            </div>
-            <div v-if="mediaMetadata.elapsed_ms != null">
-              <dt>解码耗时</dt>
-              <dd>{{ (mediaMetadata.elapsed_ms / 1000).toFixed(2) }} 秒</dd>
-            </div>
-            <div v-if="mediaMetadata.timestamp_source" class="metadata-wide">
-              <dt>时间戳来源</dt>
-              <dd>
-                {{ labelTimestampSource(mediaMetadata.timestamp_source) }}
-              </dd>
-            </div>
-          </dl>
-          <textarea
-            v-if="domain === 'ocr'"
-            readonly
-            :value="ocrText"
-            aria-label="OCR 文本结果"
-          />
-          <GenericDomainResult
-            v-if="genericPayload"
-            :payload="genericPayload"
-          />
-          <DataTable
-            v-if="selectedObjects.length"
-            :columns="objectColumns"
-            :items="selectedObjects"
-            table-class="bordered-table"
-          >
-            <template #score="{ row }">
-              {{ row.score?.toFixed(3) ?? "-" }}
-            </template>
-            <template #bbox="{ row }">
-              <span class="mono">{{ formatBox(row.bbox) }}</span>
-            </template>
-          </DataTable>
-          <details>
-            <summary>原始结果（JSON）</summary>
-            <pre>{{ resultJson }}</pre>
-          </details>
-        </div>
-        <div v-else class="empty result-empty">
-          {{ loading ? "正在解析数据" : "暂无结果" }}
-        </div>
-      </section>
-
-      <div class="results-aside">
-        <FeatureCropGallery
-          v-if="result"
-          :run-id="result.run_id"
-          :unit="selectedUnit ?? null"
-          :fallback-large-url="displayedMediaUrl"
-        />
-
-        <section class="panel timeline-panel">
-          <div class="panel-header">
-            <h2>
-              {{
-                mode === "image"
-                  ? "解析单元"
-                  : mode === "document"
-                    ? "页面"
-                    : "时间轴"
-              }}
-            </h2>
-            <span class="badge">{{ result?.units.length || 0 }}</span>
-          </div>
-          <div v-if="result?.units.length" class="unit-list">
-            <button
-              v-for="item in timelineItems"
-              :key="item.unit ? item.unit.unit_id : `jump-${item.jump}`"
-              :class="{ selected: selectedUnitIndex === item.index }"
-              :title="
-                item.unit
-                  ? undefined
-                  : item.jump === 'start'
-                    ? '跳到首个单元'
-                    : '跳到末尾'
-              "
-              @click="selectUnit(item.index)"
-            >
-              <template v-if="item.unit">
-                <span class="unit-index">{{ item.index + 1 }}</span>
-                <span
-                  ><strong>{{
-                    item.unit.unit_type === "page"
-                      ? `第 ${item.unit.page_number} 页`
-                      : formatTime(item.unit.pts_ms)
-                  }}</strong
-                  ><small
-                    >{{ item.unit.width }} × {{ item.unit.height }} ·
-                    {{ item.unit.objects.length }} 个对象</small
-                  ></span
-                >
-              </template>
-              <span v-else class="unit-jump">
-                {{ item.jump === "start" ? "首单元" : "末单元" }} ({{ item.index + 1 }})
-              </span>
-            </button>
-          </div>
-          <div v-else class="empty">等待解析单元</div>
-        </section>
-      </div>
-    </div>
-
     <section class="panel history-panel">
       <div class="panel-header">
         <div class="history-title-group">
@@ -2268,15 +1919,20 @@ onBeforeUnmount(() => {
         </template>
         <template #actions="{ row }">
           <button
-            class="button secondary history-load-btn"
-            title="载入此解析结果"
-            @click="openHistory(row)"
+            class="button secondary history-detail-btn"
+            title="查看此任务解析结果与回看"
+            @click="openHistoryDetail(row)"
           >
-            载入<ArrowRight :size="12" />
+            <Eye :size="13" />详情
           </button>
         </template>
       </DataTable>
     </section>
+
+    <ResultDetailDrawer
+      v-model:open="isDetailOpen"
+      :run-id="detailRunId"
+    />
   </section>
 </template>
 
@@ -2314,14 +1970,16 @@ onBeforeUnmount(() => {
 .workbench-config {
   display: flex;
   align-items: flex-end;
-  gap: 18px;
-  padding: 12px 0;
+  gap: 12px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
 }
 .parse-context-nav {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-left: auto;
 }
 .workbench-config > div:not(.media-modes),
@@ -2347,8 +2005,12 @@ onBeforeUnmount(() => {
   gap: 6px;
 }
 .pipeline-picker {
-  flex: 1;
-  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 200px;
+  max-width: 380px;
+  min-width: 180px;
 }
 .media-modes {
   display: inline-flex;
@@ -2364,8 +2026,9 @@ onBeforeUnmount(() => {
 }
 .input-layout {
   display: grid;
-  grid-template-columns: minmax(360px, 1.25fr) minmax(280px, 0.75fr);
-  gap: 16px;
+  grid-template-columns: minmax(360px, 1.15fr) minmax(320px, 0.85fr);
+  gap: 18px;
+  align-items: start;
 }
 .media-preview-column {
   display: grid;
@@ -2426,15 +2089,24 @@ onBeforeUnmount(() => {
 }
 .input-controls {
   position: relative;
-  display: grid;
-  align-content: start;
-  gap: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
 }
 .domain-parameters {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  padding-top: 4px;
+  margin-top: 6px;
+  padding-top: 10px;
   border-top: 1px solid var(--line);
+}
+.domain-params-heading {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
 }
 .parameter-wide {
   grid-column: 1 / -1;
@@ -2463,8 +2135,10 @@ onBeforeUnmount(() => {
 }
 .input-controls label,
 .file-picker {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 .input-controls label > span {
   font-size: 12px;
@@ -2480,24 +2154,59 @@ onBeforeUnmount(() => {
   gap: 8px;
   align-items: end;
 }
-.library-picker-row .source-refresh {
-  position: static;
-}
+.library-picker-row .source-refresh,
 .source-refresh {
-  position: absolute;
-  right: 7px;
-  top: 25px;
+  position: static;
+  height: 34px;
+  width: 34px;
+  min-height: 34px;
+  min-width: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
 }
 .parameter-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px 10px;
+  align-items: end;
+}
+.parameter-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.parameter-grid label > span {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.parameter-grid input:not([type="checkbox"]):not([type="radio"]),
+.parameter-grid select {
+  height: 32px;
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 12.5px;
+  border-radius: 4px;
 }
 .advanced-toggle {
-  justify-self: start;
+  align-self: flex-start;
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+  margin: 2px 0;
 }
 .run-strip {
   display: grid;
@@ -2559,16 +2268,8 @@ onBeforeUnmount(() => {
   overflow-wrap: anywhere;
 }
 .results-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 340px);
-  gap: 14px;
+  display: block;
   margin-top: 14px;
-  align-items: start;
-}
-.results-aside {
-  display: grid;
-  gap: 14px;
-  min-width: 0;
 }
 .result-counters {
   display: grid;

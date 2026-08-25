@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Download, Filter, RotateCcw, Search } from "@lucide/vue";
+import { Download, RotateCcw, Search } from "@lucide/vue";
 import { onMounted, reactive, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { api, apiBlob, userFacingError } from "../api";

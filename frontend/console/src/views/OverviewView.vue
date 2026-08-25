@@ -2,7 +2,6 @@
 import {
   Activity,
   AlertCircle,
-  Boxes,
   ChevronDown,
   ChevronUp,
   Cpu,
@@ -19,9 +18,7 @@ import { computed, onMounted, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { api, userFacingError } from "../api";
 import {
-  labelCapability,
   labelDomain,
-  labelDomainDescription,
   labelPipeline,
   labelProduct,
   labelProductGate,
@@ -49,7 +46,17 @@ import type {
 } from "../types";
 import DataTable from "../components/DataTable.vue";
 
-const capabilityColumns: TableColumn<CapabilityItem>[] = [
+interface FullCapabilityItem {
+  id: string;
+  domain: string;
+  name: string;
+  readiness: "ready" | "fallback" | "placeholder";
+  productionReady: boolean;
+  model: string;
+  detail: string;
+}
+
+const capabilityColumns: TableColumn<FullCapabilityItem>[] = [
   { key: "domain", label: "领域", width: "110px" },
   { key: "name", label: "核心能力", class: "pi-cap-name" },
   { key: "readiness", label: "就绪状态" },
