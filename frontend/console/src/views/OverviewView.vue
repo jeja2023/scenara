@@ -415,50 +415,50 @@ useRefresh(refresh);
   <section class="page overview-page">
     <p v-if="error" class="callout error">{{ error }}</p>
 
-    <!-- 1. 核心指标统计栏 (紧凑高密度、左右平衡卡片) -->
+    <!-- 1. 核心指标统计栏 (分层平衡结构：顶行标题+右上徽章，中层大数值，底层辅助说明) -->
     <div class="stats">
       <div class="stat teal">
-        <div class="stat-content">
+        <div class="stat-top-row">
           <span class="stat-title">总任务运行</span>
-          <div class="stat-value">{{ runs.total }}</div>
-          <span class="stat-desc">历史与当前处理总数</span>
+          <div class="stat-icon-badge">
+            <Activity :size="15" />
+          </div>
         </div>
-        <div class="stat-icon-badge">
-          <Activity :size="18" />
-        </div>
+        <div class="stat-value">{{ runs.total }}</div>
+        <div class="stat-desc">历史与当前处理总数</div>
       </div>
 
       <div class="stat green">
-        <div class="stat-content">
+        <div class="stat-top-row">
           <span class="stat-title">活跃队列</span>
-          <div class="stat-value">{{ activeRuns }}</div>
-          <span class="stat-desc">排队与并发执行中</span>
+          <div class="stat-icon-badge">
+            <Play :size="15" />
+          </div>
         </div>
-        <div class="stat-icon-badge">
-          <Play :size="18" />
-        </div>
+        <div class="stat-value">{{ activeRuns }}</div>
+        <div class="stat-desc">排队与并发执行中</div>
       </div>
 
       <div class="stat coral">
-        <div class="stat-content">
+        <div class="stat-top-row">
           <span class="stat-title">异常与关注</span>
-          <div class="stat-value">{{ failedRuns }}</div>
-          <span class="stat-desc">失败或已取消任务</span>
+          <div class="stat-icon-badge">
+            <AlertCircle :size="15" />
+          </div>
         </div>
-        <div class="stat-icon-badge">
-          <AlertCircle :size="18" />
-        </div>
+        <div class="stat-value">{{ failedRuns }}</div>
+        <div class="stat-desc">失败或已取消任务</div>
       </div>
 
       <div class="stat amber">
-        <div class="stat-content">
+        <div class="stat-top-row">
           <span class="stat-title">AI 核心能力</span>
-          <div class="stat-value">17 / 17</div>
-          <span class="stat-desc">全领域生产模型已就绪</span>
+          <div class="stat-icon-badge">
+            <Cpu :size="15" />
+          </div>
         </div>
-        <div class="stat-icon-badge">
-          <Cpu :size="18" />
-        </div>
+        <div class="stat-value">17 / 17</div>
+        <div class="stat-desc">全领域生产模型已就绪</div>
       </div>
     </div>
 
@@ -845,7 +845,7 @@ useRefresh(refresh);
 }
 
 /* ========================================================
-   1. 统计卡片栏 (Stats Metrics Bar)
+   1. 统计卡片栏 (Stats Metrics Bar - 顶层标题/右上徽章 + 中层数值 + 底层辅助)
    ======================================================== */
 .stats {
   display: grid;
@@ -854,15 +854,14 @@ useRefresh(refresh);
 }
 
 .stat {
-  padding: 12px 16px;
+  padding: 12px 14px;
   border-radius: var(--radius-sm, 6px);
   background: #fff;
   border: 1px solid var(--line, #e2e8e6);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  gap: 3px;
   transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
 }
 
@@ -872,44 +871,26 @@ useRefresh(refresh);
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
 }
 
-.stat-content {
+.stat-top-row {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 2px;
 }
 
-/* 指标小标题 */
+/* 指标小标题 (左上) */
 .stat-title {
   font-size: 12px;
   font-weight: 600;
   color: var(--muted, #64716d);
 }
 
-/* 指标大数值 */
-.stat-value {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--color-text, #17211f);
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-
-/* 指标辅助说明 */
-.stat-desc {
-  font-size: 11px;
-  color: #8c9b97;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.35;
-}
-
+/* 指标右上专属微图标徽章 */
 .stat-icon-badge {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-sm, 6px);
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -918,7 +899,7 @@ useRefresh(refresh);
 }
 
 .stat:hover .stat-icon-badge {
-  transform: scale(1.05);
+  transform: scale(1.08);
 }
 
 .stat.teal .stat-icon-badge {
@@ -943,6 +924,27 @@ useRefresh(refresh);
   background: #fffbeb;
   color: #d97706;
   border: 1px solid #fef3c7;
+}
+
+/* 指标大数值 (中层) */
+.stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text, #17211f);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 指标辅助说明 (底层) */
+.stat-desc {
+  font-size: 11px;
+  color: #8c9b97;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.35;
+  margin-top: 1px;
 }
 
 /* ========================================================
