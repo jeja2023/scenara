@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   AlertTriangle,
+  ArrowRight,
   ChevronDown,
   ChevronUp,
   Clock3,
@@ -2221,35 +2222,69 @@ onBeforeUnmount(() => {
           <h2>最近运行</h2>
           <p>{{ currentDomainLabel }} 最近运行记录</p>
         </div>
-        <button
-          class="button secondary"
-          :disabled="loadingHistory"
-          @click="refreshHistory"
-        >
-          <RefreshCw :size="15" :class="{ spin: loadingHistory }" />刷新
-        </button>
+        <div class="toolbar compact">
+          <button
+            class="button secondary"
+            :disabled="loadingHistory"
+            @click="refreshHistory"
+          >
+            <RefreshCw :size="14" :class="{ spin: loadingHistory }" />刷新
+          </button>
+          <RouterLink
+            class="button secondary"
+            :to="{ path: '/runs', query: { domain } }"
+          >
+            查看全部
+          </RouterLink>
+        </div>
       </div>
-      <div v-if="scopedHistoryRuns.length" class="history-list">
-        <button
-          v-for="item in scopedHistoryRuns"
-          :key="item.run_id"
-          class="history-item"
-          @click="openHistory(item)"
-        >
-          <span class="history-item-main">
-            <strong>{{ labelPipeline(item.pipeline.pipeline_id) }}</strong>
-            <small class="mono">{{ item.run_id }}</small>
-          </span>
-          <span class="history-item-meta">
-            <span class="badge" :class="item.status">{{
-              labelRunStatus(item.status)
-            }}</span>
-            <small>{{ formatRunDate(item.created_at) }}</small>
-          </span>
-        </button>
-      </div>
-      <div v-else class="empty history-empty">
-        {{ loadingHistory ? "正在加载历史运行" : `暂无 ${currentDomainLabel} 历史运行记录` }}
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 50px">序号</th>
+              <th>任务 ID</th>
+              <th>流水线</th>
+              <th>资产 / 来源</th>
+              <th>状态</th>
+              <th>提交时间</th>
+              <th style="width: 80px">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(item, index) in scopedHistoryRuns" :key="item.run_id">
+              <td class="muted">{{ index + 1 }}</td>
+              <td class="mono truncate">{{ item.run_id }}</td>
+              <td class="truncate">
+                <strong>{{ labelPipeline(item.pipeline.pipeline_id) }}</strong>
+                <small v-if="item.pipeline.version" class="muted"> · {{ item.pipeline.version }}</small>
+              </td>
+              <td class="mono truncate">
+                {{ item.asset_id || item.source_id || '-' }}
+              </td>
+              <td>
+                <span class="badge" :class="item.status">{{
+                  labelRunStatus(item.status)
+                }}</span>
+              </td>
+              <td class="muted">{{ formatRunDate(item.created_at) }}</td>
+              <td>
+                <button
+                  class="button secondary history-load-btn"
+                  title="载入此解析结果"
+                  @click="openHistory(item)"
+                >
+                  载入<ArrowRight :size="12" />
+                </button>
+              </td>
+            </tr>
+            <tr v-if="!scopedHistoryRuns.length">
+              <td colspan="7" class="empty history-empty">
+                {{ loadingHistory ? "正在加载历史运行..." : `暂无 ${currentDomainLabel} 历史运行记录` }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </section>
   </section>
@@ -2618,46 +2653,20 @@ onBeforeUnmount(() => {
   color: var(--muted);
   font-size: 12px;
 }
-.history-list {
-  display: grid;
-}
-.history-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  width: 100%;
-  padding: 11px 14px;
-  border: 0;
-  border-top: 1px solid var(--line);
-  background: var(--surface);
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-}
-.history-item:hover {
-  background: #f1f6f4;
-}
-.history-item-main,
-.history-item-meta {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  min-width: 0;
-}
-.history-item-main {
-  flex-wrap: wrap;
-}
-.history-item-main small,
-.history-item-meta small {
-  color: var(--muted);
+.history-load-btn {
+  height: 22px;
+  min-height: 22px;
+  padding: 0 6px;
   font-size: 11px;
-}
-.history-item-meta {
-  flex: 0 0 auto;
+  gap: 3px;
+  border-radius: 3px;
 }
 .history-empty {
-  min-height: 92px;
+  min-height: 60px;
+  padding: 16px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 12px;
 }
 .unit-list {
   display: grid;
@@ -2791,11 +2800,6 @@ pre {
   }
   .result-counters div {
     padding-inline: 8px;
-  }
-  .history-item {
-    align-items: start;
-    flex-direction: column;
-    gap: 6px;
   }
 }
 </style>
