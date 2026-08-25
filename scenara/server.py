@@ -432,6 +432,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         handle = tempfile.NamedTemporaryFile(prefix="scenara-upload-", delete=False)
         path = Path(handle.name)
         size = 0
+        failed = False
         try:
             while chunk := await file.read(1024 * 1024):
                 size += len(chunk)
@@ -441,11 +442,14 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             await asyncio.to_thread(handle.flush)
             return path
         except Exception:
-            with suppress(FileNotFoundError):
-                path.unlink()
+            failed = True
             raise
         finally:
-            handle.close()
+            with suppress(Exception):
+                handle.close()
+            if failed:
+                with suppress(FileNotFoundError, PermissionError):
+                    path.unlink()
 
     def require_presigned_storage() -> None:
         if not runtime.settings.s3_presigned_urls_enabled:
@@ -736,7 +740,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
                     kind=kind,
                 )
             finally:
-                with suppress(FileNotFoundError):
+                with suppress(FileNotFoundError, PermissionError):
                     path.unlink()
         else:
             data = await file.read(max_read)
@@ -817,7 +821,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
                 kind=body.kind,
             )
         finally:
-            with suppress(FileNotFoundError):
+            with suppress(FileNotFoundError, PermissionError):
                 path.unlink()
             with suppress(Exception):
                 await runtime.objects.delete(object_key)
@@ -1284,7 +1288,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
                 temporary=True,
             )
         finally:
-            with suppress(FileNotFoundError):
+            with suppress(FileNotFoundError, PermissionError):
                 path.unlink()
         selected_pipeline = pipeline_id or runtime.plugins.default_pipeline_id(domain)
         selected_pipeline_ref = await runtime.runs.resolve_pipeline_ref(selected_pipeline, pipeline_version)
