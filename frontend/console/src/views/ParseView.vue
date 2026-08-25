@@ -2635,16 +2635,25 @@ onBeforeUnmount(() => {
   margin-top: 14px;
 }
 .history-panel .history-title-group {
-  display: grid;
-  gap: 3px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 .history-panel .history-title-group h2 {
   margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text, #17211f);
+  white-space: nowrap;
 }
+.history-panel .history-title-group p,
 .history-panel .panel-header p {
   margin: 0;
-  color: var(--muted);
+  color: var(--muted, #64716d);
   font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
 }
 .history-toolbar {
   display: flex !important;
