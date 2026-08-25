@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  Activity,
   FileText,
   LogOut,
   Menu,
@@ -8,7 +9,6 @@ import {
   Settings,
   Sparkles,
   X,
-  Zap,
 } from "@lucide/vue";
 import {
   computed,
@@ -54,7 +54,7 @@ const draft = reactive<ConnectionSettings>(loadConnection());
 const domainManifests = ref<DomainManifest[]>([]);
 
 const domainIcons = {
-  behavior: Zap,
+  behavior: Activity,
   fashion: Sparkles,
   ocr: FileText,
   portrait: ScanFace,

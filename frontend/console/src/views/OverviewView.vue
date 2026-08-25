@@ -5,6 +5,7 @@ import {
   Boxes,
   FileText,
   Play,
+  ScanFace,
   Sparkles,
   User,
 } from "@lucide/vue";
@@ -98,17 +99,28 @@ const maturityLabels: Record<ProductMaturity, string> = {
 
 const layerLabels: Record<ProductLayer, string> = {
   product_module: "产品模块",
-  control_plane: "共享控制面",
-  developer_surface: "开发者平台",
   foundation: "基础底座",
+  control_plane: "控制面",
+  developer_surface: "开发者界面",
 };
 
 function labelMaturity(value: ProductMaturity): string {
-  return maturityLabels[value];
+  return maturityLabels[value] || value;
 }
 
 function labelLayer(value: ProductLayer): string {
-  return layerLabels[value];
+  return layerLabels[value] || value;
+}
+
+const domainIconsMap: Record<string, any> = {
+  portrait: ScanFace,
+  ocr: FileText,
+  behavior: Activity,
+  fashion: Sparkles,
+};
+
+function domainIcon(domainId: string) {
+  return domainIconsMap[domainId] || ScanFace;
 }
 
 async function refresh(): Promise<void> {
@@ -587,7 +599,7 @@ useRefresh(refresh);
       <div class="engine-grid">
         <article class="engine-card">
           <div class="engine-card-header">
-            <div class="engine-icon-wrap"><User :size="18" /></div>
+            <div class="engine-icon-wrap"><ScanFace :size="18" /></div>
             <div class="engine-meta">
               <strong>人像视觉分析</strong>
               <small>Portrait Analysis</small>
@@ -880,7 +892,14 @@ useRefresh(refresh);
             class="domain-card"
           >
             <div class="domain-card-header">
-              <strong class="domain-title">{{ domain.display_name }}</strong>
+              <div class="domain-title-wrap">
+                <component
+                  :is="domainIcon(domain.domain_id)"
+                  :size="15"
+                  class="domain-card-icon"
+                />
+                <strong class="domain-title">{{ domain.display_name }}</strong>
+              </div>
               <span class="badge active">版本化插件</span>
             </div>
             <p class="domain-desc">
@@ -1560,6 +1579,15 @@ useRefresh(refresh);
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+}
+.domain-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.domain-card-icon {
+  color: var(--teal);
+  flex-shrink: 0;
 }
 .domain-title {
   font-size: 13px;

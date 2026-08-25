@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { ArrowRight, ScanSearch } from "@lucide/vue";
+import {
+  Activity,
+  ArrowRight,
+  FileText,
+  ScanFace,
+  Sparkles,
+} from "@lucide/vue";
 import { computed, onMounted, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { RouterLink } from "vue-router";
@@ -18,6 +24,17 @@ const domains = ref<DomainManifest[]>([]);
 const pipelines = ref<Pipeline[]>([]);
 const error = ref("");
 const loading = ref(false);
+
+const domainIconsMap: Record<string, any> = {
+  portrait: ScanFace,
+  ocr: FileText,
+  behavior: Activity,
+  fashion: Sparkles,
+};
+
+function domainIcon(domainId: string) {
+  return domainIconsMap[domainId] || ScanFace;
+}
 
 const orderedDomains = computed(() =>
   [...domains.value].sort(
@@ -87,7 +104,7 @@ useRefresh(refresh);
       >
         <div class="capability-card-header">
           <div class="capability-card-title">
-            <ScanSearch :size="18" />
+            <component :is="domainIcon(domain.domain_id)" :size="18" />
             <div>
               <strong>{{ domainName(domain) }}</strong>
               <span>领域契约 {{ domain.schema_version }}</span>
