@@ -415,39 +415,50 @@ useRefresh(refresh);
   <section class="page overview-page">
     <p v-if="error" class="callout error">{{ error }}</p>
 
-    <!-- 1. 核心指标统计栏 (无冗余、强信息密度) -->
+    <!-- 1. 核心指标统计栏 (紧凑高密度、左右平衡卡片) -->
     <div class="stats">
       <div class="stat teal">
-        <div class="stat-header">
-          <span>总任务运行</span>
-          <Activity :size="16" class="stat-icon" />
+        <div class="stat-content">
+          <span class="stat-title">总任务运行</span>
+          <div class="stat-value">{{ runs.total }}</div>
+          <span class="stat-desc">历史与当前处理总数</span>
         </div>
-        <strong>{{ runs.total }}</strong>
-        <small>历史与当前处理总数</small>
+        <div class="stat-icon-badge">
+          <Activity :size="18" />
+        </div>
       </div>
+
       <div class="stat green">
-        <div class="stat-header">
-          <span>活跃队列</span>
-          <Play :size="16" class="stat-icon" />
+        <div class="stat-content">
+          <span class="stat-title">活跃队列</span>
+          <div class="stat-value">{{ activeRuns }}</div>
+          <span class="stat-desc">排队与并发执行中</span>
         </div>
-        <strong>{{ activeRuns }}</strong>
-        <small>排队与并发执行中</small>
+        <div class="stat-icon-badge">
+          <Play :size="18" />
+        </div>
       </div>
+
       <div class="stat coral">
-        <div class="stat-header">
-          <span>异常与关注</span>
-          <AlertCircle :size="16" class="stat-icon" />
+        <div class="stat-content">
+          <span class="stat-title">异常与关注</span>
+          <div class="stat-value">{{ failedRuns }}</div>
+          <span class="stat-desc">失败或已取消任务</span>
         </div>
-        <strong>{{ failedRuns }}</strong>
-        <small>失败或已取消任务</small>
+        <div class="stat-icon-badge">
+          <AlertCircle :size="18" />
+        </div>
       </div>
+
       <div class="stat amber">
-        <div class="stat-header">
-          <span>AI 核心能力</span>
-          <Cpu :size="16" class="stat-icon" />
+        <div class="stat-content">
+          <span class="stat-title">AI 核心能力</span>
+          <div class="stat-value">17 / 17</div>
+          <span class="stat-desc">全领域生产模型已就绪</span>
         </div>
-        <strong>17 / 17</strong>
-        <small>全领域生产级模型已就绪</small>
+        <div class="stat-icon-badge">
+          <Cpu :size="18" />
+        </div>
       </div>
     </div>
 
@@ -770,55 +781,99 @@ useRefresh(refresh);
   gap: 20px;
 }
 
-/* 1. 统计卡片栏 */
+/* 1. 统计卡片栏 (精简紧凑、左右平衡) */
 .stats {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
+  gap: 12px;
 }
 
 .stat {
-  padding: 16px 18px;
-  border-radius: 8px;
+  padding: 12px 16px;
+  border-radius: 7px;
   background: #fff;
   border: 1px solid var(--line, #e2e8e6);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  transition: transform 160ms ease, box-shadow 160ms ease;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
 }
 
 .stat:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transform: translateY(-1px);
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
 }
 
-.stat-header {
+.stat-content {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stat-title {
   font-size: 12px;
   font-weight: 600;
   color: var(--muted, #61736e);
 }
 
-.stat strong {
-  font-size: 26px;
+.stat-value {
+  font-size: 21px;
   font-weight: 700;
-  line-height: 1.1;
-  color: var(--text-dark, #17211f);
+  color: #17211f;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
-.stat small {
+.stat-desc {
   font-size: 11px;
-  color: var(--muted, #61736e);
+  color: #8c9b97;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.stat.teal .stat-icon { color: var(--teal, #0f766e); }
-.stat.green .stat-icon { color: #16a34a; }
-.stat.coral .stat-icon { color: #e11d48; }
-.stat.amber .stat-icon { color: #d97706; }
+.stat-icon-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: transform 140ms ease;
+}
+
+.stat:hover .stat-icon-badge {
+  transform: scale(1.05);
+}
+
+.stat.teal .stat-icon-badge {
+  background: #f0fdfa;
+  color: #0f766e;
+  border: 1px solid #ccfbf1;
+}
+
+.stat.green .stat-icon-badge {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #dcfce7;
+}
+
+.stat.coral .stat-icon-badge {
+  background: #fff1f2;
+  color: #e11d48;
+  border: 1px solid #ffe4e6;
+}
+
+.stat.amber .stat-icon-badge {
+  background: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fef3c7;
+}
 
 /* 2. AI 视觉多领域与模型引擎全景 */
 .ai-engines-panel {
