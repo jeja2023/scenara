@@ -226,7 +226,7 @@ def main() -> None:
     print(f"\n总计: {passed}/{total} 通过")
 
     if passed == total:
-        print("\n✅ 所有集成测试通过!")
+        print("\n[OK] 所有集成测试通过!")
         print("\n行为识别功能已完全集成到 Scenara 平台:")
         print("  • 配置系统 (settings.py)")
         print("  • 引擎工厂 (factory.py)")

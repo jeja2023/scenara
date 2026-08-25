@@ -91,7 +91,7 @@ def test_behavior_prediction() -> bool:
                 )
             return True
         else:
-            print("   ⚠ 未识别到行为(使用回退方法)")
+            print("   [WARN] 未识别到行为(使用回退方法)")
             return True  # 不算失败
     except Exception as e:
         print(f"   ✗ 行为识别失败: {e}")

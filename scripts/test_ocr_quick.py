@@ -87,7 +87,7 @@ def test_ocr_prediction() -> bool:
                 print(f"     [{i}] {block['text'][:30]} (score: {block.get('score', 0):.2f})")
             return True
         else:
-            print("   ⚠ 未识别到文本(可能是图像质量或字体问题)")
+            print("   [WARN] 未识别到文本(可能是图像质量或字体问题)")
             return True  # 不算失败
     except Exception as e:
         print(f"   ✗ OCR 识别失败: {e}")
