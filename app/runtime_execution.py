@@ -19,7 +19,11 @@ from app.observability import (
     wall_time,
 )
 from app.runtime_sessions import primary_execution_provider, run_session
-from app.runtime_state import decrement_gpu_queue_waiters, gpu_semaphore_for_device, increment_gpu_queue_waiters
+from app.runtime_state import (
+    decrement_gpu_queue_waiters,
+    gpu_semaphore_for_device,
+    increment_gpu_queue_waiters,
+)
 from app.schemas import ModelBundle
 from app.settings import MAX_TENSOR_ITEMS
 
@@ -53,7 +57,13 @@ def should_run_shadow(active_model_id: str, percentage: int) -> bool:
     if percentage >= 100:
         return True
     traffic_key = current_request_id() or current_scheduling_scope() or str(wall_time())
-    bucket = int.from_bytes(hashlib.sha256(f"{active_model_id}:{traffic_key}".encode()).digest()[:4], "big") % 100
+    bucket = (
+        int.from_bytes(
+            hashlib.sha256(f"{active_model_id}:{traffic_key}".encode()).digest()[:4],
+            "big",
+        )
+        % 100
+    )
     return bucket < percentage
 
 
@@ -64,7 +74,9 @@ def schedule_shadow_inference(
 ) -> None:
     active_model_id = str(bundle.get("key") or "")
     route = SHADOW_ROUTES.get(active_model_id)
-    if route is None or not should_run_shadow(active_model_id, int(route["percentage"])):
+    if route is None or not should_run_shadow(
+        active_model_id, int(route["percentage"])
+    ):
         return
     candidate = route["candidate"]
     if not isinstance(candidate, dict) or candidate is bundle:
@@ -82,15 +94,30 @@ def schedule_shadow_inference(
             "recorded_at": wall_time(),
         }
         try:
-            candidate_outputs, _, _ = await _run_model_bundle_direct(candidate_bundle, copied_input)
+            candidate_outputs, _, _ = await _run_model_bundle_direct(
+                candidate_bundle, copied_input
+            )
             shape_match = [list(output.shape) for output in official_outputs] == [
                 list(output.shape) for output in candidate_outputs
             ]
             diffs = []
             if shape_match:
-                for official, shadow in zip(official_outputs, candidate_outputs, strict=True):
-                    if np.issubdtype(official.dtype, np.number) and np.issubdtype(shadow.dtype, np.number):
-                        diffs.append(float(np.mean(np.abs(official.astype(np.float64) - shadow.astype(np.float64)))))
+                for official, shadow in zip(
+                    official_outputs, candidate_outputs, strict=True
+                ):
+                    if np.issubdtype(official.dtype, np.number) and np.issubdtype(
+                        shadow.dtype, np.number
+                    ):
+                        diffs.append(
+                            float(
+                                np.mean(
+                                    np.abs(
+                                        official.astype(np.float64)
+                                        - shadow.astype(np.float64)
+                                    )
+                                )
+                            )
+                        )
             record.update(
                 {
                     "status": "completed",
@@ -167,7 +194,9 @@ async def acquire_with_timeout(
             decrement_gpu_queue_waiters(gpu_device_id)
 
 
-async def _run_model_bundle_direct(bundle: ModelBundle, input_array: Array) -> tuple[list[Array], float, float]:
+async def _run_model_bundle_direct(
+    bundle: ModelBundle, input_array: Array
+) -> tuple[list[Array], float, float]:
     session = bundle["session"]
     model_semaphore = bundle.get("semaphore")
     gpu_device_id = bundle.get("gpu_device_id")
@@ -198,7 +227,9 @@ async def _run_model_bundle_direct(bundle: ModelBundle, input_array: Array) -> t
 
         if gpu_semaphore is not None:
             elapsed = now() - queue_start
-            remaining_timeout = max(0.001, queue_timeout - elapsed) if queue_timeout > 0 else 0
+            remaining_timeout = (
+                max(0.001, queue_timeout - elapsed) if queue_timeout > 0 else 0
+            )
             await acquire_with_timeout(
                 gpu_semaphore,
                 remaining_timeout,
@@ -254,7 +285,10 @@ async def run_model_bundle(
         return result
 
     scheduler = bundle.get("dynamic_batch_scheduler")
-    if not isinstance(scheduler, InferenceScheduler) or not scheduler.compatible_with_current_loop():
+    if (
+        not isinstance(scheduler, InferenceScheduler)
+        or not scheduler.compatible_with_current_loop()
+    ):
         scheduler = InferenceScheduler(bundle, _run_model_bundle_direct)
         bundle["dynamic_batch_scheduler"] = scheduler
     queue_timeout = (
@@ -273,6 +307,21 @@ async def run_model_bundle(
     return result
 
 
+def bundle_fixed_batch_size(bundle: ModelBundle) -> int | None:
+    """检查模型会话是否具有固定的静态批次大小（如 batch_size=1）。"""
+    session = bundle.get("session")
+    if session is not None and hasattr(session, "get_inputs"):
+        try:
+            inputs = session.get_inputs()
+            if inputs and len(inputs[0].shape) > 0:
+                first_dim = inputs[0].shape[0]
+                if isinstance(first_dim, int):
+                    return first_dim
+        except Exception:
+            pass
+    return None
+
+
 async def run_model_bundle_batch(
     bundle: ModelBundle,
     inputs: list[Array],
@@ -280,23 +329,56 @@ async def run_model_bundle_batch(
     if not inputs:
         return [], 0.0, 0.0, "empty"
     if len(inputs) == 1:
-        raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(bundle, inputs[0])
+        raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(
+            bundle, inputs[0]
+        )
         return raw_outputs, queue_seconds, inference_seconds, "single"
-    shapes = {tuple(input_array.shape[1:]) for input_array in inputs if input_array.ndim > 0}
+    shapes = {
+        tuple(input_array.shape[1:]) for input_array in inputs if input_array.ndim > 0
+    }
     dtypes = {str(input_array.dtype) for input_array in inputs}
     if len(shapes) != 1 or len(dtypes) != 1:
         output_groups: list[list[Array]] = []
         queue_seconds_sum = 0.0
         inference_seconds_sum = 0.0
         for input_array in inputs:
-            raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(bundle, input_array)
+            raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(
+                bundle, input_array
+            )
             output_groups.append(raw_outputs)
             queue_seconds_sum += queue_seconds
             inference_seconds_sum += inference_seconds
-        return stack_outputs(output_groups), queue_seconds_sum, inference_seconds_sum, "per_item_mixed_shape"
+        return (
+            stack_outputs(output_groups),
+            queue_seconds_sum,
+            inference_seconds_sum,
+            "per_item_mixed_shape",
+        )
+
+    fixed_batch = bundle_fixed_batch_size(bundle)
+    if fixed_batch is not None and fixed_batch == 1:
+        output_groups = []
+        queue_seconds_sum = 0.0
+        inference_seconds_sum = 0.0
+        for input_array in inputs:
+            raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(
+                bundle, input_array
+            )
+            output_groups.append(raw_outputs)
+            queue_seconds_sum += queue_seconds
+            inference_seconds_sum += inference_seconds
+        return (
+            stack_outputs(output_groups),
+            queue_seconds_sum,
+            inference_seconds_sum,
+            "per_item",
+        )
+
     try:
         batched_input = np.concatenate(inputs, axis=0)
-        raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(bundle, batched_input)
+        raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(
+            bundle, batched_input
+        )
         return raw_outputs, queue_seconds, inference_seconds, "batch"
     except Exception as exc:
         logger.warning("批量推理失败，回退到逐项推理: %s", exception_log_summary(exc))
@@ -304,11 +386,18 @@ async def run_model_bundle_batch(
     queue_seconds_sum = 0.0
     inference_seconds_sum = 0.0
     for input_array in inputs:
-        raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(bundle, input_array)
+        raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(
+            bundle, input_array
+        )
         output_groups.append(raw_outputs)
         queue_seconds_sum += queue_seconds
         inference_seconds_sum += inference_seconds
-    return stack_outputs(output_groups), queue_seconds_sum, inference_seconds_sum, "per_item"
+    return (
+        stack_outputs(output_groups),
+        queue_seconds_sum,
+        inference_seconds_sum,
+        "per_item",
+    )
 
 
 def stack_outputs(output_groups: list[list[Array]]) -> list[Array]:
@@ -318,7 +407,9 @@ def stack_outputs(output_groups: list[list[Array]]) -> list[Array]:
     output_count = len(output_groups[0])
     stacked: list[Array] = []
     for output_index in range(output_count):
-        stacked.append(np.concatenate([group[output_index] for group in output_groups], axis=0))
+        stacked.append(
+            np.concatenate([group[output_index] for group in output_groups], axis=0)
+        )
     return stacked
 
 
@@ -327,24 +418,54 @@ async def run_yolo_frames(
     input_array: Array,
 ) -> tuple[list[Array], float, float, str]:
     if input_array.shape[0] == 1:
-        raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(bundle, input_array)
+        raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(
+            bundle, input_array
+        )
         return raw_outputs, queue_seconds, inference_seconds, "single"
 
+    fixed_batch = bundle_fixed_batch_size(bundle)
+    if fixed_batch is not None and fixed_batch == 1:
+        output_groups: list[list[Array]] = []
+        queue_seconds_sum = 0.0
+        inference_seconds_sum = 0.0
+        for index in range(input_array.shape[0]):
+            raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(
+                bundle, input_array[index : index + 1]
+            )
+            output_groups.append(raw_outputs)
+            queue_seconds_sum += queue_seconds
+            inference_seconds_sum += inference_seconds
+        return (
+            stack_outputs(output_groups),
+            queue_seconds_sum,
+            inference_seconds_sum,
+            "per_frame",
+        )
+
     try:
-        raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(bundle, input_array)
+        raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(
+            bundle, input_array
+        )
         return raw_outputs, queue_seconds, inference_seconds, "batch"
     except Exception as exc:
         logger.warning("批量推理失败，回退到逐帧推理: %s", exception_log_summary(exc))
 
-    output_groups: list[list[Array]] = []
+    output_groups = []
     queue_seconds_sum = 0.0
     inference_seconds_sum = 0.0
     for index in range(input_array.shape[0]):
-        raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(bundle, input_array[index : index + 1])
+        raw_outputs, queue_seconds, inference_seconds = await run_model_bundle(
+            bundle, input_array[index : index + 1]
+        )
         output_groups.append(raw_outputs)
         queue_seconds_sum += queue_seconds
         inference_seconds_sum += inference_seconds
-    return stack_outputs(output_groups), queue_seconds_sum, inference_seconds_sum, "per_frame"
+    return (
+        stack_outputs(output_groups),
+        queue_seconds_sum,
+        inference_seconds_sum,
+        "per_frame",
+    )
 
 
 __all__ = [
