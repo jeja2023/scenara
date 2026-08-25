@@ -413,19 +413,6 @@ useRefresh(refresh);
 
 <template>
   <section class="page overview-page">
-    <!-- 顶部工作台状态 -->
-    <div class="overview-hero">
-      <div class="hero-title">
-        <strong class="hero-heading">工作台总览</strong>
-        <p>聚合全局核心指标、多模态 AI 视觉引擎、运行动态与平台架构底座。</p>
-      </div>
-      <div class="hero-actions">
-        <RouterLink class="button primary overview-action" to="/parse">
-          <Play :size="16" />新建解析
-        </RouterLink>
-      </div>
-    </div>
-
     <p v-if="error" class="callout error">{{ error }}</p>
 
     <!-- 1. 核心指标统计栏 (无冗余、强信息密度) -->
@@ -781,35 +768,6 @@ useRefresh(refresh);
   display: flex;
   flex-direction: column;
   gap: 20px;
-}
-
-.overview-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 4px;
-}
-
-.hero-heading {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--text-dark, #17211f);
-  letter-spacing: -0.02em;
-}
-
-.hero-title p {
-  margin: 4px 0 0;
-  color: var(--muted, #61736e);
-  font-size: 13px;
-}
-
-.overview-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  font-weight: 600;
 }
 
 /* 1. 统计卡片栏 */
