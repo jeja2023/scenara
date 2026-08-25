@@ -17,7 +17,7 @@ import { api, userFacingError } from "../api";
 import { labelDomain, labelPipeline, labelRunStatus } from "../labels";
 import type { Domain, DomainManifest, Run, RunPage, RunStatus } from "../types";
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 20;
 const runs = ref<Run[]>([]);
 const domains = ref<DomainManifest[]>([]);
 const total = ref(0);
