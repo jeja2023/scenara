@@ -197,37 +197,37 @@ const allCapabilitiesList = computed<FullCapabilityItem[]>(() => [
     id: "face_detection",
     domain: "portrait",
     name: "人脸检测与定位",
-    readiness: "fallback",
-    productionReady: false,
-    model: "opencv/haarcascade_frontalface_default",
-    detail: "OpenCV Haar 级联检测 (规划: SCRFD)",
+    readiness: "ready",
+    productionReady: true,
+    model: "models/scrfd_500m.onnx",
+    detail: "SCRFD 5 点人脸关键点检测 (640×640)",
   },
   {
     id: "face_embedding",
     domain: "portrait",
     name: "人脸特征提取",
-    readiness: "fallback",
-    productionReady: false,
-    model: "scenara.development.image_fingerprint_v1",
-    detail: "开发指纹 (规划: ArcFace 512维)",
+    readiness: "ready",
+    productionReady: true,
+    model: "models/arcface.onnx",
+    detail: "ArcFace MobileFaceNet (512 维特征抽取)",
   },
   {
     id: "gait",
     domain: "portrait",
     name: "步态时序特征",
-    readiness: "fallback",
-    productionReady: false,
-    model: "scenara.development.tracklet_fingerprint_v1",
-    detail: "轨迹指纹 (规划: OpenGait 256维)",
+    readiness: "ready",
+    productionReady: true,
+    model: "models/opengait_gait3d.onnx",
+    detail: "OpenGait 3D 步态时序特征 (256 维)",
   },
   {
     id: "appearance",
     domain: "portrait",
     name: "服饰颜色与属性",
-    readiness: "fallback",
-    productionReady: false,
-    model: "scenara.development.color_histogram_v1",
-    detail: "颜色直方图 (规划: Attribute ReID)",
+    readiness: "ready",
+    productionReady: true,
+    model: "models/attribute_reid.onnx",
+    detail: "Attribute ReID 服饰与体貌特征 (256 维)",
   },
 
   // 2. OCR 智能文档领域
@@ -612,6 +612,26 @@ useRefresh(refresh);
               <span class="dot ready"></span>
               <span class="model-name">姿态估计</span>
               <code class="model-file">models/yolov8n-pose.pt</code>
+            </div>
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">人脸检测</span>
+              <code class="model-file">models/scrfd_500m.onnx</code>
+            </div>
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">人脸特征</span>
+              <code class="model-file">models/arcface.onnx</code>
+            </div>
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">步态特征</span>
+              <code class="model-file">models/opengait_gait3d.onnx</code>
+            </div>
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">服饰属性</span>
+              <code class="model-file">models/attribute_reid.onnx</code>
             </div>
           </div>
         </article>
