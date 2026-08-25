@@ -195,7 +195,7 @@ useRefresh(refresh);
     <div class="governance-grid">
       <section class="panel create-panel">
         <div class="panel-header">
-          <h2><Database :size="18" />新建数据集</h2>
+          <h2>新建数据集</h2>
         </div>
         <div class="panel-body form-stack">
           <label

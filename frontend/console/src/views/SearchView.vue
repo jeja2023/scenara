@@ -312,7 +312,7 @@ useRefresh(runSearch);
     <section class="panel search-controls">
       <div class="panel-header">
         <div>
-          <h2><SearchIcon :size="17" />智能多模态检索</h2>
+          <h2>智能多模态检索</h2>
           <p>支持文字检索图像/视频，或选择人像特征检索相似目标。</p>
         </div>
       </div>
@@ -417,7 +417,7 @@ useRefresh(runSearch);
     <section class="panel saved-panel">
       <div class="panel-header">
         <div>
-          <h2><Bookmark :size="17" />保存检索</h2>
+          <h2>保存检索</h2>
           <p>把常用的文字或人像资产查询保存下来，下一次直接执行。</p>
         </div>
         <span class="badge">{{ savedSearches.length }} 个</span>
@@ -471,7 +471,7 @@ useRefresh(runSearch);
     <section class="panel result-panel">
       <div class="panel-header">
         <div>
-          <h2><FileSearch :size="17" />检索结果</h2>
+          <h2>检索结果</h2>
           <p v-if="response">
             {{ response.total }} 条命中 ·
             {{ response.searched_indexes.length }} 个索引

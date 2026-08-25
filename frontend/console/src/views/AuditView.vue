@@ -96,7 +96,7 @@ useRefresh(refresh);
 
     <section class="panel filter-panel">
       <div class="panel-header">
-        <h2><Filter :size="16" /> 审计日志筛选</h2>
+        <h2>审计日志筛选</h2>
         <button class="button secondary" @click="resetFilters">
           <RotateCcw :size="14" />重置条件
         </button>

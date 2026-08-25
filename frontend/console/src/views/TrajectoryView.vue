@@ -285,7 +285,7 @@ useRefresh(refresh);
     <div class="trajectory-grid">
       <section class="panel">
         <div class="panel-header">
-          <h2><Route :size="18" />身份</h2>
+          <h2>身份</h2>
           <span class="muted">{{ total }} 个</span>
         </div>
         <div class="identity-list">
