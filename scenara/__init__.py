@@ -1,3 +1,3 @@
-"""Scenara enterprise vision parsing platform."""
+"""Scenara AI perception engine."""
 
-__version__ = "0.3.0.dev29"
+__version__ = "0.3.0.dev30"

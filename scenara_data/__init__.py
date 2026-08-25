@@ -5,6 +5,6 @@ be deployed as a separate process. It intentionally has no Core database
 imports or shared persistence objects.
 """
 
-__version__ = "0.3.0.dev29"
+__version__ = "0.3.0.dev30"
 
 __all__ = ["__version__"]
