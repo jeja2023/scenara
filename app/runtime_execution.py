@@ -317,6 +317,8 @@ def bundle_fixed_batch_size(bundle: ModelBundle) -> int | None:
                 first_dim = inputs[0].shape[0]
                 if isinstance(first_dim, int):
                     return first_dim
+                if isinstance(first_dim, str) and first_dim.isdigit():
+                    return int(first_dim)
         except Exception:
             pass
     return None
@@ -356,7 +358,7 @@ async def run_model_bundle_batch(
         )
 
     fixed_batch = bundle_fixed_batch_size(bundle)
-    if fixed_batch is not None and fixed_batch == 1:
+    if fixed_batch is not None and fixed_batch < len(inputs):
         output_groups = []
         queue_seconds_sum = 0.0
         inference_seconds_sum = 0.0
@@ -381,7 +383,9 @@ async def run_model_bundle_batch(
         )
         return raw_outputs, queue_seconds, inference_seconds, "batch"
     except Exception as exc:
-        logger.warning("批量推理失败，回退到逐项推理: %s", exception_log_summary(exc))
+        logger.info(
+            "批量推理不适用或失败，已自动转为逐项推理: %s", exception_log_summary(exc)
+        )
     output_groups = []
     queue_seconds_sum = 0.0
     inference_seconds_sum = 0.0
@@ -424,7 +428,7 @@ async def run_yolo_frames(
         return raw_outputs, queue_seconds, inference_seconds, "single"
 
     fixed_batch = bundle_fixed_batch_size(bundle)
-    if fixed_batch is not None and fixed_batch == 1:
+    if fixed_batch is not None and fixed_batch < input_array.shape[0]:
         output_groups: list[list[Array]] = []
         queue_seconds_sum = 0.0
         inference_seconds_sum = 0.0
@@ -448,7 +452,9 @@ async def run_yolo_frames(
         )
         return raw_outputs, queue_seconds, inference_seconds, "batch"
     except Exception as exc:
-        logger.warning("批量推理失败，回退到逐帧推理: %s", exception_log_summary(exc))
+        logger.info(
+            "批量推理不适用或失败，已自动转为逐帧推理: %s", exception_log_summary(exc)
+        )
 
     output_groups = []
     queue_seconds_sum = 0.0
