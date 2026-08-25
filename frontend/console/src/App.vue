@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import {
-  Activity,
   FileText,
   LogOut,
   Menu,
   RefreshCw,
-  ScanSearch,
+  ScanFace,
   Settings,
   Sparkles,
   X,
+  Zap,
 } from "@lucide/vue";
 import {
   computed,
@@ -54,10 +54,10 @@ const draft = reactive<ConnectionSettings>(loadConnection());
 const domainManifests = ref<DomainManifest[]>([]);
 
 const domainIcons = {
-  behavior: Activity,
+  behavior: Zap,
   fashion: Sparkles,
   ocr: FileText,
-  portrait: ScanSearch,
+  portrait: ScanFace,
 };
 
 type NavigationItem =
@@ -68,7 +68,7 @@ type NavigationItem =
       meta: {
         title: string;
         description: string;
-        icon: typeof ScanSearch;
+        icon: typeof ScanFace;
         section: string;
       };
     };
@@ -132,7 +132,7 @@ const navigation = computed(() => {
             ),
             icon:
               domainIcons[manifest.domain_id as keyof typeof domainIcons] ??
-              ScanSearch,
+              ScanFace,
             section: "核心工作区",
           },
         } satisfies NavigationItem;

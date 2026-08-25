@@ -1,20 +1,21 @@
 import {
-  Activity,
   Boxes,
+  Cpu,
   Database,
-  FileSearch,
+  FileCheck,
   FileClock,
   FileText,
-  Images,
+  History,
+  KeyRound,
+  Layers,
   LayoutDashboard,
-  MessageSquareText,
-  PlaySquare,
+  MessageSquarePlus,
   Route,
-  Search,
-  ScanSearch,
   ScanFace,
-  Settings2,
+  Search,
+  Server,
   ShieldCheck,
+  UserCheck,
   Workflow,
 } from "@lucide/vue";
 import { createRouter, createWebHistory } from "vue-router";
@@ -52,7 +53,7 @@ const routes = [
     meta: {
       title: "人像解析",
       description: "检测人员并分析人像相关的视觉特征。",
-      icon: ScanSearch,
+      icon: ScanFace,
       section: "核心工作区",
     },
   },
@@ -79,7 +80,7 @@ const routes = [
     meta: {
       title: "解析",
       description: "AI 引擎与多模态解析工作区。",
-      icon: ScanSearch,
+      icon: ScanFace,
       section: "核心工作区",
       hideFromNavigation: true,
     },
@@ -91,7 +92,7 @@ const routes = [
     meta: {
       title: "解析",
       description: "AI 引擎与多模态解析工作区。",
-      icon: ScanSearch,
+      icon: ScanFace,
       section: "核心工作区",
       hideFromNavigation: true,
     },
@@ -103,7 +104,7 @@ const routes = [
     meta: {
       title: "数据资产",
       description: "全局文件与视频流资产治理。",
-      icon: Images,
+      icon: Layers,
       section: "数据与分析",
     },
   },
@@ -130,7 +131,7 @@ const routes = [
     meta: {
       title: "运行历史",
       description: "全局解析任务运行状态跟踪与调试。",
-      icon: PlaySquare,
+      icon: History,
       section: "核心工作区",
     },
   },
@@ -149,7 +150,7 @@ const routes = [
     meta: {
       title: "解析结果",
       description: "跨领域历史解析结果汇总与按特征检索。",
-      icon: FileSearch,
+      icon: FileCheck,
       section: "数据与分析",
     },
   },
@@ -171,7 +172,7 @@ const routes = [
     meta: {
       title: "人像比对",
       description: "两张人像 1:1 比对与同人关联概率判断。",
-      icon: ScanFace,
+      icon: UserCheck,
       section: "智能检索",
     },
   },
@@ -193,7 +194,7 @@ const routes = [
     meta: {
       title: "领域与能力",
       description: "统一查看与管理系统领域模块及核心视觉 AI 能力。",
-      icon: ScanSearch,
+      icon: Cpu,
       section: "AI 引擎与模型",
     },
   },
@@ -227,7 +228,7 @@ const routes = [
     meta: {
       title: "反馈与发布",
       description: "查看系统异常与纠错反馈，管理模型评测、阶段发布及一键回滚。",
-      icon: MessageSquareText,
+      icon: MessageSquarePlus,
       section: "AI 引擎与模型",
     },
   },
@@ -238,7 +239,7 @@ const routes = [
     meta: {
       title: "接入与权限",
       description: "API 密钥、会话与多租户权限配置。",
-      icon: Settings2,
+      icon: KeyRound,
       section: "平台治理与系统",
     },
   },
@@ -249,7 +250,7 @@ const routes = [
     meta: {
       title: "系统运维",
       description: "监控平台核心服务与关键基础设施运行状态。",
-      icon: Activity,
+      icon: Server,
       section: "平台治理与系统",
     },
   },
