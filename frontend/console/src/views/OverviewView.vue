@@ -593,108 +593,105 @@ useRefresh(refresh);
       </div>
     </section>
 
-    <!-- 3. 双栏看板：最近运行动态 (左 62%) + Scenara 产品体系与成熟度 (右 38%) -->
-    <div class="two-column-layout">
-      <!-- 左栏：最近任务运行列表 -->
-      <section class="panel runs-panel">
-        <div class="panel-header">
-          <div>
-            <h2>最近运行动态</h2>
-            <p>实时查看多领域解析任务队列与执行状态。</p>
+    <!-- 3. 最近运行动态看板 (独立全宽横向展开) -->
+    <section class="panel runs-panel">
+      <div class="panel-header">
+        <div>
+          <h2>最近运行动态</h2>
+          <p>实时查看多领域解析任务队列与执行状态。</p>
+        </div>
+        <RouterLink class="button secondary" to="/runs">查看全部队列</RouterLink>
+      </div>
+
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 50px">序号</th>
+              <th>任务 ID</th>
+              <th>领域</th>
+              <th>流水线</th>
+              <th>状态</th>
+              <th>更新时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(run, index) in runs.items" :key="run.run_id">
+              <td class="muted">{{ index + 1 }}</td>
+              <td class="mono">
+                <RouterLink
+                  :to="{ path: '/parse', query: { run: run.run_id } }"
+                  class="run-link"
+                >
+                  {{ run.run_id }}
+                </RouterLink>
+              </td>
+              <td>
+                <span class="domain-tag">
+                  <component :is="domainIcon(run.domain)" :size="12" />
+                  {{ domainLabel(run.domain) }}
+                </span>
+              </td>
+              <td class="truncate">
+                {{ labelPipeline(run.pipeline.pipeline_id) }} · {{ run.pipeline.version }}
+              </td>
+              <td>
+                <span class="badge" :class="run.status">{{
+                  labelRunStatus(run.status)
+                }}</span>
+              </td>
+              <td class="muted">{{ new Date(run.updated_at * 1000).toLocaleString() }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-if="!runs.items.length" class="empty">暂无运行记录，点击右上角「新建解析」开始体验</div>
+      </div>
+    </section>
+
+    <!-- 4. 平台产品体系与成熟度 (垂直纵向排布，全宽网格化展示各模块) -->
+    <section class="panel product-matrix-panel">
+      <div class="panel-header">
+        <div>
+          <h2>产品体系与成熟度</h2>
+          <p>平台母品牌 Scenara 下各产品模块与共享底座演进矩阵。</p>
+        </div>
+        <span class="badge">{{ products.length }} 个目录项</span>
+      </div>
+
+      <div class="product-mini-list">
+        <article
+          v-for="product in productModules"
+          :key="product.product_id"
+          class="product-mini-item"
+        >
+          <div class="product-mini-header">
+            <strong>{{ labelProduct(product.product_id) }}</strong>
+            <span class="badge" :class="product.maturity">
+              {{ labelMaturity(product.maturity) }}
+            </span>
           </div>
-          <RouterLink class="button secondary" to="/runs">查看全部队列</RouterLink>
-        </div>
+          <p class="product-mini-desc">{{ labelProductSummary(product.product_id) }}</p>
+          <small class="product-mini-gate">
+            {{ labelLayer(product.layer) }} · {{ labelProductGate(product.product_id) }}
+          </small>
+        </article>
+      </div>
 
-        <div class="table-scroll">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th style="width: 50px">序号</th>
-                <th>任务 ID</th>
-                <th>领域</th>
-                <th>流水线</th>
-                <th>状态</th>
-                <th>更新时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(run, index) in runs.items" :key="run.run_id">
-                <td class="muted">{{ index + 1 }}</td>
-                <td class="mono">
-                  <RouterLink
-                    :to="{ path: '/parse', query: { run: run.run_id } }"
-                    class="run-link"
-                  >
-                    {{ run.run_id }}
-                  </RouterLink>
-                </td>
-                <td>
-                  <span class="domain-tag">
-                    <component :is="domainIcon(run.domain)" :size="12" />
-                    {{ domainLabel(run.domain) }}
-                  </span>
-                </td>
-                <td class="truncate">
-                  {{ labelPipeline(run.pipeline.pipeline_id) }} · {{ run.pipeline.version }}
-                </td>
-                <td>
-                  <span class="badge" :class="run.status">{{
-                    labelRunStatus(run.status)
-                  }}</span>
-                </td>
-                <td class="muted">{{ new Date(run.updated_at * 1000).toLocaleString() }}</td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-if="!runs.items.length" class="empty">暂无运行记录，点击右上角「新建解析」开始体验</div>
-        </div>
-      </section>
-
-      <!-- 右栏：平台产品矩阵与成熟度体系 (紧凑高密度呈现，解释种子能力与各产品层级) -->
-      <section class="panel product-matrix-panel">
-        <div class="panel-header">
-          <div>
-            <h2>产品体系与成熟度</h2>
-            <p>平台母品牌 Scenara 下各产品模块与共享底座演进矩阵。</p>
-          </div>
-          <span class="badge">{{ products.length }} 个目录项</span>
-        </div>
-
-        <div class="product-mini-list">
-          <article
-            v-for="product in productModules"
+      <!-- 底座与控制面精简状态 -->
+      <div class="product-foundation-bar">
+        <div class="foundation-title">基础底座与共享控制面</div>
+        <div class="foundation-chips">
+          <div
+            v-for="product in [...foundationProducts, ...sharedProducts]"
             :key="product.product_id"
-            class="product-mini-item"
+            class="foundation-chip"
           >
-            <div class="product-mini-header">
-              <strong>{{ labelProduct(product.product_id) }}</strong>
-              <span class="badge" :class="product.maturity">
-                {{ labelMaturity(product.maturity) }}
-              </span>
-            </div>
-            <p class="product-mini-desc">{{ labelProductSummary(product.product_id) }}</p>
-            <small class="product-mini-gate">
-              {{ labelLayer(product.layer) }} · {{ labelProductGate(product.product_id) }}
-            </small>
-          </article>
-        </div>
-
-        <!-- 底座与控制面精简状态 -->
-        <div class="product-foundation-bar">
-          <div class="foundation-title">基础底座与共享控制面</div>
-          <div class="foundation-chips">
-            <div
-              v-for="product in [...foundationProducts, ...sharedProducts]"
-              :key="product.product_id"
-              class="foundation-chip"
-            >
-              <span class="chip-name">{{ labelProduct(product.product_id) }}</span>
-              <span class="badge" :class="product.maturity">{{ labelMaturity(product.maturity) }}</span>
-            </div>
+            <span class="chip-name">{{ labelProduct(product.product_id) }}</span>
+            <span class="badge" :class="product.maturity">{{ labelMaturity(product.maturity) }}</span>
           </div>
         </div>
-      </section>
-    </div>
+      </div>
+    </section>
 
     <!-- 4. 平台拓扑与架构治理 (精炼 3 仓库架构边界) -->
     <section class="panel repository-topology-panel">
@@ -1090,14 +1087,7 @@ useRefresh(refresh);
   color: #334155;
 }
 
-/* 3. 双栏看板 */
-.two-column-layout {
-  display: grid;
-  grid-template-columns: 1.6fr 1fr;
-  gap: 16px;
-  align-items: start;
-}
-
+/* 3. 运行动态与产品体系看板 (垂直纵向排布) */
 .runs-panel, .product-matrix-panel {
   background: #fff;
   border: 1px solid var(--line, #e2e8e6);
@@ -1126,21 +1116,27 @@ useRefresh(refresh);
   color: #334155;
 }
 
-/* 产品体系小卡片列表 */
+/* 产品体系网格化展示 */
 .product-mini-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
 }
 
 .product-mini-item {
   border: 1px solid var(--line, #e2e8e6);
   border-radius: 6px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   background: #fafbfb;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
+  transition: all 140ms ease;
+}
+
+.product-mini-item:hover {
+  border-color: var(--teal, #0f766e);
+  background: #f7fdfb;
 }
 
 .product-mini-header {
