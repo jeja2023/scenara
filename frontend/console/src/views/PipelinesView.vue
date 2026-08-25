@@ -52,7 +52,6 @@ useRefresh(refresh);
               <td class="muted">{{ index + 1 }}</td>
               <td>
                 <strong>{{ labelPipeline(row.pipeline_id) }}</strong>
-                <div class="mono muted">{{ row.pipeline_id }}</div>
               </td>
               <td class="mono">{{ row.version }}</td>
               <td>{{ labelDomain(row.domain) }}</td>
