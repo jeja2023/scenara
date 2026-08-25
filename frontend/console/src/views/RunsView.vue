@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ArrowRight, Filter, RotateCcw } from "@lucide/vue";
+import { Activity, AlertCircle, ArrowRight, CheckCircle2, Filter, Play, RotateCcw } from "@lucide/vue";
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { useRoute, useRouter } from "vue-router";
@@ -144,20 +144,44 @@ onBeforeUnmount(() => {
   <section class="page">
     <div class="stats">
       <div class="stat teal">
-        <span>全部运行</span><strong>{{ total }}</strong
-        ><small>当前筛选条件</small>
+        <div class="stat-top-row">
+          <span class="stat-title">全部运行</span>
+          <div class="stat-icon-badge">
+            <Activity :size="15" />
+          </div>
+        </div>
+        <div class="stat-value">{{ total }}</div>
+        <div class="stat-desc">当前筛选条件</div>
       </div>
-      <div class="stat">
-        <span>进行中</span><strong>{{ activeCount }}</strong
-        ><small>排队、运行或暂停</small>
+      <div class="stat amber">
+        <div class="stat-top-row">
+          <span class="stat-title">进行中</span>
+          <div class="stat-icon-badge">
+            <Play :size="15" />
+          </div>
+        </div>
+        <div class="stat-value">{{ activeCount }}</div>
+        <div class="stat-desc">排队、运行或暂停</div>
       </div>
       <div class="stat green">
-        <span>已完成</span><strong>{{ completedCount }}</strong
-        ><small>结果可查询</small>
+        <div class="stat-top-row">
+          <span class="stat-title">已完成</span>
+          <div class="stat-icon-badge">
+            <CheckCircle2 :size="15" />
+          </div>
+        </div>
+        <div class="stat-value">{{ completedCount }}</div>
+        <div class="stat-desc">结果可查询</div>
       </div>
       <div class="stat coral">
-        <span>失败</span><strong>{{ failedCount }}</strong
-        ><small>需要排查原因</small>
+        <div class="stat-top-row">
+          <span class="stat-title">失败</span>
+          <div class="stat-icon-badge">
+            <AlertCircle :size="15" />
+          </div>
+        </div>
+        <div class="stat-value">{{ failedCount }}</div>
+        <div class="stat-desc">需要排查原因</div>
       </div>
     </div>
 

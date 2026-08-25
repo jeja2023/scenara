@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Cpu, Database, HardDrive, Server } from "@lucide/vue";
 import { onMounted, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { api, userFacingError } from "../api";
@@ -35,23 +36,47 @@ useRefresh(refresh);
     <p v-if="error" class="callout error">{{ error }}</p>
     <div v-if="status" class="stats">
       <div class="stat teal">
-        <span>配置档</span><strong>{{ labelRuntime(status.profile) }}</strong
-        ><small>Scenara {{ labelVersion(status.version) }}</small>
+        <div class="stat-top-row">
+          <span class="stat-title">配置档</span>
+          <div class="stat-icon-badge">
+            <Server :size="15" />
+          </div>
+        </div>
+        <div class="stat-value">{{ labelRuntime(status.profile) }}</div>
+        <div class="stat-desc">Scenara {{ labelVersion(status.version) }}</div>
       </div>
-      <div class="stat">
-        <span>状态存储</span
-        ><strong>{{ labelRuntime(status.state_backend) }}</strong
-        ><small>唯一事实源</small>
-      </div>
-      <div class="stat">
-        <span>对象存储</span
-        ><strong>{{ labelRuntime(status.object_backend) }}</strong
-        ><small>媒体与结果文档</small>
-      </div>
+
       <div class="stat green">
-        <span>队列</span
-        ><strong>{{ labelRuntime(status.queue_backend) }}</strong
-        ><small>执行投递</small>
+        <div class="stat-top-row">
+          <span class="stat-title">状态存储</span>
+          <div class="stat-icon-badge">
+            <Database :size="15" />
+          </div>
+        </div>
+        <div class="stat-value">{{ labelRuntime(status.state_backend) }}</div>
+        <div class="stat-desc">唯一事实源</div>
+      </div>
+
+      <div class="stat amber">
+        <div class="stat-top-row">
+          <span class="stat-title">对象存储</span>
+          <div class="stat-icon-badge">
+            <HardDrive :size="15" />
+          </div>
+        </div>
+        <div class="stat-value">{{ labelRuntime(status.object_backend) }}</div>
+        <div class="stat-desc">媒体与结果文档</div>
+      </div>
+
+      <div class="stat teal">
+        <div class="stat-top-row">
+          <span class="stat-title">消息队列</span>
+          <div class="stat-icon-badge">
+            <Cpu :size="15" />
+          </div>
+        </div>
+        <div class="stat-value">{{ labelRuntime(status.queue_backend) }}</div>
+        <div class="stat-desc">执行调度投递</div>
       </div>
     </div>
     <section class="panel">

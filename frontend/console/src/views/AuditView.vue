@@ -277,22 +277,32 @@ label {
 .table-wrap {
   overflow-x: auto;
 }
+.panel-header h2 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text, #17211f);
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
 table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: 12px;
 }
 th,
 td {
-  border-bottom: 1px solid var(--line);
-  padding: 11px 14px;
+  border-bottom: 1px solid var(--line, #e2e8e6);
+  padding: 10px 12px;
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
   white-space: nowrap;
 }
 th {
-  color: var(--muted);
+  color: var(--muted, #64716d);
   font-weight: 600;
+  font-size: 11.5px;
   background: #fafbfb;
 }
 td strong,
@@ -300,8 +310,8 @@ td small {
   display: block;
 }
 td small {
-  color: var(--muted);
-  margin-top: 4px;
+  color: var(--muted, #64716d);
+  margin-top: 2px;
   font-size: 11px;
 }
 code {
@@ -309,17 +319,21 @@ code {
   max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-family: var(--font-mono);
+  font-size: 11px;
   color: #526066;
 }
 .outcome {
-  color: var(--muted);
+  color: var(--muted, #64716d);
+  font-size: 11.5px;
 }
 .outcome.success {
   color: #0b7557;
+  font-weight: 600;
 }
 .muted {
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--muted, #64716d);
+  font-size: 11px;
 }
 .empty {
   text-align: center;

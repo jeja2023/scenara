@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import {
+  AlertCircle,
   ExternalLink,
   Eye,
   FileSearch,
@@ -7,6 +8,7 @@ import {
   Play,
   Plus,
   RotateCcw,
+  ScanFace,
   Search,
   UserRound,
   Video,
@@ -226,31 +228,57 @@ useRefresh(refresh);
   <section class="page results-page">
     <div class="stats result-stats">
       <div class="stat teal">
-        <span>结果总数</span><strong>{{ total }}</strong
-        ><small>当前筛选范围</small>
+        <div class="stat-top-row">
+          <span class="stat-title">结果总数</span>
+          <div class="stat-icon-badge">
+            <FileSearch :size="15" />
+          </div>
+        </div>
+        <div class="stat-value">{{ total }}</div>
+        <div class="stat-desc">当前筛选范围</div>
       </div>
-      <div class="stat">
-        <span>人像结果</span
-        ><strong>{{
-          items.filter((item) => item.domain === "portrait").length
-        }}</strong
-        ><small>当前页</small>
-      </div>
+
       <div class="stat green">
-        <span>OCR 结果</span
-        ><strong>{{
-          items.filter((item) => item.domain === "ocr").length
-        }}</strong
-        ><small>当前页</small>
+        <div class="stat-top-row">
+          <span class="stat-title">人像结果</span>
+          <div class="stat-icon-badge">
+            <ScanFace :size="15" />
+          </div>
+        </div>
+        <div class="stat-value">
+          {{ items.filter((item) => item.domain === "portrait").length }}
+        </div>
+        <div class="stat-desc">当前页</div>
       </div>
+
+      <div class="stat amber">
+        <div class="stat-top-row">
+          <span class="stat-title">OCR 结果</span>
+          <div class="stat-icon-badge">
+            <FileText :size="15" />
+          </div>
+        </div>
+        <div class="stat-value">
+          {{ items.filter((item) => item.domain === "ocr").length }}
+        </div>
+        <div class="stat-desc">当前页</div>
+      </div>
+
       <div class="stat coral">
-        <span>待关注</span
-        ><strong>{{
-          items.filter(
-            (item) => item.warning_count > 0 || item.status === "failed",
-          ).length
-        }}</strong
-        ><small>告警或失败</small>
+        <div class="stat-top-row">
+          <span class="stat-title">待关注</span>
+          <div class="stat-icon-badge">
+            <AlertCircle :size="15" />
+          </div>
+        </div>
+        <div class="stat-value">
+          {{
+            items.filter(
+              (item) => item.warning_count > 0 || item.status === "failed",
+            ).length
+          }}
+        </div>
+        <div class="stat-desc">告警或失败</div>
       </div>
     </div>
 

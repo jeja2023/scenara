@@ -503,9 +503,11 @@ useRefresh(refresh);
           class="stat"
           :class="{ teal: index === 0, green: index === 5, coral: index === 7 }"
         >
-          <span>{{ item.label }}</span
-          ><strong>{{ item.value }}</strong
-          ><small>{{ item.detail }}</small>
+          <div class="stat-top-row">
+            <span class="stat-title">{{ item.label }}</span>
+          </div>
+          <div class="stat-value">{{ item.value }}</div>
+          <div class="stat-desc">{{ item.detail }}</div>
         </div>
       </div>
       <section class="panel access-panel">

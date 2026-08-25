@@ -194,8 +194,11 @@ useRefresh(refresh);
 .capability-card {
   min-width: 0;
   padding: 16px;
-  border: 1px solid var(--line);
-  background: var(--surface);
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface, #fff);
+  display: flex;
+  flex-direction: column;
 }
 .capability-card-header,
 .capability-card-title,
@@ -214,41 +217,47 @@ useRefresh(refresh);
   gap: 9px;
   min-width: 0;
 }
+.capability-card-title strong {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text, #17211f);
+}
 .capability-card-title > div {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 .capability-card-title span {
-  color: var(--muted);
+  color: var(--muted, #64716d);
   font-size: 11px;
   overflow-wrap: anywhere;
 }
 .capability-description {
-  min-height: 40px;
-  margin: 14px 0;
-  color: var(--muted);
-  line-height: 1.6;
+  min-height: 38px;
+  margin: 12px 0;
+  color: #4b5d58;
+  font-size: 12px;
+  line-height: 1.5;
 }
 .capability-summary {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 16px;
   margin-top: 8px;
-  color: var(--muted);
+  color: var(--muted, #64716d);
   font-size: 12px;
 }
 .capability-summary strong {
-  color: var(--ink);
+  color: var(--color-text, #17211f);
 }
 .capability-section {
   margin-top: 12px;
 }
 .capability-section-title {
-  margin: 0 0 7px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--color-text, #17211f);
+  font-size: 12px;
+  font-weight: 600;
 }
 .capability-meta,
 .capability-list {
@@ -258,12 +267,13 @@ useRefresh(refresh);
 .capability-meta span,
 .capability-list span {
   padding: 3px 7px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 4px;
   font-size: 11px;
 }
 .capability-meta .muted-chip,
 .capability-list .muted-chip {
-  color: var(--muted);
+  color: var(--muted, #64716d);
   background: #f4f6f5;
 }
 .capability-meta span {
@@ -277,7 +287,7 @@ useRefresh(refresh);
   gap: 6px;
   margin-top: 14px;
   padding-top: 12px;
-  border-top: 1px solid var(--line);
+  border-top: 1px dashed var(--line, #e2e8e6);
 }
 .capability-pipelines div {
   display: flex;

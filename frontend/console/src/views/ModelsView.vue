@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Box, CheckCircle2, Cpu } from "@lucide/vue";
 import { onMounted, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { api, userFacingError } from "../api";
@@ -30,22 +31,40 @@ useRefresh(refresh);
     <p v-if="error" class="callout error">{{ error }}</p>
     <div class="stats model-stats">
       <div class="stat teal">
-        <span>已登记</span><strong>{{ models.length }}</strong
-        ><small>不可变版本</small>
+        <div class="stat-top-row">
+          <span class="stat-title">已登记</span>
+          <div class="stat-icon-badge">
+            <Box :size="15" />
+          </div>
+        </div>
+        <div class="stat-value">{{ models.length }}</div>
+        <div class="stat-desc">不可变版本</div>
       </div>
+
       <div class="stat green">
-        <span>生产就绪</span
-        ><strong>{{
-          models.filter((item) => item.production_ready).length
-        }}</strong
-        ><small>许可与回归已确认</small>
+        <div class="stat-top-row">
+          <span class="stat-title">生产就绪</span>
+          <div class="stat-icon-badge">
+            <CheckCircle2 :size="15" />
+          </div>
+        </div>
+        <div class="stat-value">
+          {{ models.filter((item) => item.production_ready).length }}
+        </div>
+        <div class="stat-desc">许可与回归已确认</div>
       </div>
-      <div class="stat">
-        <span>显存预算</span
-        ><strong>{{
-          models.reduce((sum, item) => sum + item.vram_mb, 0)
-        }}</strong
-        ><small>MiB</small>
+
+      <div class="stat amber">
+        <div class="stat-top-row">
+          <span class="stat-title">显存预算</span>
+          <div class="stat-icon-badge">
+            <Cpu :size="15" />
+          </div>
+        </div>
+        <div class="stat-value">
+          {{ models.reduce((sum, item) => sum + item.vram_mb, 0) }}
+        </div>
+        <div class="stat-desc">总额度 MiB</div>
       </div>
     </div>
     <section class="panel">
