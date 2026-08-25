@@ -1188,13 +1188,13 @@ useRefresh(refresh);
   color: var(--muted, #64716d);
   text-align: left;
   padding: 8px 10px;
-  border-bottom: 1px solid var(--line, #e2e8e6);
+  border: 1px solid var(--line, #e2e8e6);
   background: #fafbfb;
 }
 
 .data-table td {
   padding: 10px;
-  border-bottom: 1px solid var(--line, #e2e8e6);
+  border: 1px solid var(--line, #e2e8e6);
   color: var(--color-text, #17211f);
   line-height: 1.45;
 }

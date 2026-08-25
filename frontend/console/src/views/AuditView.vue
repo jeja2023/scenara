@@ -293,7 +293,7 @@ table {
 }
 th,
 td {
-  border-bottom: 1px solid var(--line, #e2e8e6);
+  border: 1px solid var(--line, #e2e8e6);
   padding: 10px 12px;
   text-align: left;
   vertical-align: middle;

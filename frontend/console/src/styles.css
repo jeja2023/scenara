@@ -644,11 +644,10 @@ table,
 table th,
 table td,
 .data-table th,
-.data-table td {
-  border-bottom: 1px solid var(--line, #e2e8e6);
-  border-right: 0;
-  border-left: 0;
-  border-top: 0;
+.data-table td,
+.bordered-table th,
+.bordered-table td {
+  border: 1px solid var(--line, #e2e8e6);
 }
 table th,
 .data-table th {
