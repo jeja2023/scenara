@@ -186,14 +186,17 @@ useRefresh(refresh);
 </template>
 
 <style scoped>
+.capabilities-page .page-header {
+  margin-bottom: 10px;
+}
 .capability-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 .capability-card {
   min-width: 0;
-  padding: 16px;
+  padding: 12px 14px;
   border: 1px solid var(--line, #e2e8e6);
   border-radius: var(--radius-sm, 6px);
   background: var(--surface, #fff);
@@ -214,36 +217,35 @@ useRefresh(refresh);
   gap: 10px;
 }
 .capability-card-title {
-  gap: 9px;
+  gap: 8px;
   min-width: 0;
 }
 .capability-card-title strong {
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--color-text, #17211f);
 }
 .capability-card-title > div {
   display: grid;
-  gap: 2px;
+  gap: 1px;
   min-width: 0;
 }
 .capability-card-title span {
   color: var(--muted, #64716d);
-  font-size: 11px;
+  font-size: 10.5px;
   overflow-wrap: anywhere;
 }
 .capability-description {
-  min-height: 38px;
-  margin: 12px 0;
+  margin: 6px 0 8px;
   color: #4b5d58;
-  font-size: 12px;
-  line-height: 1.5;
+  font-size: 11.5px;
+  line-height: 1.4;
 }
 .capability-summary {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 16px;
-  margin-top: 8px;
+  margin-top: 0;
   color: var(--muted, #64716d);
   font-size: 12px;
 }
@@ -251,25 +253,25 @@ useRefresh(refresh);
   color: var(--color-text, #17211f);
 }
 .capability-section {
-  margin-top: 12px;
+  margin-top: 7px;
 }
 .capability-section-title {
-  margin: 0 0 6px;
+  margin: 0 0 3px;
   color: var(--color-text, #17211f);
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 600;
 }
 .capability-meta,
 .capability-list {
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
 .capability-meta span,
 .capability-list span {
-  padding: 3px 7px;
+  padding: 2px 6px;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 4px;
-  font-size: 11px;
+  border-radius: 3px;
+  font-size: 10.5px;
 }
 .capability-meta .muted-chip,
 .capability-list .muted-chip {
@@ -284,37 +286,39 @@ useRefresh(refresh);
 }
 .capability-pipelines {
   display: grid;
-  gap: 6px;
-  margin-top: 14px;
-  padding-top: 12px;
+  gap: 4px;
+  margin-top: 8px;
+  padding-top: 7px;
   border-top: 1px dashed var(--line, #e2e8e6);
 }
 .capability-pipelines div {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  font-size: 12px;
+  gap: 8px;
+  font-size: 11.5px;
 }
 .capability-pipelines strong {
-  font-size: 12px;
+  font-size: 11.5px;
   font-weight: 650;
 }
 .pipeline-meta {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   flex-shrink: 0;
 }
 .capability-pipelines small {
   color: var(--muted);
+  font-size: 10.5px;
 }
 .pipeline-status {
-  padding: 2px 6px;
+  padding: 1px 5px;
   border: 1px solid var(--line);
   color: var(--muted);
   font-size: 10px;
   font-style: normal;
+  border-radius: 3px;
 }
 .pipeline-status.active,
 .pipeline-status.approved,
@@ -326,13 +330,17 @@ useRefresh(refresh);
 .capability-empty {
   margin: 0;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11.5px;
 }
 .capability-entry {
   justify-content: center;
   gap: 6px;
   width: 100%;
-  margin-top: 14px;
+  margin-top: 10px;
+  min-height: 30px;
+  height: 30px;
+  font-size: 12px;
+  padding: 0 10px;
 }
 .spin {
   animation: spin 0.9s linear infinite;
