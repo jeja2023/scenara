@@ -704,9 +704,11 @@ useRefresh(refresh);
                 </td>
                 <td>{{ formatTime(item.created_at) }}</td>
               </tr>
+              <tr v-if="!users.length">
+                <td colspan="5" class="empty">暂无用户</td>
+              </tr>
             </tbody>
           </table>
-          <div v-if="!users.length" class="empty compact-empty">暂无用户</div>
         </div>
       </section>
 
@@ -944,11 +946,11 @@ useRefresh(refresh);
                   >
                 </td>
               </tr>
+              <tr v-if="!serviceAccounts.length">
+                <td colspan="5" class="empty">暂无服务账号</td>
+              </tr>
             </tbody>
           </table>
-          <div v-if="!serviceAccounts.length" class="empty compact-empty">
-            暂无服务账号
-          </div>
         </div>
       </section>
 
@@ -998,11 +1000,11 @@ useRefresh(refresh);
                   </button>
                 </td>
               </tr>
+              <tr v-if="!apiKeys.length">
+                <td colspan="7" class="empty">暂无 API 密钥</td>
+              </tr>
             </tbody>
           </table>
-          <div v-if="!apiKeys.length" class="empty compact-empty">
-            暂无 API 密钥
-          </div>
         </div>
       </section>
     </template>
@@ -1066,11 +1068,11 @@ useRefresh(refresh);
                 </td>
                 <td>{{ formatTime(item.updated_at) }}</td>
               </tr>
+              <tr v-if="!entitlements.length">
+                <td colspan="6" class="empty">当前项目没有产品授权</td>
+              </tr>
             </tbody>
           </table>
-          <div v-if="!entitlements.length" class="empty">
-            当前项目没有产品授权
-          </div>
         </div>
       </section>
     </template>
@@ -1160,11 +1162,11 @@ useRefresh(refresh);
                   </button>
                 </td>
               </tr>
+              <tr v-if="!subscriptions.length">
+                <td colspan="6" class="empty">没有事件回调订阅</td>
+              </tr>
             </tbody>
           </table>
-          <div v-if="!subscriptions.length" class="empty compact-empty">
-            没有事件回调订阅
-          </div>
         </div>
       </section>
       <section class="panel access-panel">
@@ -1210,11 +1212,11 @@ useRefresh(refresh);
                 <td>{{ item.status_code ?? "-" }}</td>
                 <td>{{ formatTime(item.updated_at) }}</td>
               </tr>
+              <tr v-if="!deliveries.length">
+                <td colspan="7" class="empty">没有投递记录</td>
+              </tr>
             </tbody>
           </table>
-          <div v-if="!deliveries.length" class="empty compact-empty">
-            没有投递记录
-          </div>
         </div>
       </section>
     </template>

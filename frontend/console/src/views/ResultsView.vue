@@ -351,7 +351,7 @@ useRefresh(refresh);
         <span class="badge muted-badge">按最新解析排序</span>
       </div>
       <div class="table-scroll">
-        <table class="data-table">
+        <table v-if="items.length" class="data-table">
           <thead>
             <tr>
               <th style="width: 50px">序号</th>
@@ -436,7 +436,7 @@ useRefresh(refresh);
             </tr>
           </tbody>
         </table>
-        <div v-if="!items.length" class="empty result-list-empty">
+        <div v-else class="empty result-list-empty">
           <FileSearch :size="32" />
           <strong>还没有匹配的解析结果</strong>
           <span>完成一次解析后，结果会自动出现在这里。</span>

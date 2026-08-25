@@ -87,6 +87,9 @@ function formatCell(value: unknown): string {
                 {{ formatCell(row[column]) }}
               </td>
             </tr>
+            <tr v-if="!rows.length">
+              <td :colspan="tableColumns(rows).length + 1" class="empty">暂无数据</td>
+            </tr>
           </tbody>
         </table>
       </div>

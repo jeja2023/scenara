@@ -640,9 +640,11 @@ useRefresh(refresh);
               </td>
               <td class="muted">{{ new Date(run.updated_at * 1000).toLocaleString() }}</td>
             </tr>
+            <tr v-if="!runs.items.length">
+              <td colspan="6" class="empty">暂无运行记录，点击右上角「新建解析」开始体验</td>
+            </tr>
           </tbody>
         </table>
-        <div v-if="!runs.items.length" class="empty">暂无运行记录，点击右上角「新建解析」开始体验</div>
       </div>
     </section>
 

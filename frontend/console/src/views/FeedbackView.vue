@@ -427,7 +427,7 @@ useRefresh(refresh);
                 </td>
               </tr>
               <tr v-if="!feedback.length">
-                <td colspan="9" class="empty">暂无反馈</td>
+                <td colspan="7" class="empty">暂无反馈</td>
               </tr>
             </tbody>
           </table>
@@ -509,9 +509,11 @@ useRefresh(refresh);
                 <td class="mono">{{ item.sha256.slice(0, 16) }}…</td>
                 <td>{{ new Date(item.created_at * 1000).toLocaleString() }}</td>
               </tr>
+              <tr v-if="!manifests.length">
+                <td colspan="6" class="empty">暂无难例清单</td>
+              </tr>
             </tbody>
           </table>
-          <div v-if="!manifests.length" class="empty">暂无难例清单</div>
         </div>
       </section>
     </template>
@@ -623,9 +625,11 @@ useRefresh(refresh);
                   </div>
                 </td>
               </tr>
+              <tr v-if="!releases.length">
+                <td colspan="6" class="empty">暂无发布版本</td>
+              </tr>
             </tbody>
           </table>
-          <div v-if="!releases.length" class="empty">暂无发布版本</div>
         </div>
       </section>
       <section class="panel spaced">
@@ -664,9 +668,11 @@ useRefresh(refresh);
                 <td>{{ labelSystemReason(item.reason) }}</td>
                 <td>{{ new Date(item.created_at * 1000).toLocaleString() }}</td>
               </tr>
+              <tr v-if="!events.length">
+                <td colspan="6" class="empty">暂无部署事件</td>
+              </tr>
             </tbody>
           </table>
-          <div v-if="!events.length" class="empty">暂无部署事件</div>
         </div>
       </section>
     </template>

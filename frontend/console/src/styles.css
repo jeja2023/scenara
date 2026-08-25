@@ -793,13 +793,28 @@ table .icon-button,
   background: #f9e8e5;
   color: #a23e30;
 }
-.badge.paused,
-.badge.pausing {
-  background: #fbf0de;
-  color: #8b5a14;
+td.empty,
+td.table-empty-cell,
+table td.empty,
+table td.table-empty-cell,
+.data-table td.empty,
+.data-table td.table-empty-cell {
+  display: table-cell !important;
+  text-align: center !important;
+  vertical-align: middle !important;
+  padding: 24px 16px !important;
+  height: auto !important;
+  min-height: 48px;
+  color: var(--muted, #64716d) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  background: #fafbfb !important;
+  border: 1px solid var(--line, #e2e8e6) !important;
+  white-space: normal !important;
+  line-height: 1.5 !important;
 }
-.empty {
-  min-height: 180px;
+.empty:not(td) {
+  min-height: 140px;
   display: grid;
   place-items: center;
   padding: 24px;

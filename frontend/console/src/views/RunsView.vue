@@ -360,9 +360,11 @@ onBeforeUnmount(() => {
                 </div>
               </td>
             </tr>
+            <tr v-if="!runs.length">
+              <td colspan="9" class="empty">暂无运行记录</td>
+            </tr>
           </tbody>
         </table>
-        <div v-if="!runs.length" class="empty">暂无运行记录</div>
       </div>
       <div v-if="total > 0" class="pagination">
         <span class="pagination-info">

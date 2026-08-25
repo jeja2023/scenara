@@ -176,6 +176,9 @@ useRefresh(refresh);
                   </button>
                 </td>
               </tr>
+              <tr v-if="!lifecycle.length">
+                <td colspan="5" class="empty">暂无待审批记录</td>
+              </tr>
             </tbody>
           </table>
         </div>

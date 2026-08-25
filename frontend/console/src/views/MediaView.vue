@@ -472,15 +472,17 @@ useRefresh(refresh);
                 </td>
               </tr>
             </template>
+            <tr v-if="!filteredAssets.length">
+              <td colspan="8" class="empty">
+                {{
+                  kindFilter
+                    ? `没有 ${labelMediaKind(kindFilter)} 类型的资产`
+                    : "暂无文件资产"
+                }}
+              </td>
+            </tr>
           </tbody>
         </table>
-        <div v-if="!filteredAssets.length" class="empty">
-          {{
-            kindFilter
-              ? `没有 ${labelMediaKind(kindFilter)} 类型的资产`
-              : "暂无文件资产"
-          }}
-        </div>
       </div>
     </section>
 
@@ -565,9 +567,11 @@ useRefresh(refresh);
                 </div>
               </td>
             </tr>
+            <tr v-if="!sources.length">
+              <td colspan="6" class="empty">暂无视频流源</td>
+            </tr>
           </tbody>
         </table>
-        <div v-if="!sources.length" class="empty">暂无视频流源</div>
       </div>
     </section>
 
