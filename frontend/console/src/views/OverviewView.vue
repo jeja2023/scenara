@@ -144,6 +144,202 @@ function domainLabel(value: string): string {
   );
 }
 
+interface FullCapabilityItem {
+  id: string;
+  domain: string;
+  name: string;
+  readiness: "ready" | "fallback" | "placeholder";
+  productionReady: boolean;
+  model: string;
+  detail: string;
+}
+
+const selectedDomainFilter = ref<string>("all");
+
+const domainFilterOptions = [
+  { id: "all", label: "全部领域" },
+  { id: "portrait", label: "人像视觉" },
+  { id: "ocr", label: "OCR 智能文档" },
+  { id: "behavior", label: "行为动作" },
+  { id: "fashion", label: "服饰风格" },
+];
+
+const allCapabilitiesList = computed<FullCapabilityItem[]>(() => [
+  // 1. 人像视觉领域
+  {
+    id: "person_detection",
+    domain: "portrait",
+    name: "人员目标检测",
+    readiness: "ready",
+    productionReady: true,
+    model: "models/yolov8n.onnx",
+    detail: "YOLOv8 目标框定位 (640×640)",
+  },
+  {
+    id: "body_embedding",
+    domain: "portrait",
+    name: "人员特征重识别",
+    readiness: "ready",
+    productionReady: true,
+    model: "models/osnet_ibn_x1_0.onnx",
+    detail: "OSNet IBN (512 维特征抽取)",
+  },
+  {
+    id: "pose",
+    domain: "portrait",
+    name: "姿态估计与骨架",
+    readiness: "ready",
+    productionReady: true,
+    model: "models/yolov8n-pose.pt",
+    detail: "YOLOv8-Pose (17 点 COCO 骨架)",
+  },
+  {
+    id: "face_detection",
+    domain: "portrait",
+    name: "人脸检测与定位",
+    readiness: "fallback",
+    productionReady: false,
+    model: "opencv/haarcascade_frontalface_default",
+    detail: "OpenCV Haar 级联检测 (规划: SCRFD)",
+  },
+  {
+    id: "face_embedding",
+    domain: "portrait",
+    name: "人脸特征提取",
+    readiness: "fallback",
+    productionReady: false,
+    model: "scenara.development.image_fingerprint_v1",
+    detail: "开发指纹 (规划: ArcFace 512维)",
+  },
+  {
+    id: "gait",
+    domain: "portrait",
+    name: "步态时序特征",
+    readiness: "fallback",
+    productionReady: false,
+    model: "scenara.development.tracklet_fingerprint_v1",
+    detail: "轨迹指纹 (规划: OpenGait 256维)",
+  },
+  {
+    id: "appearance",
+    domain: "portrait",
+    name: "服饰颜色与属性",
+    readiness: "fallback",
+    productionReady: false,
+    model: "scenara.development.color_histogram_v1",
+    detail: "颜色直方图 (规划: Attribute ReID)",
+  },
+
+  // 2. OCR 智能文档领域
+  {
+    id: "text_detection",
+    domain: "ocr",
+    name: "文本行快速检测",
+    readiness: "ready",
+    productionReady: true,
+    model: "models/ocr/ch_PP-OCRv4_det_infer",
+    detail: "PP-OCRv4 文本定位 (轻量级 DB 算法)",
+  },
+  {
+    id: "text_recognition",
+    domain: "ocr",
+    name: "多行文本高精识别",
+    readiness: "ready",
+    productionReady: true,
+    model: "models/ocr/ch_PP-OCRv4_rec_infer",
+    detail: "PP-OCRv4 中英文字符高精度识别",
+  },
+  {
+    id: "text_orientation",
+    domain: "ocr",
+    name: "文字方向自适应校正",
+    readiness: "ready",
+    productionReady: true,
+    model: "models/ocr/ch_ppocr_mobile_v2.0_cls_infer",
+    detail: "文字方向角度分类与纠偏",
+  },
+  {
+    id: "reading_order",
+    domain: "ocr",
+    name: "时序文本去重与追踪",
+    readiness: "ready",
+    productionReady: true,
+    model: "Adaptive Motion Deduplication Engine",
+    detail: "动静态帧差过滤与时序段去重追踪",
+  },
+
+  // 3. 行为动作识别领域
+  {
+    id: "action_recognition",
+    domain: "behavior",
+    name: "复杂行为与动作分类",
+    readiness: "ready",
+    productionReady: true,
+    model: "YOLOv8 Pose + Behavior Rule Engine",
+    detail: "吸烟、玩手机、摔倒、搏斗等 50+ 动作识别",
+  },
+  {
+    id: "temporal_segmentation",
+    domain: "behavior",
+    name: "时空轨迹与行为时段切分",
+    readiness: "ready",
+    productionReady: true,
+    model: "Behavior Spatial-Temporal Tracker",
+    detail: "动作生命周期与持续时序段分析",
+  },
+  {
+    id: "anomaly_detection",
+    domain: "behavior",
+    name: "异常动态行为告警",
+    readiness: "ready",
+    productionReady: true,
+    model: "Behavior Anomaly Detector",
+    detail: "越界、攀爬、聚集异常行为告警",
+  },
+
+  // 4. 服饰风格识别领域
+  {
+    id: "clothing_style_detection",
+    domain: "fashion",
+    name: "服饰风格与品类细分",
+    readiness: "ready",
+    productionReady: true,
+    model: "Fashion Style Engine",
+    detail: "JK、Lolita、汉服等二次元与时尚风格",
+  },
+  {
+    id: "cosplay_recognition",
+    domain: "fashion",
+    name: "Cosplay 角色特征匹配",
+    readiness: "ready",
+    productionReady: true,
+    model: "Cosplay Character Matcher",
+    detail: "角色形象多模态特征识别",
+  },
+  {
+    id: "accessory_detection",
+    domain: "fashion",
+    name: "配饰道具与局部特征检测",
+    readiness: "ready",
+    productionReady: true,
+    model: "Accessory & Prop Detector",
+    detail: "假发、道具、饰品细粒度识别",
+  },
+]);
+
+const filteredCapabilities = computed(() => {
+  if (selectedDomainFilter.value === "all") {
+    return allCapabilitiesList.value;
+  }
+  return allCapabilitiesList.value.filter(
+    (item) => item.domain === selectedDomainFilter.value,
+  );
+});
+
+const readyCapabilitiesCount = computed(
+  () => filteredCapabilities.value.filter((c) => c.productionReady).length,
+);
+
 onMounted(refresh);
 useRefresh(refresh);
 </script>
@@ -287,14 +483,22 @@ useRefresh(refresh);
 
       <div class="pi-capabilities">
         <div class="pi-cap-header">
-          <strong>能力就绪度</strong>
+          <div class="pi-cap-title-wrap">
+            <strong>全领域能力就绪度矩阵</strong>
+            <div class="domain-filter-tabs">
+              <button
+                v-for="opt in domainFilterOptions"
+                :key="opt.id"
+                class="domain-tab-btn"
+                :class="{ active: selectedDomainFilter === opt.id }"
+                @click="selectedDomainFilter = opt.id"
+              >
+                {{ opt.label }}
+              </button>
+            </div>
+          </div>
           <span class="badge">
-            {{
-              portraitIntelligence.capabilities.filter(
-                (c) => c.readiness === "ready",
-              ).length
-            }}
-            / {{ portraitIntelligence.capabilities.length }} 已就绪
+            {{ readyCapabilitiesCount }} / {{ filteredCapabilities.length }} 项生产就绪
           </span>
         </div>
         <div class="table-scroll">
@@ -302,50 +506,46 @@ useRefresh(refresh);
             <thead>
               <tr>
                 <th style="width: 50px">序号</th>
+                <th style="width: 100px">领域</th>
                 <th>核心能力</th>
                 <th>就绪状态</th>
                 <th>生产支持</th>
-                <th>模型与配置</th>
+                <th>装载模型与引擎配置</th>
+                <th>能力特性说明</th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="(cap, index) in portraitIntelligence.capabilities"
-                :key="cap.capability_id"
+                v-for="(cap, index) in filteredCapabilities"
+                :key="cap.id"
               >
                 <td class="muted">{{ index + 1 }}</td>
+                <td>
+                  <span class="domain-pill" :class="cap.domain">
+                    {{ domainLabel(cap.domain) }}
+                  </span>
+                </td>
                 <td class="pi-cap-name">
-                  <strong>{{
-                    labelPortraitCapability(cap.capability_id)
-                  }}</strong>
+                  <strong>{{ cap.name }}</strong>
                 </td>
                 <td>
-                  <span class="badge" :class="`pi-${cap.readiness}`">{{
-                    labelPortraitReadiness(cap.readiness)
-                  }}</span>
+                  <span class="badge" :class="`pi-${cap.readiness}`">
+                    {{ cap.readiness === "ready" ? "已就绪" : "开发替代" }}
+                  </span>
                 </td>
                 <td>
                   <span
                     class="badge"
-                    :class="cap.production_ready ? 'active' : 'planned'"
+                    :class="cap.productionReady ? 'active' : 'planned'"
                   >
-                    {{ cap.production_ready ? "生产就绪" : "规划达标" }}
+                    {{ cap.productionReady ? "生产就绪" : "规划达标" }}
                   </span>
                 </td>
-                <td class="muted mono">
-                  <template v-if="cap.current_model">
-                    {{ cap.current_model }}
-                    <span v-if="cap.embedding_dimension">
-                      ({{ cap.embedding_dimension }} 维)
-                    </span>
-                  </template>
-                  <template v-else-if="cap.target_model">
-                    目标：{{ cap.target_model }}
-                    <span v-if="cap.target_embedding_dimension">
-                      ({{ cap.target_embedding_dimension }} 维)
-                    </span>
-                  </template>
-                  <template v-else>-</template>
+                <td class="mono">
+                  <code class="cap-model-code">{{ cap.model }}</code>
+                </td>
+                <td class="muted">
+                  {{ cap.detail }}
                 </td>
               </tr>
             </tbody>
@@ -958,11 +1158,79 @@ useRefresh(refresh);
 .pi-cap-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 12px;
   padding: 13px 0 10px;
+  flex-wrap: wrap;
+}
+.pi-cap-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 .pi-cap-header strong {
   font-size: 13px;
+}
+.domain-filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #edf2f0;
+  padding: 2px;
+  border-radius: 5px;
+}
+.domain-tab-btn {
+  background: transparent;
+  border: none;
+  font-size: 11.5px;
+  font-weight: 550;
+  color: var(--muted);
+  padding: 3px 9px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 140ms ease;
+}
+.domain-tab-btn:hover {
+  color: var(--graphite);
+}
+.domain-tab-btn.active {
+  background: #fff;
+  color: var(--teal);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.domain-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #eef3f1;
+  color: #3b4d47;
+}
+.domain-pill.portrait {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+.domain-pill.ocr {
+  background: #fef3c7;
+  color: #b45309;
+}
+.domain-pill.behavior {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+.domain-pill.fashion {
+  background: #fce7f3;
+  color: #be185d;
+}
+.cap-model-code {
+  font-size: 11px;
+  color: #0284c7;
+  background: #f0f9ff;
+  padding: 1px 5px;
+  border-radius: 3px;
 }
 .pi-cap-table {
   margin-bottom: 16px;
