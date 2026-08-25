@@ -570,13 +570,14 @@ useRefresh(runSearch);
 .mode-tabs button {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 13px 16px;
+  gap: 6px;
+  padding: 8px 14px;
   border: 0;
   border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
+  font-size: 12px;
 }
 .mode-tabs button.active {
   border-bottom-color: var(--teal);
@@ -587,12 +588,12 @@ useRefresh(runSearch);
 .text-query-row {
   display: flex;
   align-items: center;
-  gap: 9px;
-  margin: 16px;
-  padding: 0 12px;
+  gap: 8px;
+  margin: 10px 14px;
+  padding: 0 10px;
   border: 1px solid var(--line);
-  border-radius: 5px;
-  min-height: 42px;
+  border-radius: 4px;
+  min-height: 36px;
 }
 .text-query-row input {
   flex: 1;
@@ -600,18 +601,19 @@ useRefresh(runSearch);
   border: 0;
   outline: 0;
   background: transparent;
+  font-size: 12px;
 }
 .portrait-query-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 16px;
+  gap: 10px;
+  margin: 10px 14px;
 }
 .query-preview {
   display: grid;
   place-items: center;
-  width: 72px;
-  height: 54px;
+  width: 60px;
+  height: 44px;
   overflow: hidden;
   border-radius: 4px;
   background: #0d1917;
@@ -641,25 +643,29 @@ useRefresh(runSearch);
   font-size: 12px;
 }
 .threshold input {
-  width: 78px;
-  min-height: 34px;
+  width: 72px;
+  min-height: 32px;
+  height: 32px;
+  padding: 2px 6px;
+  font-size: 12px;
 }
 .filter-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
-  padding: 0 16px 16px;
+  padding: 0 14px 10px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11.5px;
 }
 .filter-chip {
-  padding: 7px 11px;
+  padding: 4px 9px;
   border: 1px solid var(--line);
   border-radius: 4px;
   background: #fff;
   color: var(--muted);
   cursor: pointer;
+  font-size: 11.5px;
 }
 .filter-chip.active {
   border-color: var(--teal);
@@ -668,26 +674,38 @@ useRefresh(runSearch);
 }
 .search-submit {
   margin-left: auto;
+  min-height: 32px;
+  height: 32px;
+  font-size: 12px;
+  padding: 0 12px;
 }
 .result-panel {
-  margin-top: 16px;
-  min-height: 420px;
+  margin-top: 12px;
 }
 .saved-panel {
-  margin-top: 16px;
+  margin-top: 12px;
 }
 .saved-create {
   display: flex;
-  gap: 10px;
-  padding: 14px 16px;
+  gap: 8px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--line);
 }
 .saved-create input {
   flex: 1;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 5px;
-  padding: 9px 10px;
+  border-radius: 4px;
+  padding: 5px 10px;
+  min-height: 32px;
+  height: 32px;
+  font-size: 12px;
+}
+.saved-create button {
+  min-height: 32px;
+  height: 32px;
+  font-size: 12px;
+  padding: 0 10px;
 }
 .saved-list {
   display: flex;
@@ -697,13 +715,13 @@ useRefresh(runSearch);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 11px 16px;
+  gap: 10px;
+  padding: 8px 14px;
   border-bottom: 1px solid var(--line);
 }
 .saved-item > span:first-child {
   display: grid;
-  gap: 3px;
+  gap: 2px;
   min-width: 0;
 }
 .saved-item small {
@@ -715,16 +733,16 @@ useRefresh(runSearch);
   gap: 4px;
 }
 .saved-empty {
-  padding: 18px;
+  padding: 10px 14px;
   color: var(--muted);
   text-align: center;
-  font-size: 12px;
+  font-size: 11.5px;
 }
 .query-summary {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 11px 16px;
+  padding: 8px 14px;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   color: var(--muted);
@@ -737,9 +755,9 @@ useRefresh(runSearch);
 .hit-item {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 10px;
   width: 100%;
-  padding: 14px 16px;
+  padding: 10px 14px;
   border: 0;
   border-top: 1px solid var(--line);
   background: transparent;
@@ -753,15 +771,15 @@ useRefresh(runSearch);
 .hit-icon {
   display: grid;
   place-items: center;
-  flex: 0 0 34px;
-  height: 34px;
+  flex: 0 0 30px;
+  height: 30px;
   border-radius: 4px;
   background: #eaf4f1;
   color: var(--teal);
 }
 .hit-main {
   display: grid;
-  gap: 4px;
+  gap: 2px;
   min-width: 0;
   flex: 1;
 }
@@ -779,14 +797,21 @@ useRefresh(runSearch);
   display: -webkit-box;
   overflow: hidden;
   color: var(--graphite);
-  font-size: 13px;
+  font-size: 12.5px;
   line-height: 1.45;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
 }
 .search-empty {
-  min-height: 300px;
-  gap: 10px;
+  min-height: 130px;
+  padding: 20px 14px;
+  gap: 6px;
+}
+.search-empty strong {
+  font-size: 12.5px;
+}
+.search-empty span {
+  font-size: 11.5px;
 }
 .spin {
   animation: spin 1s linear infinite;
