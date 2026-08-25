@@ -121,6 +121,12 @@ ADAPTER_SCHEMAS = {
         "input_size": [640, 640],
         "embedding_dim": 0,
     },
+    "yolo_pose": {
+        "task": "pose",
+        "input_size": [640, 640],
+        "keypoint_schema": "coco17",
+        "embedding_dim": 0,
+    },
 }
 
 

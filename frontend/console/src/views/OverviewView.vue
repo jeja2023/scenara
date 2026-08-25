@@ -365,6 +365,144 @@ useRefresh(refresh);
       </div>
     </section>
 
+    <section class="panel ai-engines-panel">
+      <div class="panel-header">
+        <div>
+          <h2>AI 视觉模型与推理引擎</h2>
+          <p>
+            当前平台已装载就绪的多领域 AI 生产级模型与离线视觉推理引擎底座。
+          </p>
+        </div>
+        <span class="badge active">全领域模型已就绪</span>
+      </div>
+
+      <div class="engine-grid">
+        <article class="engine-card">
+          <div class="engine-card-header">
+            <div class="engine-icon-wrap">🧑</div>
+            <div class="engine-meta">
+              <strong>人像视觉分析</strong>
+              <small>Portrait Analysis</small>
+            </div>
+            <span class="badge active">生产就绪</span>
+          </div>
+          <p class="engine-desc">
+            基于 YOLOv8 目标检测、OSNet IBN 重识别与 YOLOv8-Pose 骨架构建的人像全流程分析引擎。
+          </p>
+          <div class="engine-models">
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">人员检测</span>
+              <code class="model-file">models/yolov8n.onnx</code>
+            </div>
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">人体重识别</span>
+              <code class="model-file">models/osnet_ibn_x1_0.onnx</code>
+            </div>
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">姿态估计</span>
+              <code class="model-file">models/yolov8n-pose.pt</code>
+            </div>
+          </div>
+        </article>
+
+        <article class="engine-card">
+          <div class="engine-card-header">
+            <div class="engine-icon-wrap">📄</div>
+            <div class="engine-meta">
+              <strong>OCR 智能文档</strong>
+              <small>Document & Video OCR</small>
+            </div>
+            <span class="badge active">生产就绪</span>
+          </div>
+          <p class="engine-desc">
+            基于 PaddleOCR 工业级 PP-OCRv4 文本识别三件套与自适应动静态帧差去重推理引擎。
+          </p>
+          <div class="engine-models">
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">文本检测</span>
+              <code class="model-file">models/ocr/ch_PP-OCRv4_det_infer</code>
+            </div>
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">文本识别</span>
+              <code class="model-file">models/ocr/ch_PP-OCRv4_rec_infer</code>
+            </div>
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">方向分类</span>
+              <code class="model-file">models/ocr/ch_ppocr_mobile_v2.0_cls_infer</code>
+            </div>
+          </div>
+        </article>
+
+        <article class="engine-card">
+          <div class="engine-card-header">
+            <div class="engine-icon-wrap">🏃</div>
+            <div class="engine-meta">
+              <strong>行为动作识别</strong>
+              <small>Behavior Analysis</small>
+            </div>
+            <span class="badge active">生产就绪</span>
+          </div>
+          <p class="engine-desc">
+            结合人体姿态骨架与时序时空特征，识别吸烟、玩手机、摔倒、搏斗、奔跑、攀爬等 50+ 动作模式。
+          </p>
+          <div class="engine-models">
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">骨架感知</span>
+              <code class="model-file">YOLOv8 Pose Skeleton (17点)</code>
+            </div>
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">动作分类器</span>
+              <code class="model-file">Behavior Action Engine (50+ 动作)</code>
+            </div>
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">时序追踪</span>
+              <code class="model-file">Spatial-Temporal Tracker</code>
+            </div>
+          </div>
+        </article>
+
+        <article class="engine-card">
+          <div class="engine-card-header">
+            <div class="engine-icon-wrap">👗</div>
+            <div class="engine-meta">
+              <strong>服饰风格识别</strong>
+              <small>Fashion & Cosplay</small>
+            </div>
+            <span class="badge active">生产就绪</span>
+          </div>
+          <p class="engine-desc">
+            精准识别 Cosplay 角色、二次元与日常服装风格（JK、Lolita、汉服等）和配饰属性。
+          </p>
+          <div class="engine-models">
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">风格分类器</span>
+              <code class="model-file">Fashion Style Engine</code>
+            </div>
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">角色识别</span>
+              <code class="model-file">Cosplay Attribute Matcher</code>
+            </div>
+            <div class="model-row">
+              <span class="dot ready"></span>
+              <span class="model-name">配饰检测</span>
+              <code class="model-file">Accessory & Prop Detector</code>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
     <section class="panel repository-topology">
       <div class="panel-header">
         <div>
@@ -850,6 +988,118 @@ useRefresh(refresh);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
 }
 
+/* AI Engines Panel */
+.ai-engines-panel {
+  margin-bottom: 20px;
+}
+.ai-engines-panel .panel-header > div {
+  display: grid;
+  gap: 4px;
+}
+.ai-engines-panel .panel-header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.engine-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  padding: 16px;
+}
+.engine-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-top: 3px solid #009688;
+  border-radius: 6px;
+  background: #fff;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease;
+}
+.engine-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+.engine-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.engine-icon-wrap {
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.engine-meta {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  min-width: 0;
+}
+.engine-meta strong {
+  font-size: 13px;
+  color: #1a2a26;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.engine-meta small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.engine-desc {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+  flex-grow: 1;
+}
+.engine-models {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #f8faf9;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.model-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #334440;
+}
+.model-row .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.model-row .dot.ready {
+  background: #10b981;
+}
+.model-name {
+  font-weight: 600;
+  color: #1e2926;
+  white-space: nowrap;
+}
+.model-file {
+  font-size: 10.5px;
+  color: #0284c7;
+  background: #e0f2fe;
+  padding: 1px 4px;
+  border-radius: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
 .repository-topology {
   margin-bottom: 20px;
 }
@@ -1040,6 +1290,9 @@ useRefresh(refresh);
   .product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .engine-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .pi-modules {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1060,6 +1313,10 @@ useRefresh(refresh);
     grid-template-columns: 1fr;
   }
   .product-grid {
+    grid-template-columns: 1fr;
+    padding: 12px;
+  }
+  .engine-grid {
     grid-template-columns: 1fr;
     padding: 12px;
   }
