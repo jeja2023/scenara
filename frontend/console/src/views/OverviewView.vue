@@ -926,17 +926,19 @@ useRefresh(refresh);
   border: 1px solid #fef3c7;
 }
 
-/* 指标大数值 (中层) */
+/* 指标大数值 (中层居中突出) */
 .stat-value {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   color: var(--color-text, #17211f);
   line-height: 1.15;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
+  text-align: center;
+  margin: 3px 0 1px;
 }
 
-/* 指标辅助说明 (底层) */
+/* 指标辅助说明 (底层居中) */
 .stat-desc {
   font-size: 11px;
   color: #8c9b97;
@@ -944,7 +946,7 @@ useRefresh(refresh);
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.35;
-  margin-top: 1px;
+  text-align: center;
 }
 
 /* ========================================================
