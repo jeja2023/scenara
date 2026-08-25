@@ -10,7 +10,7 @@ const total = ref(0);
 const loading = ref(false);
 const error = ref("");
 const offset = ref(0);
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 20;
 const filters = reactive({
   action: "",
   resource_type: "",
@@ -156,8 +156,8 @@ useRefresh(refresh);
           </button>
         </div>
       </div>
-      <div class="table-wrap">
-        <table>
+      <div class="table-scroll">
+        <table class="data-table">
           <thead>
             <tr>
               <th style="width: 50px">序号</th>
@@ -177,12 +177,12 @@ useRefresh(refresh);
               <td class="muted">{{ offset + index + 1 }}</td>
               <td>{{ formatTime(event.created_at) }}</td>
               <td>
-                <strong>{{ event.action }}</strong
-                ><small>{{ event.event_id }}</small>
+                <strong>{{ event.action }}</strong>
+                <small class="mono">{{ event.event_id }}</small>
               </td>
               <td>
-                {{ event.resource_type
-                }}<small>{{ event.resource_id || "-" }}</small>
+                {{ event.resource_type }}
+                <small class="mono">{{ event.resource_id || "-" }}</small>
               </td>
               <td>{{ event.principal_id }}</td>
               <td>
@@ -277,25 +277,6 @@ label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-}
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-th,
-td {
-  border: 1px solid var(--line, #e2e8e6);
-  padding: 10px 12px;
-  text-align: left;
-  vertical-align: middle;
-  white-space: nowrap;
-}
-th {
-  color: var(--muted, #64716d);
-  font-weight: 600;
-  font-size: 11.5px;
-  background: #fafbfb;
 }
 td strong,
 td small {

@@ -596,7 +596,7 @@ useRefresh(refresh);
                   <div class="row-actions">
                     <button
                       v-if="nextStatus(item)"
-                      class="button compact"
+                      class="button secondary"
                       :disabled="
                         item.status === 'candidate' &&
                         !item.evidence_refs.length
@@ -699,43 +699,16 @@ useRefresh(refresh);
   color: var(--teal);
   font-weight: 700;
 }
-.spaced {
-  margin-top: 14px;
-}
-.checks,
-.row-actions {
+.checks {
   display: flex;
   align-items: center;
   gap: 10px;
-}
-.checks {
   margin: 12px 0;
 }
-.checks label,
-.selection-list label {
+.row-actions {
   display: flex;
   align-items: center;
-  gap: 7px;
-}
-.selection-list {
-  max-height: 220px;
-  overflow: auto;
-  margin: 12px 0;
-  padding: 10px;
-  border: 1px solid var(--line);
-}
-.selection-list label {
-  min-height: 32px;
-}
-.selection-list input,
-.checks input {
-  width: 15px;
-  min-height: 15px;
-}
-.compact {
-  height: 30px;
-  padding: 0 9px;
-  font-size: 12px;
+  gap: 4px;
 }
 .danger-icon {
   color: var(--coral);

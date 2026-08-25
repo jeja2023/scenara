@@ -741,41 +741,9 @@ useRefresh(refresh);
   flex-shrink: 0;
   border-radius: 4px;
 }
-.data-table th {
-  height: 32px;
-  padding: 4px 10px;
-}
-.data-table td {
-  min-height: 34px;
-  padding: 5px 10px;
-  vertical-align: middle;
-}
-.data-table .badge {
-  min-height: 20px;
-  padding: 0 6px;
-  font-size: 11px;
-  line-height: 20px;
-}
 .compact {
   gap: 4px;
   flex-wrap: nowrap;
-}
-.compact .button {
-  min-height: 24px;
-  height: 24px;
-  padding: 0 7px;
-  font-size: 11.5px;
-  font-weight: 550;
-  gap: 4px;
-  border-radius: 4px;
-}
-.compact .icon-button {
-  width: 24px;
-  height: 24px;
-  min-width: 24px;
-  min-height: 24px;
-  padding: 0;
-  border-radius: 4px;
 }
 .danger-icon {
   color: var(--danger);

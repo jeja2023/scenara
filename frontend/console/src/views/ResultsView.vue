@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import {
   AlertCircle,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   Eye,
   FileSearch,
@@ -45,6 +47,8 @@ const query = ref("");
 const domain = ref<Domain | "">("");
 const mediaKind = ref<MediaKind | "">("");
 const total = ref(0);
+const offset = ref(0);
+const PAGE_SIZE = 20;
 const unitTotal = ref(0);
 const selectedUnit = ref<MediaUnitResult | null>(null);
 
@@ -101,7 +105,10 @@ async function refresh(): Promise<void> {
   loading.value = true;
   error.value = "";
   try {
-    const params = new URLSearchParams({ limit: "50" });
+    const params = new URLSearchParams({
+      limit: String(PAGE_SIZE),
+      offset: String(offset.value),
+    });
     if (query.value.trim()) params.set("query", query.value.trim());
     if (domain.value) params.set("domain", domain.value);
     if (mediaKind.value) params.set("media_kind", mediaKind.value);
@@ -213,10 +220,21 @@ function navigateToParse(runId?: string): void {
   }
 }
 
+function goToPage(nextOffset: number): void {
+  offset.value = Math.max(0, nextOffset);
+  void refresh();
+}
+
+function onFilterChange(): void {
+  offset.value = 0;
+  void refresh();
+}
+
 function clearFilters(): void {
   query.value = "";
   domain.value = "";
   mediaKind.value = "";
+  offset.value = 0;
   void refresh();
 }
 
@@ -290,10 +308,10 @@ useRefresh(refresh);
             v-model.trim="query"
             type="search"
             placeholder="搜索文件名、来源或运行编号"
-            @keyup.enter="refresh"
+            @keyup.enter="onFilterChange"
           />
         </div>
-        <select v-model="domain" aria-label="领域筛选" @change="refresh">
+        <select v-model="domain" aria-label="领域筛选" @change="onFilterChange">
           <option value="">全部领域</option>
           <option
             v-for="item in domains"
@@ -303,7 +321,7 @@ useRefresh(refresh);
             {{ item.display_name || labelDomain(item.domain_id) }}
           </option>
         </select>
-        <select v-model="mediaKind" aria-label="资产类型筛选" @change="refresh">
+        <select v-model="mediaKind" aria-label="资产类型筛选" @change="onFilterChange">
           <option value="">全部资产类型</option>
           <option value="image">图片</option>
           <option value="video">视频</option>
@@ -355,7 +373,7 @@ useRefresh(refresh);
                   selected?.result_id === item.result_id && isDetailOpen,
               }"
             >
-              <td class="muted">{{ index + 1 }}</td>
+              <td class="muted">{{ offset + index + 1 }}</td>
               <td>
                 <div class="result-title-cell">
                   <component
@@ -424,6 +442,28 @@ useRefresh(refresh);
           <span>完成一次解析后，结果会自动出现在这里。</span>
           <button class="button primary" @click="navigateToParse()">
             开始解析
+          </button>
+        </div>
+      </div>
+      <div v-if="total > 0" class="pagination">
+        <span class="pagination-info">
+          显示第 <strong>{{ offset + 1 }}-{{ Math.min(total, offset + PAGE_SIZE) }}</strong> 条，共 <strong>{{ total }}</strong> 条记录
+        </span>
+        <div class="pagination-controls">
+          <button
+            class="pagination-btn"
+            :disabled="offset === 0 || loading"
+            @click="goToPage(offset - PAGE_SIZE)"
+          >
+            <ChevronLeft :size="14" />上一页
+          </button>
+          <span class="pagination-page-indicator">{{ Math.floor(offset / PAGE_SIZE) + 1 }} / {{ Math.max(1, Math.ceil(total / PAGE_SIZE)) }}</span>
+          <button
+            class="pagination-btn"
+            :disabled="offset + PAGE_SIZE >= total || loading"
+            @click="goToPage(offset + PAGE_SIZE)"
+          >
+            下一页<ChevronRight :size="14" />
           </button>
         </div>
       </div>
@@ -653,16 +693,6 @@ useRefresh(refresh);
 .muted-badge {
   color: var(--muted);
   font-size: 11px;
-}
-.data-table th {
-  height: 32px;
-  padding: 4px 10px;
-  font-size: 12px;
-}
-.data-table td {
-  min-height: 34px;
-  padding: 5px 10px;
-  vertical-align: middle;
 }
 .data-table tbody tr.selected td {
   background: var(--color-selection);

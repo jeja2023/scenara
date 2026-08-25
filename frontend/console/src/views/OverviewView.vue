@@ -1176,29 +1176,6 @@ useRefresh(refresh);
   gap: 14px;
 }
 
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 12px;
-}
-
-.data-table th {
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--muted, #64716d);
-  text-align: left;
-  padding: 8px 10px;
-  border: 1px solid var(--line, #e2e8e6);
-  background: #fafbfb;
-}
-
-.data-table td {
-  padding: 10px;
-  border: 1px solid var(--line, #e2e8e6);
-  color: var(--color-text, #17211f);
-  line-height: 1.45;
-}
-
 .run-link {
   font-family: var(--font-mono);
   color: var(--teal, #087682);
