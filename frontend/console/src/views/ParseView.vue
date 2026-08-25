@@ -66,7 +66,25 @@ import type {
   RunPage,
   VisionObject,
   OcrBlock,
+  TableColumn,
 } from "../types";
+import DataTable from "../components/DataTable.vue";
+
+const objectColumns: TableColumn<VisionObject>[] = [
+  { key: "object_id", label: "对象", class: "mono" },
+  { key: "object_type", label: "类型" },
+  { key: "score", label: "置信度" },
+  { key: "bbox", label: "边框 x, y, w, h", class: "mono" },
+];
+
+const historyRunColumns: TableColumn<Run>[] = [
+  { key: "run_id", label: "任务 ID", class: "mono truncate" },
+  { key: "pipeline", label: "流水线", class: "truncate" },
+  { key: "asset_source", label: "资产 / 来源", class: "mono truncate" },
+  { key: "status", label: "状态" },
+  { key: "created_at", label: "提交时间", class: "muted" },
+  { key: "actions", label: "操作", width: "80px" },
+];
 
 type InputOrigin = "library" | "upload";
 type SampleStrategy = "interval" | "keyframe" | "scene_change" | "uniform";
@@ -2122,31 +2140,19 @@ onBeforeUnmount(() => {
             v-if="genericPayload"
             :payload="genericPayload"
           />
-          <div v-if="selectedObjects.length" class="table-scroll">
-            <table class="data-table bordered-table">
-              <thead>
-                <tr>
-                  <th style="width: 50px">序号</th>
-                  <th>对象</th>
-                  <th>类型</th>
-                  <th>置信度</th>
-                  <th>边框 x, y, w, h</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(item, index) in selectedObjects"
-                  :key="item.object_id"
-                >
-                  <td class="muted">{{ index + 1 }}</td>
-                  <td class="mono">{{ item.object_id }}</td>
-                  <td>{{ item.object_type }}</td>
-                  <td>{{ item.score?.toFixed(3) ?? "-" }}</td>
-                  <td class="mono">{{ formatBox(item.bbox) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            v-if="selectedObjects.length"
+            :columns="objectColumns"
+            :items="selectedObjects"
+            table-class="bordered-table"
+          >
+            <template #score="{ row }">
+              {{ row.score?.toFixed(3) ?? "-" }}
+            </template>
+            <template #bbox="{ row }">
+              <span class="mono">{{ formatBox(row.bbox) }}</span>
+            </template>
+          </DataTable>
           <details>
             <summary>原始结果（JSON）</summary>
             <pre>{{ resultJson }}</pre>
@@ -2238,54 +2244,38 @@ onBeforeUnmount(() => {
           </RouterLink>
         </div>
       </div>
-      <div class="table-scroll">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 50px">序号</th>
-              <th>任务 ID</th>
-              <th>流水线</th>
-              <th>资产 / 来源</th>
-              <th>状态</th>
-              <th>提交时间</th>
-              <th style="width: 80px">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(item, index) in scopedHistoryRuns" :key="item.run_id">
-              <td class="muted">{{ index + 1 }}</td>
-              <td class="mono truncate">{{ item.run_id }}</td>
-              <td class="truncate">
-                <strong>{{ labelPipeline(item.pipeline.pipeline_id) }}</strong>
-                <small v-if="item.pipeline.version" class="muted"> · {{ item.pipeline.version }}</small>
-              </td>
-              <td class="mono truncate">
-                {{ item.asset_id || item.source_id || '-' }}
-              </td>
-              <td>
-                <span class="badge" :class="item.status">{{
-                  labelRunStatus(item.status)
-                }}</span>
-              </td>
-              <td class="muted">{{ formatRunDate(item.created_at) }}</td>
-              <td>
-                <button
-                  class="button secondary history-load-btn"
-                  title="载入此解析结果"
-                  @click="openHistory(item)"
-                >
-                  载入<ArrowRight :size="12" />
-                </button>
-              </td>
-            </tr>
-            <tr v-if="!scopedHistoryRuns.length">
-              <td colspan="7" class="empty history-empty">
-                {{ loadingHistory ? "正在加载历史运行..." : `暂无 ${currentDomainLabel} 历史运行记录` }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        :columns="historyRunColumns"
+        :items="scopedHistoryRuns"
+        :loading="loadingHistory"
+        :loading-text="'正在加载历史运行...'"
+        :empty-text="`暂无 ${currentDomainLabel} 历史运行记录`"
+      >
+        <template #pipeline="{ row }">
+          <strong>{{ labelPipeline(row.pipeline.pipeline_id) }}</strong>
+          <small v-if="row.pipeline.version" class="muted"> · {{ row.pipeline.version }}</small>
+        </template>
+        <template #asset_source="{ row }">
+          {{ row.asset_id || row.source_id || '-' }}
+        </template>
+        <template #status="{ row }">
+          <span class="badge" :class="row.status">{{
+            labelRunStatus(row.status)
+          }}</span>
+        </template>
+        <template #created_at="{ row }">
+          {{ formatRunDate(row.created_at) }}
+        </template>
+        <template #actions="{ row }">
+          <button
+            class="button secondary history-load-btn"
+            title="载入此解析结果"
+            @click="openHistory(row)"
+          >
+            载入<ArrowRight :size="12" />
+          </button>
+        </template>
+      </DataTable>
     </section>
   </section>
 </template>

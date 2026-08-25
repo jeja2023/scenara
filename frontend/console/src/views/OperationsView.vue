@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { Cpu, Database, HardDrive, Server } from "@lucide/vue";
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { api, userFacingError } from "../api";
 import { labelRuntime, labelVersion } from "../labels";
+import DataTable from "../components/DataTable.vue";
+import type { TableColumn } from "../types";
 
 interface Status {
   version: string;
@@ -14,9 +16,62 @@ interface Status {
   production_models_required: boolean;
   auth_required: boolean;
 }
+
+interface GateCheck {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  status: string;
+  statusClass: string;
+}
+
 const status = ref<Status | null>(null);
 const loading = ref(false);
 const error = ref("");
+
+const checkColumns: TableColumn<GateCheck>[] = [
+  { key: "name", label: "检查项" },
+  { key: "category", label: "分类" },
+  { key: "description", label: "校验说明", class: "muted" },
+  { key: "status", label: "当前状态" },
+];
+
+const checkRows = computed<GateCheck[]>(() => [
+  {
+    id: "auth",
+    name: "接口认证",
+    category: "访问控制",
+    description: "强校验 HTTP 接口访问令牌与会话认证凭据",
+    status: status.value?.auth_required ? "开启" : "开发关闭",
+    statusClass: status.value?.auth_required ? "active" : "paused",
+  },
+  {
+    id: "models",
+    name: "生产模型强制",
+    category: "算法合规",
+    description: "生产环境离线部署强制校验模型包文件与签名完整性",
+    status: status.value?.production_models_required ? "开启" : "开发关闭",
+    statusClass: status.value?.production_models_required ? "active" : "paused",
+  },
+  {
+    id: "audit",
+    name: "审计持久化",
+    category: "合规审计",
+    description: "存储底层具备完整安全审计事件与数据控制面结构表",
+    status: "数据结构已建立",
+    statusClass: "completed",
+  },
+  {
+    id: "backup",
+    name: "备份恢复证据",
+    category: "容灾可靠性",
+    description: "定期验证完整备份恢复与 RPO/RTO 演练签名报告",
+    status: "待验证",
+    statusClass: "paused",
+  },
+]);
+
 async function refresh(): Promise<void> {
   loading.value = true;
   try {
@@ -42,22 +97,22 @@ useRefresh(refresh);
             <Server :size="15" />
           </div>
         </div>
-        <div class="stat-value">{{ labelRuntime(status.profile) }}</div>
-        <div class="stat-desc">Scenara {{ labelVersion(status.version) }}</div>
+        <div class="stat-value">{{ status.profile }}</div>
+        <div class="stat-desc">环境模式</div>
       </div>
 
       <div class="stat green">
         <div class="stat-top-row">
-          <span class="stat-title">状态存储</span>
+          <span class="stat-title">持久化状态</span>
           <div class="stat-icon-badge">
             <Database :size="15" />
           </div>
         </div>
         <div class="stat-value">{{ labelRuntime(status.state_backend) }}</div>
-        <div class="stat-desc">唯一事实源</div>
+        <div class="stat-desc">系统元数据</div>
       </div>
 
-      <div class="stat amber">
+      <div class="stat coral">
         <div class="stat-top-row">
           <span class="stat-title">对象存储</span>
           <div class="stat-icon-badge">
@@ -65,7 +120,7 @@ useRefresh(refresh);
           </div>
         </div>
         <div class="stat-value">{{ labelRuntime(status.object_backend) }}</div>
-        <div class="stat-desc">媒体与结果文档</div>
+        <div class="stat-desc">产物与原始资产</div>
       </div>
 
       <div class="stat teal">
@@ -81,73 +136,21 @@ useRefresh(refresh);
     </div>
     <section class="panel">
       <div class="panel-header"><h2>门禁状态与校验</h2></div>
-      <div class="table-scroll">
-        <table class="data-table bordered-table">
-          <thead>
-            <tr>
-              <th style="width: 50px">序号</th>
-              <th>检查项</th>
-              <th>分类</th>
-              <th>校验说明</th>
-              <th>当前状态</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td class="muted">1</td>
-              <td><strong>接口认证</strong></td>
-              <td><span class="badge">访问控制</span></td>
-              <td class="muted">强校验 HTTP 接口访问令牌与会话认证凭据</td>
-              <td>
-                <span
-                  class="badge"
-                  :class="status?.auth_required ? 'active' : 'paused'"
-                  >{{ status?.auth_required ? "开启" : "开发关闭" }}</span
-                >
-              </td>
-            </tr>
-            <tr>
-              <td class="muted">2</td>
-              <td><strong>生产模型强制</strong></td>
-              <td><span class="badge">算法合规</span></td>
-              <td class="muted">
-                生产环境离线部署强制校验模型包文件与签名完整性
-              </td>
-              <td>
-                <span
-                  class="badge"
-                  :class="
-                    status?.production_models_required ? 'active' : 'paused'
-                  "
-                  >{{
-                    status?.production_models_required ? "开启" : "开发关闭"
-                  }}</span
-                >
-              </td>
-            </tr>
-            <tr>
-              <td class="muted">3</td>
-              <td><strong>审计持久化</strong></td>
-              <td><span class="badge">合规审计</span></td>
-              <td class="muted">
-                存储底层具备完整安全审计事件与数据控制面结构表
-              </td>
-              <td>
-                <span class="badge completed">数据结构已建立</span>
-              </td>
-            </tr>
-            <tr>
-              <td class="muted">4</td>
-              <td><strong>备份恢复证据</strong></td>
-              <td><span class="badge">容灾可靠性</span></td>
-              <td class="muted">定期验证完整备份恢复与 RPO/RTO 演练签名报告</td>
-              <td>
-                <span class="badge paused">待验证</span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        :columns="checkColumns"
+        :items="checkRows"
+        :loading="loading"
+      >
+        <template #name="{ row }">
+          <strong>{{ row.name }}</strong>
+        </template>
+        <template #category="{ row }">
+          <span class="badge">{{ row.category }}</span>
+        </template>
+        <template #status="{ row }">
+          <span class="badge" :class="row.statusClass">{{ row.status }}</span>
+        </template>
+      </DataTable>
     </section>
   </section>
 </template>

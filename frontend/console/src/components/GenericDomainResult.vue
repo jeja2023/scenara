@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import DataTable from "./DataTable.vue";
+import type { TableColumn } from "../types";
 
 const props = defineProps<{
   payload: Record<string, unknown>;
@@ -54,6 +56,13 @@ function formatCell(value: unknown): string {
   if (value === null || value === undefined) return "-";
   return typeof value === "object" ? JSON.stringify(value) : String(value);
 }
+
+function getDynamicColumns(rows: Array<Record<string, unknown>>): TableColumn<Record<string, unknown>>[] {
+  return tableColumns(rows).map((column) => ({
+    key: column,
+    label: formatKey(column),
+  }));
+}
 </script>
 
 <template>
@@ -70,29 +79,19 @@ function formatCell(value: unknown): string {
     </dl>
     <div v-for="[key, rows] in tableEntries" :key="key" class="generic-table">
       <div class="generic-subheading">{{ formatKey(key) }}</div>
-      <div class="table-scroll">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 50px">序号</th>
-              <th v-for="column in tableColumns(rows)" :key="column">
-                {{ formatKey(column) }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, index) in rows.slice(0, 100)" :key="index">
-              <td class="muted">{{ index + 1 }}</td>
-              <td v-for="column in tableColumns(rows)" :key="column">
-                {{ formatCell(row[column]) }}
-              </td>
-            </tr>
-            <tr v-if="!rows.length">
-              <td :colspan="tableColumns(rows).length + 1" class="empty">暂无数据</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        :columns="getDynamicColumns(rows)"
+        :items="rows.slice(0, 100)"
+        empty-text="暂无数据"
+      >
+        <template
+          v-for="col in tableColumns(rows)"
+          :key="col"
+          #[col]="{ row }"
+        >
+          {{ formatCell(row[col]) }}
+        </template>
+      </DataTable>
     </div>
     <details
       v-for="[key, value] in otherEntries"

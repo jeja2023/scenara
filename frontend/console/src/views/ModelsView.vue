@@ -4,11 +4,21 @@ import { onMounted, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { api, userFacingError } from "../api";
 import { labelCapability } from "../labels";
-import type { ModelPackage } from "../types";
+import DataTable from "../components/DataTable.vue";
+import type { ModelPackage, TableColumn } from "../types";
 
 const models = ref<ModelPackage[]>([]);
 const error = ref("");
 const loading = ref(false);
+
+const columns: TableColumn<ModelPackage>[] = [
+  { key: "model", label: "模型" },
+  { key: "capability", label: "能力" },
+  { key: "adapter", label: "适配器", class: "mono" },
+  { key: "license_id", label: "许可证" },
+  { key: "vram_mb", label: "显存" },
+  { key: "status", label: "状态" },
+];
 
 async function refresh(): Promise<void> {
   loading.value = true;
@@ -72,49 +82,33 @@ useRefresh(refresh);
         <h2>安装清单</h2>
         <span class="badge">{{ models.length }}</span>
       </div>
-      <div class="table-scroll">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 50px">序号</th>
-              <th>模型</th>
-              <th>能力</th>
-              <th>适配器</th>
-              <th>许可证</th>
-              <th>显存</th>
-              <th>状态</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(model, index) in models"
-              :key="model.model_id + model.version"
-            >
-              <td class="muted">{{ index + 1 }}</td>
-              <td>
-                <strong>{{ model.model_id }}</strong>
-                <div class="mono muted">
-                  {{ model.version }} · {{ model.sha256.slice(0, 12) }}
-                </div>
-              </td>
-              <td>{{ labelCapability(model.capability) }}</td>
-              <td class="mono">{{ model.adapter }}</td>
-              <td>{{ model.license_id }}</td>
-              <td>{{ model.vram_mb }} MiB</td>
-              <td>
-                <span
-                  class="badge"
-                  :class="model.production_ready ? 'active' : ''"
-                  >{{ model.production_ready ? "生产" : "开发" }}</span
-                >
-              </td>
-            </tr>
-            <tr v-if="!models.length">
-              <td colspan="7" class="empty">没有已登记模型</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        :columns="columns"
+        :items="models"
+        :loading="loading"
+        empty-text="没有已登记模型"
+      >
+        <template #model="{ row }">
+          <strong>{{ row.model_id }}</strong>
+          <div class="mono muted">
+            {{ row.version }} · {{ row.sha256.slice(0, 12) }}
+          </div>
+        </template>
+        <template #capability="{ row }">
+          {{ labelCapability(row.capability) }}
+        </template>
+        <template #vram_mb="{ row }">
+          {{ row.vram_mb }} MiB
+        </template>
+        <template #status="{ row }">
+          <span
+            class="badge"
+            :class="row.production_ready ? 'active' : ''"
+          >
+            {{ row.production_ready ? "生产" : "开发" }}
+          </span>
+        </template>
+      </DataTable>
     </section>
   </section>
 </template>

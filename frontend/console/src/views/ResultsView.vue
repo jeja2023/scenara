@@ -12,6 +12,7 @@ import {
   RotateCcw,
   ScanFace,
   Search,
+  SlidersHorizontal,
   UserRound,
   Video,
   X,
@@ -22,8 +23,9 @@ import type { Router } from "vue-router";
 import { useRoute, useRouter } from "vue-router";
 
 import { api, userFacingError } from "../api";
+import DataTable from "../components/DataTable.vue";
 import FeatureCropGallery from "../components/FeatureCropGallery.vue";
-import { labelDomain, labelMediaKind, labelUnitType } from "../labels";
+import { formatDate, labelDomain, labelMediaKind, mediaKindIcon } from "../labels";
 import type {
   Domain,
   DomainManifest,
@@ -32,7 +34,20 @@ import type {
   ResultEnvelope,
   ResultSummary,
   ResultSummaryPage,
+  TableColumn,
 } from "../types";
+
+const PAGE_SIZE = 20;
+
+const columns: TableColumn<ResultSummary>[] = [
+  { key: "title", label: "标识 / 资源名称" },
+  { key: "domain", label: "领域" },
+  { key: "media_kind", label: "资产类型" },
+  { key: "summary", label: "解析成果概况" },
+  { key: "status", label: "状态" },
+  { key: "created_at", label: "解析时间", class: "muted time-cell" },
+  { key: "actions", label: "操作", align: "right", headerAlign: "right", width: "140px" },
+];
 
 const router: Router = useRouter();
 const route = useRoute();
@@ -48,7 +63,6 @@ const domain = ref<Domain | "">("");
 const mediaKind = ref<MediaKind | "">("");
 const total = ref(0);
 const offset = ref(0);
-const PAGE_SIZE = 20;
 const unitTotal = ref(0);
 const selectedUnit = ref<MediaUnitResult | null>(null);
 
@@ -350,123 +364,89 @@ useRefresh(refresh);
         </div>
         <span class="badge muted-badge">按最新解析排序</span>
       </div>
-      <div class="table-scroll">
-        <table v-if="items.length" class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 50px">序号</th>
-              <th>标识 / 资源名称</th>
-              <th>领域</th>
-              <th>资产类型</th>
-              <th>解析成果概况</th>
-              <th>状态</th>
-              <th>解析时间</th>
-              <th style="text-align: right; width: 140px">操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="(item, index) in items"
-              :key="item.result_id"
-              :class="{
-                selected:
-                  selected?.result_id === item.result_id && isDetailOpen,
-              }"
+      <DataTable
+        :columns="columns"
+        :items="items"
+        :loading="loading"
+        :total="total"
+        :offset="offset"
+        :page-size="PAGE_SIZE"
+        :index-offset="offset"
+        :row-class="(item: ResultSummary) => ({ selected: selected?.result_id === item.result_id && isDetailOpen })"
+        @page-change="goToPage"
+      >
+        <template #title="{ row }">
+          <div class="result-title-cell">
+            <component
+              :is="resultIcon(row)"
+              :size="15"
+              class="cell-icon"
+            />
+            <strong class="title-text" :title="resultTitle(row)">{{
+              resultTitle(row)
+            }}</strong>
+          </div>
+        </template>
+        <template #domain="{ row }">
+          <span class="badge">{{ labelDomain(row.domain) }}</span>
+        </template>
+        <template #media_kind="{ row }">
+          <span class="badge">{{
+            labelMediaKind(row.media_kind || "")
+          }}</span>
+        </template>
+        <template #summary="{ row }">
+          <span class="summary-text">
+            {{
+              row.domain === "ocr"
+                ? `${formatBytesCount(row.ocr_block_count)} 个文本块 · ${row.unit_count} ${row.media_kind === "document" ? "页" : "单元"}`
+                : `${formatBytesCount(row.person_count)} 个人员 · ${row.unit_count} 单元`
+            }}
+          </span>
+        </template>
+        <template #status="{ row }">
+          <span v-if="row.warning_count" class="badge warning">
+            {{ row.warning_count }} 个告警
+          </span>
+          <span v-else-if="row.status === 'failed'" class="badge danger">
+            失败
+          </span>
+          <span v-else class="badge green">已完成</span>
+        </template>
+        <template #created_at="{ row }">
+          <span class="muted time-cell">{{ formatDate(row.created_at) }}</span>
+        </template>
+        <template #actions="{ row }">
+          <div class="toolbar compact table-actions">
+            <button
+              class="button secondary compact-btn detail-btn"
+              title="查看详情"
+              aria-label="查看详情"
+              @click="showDetail(row)"
             >
-              <td class="muted">{{ offset + index + 1 }}</td>
-              <td>
-                <div class="result-title-cell">
-                  <component
-                    :is="resultIcon(item)"
-                    :size="15"
-                    class="cell-icon"
-                  />
-                  <strong class="title-text" :title="resultTitle(item)">{{
-                    resultTitle(item)
-                  }}</strong>
-                </div>
-              </td>
-              <td>
-                <span class="badge">{{ labelDomain(item.domain) }}</span>
-              </td>
-              <td>
-                <span class="badge">{{
-                  labelMediaKind(item.media_kind || "")
-                }}</span>
-              </td>
-              <td>
-                <span class="summary-text">
-                  {{
-                    item.domain === "ocr"
-                      ? `${formatBytesCount(item.ocr_block_count)} 个文本块 · ${item.unit_count} ${item.media_kind === "document" ? "页" : "单元"}`
-                      : `${formatBytesCount(item.person_count)} 个人员 · ${item.unit_count} 单元`
-                  }}
-                </span>
-              </td>
-              <td>
-                <span v-if="item.warning_count" class="badge warning">
-                  {{ item.warning_count }} 个告警
-                </span>
-                <span v-else-if="item.status === 'failed'" class="badge danger">
-                  失败
-                </span>
-                <span v-else class="badge green">已完成</span>
-              </td>
-              <td class="muted time-cell">{{ formatDate(item.created_at) }}</td>
-              <td>
-                <div class="toolbar compact table-actions">
-                  <button
-                    class="button secondary compact-btn detail-btn"
-                    title="查看详情"
-                    aria-label="查看详情"
-                    @click="showDetail(item)"
-                  >
-                    <Eye :size="12" />详情
-                  </button>
-                  <button
-                    class="button secondary compact-btn"
-                    title="回到解析工作台"
-                    aria-label="回到解析工作台"
-                    @click="openWorkspace(item)"
-                  >
-                    <Play :size="12" />处理
-                  </button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-        <div v-else class="empty result-list-empty">
-          <FileSearch :size="32" />
-          <strong>还没有匹配的解析结果</strong>
-          <span>完成一次解析后，结果会自动出现在这里。</span>
-          <button class="button primary" @click="navigateToParse()">
-            开始解析
-          </button>
-        </div>
-      </div>
-      <div v-if="total > 0" class="pagination">
-        <span class="pagination-info">
-          显示第 <strong>{{ offset + 1 }}-{{ Math.min(total, offset + PAGE_SIZE) }}</strong> 条，共 <strong>{{ total }}</strong> 条记录
-        </span>
-        <div class="pagination-controls">
-          <button
-            class="pagination-btn"
-            :disabled="offset === 0 || loading"
-            @click="goToPage(offset - PAGE_SIZE)"
-          >
-            <ChevronLeft :size="14" />上一页
-          </button>
-          <span class="pagination-page-indicator">{{ Math.floor(offset / PAGE_SIZE) + 1 }} / {{ Math.max(1, Math.ceil(total / PAGE_SIZE)) }}</span>
-          <button
-            class="pagination-btn"
-            :disabled="offset + PAGE_SIZE >= total || loading"
-            @click="goToPage(offset + PAGE_SIZE)"
-          >
-            下一页<ChevronRight :size="14" />
-          </button>
-        </div>
-      </div>
+              <Eye :size="12" />详情
+            </button>
+            <button
+              class="button secondary compact-btn"
+              title="回到解析工作台"
+              aria-label="回到解析工作台"
+              @click="openWorkspace(row)"
+            >
+              <Play :size="12" />处理
+            </button>
+          </div>
+        </template>
+        <template #empty>
+          <div class="empty result-list-empty">
+            <FileSearch :size="32" />
+            <strong>还没有匹配的解析结果</strong>
+            <span>完成一次解析后，结果会自动出现在这里。</span>
+            <button class="button primary" @click="navigateToParse()">
+              开始解析
+            </button>
+          </div>
+        </template>
+      </DataTable>
     </section>
 
     <!-- 详情右侧抽屉 / 弹窗 -->

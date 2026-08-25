@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight, Download, Filter, RotateCcw, Search } from "@lucide/vue";
+import { Download, Filter, RotateCcw, Search } from "@lucide/vue";
 import { onMounted, reactive, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { api, apiBlob, userFacingError } from "../api";
-import type { AuditEvent } from "../types";
+import DataTable from "../components/DataTable.vue";
+import type { AuditEvent, TableColumn } from "../types";
 
 const events = ref<AuditEvent[]>([]);
 const total = ref(0);
@@ -17,6 +18,15 @@ const filters = reactive({
   principal_id: "",
   outcome: "",
 });
+
+const columns: TableColumn<AuditEvent>[] = [
+  { key: "created_at", label: "时间" },
+  { key: "action", label: "操作" },
+  { key: "resource", label: "资源" },
+  { key: "principal_id", label: "主体" },
+  { key: "outcome", label: "结果" },
+  { key: "evidence", label: "证据" },
+];
 
 function resetFilters(): void {
   filters.action = "";
@@ -47,43 +57,35 @@ async function refresh(): Promise<void> {
   error.value = "";
   try {
     const page = await api<{ items: AuditEvent[]; total: number }>(
-      `/api/v1/audit/events?${query()}`,
+      "/api/v1/audit/events?" + query(),
     );
     events.value = page.items;
     total.value = page.total;
-    if (page.items.length === 0 && offset.value > 0) {
-      offset.value = Math.max(0, total.value - PAGE_SIZE);
-      const retry = await api<{ items: AuditEvent[]; total: number }>(
-        `/api/v1/audit/events?${query()}`,
-      );
-      events.value = retry.items;
-      total.value = retry.total;
-    }
   } catch (caught) {
-    error.value = userFacingError(caught, "审计记录加载失败");
+    error.value = userFacingError(caught, "审计日志加载失败，请稍后重试");
   } finally {
     loading.value = false;
   }
 }
 
-async function exportAudit(format: "json" | "csv"): Promise<void> {
+async function exportAudit(format: "csv" | "json"): Promise<void> {
   try {
     const blob = await apiBlob(
       `/api/v1/audit/export?format=${format}&${query()}`,
     );
     const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `scenara-audit.${format}`;
-    anchor.click();
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `audit-${Date.now()}.${format}`;
+    a.click();
     URL.revokeObjectURL(url);
   } catch (caught) {
-    error.value = userFacingError(caught, "审计导出失败");
+    error.value = userFacingError(caught, "导出失败，请稍后重试");
   }
 }
 
-function formatTime(timestamp: number): string {
-  return new Date(timestamp * 1000).toLocaleString("zh-CN", { hour12: false });
+function formatTime(epoch: number): string {
+  return new Date(epoch * 1000).toLocaleString();
 }
 
 onMounted(refresh);
@@ -92,60 +94,54 @@ useRefresh(refresh);
 
 <template>
   <section class="page">
-    <p v-if="error" class="callout error">{{ error }}</p>
-
-    <section class="panel filter-panel">
-      <div class="panel-header">
-        <h2>审计日志筛选</h2>
+    <div class="panel filters">
+      <div class="filters-grid">
+        <label
+          ><span>动作</span
+          ><input
+            v-model="filters.action"
+            placeholder="如 run.completed"
+            @keyup.enter="refresh"
+        /></label>
+        <label
+          ><span>资源类型</span
+          ><input
+            v-model="filters.resource_type"
+            placeholder="如 run"
+            @keyup.enter="refresh"
+        /></label>
+        <label
+          ><span>主体</span
+          ><input
+            v-model="filters.principal_id"
+            placeholder="如 sys:runtime"
+            @keyup.enter="refresh"
+        /></label>
+        <label
+          ><span>结果</span
+          ><select v-model="filters.outcome" @change="refresh">
+            <option value="">全部</option>
+            <option value="success">成功</option>
+            <option value="failure">失败</option>
+            <option value="denied">拒绝</option>
+          </select></label
+        >
+      </div>
+      <div class="filter-actions">
+        <button class="button primary" @click="refresh">
+          <Search :size="15" />查询
+        </button>
         <button class="button secondary" @click="resetFilters">
-          <RotateCcw :size="14" />重置条件
+          <RotateCcw :size="15" />重置
         </button>
       </div>
-      <div class="panel-body">
-        <div class="filter-grid">
-          <label
-            ><span>操作名称</span
-            ><input
-              v-model="filters.action"
-              placeholder="例如 dataset.create"
-              @keyup.enter="refresh"
-          /></label>
-          <label
-            ><span>资源类型</span
-            ><input
-              v-model="filters.resource_type"
-              placeholder="例如 dataset"
-              @keyup.enter="refresh"
-          /></label>
-          <label
-            ><span>操作主体</span
-            ><input
-              v-model="filters.principal_id"
-              placeholder="用户或服务账号"
-              @keyup.enter="refresh"
-          /></label>
-          <label
-            ><span>执行结果</span
-            ><select v-model="filters.outcome" @change="refresh">
-              <option value="">全部结果</option>
-              <option value="success">成功</option>
-              <option value="failure">失败</option>
-            </select></label
-          >
-          <div class="filter-actions">
-            <button class="button primary filter-submit" @click="refresh">
-              <Search :size="16" />查询记录
-            </button>
-          </div>
-        </div>
-      </div>
-    </section>
-
+    </div>
+    <p v-if="error" class="callout error">{{ error }}</p>
     <section class="panel">
       <div class="panel-header">
         <div class="header-title">
-          <h2>事件记录</h2>
-          <span class="badge">共 {{ total }} 条</span>
+          <h2>审计事件</h2>
+          <span class="badge">{{ total }}</span>
         </div>
         <div class="header-actions">
           <button class="button secondary" @click="exportAudit('csv')">
@@ -156,72 +152,38 @@ useRefresh(refresh);
           </button>
         </div>
       </div>
-      <div class="table-scroll">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 50px">序号</th>
-              <th>时间</th>
-              <th>操作</th>
-              <th>资源</th>
-              <th>主体</th>
-              <th>结果</th>
-              <th>证据</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-if="loading">
-              <td colspan="7" class="empty">正在加载审计记录…</td>
-            </tr>
-            <tr v-for="(event, index) in events" :key="event.event_id">
-              <td class="muted">{{ offset + index + 1 }}</td>
-              <td>{{ formatTime(event.created_at) }}</td>
-              <td>
-                <strong>{{ event.action }}</strong>
-                <small class="mono">{{ event.event_id }}</small>
-              </td>
-              <td>
-                {{ event.resource_type }}
-                <small class="mono">{{ event.resource_id || "-" }}</small>
-              </td>
-              <td>{{ event.principal_id }}</td>
-              <td>
-                <span :class="['outcome', event.outcome]">{{
-                  event.outcome === "success" ? "成功" : event.outcome
-                }}</span>
-              </td>
-              <td>
-                <code>{{ JSON.stringify(event.evidence) }}</code>
-              </td>
-            </tr>
-            <tr v-if="!loading && !events.length">
-              <td colspan="7" class="empty">没有匹配的审计事件</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div v-if="total > 0" class="pagination">
-        <span class="pagination-info">
-          显示第 <strong>{{ offset + 1 }}-{{ Math.min(total, offset + PAGE_SIZE) }}</strong> 条，共 <strong>{{ total }}</strong> 条记录
-        </span>
-        <div class="pagination-controls">
-          <button
-            class="pagination-btn"
-            :disabled="offset === 0 || loading"
-            @click="goToPage(offset - PAGE_SIZE)"
-          >
-            <ChevronLeft :size="14" />上一页
-          </button>
-          <span class="pagination-page-indicator">{{ Math.floor(offset / PAGE_SIZE) + 1 }} / {{ Math.max(1, Math.ceil(total / PAGE_SIZE)) }}</span>
-          <button
-            class="pagination-btn"
-            :disabled="offset + PAGE_SIZE >= total || loading"
-            @click="goToPage(offset + PAGE_SIZE)"
-          >
-            下一页<ChevronRight :size="14" />
-          </button>
-        </div>
-      </div>
+      <DataTable
+        :columns="columns"
+        :items="events"
+        :loading="loading"
+        :total="total"
+        :offset="offset"
+        :page-size="PAGE_SIZE"
+        :index-offset="offset"
+        empty-text="没有匹配的审计事件"
+        loading-text="正在加载审计记录…"
+        @page-change="goToPage"
+      >
+        <template #created_at="{ row }">
+          {{ formatTime(row.created_at) }}
+        </template>
+        <template #action="{ row }">
+          <strong>{{ row.action }}</strong>
+          <small class="mono">{{ row.event_id }}</small>
+        </template>
+        <template #resource="{ row }">
+          {{ row.resource_type }}
+          <small class="mono">{{ row.resource_id || "-" }}</small>
+        </template>
+        <template #outcome="{ row }">
+          <span :class="['outcome', row.outcome]">{{
+            row.outcome === "success" ? "成功" : row.outcome
+          }}</span>
+        </template>
+        <template #evidence="{ row }">
+          <code>{{ JSON.stringify(row.evidence) }}</code>
+        </template>
+      </DataTable>
     </section>
   </section>
 </template>

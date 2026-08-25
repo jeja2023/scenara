@@ -44,7 +44,27 @@ import type {
   ProductMaturity,
   RepositoryTopology,
   RunPage,
+  Run,
+  TableColumn,
 } from "../types";
+import DataTable from "../components/DataTable.vue";
+
+const capabilityColumns: TableColumn<CapabilityItem>[] = [
+  { key: "domain", label: "领域", width: "110px" },
+  { key: "name", label: "核心能力", class: "pi-cap-name" },
+  { key: "readiness", label: "就绪状态" },
+  { key: "productionReady", label: "生产支持" },
+  { key: "model", label: "模型与引擎配置", class: "mono" },
+  { key: "detail", label: "特性说明", class: "muted" },
+];
+
+const overviewRunColumns: TableColumn<Run>[] = [
+  { key: "run_id", label: "任务 ID", class: "mono" },
+  { key: "domain", label: "领域" },
+  { key: "pipeline", label: "流水线", class: "truncate" },
+  { key: "status", label: "状态" },
+  { key: "updated_at", label: "更新时间", class: "muted" },
+];
 
 const loading = ref(false);
 const error = ref("");
@@ -537,57 +557,38 @@ useRefresh(refresh);
           </small>
         </div>
 
-        <div class="table-scroll">
-          <table class="data-table bordered-table pi-cap-table">
-            <thead>
-              <tr>
-                <th style="width: 50px">序号</th>
-                <th style="width: 110px">领域</th>
-                <th>核心能力</th>
-                <th>就绪状态</th>
-                <th>生产支持</th>
-                <th>模型与引擎配置</th>
-                <th>特性说明</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="(cap, index) in filteredCapabilities"
-                :key="cap.id"
-              >
-                <td class="muted">{{ index + 1 }}</td>
-                <td>
-                  <span class="domain-pill" :class="cap.domain">
-                    <component :is="domainIcon(cap.domain)" :size="12" />
-                    {{ domainLabel(cap.domain) }}
-                  </span>
-                </td>
-                <td class="pi-cap-name">
-                  <strong>{{ cap.name }}</strong>
-                </td>
-                <td>
-                  <span class="badge" :class="`pi-${cap.readiness}`">
-                    {{ cap.readiness === "ready" ? "已就绪" : "开发替代" }}
-                  </span>
-                </td>
-                <td>
-                  <span
-                    class="badge"
-                    :class="cap.productionReady ? 'active' : 'planned'"
-                  >
-                    {{ cap.productionReady ? "生产就绪" : "规划达标" }}
-                  </span>
-                </td>
-                <td class="mono">
-                  <code class="cap-model-code">{{ cap.model }}</code>
-                </td>
-                <td class="muted">
-                  {{ cap.detail }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          :columns="capabilityColumns"
+          :items="filteredCapabilities"
+          table-class="pi-cap-table"
+          empty-text="暂无匹配的算法能力"
+        >
+          <template #domain="{ row }">
+            <span class="domain-pill" :class="row.domain">
+              <component :is="domainIcon(row.domain)" :size="12" />
+              {{ domainLabel(row.domain) }}
+            </span>
+          </template>
+          <template #name="{ row }">
+            <strong>{{ row.name }}</strong>
+          </template>
+          <template #readiness="{ row }">
+            <span class="badge" :class="`pi-${row.readiness}`">
+              {{ row.readiness === "ready" ? "已就绪" : "开发替代" }}
+            </span>
+          </template>
+          <template #productionReady="{ row }">
+            <span
+              class="badge"
+              :class="row.productionReady ? 'active' : 'planned'"
+            >
+              {{ row.productionReady ? "生产就绪" : "规划达标" }}
+            </span>
+          </template>
+          <template #model="{ row }">
+            <code class="cap-model-code">{{ row.model }}</code>
+          </template>
+        </DataTable>
       </div>
     </section>
 
@@ -601,51 +602,37 @@ useRefresh(refresh);
         <RouterLink class="button secondary" to="/runs">查看全部队列</RouterLink>
       </div>
 
-      <div class="table-scroll">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 50px">序号</th>
-              <th>任务 ID</th>
-              <th>领域</th>
-              <th>流水线</th>
-              <th>状态</th>
-              <th>更新时间</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(run, index) in runs.items" :key="run.run_id">
-              <td class="muted">{{ index + 1 }}</td>
-              <td class="mono">
-                <RouterLink
-                  :to="{ path: '/parse', query: { run: run.run_id } }"
-                  class="run-link"
-                >
-                  {{ run.run_id }}
-                </RouterLink>
-              </td>
-              <td>
-                <span class="domain-tag">
-                  <component :is="domainIcon(run.domain)" :size="12" />
-                  {{ domainLabel(run.domain) }}
-                </span>
-              </td>
-              <td class="truncate">
-                {{ labelPipeline(run.pipeline.pipeline_id) }} · {{ run.pipeline.version }}
-              </td>
-              <td>
-                <span class="badge" :class="run.status">{{
-                  labelRunStatus(run.status)
-                }}</span>
-              </td>
-              <td class="muted">{{ new Date(run.updated_at * 1000).toLocaleString() }}</td>
-            </tr>
-            <tr v-if="!runs.items.length">
-              <td colspan="6" class="empty">暂无运行记录，点击右上角「新建解析」开始体验</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        :columns="overviewRunColumns"
+        :items="runs.items"
+        empty-text="暂无运行记录，点击右上角「新建解析」开始体验"
+      >
+        <template #run_id="{ row }">
+          <RouterLink
+            :to="{ path: '/parse', query: { run: row.run_id } }"
+            class="run-link"
+          >
+            {{ row.run_id }}
+          </RouterLink>
+        </template>
+        <template #domain="{ row }">
+          <span class="domain-tag">
+            <component :is="domainIcon(row.domain)" :size="12" />
+            {{ domainLabel(row.domain) }}
+          </span>
+        </template>
+        <template #pipeline="{ row }">
+          {{ labelPipeline(row.pipeline.pipeline_id) }} · {{ row.pipeline.version }}
+        </template>
+        <template #status="{ row }">
+          <span class="badge" :class="row.status">{{
+            labelRunStatus(row.status)
+          }}</span>
+        </template>
+        <template #updated_at="{ row }">
+          {{ new Date(row.updated_at * 1000).toLocaleString() }}
+        </template>
+      </DataTable>
     </section>
 
     <!-- 4. 平台产品体系与成熟度 (垂直纵向排布，全宽网格化展示各模块) -->

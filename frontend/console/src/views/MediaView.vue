@@ -14,12 +14,30 @@ import {
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import type { Router } from "vue-router";
-import { useRouter } from "vue-router";
 import { api, apiBlob, userFacingError } from "../api";
 import { labelMediaKind } from "../labels";
-import type { MediaAsset, MediaSource, MediaSourceProbe } from "../types";
+import DataTable from "../components/DataTable.vue";
+import type { MediaAsset, MediaSource, MediaSourceProbe, TableColumn } from "../types";
 
 type AssetKindFilter = "" | "image" | "video" | "document";
+
+const assetColumns: TableColumn<MediaAsset>[] = [
+  { key: "select", label: "", width: "32px", class: "check-col", headerClass: "check-col" },
+  { key: "asset_id", label: "标识", class: "mono truncate" },
+  { key: "kind", label: "类型" },
+  { key: "filename", label: "文件名", class: "truncate" },
+  { key: "size_bytes", label: "大小" },
+  { key: "created_at", label: "创建时间" },
+  { key: "actions", label: "操作" },
+];
+
+const sourceColumns: TableColumn<MediaSource>[] = [
+  { key: "source_id", label: "标识", class: "mono truncate" },
+  { key: "name", label: "名称" },
+  { key: "masked_url", label: "脱敏地址", class: "mono truncate" },
+  { key: "status", label: "连接状态" },
+  { key: "actions", label: "操作" },
+];
 
 const loading = ref(false);
 const uploading = ref(false);
@@ -360,130 +378,104 @@ useRefresh(refresh);
           </label>
         </div>
       </div>
-      <div class="table-scroll">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th class="check-col"></th>
-              <th style="width: 50px">序号</th>
-              <th>标识</th>
-              <th>类型</th>
-              <th>文件名</th>
-              <th>大小</th>
-              <th>创建时间</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <template
-              v-for="(asset, index) in filteredAssets"
-              :key="asset.asset_id"
+      <DataTable
+        :columns="assetColumns"
+        :items="filteredAssets"
+        :row-class="(asset: MediaAsset) => ({ 'selected-row': selectedForDelete.has(asset.asset_id) })"
+        :empty-text="kindFilter ? `没有 ${labelMediaKind(kindFilter)} 类型的资产` : '暂无文件资产'"
+      >
+        <template #header-select>
+          <span class="check-col"></span>
+        </template>
+        <template #select="{ row }">
+          <input
+            type="checkbox"
+            :checked="selectedForDelete.has(row.asset_id)"
+            :aria-label="`选择 ${row.filename || row.asset_id}`"
+            @change="toggleSelect(row.asset_id)"
+          />
+        </template>
+        <template #kind="{ row }">
+          <span class="badge" :class="row.kind">{{
+            labelMediaKind(row.kind)
+          }}</span>
+        </template>
+        <template #filename="{ row }">
+          {{ row.filename || "未命名" }}
+          <span v-if="row.temporary" class="badge">临时</span>
+        </template>
+        <template #size_bytes="{ row }">
+          {{ formatBytes(row.size_bytes) }}
+        </template>
+        <template #created_at="{ row }">
+          {{ new Date(row.created_at * 1000).toLocaleString() }}
+        </template>
+        <template #actions="{ row }">
+          <div class="toolbar compact">
+            <button
+              class="icon-button"
+              :title="`${expandedAssets.has(row.asset_id) ? '收起' : '展开'}元数据`"
+              :aria-label="`${expandedAssets.has(row.asset_id) ? '收起' : '展开'}元数据`"
+              @click="toggleExpand(row.asset_id)"
             >
-              <tr
-                :class="{
-                  'selected-row': selectedForDelete.has(asset.asset_id),
-                }"
-              >
-                <td class="check-col">
-                  <input
-                    type="checkbox"
-                    :checked="selectedForDelete.has(asset.asset_id)"
-                    :aria-label="`选择 ${asset.filename || asset.asset_id}`"
-                    @change="toggleSelect(asset.asset_id)"
-                  />
-                </td>
-                <td class="muted">{{ index + 1 }}</td>
-                <td class="mono truncate">{{ asset.asset_id }}</td>
-                <td>
-                  <span class="badge" :class="asset.kind">{{
-                    labelMediaKind(asset.kind)
-                  }}</span>
-                </td>
-                <td class="truncate">
-                  {{ asset.filename || "未命名" }}
-                  <span v-if="asset.temporary" class="badge">临时</span>
-                </td>
-                <td>{{ formatBytes(asset.size_bytes) }}</td>
-                <td>
-                  {{ new Date(asset.created_at * 1000).toLocaleString() }}
-                </td>
-                <td>
-                  <div class="toolbar compact">
-                    <button
-                      class="icon-button"
-                      :title="`${expandedAssets.has(asset.asset_id) ? '收起' : '展开'}元数据`"
-                      :aria-label="`${expandedAssets.has(asset.asset_id) ? '收起' : '展开'}元数据`"
-                      @click="toggleExpand(asset.asset_id)"
-                    >
-                      <component
-                        :is="
-                          expandedAssets.has(asset.asset_id)
-                            ? ChevronDown
-                            : ChevronRight
-                        "
-                        :size="13"
-                      />
-                    </button>
-                    <button
-                      class="icon-button"
-                      title="预览"
-                      aria-label="预览"
-                      @click="preview(asset)"
-                    >
-                      <Eye :size="13" />
-                    </button>
-                    <button
-                      v-if="asset.kind === 'video'"
-                      class="icon-button"
-                      title="预览视频首帧"
-                      aria-label="预览视频首帧"
-                      @click="preview(asset)"
-                    >
-                      <Video :size="13" />
-                    </button>
-                    <button class="button secondary" @click="launch(asset)">
-                      <Play :size="12" />解析
-                    </button>
-                    <button
-                      class="icon-button danger-icon"
-                      title="删除"
-                      aria-label="删除"
-                      @click="deleteAsset(asset)"
-                    >
-                      <Trash2 :size="13" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr
-                v-if="expandedAssets.has(asset.asset_id)"
-                class="metadata-row"
-              >
-                <td colspan="8">
-                  <dl class="metadata-list">
-                    <div
-                      v-for="[label, value] in metadataItems(asset)"
-                      :key="label"
-                    >
-                      <dt>{{ label }}</dt>
-                      <dd>{{ value }}</dd>
-                    </div>
-                  </dl>
-                </td>
-              </tr>
-            </template>
-            <tr v-if="!filteredAssets.length">
-              <td colspan="8" class="empty">
-                {{
-                  kindFilter
-                    ? `没有 ${labelMediaKind(kindFilter)} 类型的资产`
-                    : "暂无文件资产"
-                }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+              <component
+                :is="
+                  expandedAssets.has(row.asset_id)
+                    ? ChevronDown
+                    : ChevronRight
+                "
+                :size="13"
+              />
+            </button>
+            <button
+              class="icon-button"
+              title="预览"
+              aria-label="预览"
+              @click="preview(row)"
+            >
+              <Eye :size="13" />
+            </button>
+            <button
+              v-if="row.kind === 'video'"
+              class="icon-button"
+              title="预览视频首帧"
+              aria-label="预览视频首帧"
+              @click="preview(row)"
+            >
+              <Video :size="13" />
+            </button>
+            <button class="button secondary" @click="launch(row)">
+              <Play :size="12" />解析
+            </button>
+            <button
+              class="icon-button danger-icon"
+              title="删除"
+              aria-label="删除"
+              @click="deleteAsset(row)"
+            >
+              <Trash2 :size="13" />
+            </button>
+          </div>
+        </template>
+        <template #subrow="{ row, totalColspan }">
+          <tr
+            v-if="expandedAssets.has(row.asset_id)"
+            class="metadata-row"
+          >
+            <td :colspan="totalColspan">
+              <dl class="metadata-list">
+                <div
+                  v-for="[label, value] in metadataItems(row)"
+                  :key="label"
+                >
+                  <dt>{{ label }}</dt>
+                  <dd>{{ value }}</dd>
+                </div>
+              </dl>
+            </td>
+          </tr>
+        </template>
+      </DataTable>
     </section>
 
     <section class="panel source-panel">
@@ -520,59 +512,42 @@ useRefresh(refresh);
           <Plus :size="13" />登记视频流
         </button>
       </div>
-      <div class="table-scroll">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 50px">序号</th>
-              <th>标识</th>
-              <th>名称</th>
-              <th>脱敏地址</th>
-              <th>连接状态</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(source, index) in sources" :key="source.source_id">
-              <td class="muted">{{ index + 1 }}</td>
-              <td class="mono truncate">{{ source.source_id }}</td>
-              <td>{{ source.name }}</td>
-              <td class="mono truncate">{{ source.masked_url }}</td>
-              <td>
-                <span
-                  v-if="probeText(source.source_id)"
-                  class="badge completed"
-                  >{{ probeText(source.source_id) }}</span
-                ><span v-else class="muted">未探测</span>
-              </td>
-              <td>
-                <div class="toolbar compact">
-                  <button
-                    class="icon-button"
-                    title="探测连接"
-                    aria-label="探测连接"
-                    @click="probeSource(source)"
-                  >
-                    <Activity :size="13" /></button
-                  ><button class="button secondary" @click="launch(source)">
-                    <Play :size="12" />解析</button
-                  ><button
-                    class="icon-button danger-icon"
-                    title="删除"
-                    aria-label="删除"
-                    @click="deleteSource(source)"
-                  >
-                    <Trash2 :size="13" />
-                  </button>
-                </div>
-              </td>
-            </tr>
-            <tr v-if="!sources.length">
-              <td colspan="6" class="empty">暂无视频流源</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <DataTable
+        :columns="sourceColumns"
+        :items="sources"
+        empty-text="暂无视频流源"
+      >
+        <template #status="{ row }">
+          <span
+            v-if="probeText(row.source_id)"
+            class="badge completed"
+          >{{ probeText(row.source_id) }}</span>
+          <span v-else class="muted">未探测</span>
+        </template>
+        <template #actions="{ row }">
+          <div class="toolbar compact">
+            <button
+              class="icon-button"
+              title="探测连接"
+              aria-label="探测连接"
+              @click="probeSource(row)"
+            >
+              <Activity :size="13" />
+            </button>
+            <button class="button secondary" @click="launch(row)">
+              <Play :size="12" />解析
+            </button>
+            <button
+              class="icon-button danger-icon"
+              title="删除"
+              aria-label="删除"
+              @click="deleteSource(row)"
+            >
+              <Trash2 :size="13" />
+            </button>
+          </div>
+        </template>
+      </DataTable>
     </section>
 
     <dialog ref="previewDialog" class="modal preview-modal">

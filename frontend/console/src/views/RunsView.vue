@@ -4,8 +4,6 @@ import {
   AlertCircle,
   ArrowRight,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
   Filter,
   Play,
   RotateCcw,
@@ -15,7 +13,8 @@ import { useRefresh } from "../composables/useRefresh";
 import { useRoute, useRouter } from "vue-router";
 import { api, userFacingError } from "../api";
 import { labelDomain, labelPipeline, labelRunStatus } from "../labels";
-import type { Domain, DomainManifest, Run, RunPage, RunStatus } from "../types";
+import DataTable from "../components/DataTable.vue";
+import type { Domain, DomainManifest, Run, RunPage, RunStatus, TableColumn } from "../types";
 
 const PAGE_SIZE = 20;
 const runs = ref<Run[]>([]);
@@ -177,6 +176,22 @@ function duration(run: Run): string {
   return `${Math.floor(seconds / 60)} 分 ${Math.round(seconds % 60)} 秒`;
 }
 
+const columns: TableColumn<Run>[] = [
+  { key: "run_id", label: "运行", class: "mono truncate" },
+  { key: "domain", label: "领域" },
+  { key: "status", label: "状态" },
+  { key: "progress", label: "进度", class: "progress-cell" },
+  { key: "pipeline", label: "流水线", class: "truncate" },
+  { key: "asset_source", label: "资产/源", class: "mono truncate" },
+  { key: "duration", label: "耗时" },
+  { key: "actions", label: "操作" },
+];
+
+function onPageChange(nextOffset: number): void {
+  offset.value = nextOffset;
+  void refresh();
+}
+
 function resetFilters(): void {
   status.value = "";
   domain.value = "";
@@ -282,112 +297,80 @@ onBeforeUnmount(() => {
     <p v-if="error" class="callout error">{{ error }}</p>
 
     <section class="panel runs-panel">
-      <div class="table-scroll">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th style="width: 50px">序号</th>
-              <th>运行</th>
-              <th>领域</th>
-              <th>状态</th>
-              <th>进度</th>
-              <th>流水线</th>
-              <th>资产/源</th>
-              <th>耗时</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(run, index) in runs" :key="run.run_id">
-              <td class="muted">{{ offset + index + 1 }}</td>
-              <td class="mono truncate">{{ run.run_id }}</td>
-              <td>{{ domainLabel(run.domain) }}</td>
-              <td>
-                <span class="badge" :class="run.status">{{
-                  labelRunStatus(run.status)
-                }}</span>
-              </td>
-              <td class="progress-cell">
-                <div class="progress-inline">
-                  <div
-                    class="progress-track"
-                    role="progressbar"
-                    :aria-valuenow="progressPercent(run)"
-                    aria-valuemin="0"
-                    aria-valuemax="100"
-                  >
-                    <span :style="{ width: `${progressPercent(run)}%` }" />
-                  </div>
-                  <span class="progress-value"
-                    >{{ progressPercent(run) }}%</span
-                  >
-                </div>
-              </td>
-              <td class="truncate">
-                {{ labelPipeline(run.pipeline.pipeline_id) }} ·
-                {{ run.pipeline.version }}
-              </td>
-              <td class="mono truncate">{{ run.asset_id || run.source_id }}</td>
-              <td>{{ duration(run) }}</td>
-              <td>
-                <div class="toolbar compact">
-                  <button class="button secondary" @click="openWorkspace(run)">
-                    查看<ArrowRight :size="12" />
-                  </button>
-                  <button
-                    class="button secondary"
-                    :disabled="run.status !== 'running'"
-                    @click="transition(run, 'pause')"
-                  >
-                    暂停
-                  </button>
-                  <button
-                    class="button secondary"
-                    :disabled="run.status !== 'paused'"
-                    @click="transition(run, 'resume')"
-                  >
-                    恢复
-                  </button>
-                  <button
-                    class="button danger"
-                    :disabled="
-                      ['completed', 'failed', 'cancelled'].includes(run.status)
-                    "
-                    @click="transition(run, 'cancel')"
-                  >
-                    {{ run.status === "cancelling" ? "强制取消" : "取消" }}
-                  </button>
-                </div>
-              </td>
-            </tr>
-            <tr v-if="!runs.length">
-              <td colspan="9" class="empty">暂无运行记录</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div v-if="total > 0" class="pagination">
-        <span class="pagination-info">
-          显示第 <strong>{{ offset + 1 }}-{{ Math.min(total, offset + PAGE_SIZE) }}</strong> 条，共 <strong>{{ total }}</strong> 条记录
-        </span>
-        <div class="pagination-controls">
-          <button
-            class="pagination-btn"
-            :disabled="offset === 0 || loading"
-            @click="prevPage"
-          >
-            <ChevronLeft :size="14" />上一页
-          </button>
-          <span class="pagination-page-indicator">{{ currentPage }} / {{ totalPages }}</span>
-          <button
-            class="pagination-btn"
-            :disabled="offset + PAGE_SIZE >= total || loading"
-            @click="nextPage"
-          >
-            下一页<ChevronRight :size="14" />
-          </button>
-        </div>
-      </div>
+      <DataTable
+        :columns="columns"
+        :items="runs"
+        :loading="loading"
+        :total="total"
+        :offset="offset"
+        :page-size="PAGE_SIZE"
+        :index-offset="offset"
+        empty-text="暂无运行记录"
+        @page-change="onPageChange"
+      >
+        <template #domain="{ row }">
+          {{ domainLabel(row.domain) }}
+        </template>
+        <template #status="{ row }">
+          <span class="badge" :class="row.status">{{
+            labelRunStatus(row.status)
+          }}</span>
+        </template>
+        <template #progress="{ row }">
+          <div class="progress-inline">
+            <div
+              class="progress-track"
+              role="progressbar"
+              :aria-valuenow="progressPercent(row)"
+              aria-valuemin="0"
+              aria-valuemax="100"
+            >
+              <span :style="{ width: `${progressPercent(row)}%` }" />
+            </div>
+            <span class="progress-value">{{ progressPercent(row) }}%</span>
+          </div>
+        </template>
+        <template #pipeline="{ row }">
+          {{ labelPipeline(row.pipeline.pipeline_id) }} ·
+          {{ row.pipeline.version }}
+        </template>
+        <template #asset_source="{ row }">
+          {{ row.asset_id || row.source_id }}
+        </template>
+        <template #duration="{ row }">
+          {{ duration(row) }}
+        </template>
+        <template #actions="{ row }">
+          <div class="toolbar compact">
+            <button class="button secondary" @click="openWorkspace(row)">
+              查看<ArrowRight :size="12" />
+            </button>
+            <button
+              class="button secondary"
+              :disabled="row.status !== 'running'"
+              @click="transition(row, 'pause')"
+            >
+              暂停
+            </button>
+            <button
+              class="button secondary"
+              :disabled="row.status !== 'paused'"
+              @click="transition(row, 'resume')"
+            >
+              恢复
+            </button>
+            <button
+              class="button danger"
+              :disabled="
+                ['completed', 'failed', 'cancelled'].includes(row.status)
+              "
+              @click="transition(row, 'cancel')"
+            >
+              {{ row.status === "cancelling" ? "强制取消" : "取消" }}
+            </button>
+          </div>
+        </template>
+      </DataTable>
     </section>
   </section>
 </template>

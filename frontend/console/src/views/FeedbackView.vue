@@ -11,6 +11,7 @@ import {
   labelModelReleaseStatus,
   labelSystemReason,
 } from "../labels";
+import DataTable from "../components/DataTable.vue";
 import type {
   FeedbackRecord,
   HardSampleManifest,
@@ -21,9 +22,43 @@ import type {
   ResultPage,
   Run,
   RunPage,
+  TableColumn,
 } from "../types";
 
 type Tab = "feedback" | "manifests" | "releases";
+
+const feedbackColumns: TableColumn<FeedbackRecord>[] = [
+  { key: "kind", label: "类型" },
+  { key: "run_id", label: "运行", class: "mono" },
+  { key: "model", label: "模型" },
+  { key: "compliance", label: "合规" },
+  { key: "status", label: "状态" },
+  { key: "actions", label: "操作" },
+];
+
+const manifestColumns: TableColumn<HardSampleManifest>[] = [
+  { key: "dataset", label: "数据集" },
+  { key: "version", label: "版本", class: "mono" },
+  { key: "items", label: "条目" },
+  { key: "sha256", label: "SHA-256", class: "mono" },
+  { key: "created_at", label: "创建时间" },
+];
+
+const releaseColumns: TableColumn<ModelRelease>[] = [
+  { key: "model_id", label: "模型" },
+  { key: "version", label: "版本", class: "mono" },
+  { key: "status", label: "状态" },
+  { key: "evidence_refs", label: "证据" },
+  { key: "actions", label: "操作" },
+];
+
+const eventColumns: TableColumn<ModelDeploymentEvent>[] = [
+  { key: "action", label: "操作" },
+  { key: "model_version", label: "模型版本" },
+  { key: "status_change", label: "状态变化" },
+  { key: "reason", label: "原因" },
+  { key: "created_at", label: "时间" },
+];
 
 const tab = ref<Tab>("feedback");
 const feedback = ref<FeedbackRecord[]>([]);
@@ -371,67 +406,50 @@ useRefresh(refresh);
           <h2>反馈队列</h2>
           <span class="badge">{{ feedback.length }}</span>
         </div>
-        <div class="table-scroll">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th style="width: 50px">序号</th>
-                <th>类型</th>
-                <th>运行</th>
-                <th>模型</th>
-                <th>合规</th>
-                <th>状态</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(item, index) in feedback" :key="item.feedback_id">
-                <td class="muted">{{ index + 1 }}</td>
-                <td>
-                  <strong>{{ labelFeedbackKind(item.kind) }}</strong>
-                  <div class="mono muted">{{ item.feedback_id }}</div>
-                </td>
-                <td class="mono">{{ item.run_id }}</td>
-                <td>
-                  {{ item.model_id }}
-                  <div class="mono muted">{{ item.model_version }}</div>
-                </td>
-                <td>
-                  {{ item.authorized_for_training ? "已授权" : "未授权" }} ·
-                  {{ item.deidentified ? "已脱敏" : "未脱敏" }}
-                </td>
-                <td>
-                  <span class="badge" :class="item.status">{{
-                    labelFeedbackStatus(item.status)
-                  }}</span>
-                </td>
-                <td>
-                  <div v-if="item.status === 'pending'" class="row-actions">
-                    <button
-                      class="icon-button"
-                      title="批准反馈"
-                      :disabled="
-                        !item.authorized_for_training || !item.deidentified
-                      "
-                      @click="review(item, 'approved')"
-                    >
-                      <Check :size="15" /></button
-                    ><button
-                      class="icon-button danger-icon"
-                      title="拒绝反馈"
-                      @click="review(item, 'rejected')"
-                    >
-                      <X :size="15" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="!feedback.length">
-                <td colspan="7" class="empty">暂无反馈</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          :columns="feedbackColumns"
+          :items="feedback"
+          empty-text="暂无反馈"
+        >
+          <template #kind="{ row }">
+            <strong>{{ labelFeedbackKind(row.kind) }}</strong>
+            <div class="mono muted">{{ row.feedback_id }}</div>
+          </template>
+          <template #model="{ row }">
+            {{ row.model_id }}
+            <div class="mono muted">{{ row.model_version }}</div>
+          </template>
+          <template #compliance="{ row }">
+            {{ row.authorized_for_training ? "已授权" : "未授权" }} ·
+            {{ row.deidentified ? "已脱敏" : "未脱敏" }}
+          </template>
+          <template #status="{ row }">
+            <span class="badge" :class="row.status">{{
+              labelFeedbackStatus(row.status)
+            }}</span>
+          </template>
+          <template #actions="{ row }">
+            <div v-if="row.status === 'pending'" class="row-actions">
+              <button
+                class="icon-button"
+                title="批准反馈"
+                :disabled="
+                  !row.authorized_for_training || !row.deidentified
+                "
+                @click="review(row, 'approved')"
+              >
+                <Check :size="15" />
+              </button>
+              <button
+                class="icon-button danger-icon"
+                title="拒绝反馈"
+                @click="review(row, 'rejected')"
+              >
+                <X :size="15" />
+              </button>
+            </div>
+          </template>
+        </DataTable>
       </section>
     </template>
 
@@ -485,36 +503,25 @@ useRefresh(refresh);
           <h2>版本化清单</h2>
           <span class="badge">{{ manifests.length }}</span>
         </div>
-        <div class="table-scroll">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th style="width: 50px">序号</th>
-                <th>数据集</th>
-                <th>版本</th>
-                <th>条目</th>
-                <th>SHA-256</th>
-                <th>创建时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(item, index) in manifests" :key="item.manifest_id">
-                <td class="muted">{{ index + 1 }}</td>
-                <td>
-                  <strong>{{ item.dataset_id }}</strong>
-                  <div class="mono muted">{{ item.manifest_id }}</div>
-                </td>
-                <td class="mono">{{ item.version }}</td>
-                <td>{{ item.items.length }}</td>
-                <td class="mono">{{ item.sha256.slice(0, 16) }}…</td>
-                <td>{{ new Date(item.created_at * 1000).toLocaleString() }}</td>
-              </tr>
-              <tr v-if="!manifests.length">
-                <td colspan="6" class="empty">暂无难例清单</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          :columns="manifestColumns"
+          :items="manifests"
+          empty-text="暂无难例清单"
+        >
+          <template #dataset="{ row }">
+            <strong>{{ row.dataset_id }}</strong>
+            <div class="mono muted">{{ row.manifest_id }}</div>
+          </template>
+          <template #items="{ row }">
+            {{ row.items.length }}
+          </template>
+          <template #sha256="{ row }">
+            <span class="mono">{{ row.sha256.slice(0, 16) }}…</span>
+          </template>
+          <template #created_at="{ row }">
+            {{ new Date(row.created_at * 1000).toLocaleString() }}
+          </template>
+        </DataTable>
       </section>
     </template>
 
@@ -554,126 +561,97 @@ useRefresh(refresh);
           <h2>发布版本</h2>
           <span class="badge">{{ releases.length }}</span>
         </div>
-        <div class="table-scroll">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th style="width: 50px">序号</th>
-                <th>模型</th>
-                <th>版本</th>
-                <th>状态</th>
-                <th>证据</th>
-                <th>操作</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="(item, index) in releases"
-                :key="item.model_id + item.version"
+        <DataTable
+          :columns="releaseColumns"
+          :items="releases"
+          empty-text="暂无发布版本"
+        >
+          <template #model_id="{ row }">
+            <strong>{{ row.model_id }}</strong>
+          </template>
+          <template #status="{ row }">
+            <span class="badge" :class="row.status">{{
+              labelModelReleaseStatus(row.status)
+            }}</span>
+          </template>
+          <template #evidence_refs="{ row }">
+            <details v-if="row.evidence_refs.length">
+              <summary>{{ row.evidence_refs.length }} 项</summary>
+              <div
+                v-for="reference in row.evidence_refs"
+                :key="reference"
+                class="mono evidence-ref"
               >
-                <td class="muted">{{ index + 1 }}</td>
-                <td>
-                  <strong>{{ item.model_id }}</strong>
-                </td>
-                <td class="mono">{{ item.version }}</td>
-                <td>
-                  <span class="badge" :class="item.status">{{
-                    labelModelReleaseStatus(item.status)
-                  }}</span>
-                </td>
-                <td>
-                  <details v-if="item.evidence_refs.length">
-                    <summary>{{ item.evidence_refs.length }} 项</summary>
-                    <div
-                      v-for="reference in item.evidence_refs"
-                      :key="reference"
-                      class="mono evidence-ref"
-                    >
-                      {{ reference }}
-                    </div>
-                  </details>
-                  <span v-else class="muted">未登记</span>
-                </td>
-                <td>
-                  <div class="row-actions">
-                    <button
-                      v-if="nextStatus(item)"
-                      class="button secondary"
-                      :disabled="
-                        item.status === 'candidate' &&
-                        !item.evidence_refs.length
-                      "
-                      :title="
-                        item.status === 'candidate' &&
-                        !item.evidence_refs.length
-                          ? '登记证据后才能验证'
-                          : ''
-                      "
-                      @click="transition(item)"
-                    >
-                      {{
-                        labelModelReleaseStatus(nextStatus(item) || "")
-                      }}</button
-                    ><button
-                      v-if="item.status === 'retired'"
-                      class="icon-button"
-                      title="回滚到此版本"
-                      @click="rollback(item)"
-                    >
-                      <RotateCcw :size="15" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-              <tr v-if="!releases.length">
-                <td colspan="6" class="empty">暂无发布版本</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                {{ reference }}
+              </div>
+            </details>
+            <span v-else class="muted">未登记</span>
+          </template>
+          <template #actions="{ row }">
+            <div class="row-actions">
+              <button
+                v-if="nextStatus(row)"
+                class="button secondary"
+                :disabled="
+                  row.status === 'candidate' &&
+                  !row.evidence_refs.length
+                "
+                :title="
+                  row.status === 'candidate' &&
+                  !row.evidence_refs.length
+                    ? '登记证据后才能验证'
+                    : ''
+                "
+                @click="transition(row)"
+              >
+                {{
+                  labelModelReleaseStatus(nextStatus(row) || "")
+                }}
+              </button>
+              <button
+                v-if="row.status === 'retired'"
+                class="icon-button"
+                title="回滚到此版本"
+                @click="rollback(row)"
+              >
+                <RotateCcw :size="15" />
+              </button>
+            </div>
+          </template>
+        </DataTable>
       </section>
       <section class="panel spaced">
         <div class="panel-header">
           <h2>部署事件</h2>
           <History :size="16" />
         </div>
-        <div class="table-scroll">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th style="width: 50px">序号</th>
-                <th>操作</th>
-                <th>模型版本</th>
-                <th>状态变化</th>
-                <th>原因</th>
-                <th>时间</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(item, index) in events" :key="item.event_id">
-                <td class="muted">{{ index + 1 }}</td>
-                <td>{{ labelDeploymentAction(item.action) }}</td>
-                <td>
-                  {{ item.model_id }}
-                  <div class="mono muted">{{ item.version }}</div>
-                </td>
-                <td>
-                  {{
-                    item.from_status
-                      ? labelModelReleaseStatus(item.from_status)
-                      : "无"
-                  }}
-                  → {{ labelModelReleaseStatus(item.to_status) }}
-                </td>
-                <td>{{ labelSystemReason(item.reason) }}</td>
-                <td>{{ new Date(item.created_at * 1000).toLocaleString() }}</td>
-              </tr>
-              <tr v-if="!events.length">
-                <td colspan="6" class="empty">暂无部署事件</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          :columns="eventColumns"
+          :items="events"
+          empty-text="暂无部署事件"
+        >
+          <template #action="{ row }">
+            {{ labelDeploymentAction(row.action) }}
+          </template>
+          <template #model_version="{ row }">
+            {{ row.model_id }}
+            <div class="mono muted">{{ row.version }}</div>
+          </template>
+          <template #status_change="{ row }">
+            {{
+              row.from_status
+                ? labelModelReleaseStatus(row.from_status)
+                : "无"
+            }}
+            → {{ labelModelReleaseStatus(row.to_status) }}
+          </template>
+          <template #reason="{ row }">
+            {{ labelSystemReason(row.reason) }}
+          </template>
+          <template #created_at="{ row }">
+            {{ new Date(row.created_at * 1000).toLocaleString() }}
+          </template>
+        </DataTable>
       </section>
     </template>
   </section>

@@ -4,12 +4,21 @@ import { onMounted, reactive, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 
 import { api, userFacingError } from "../api";
+import DataTable from "../components/DataTable.vue";
+import type { TableColumn } from "../types";
 
 type RecordMap = {
   record_id: string;
   period_started_at: number;
   [key: string]: string | number | boolean;
 };
+
+const lifecycleColumns: TableColumn<RecordMap>[] = [
+  { key: "project_id", label: "项目" },
+  { key: "action", label: "动作" },
+  { key: "status", label: "状态" },
+  { key: "operations", label: "操作", align: "right", headerAlign: "right" },
+];
 
 const lifecycle = ref<RecordMap[]>([]);
 const identityProviders = ref<RecordMap[]>([]);
@@ -129,19 +138,23 @@ useRefresh(refresh);
       <section class="panel">
         <div class="panel-header"><h2>项目生命周期</h2></div>
         <div class="panel-body form-grid">
-          <label
-            ><span>项目</span
-            ><input v-model="lifecycleForm.project_id" /></label
-          ><label
-            ><span>动作</span
-            ><select v-model="lifecycleForm.action">
+          <label>
+            <span>项目</span>
+            <input v-model="lifecycleForm.project_id" />
+          </label>
+          <label>
+            <span>动作</span>
+            <select v-model="lifecycleForm.action">
               <option value="disable">停用</option>
               <option value="restore">恢复</option>
               <option value="delete">删除</option>
-            </select></label
-          ><label class="span-2"
-            ><span>原因</span><input v-model="lifecycleForm.reason" /></label
-          ><button
+            </select>
+          </label>
+          <label class="span-2">
+            <span>原因</span>
+            <input v-model="lifecycleForm.reason" />
+          </label>
+          <button
             class="button primary"
             :disabled="saving || !lifecycleForm.reason"
             @click="requestLifecycle"
@@ -149,39 +162,22 @@ useRefresh(refresh);
             <ShieldCheck :size="16" />提交审批
           </button>
         </div>
-        <div class="table-scroll">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th style="width: 50px">序号</th>
-                <th>项目</th>
-                <th>动作</th>
-                <th>状态</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(item, index) in lifecycle" :key="item.record_id">
-                <td class="muted">{{ index + 1 }}</td>
-                <td>{{ item.project_id }}</td>
-                <td>{{ item.action }}</td>
-                <td>{{ item.status }}</td>
-                <td>
-                  <button
-                    v-if="item.status === 'pending'"
-                    class="button ghost"
-                    @click="decide(item, true)"
-                  >
-                    <Check :size="14" />批准
-                  </button>
-                </td>
-              </tr>
-              <tr v-if="!lifecycle.length">
-                <td colspan="5" class="empty">暂无待审批记录</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          :columns="lifecycleColumns"
+          :items="lifecycle"
+          :loading="loading"
+          empty-text="暂无待审批记录"
+        >
+          <template #operations="{ row }">
+            <button
+              v-if="row.status === 'pending'"
+              class="button ghost"
+              @click="decide(row, true)"
+            >
+              <Check :size="14" />批准
+            </button>
+          </template>
+        </DataTable>
       </section>
       <section class="panel">
         <div class="panel-header"><h2>审计保留</h2></div>

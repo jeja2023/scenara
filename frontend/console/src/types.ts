@@ -722,3 +722,17 @@ export interface ModelDeploymentEvent {
   audit_id: string;
   created_at: number;
 }
+
+export interface TableColumn<T = any> {
+  key: string;
+  label?: string;
+  width?: string;
+  minWidth?: string;
+  align?: "left" | "center" | "right";
+  headerAlign?: "left" | "center" | "right";
+  class?: string;
+  headerClass?: string;
+  style?: Record<string, string | number> | string;
+  formatter?: (value: any, row: T, index: number) => any;
+}
+
