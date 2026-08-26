@@ -96,7 +96,9 @@ class MediaTechnicalMetadata(StrictModel):
     elapsed_ms: int | None = Field(default=None, ge=0)
     stream_segment_duration_ms: int | None = Field(default=None, ge=1_000)
     stream_segment_index: int | None = Field(default=None, ge=0)
-    timestamp_source: Literal["decoder_pts", "position_msec", "monotonic_clock"] | None = None
+    timestamp_source: (
+        Literal["decoder_pts", "position_msec", "monotonic_clock"] | None
+    ) = None
     native_text_available: bool | None = None
 
 
@@ -489,6 +491,9 @@ class OcrDomainPayload(ExtensibleModel):
     text: str = ""
     blocks: list[OcrTextBlock] = Field(default_factory=list)
     language: str | None = None
+    compliance_report: dict[str, Any] | None = None
+    slides: list[dict[str, Any]] = Field(default_factory=list)
+    html_layout: str | None = None
 
 
 class BehaviorAction(ExtensibleModel):
@@ -501,7 +506,9 @@ class BehaviorAction(ExtensibleModel):
     start_ms: int = Field(ge=0, description="动作开始时间(毫秒)")
     end_ms: int = Field(ge=0, description="动作结束时间(毫秒)")
     track_id: str | None = Field(default=None, description="关联的轨迹 ID")
-    bounding_box: BoundingBox | None = Field(default=None, description="动作主体的边界框")
+    bounding_box: BoundingBox | None = Field(
+        default=None, description="动作主体的边界框"
+    )
 
     @model_validator(mode="after")
     def valid_time_range(self) -> BehaviorAction:
@@ -532,8 +539,12 @@ class BehaviorDomainPayload(ExtensibleModel):
 
     domain: Literal["behavior"] = "behavior"
     schema_version: Literal["1.0"] = "1.0"
-    actions: list[BehaviorAction] = Field(default_factory=list, description="识别到的行为动作列表")
-    segments: list[TemporalSegment] = Field(default_factory=list, description="时序片段列表")
+    actions: list[BehaviorAction] = Field(
+        default_factory=list, description="识别到的行为动作列表"
+    )
+    segments: list[TemporalSegment] = Field(
+        default_factory=list, description="时序片段列表"
+    )
     summary: str = Field(default="", description="行为识别结果摘要")
 
 
@@ -545,7 +556,9 @@ class CosplayDetection(ExtensibleModel):
     series_name: str = Field(description="作品名称,如'海贼王'、'VOCALOID'")
     confidence: float = Field(ge=0, le=1, description="识别置信度")
     bounding_box: BoundingBox | None = Field(default=None, description="角色所在区域")
-    attributes: dict[str, Any] = Field(default_factory=dict, description="角色特征(发色、服装特点等)")
+    attributes: dict[str, Any] = Field(
+        default_factory=dict, description="角色特征(发色、服装特点等)"
+    )
     character_id: str | None = Field(default=None, description="角色唯一标识")
 
 
@@ -553,12 +566,18 @@ class ClothingStyle(ExtensibleModel):
     """服装风格识别结果"""
 
     style_id: str
-    style_type: str = Field(description="风格类型标识(jk_uniform, lolita, hanfu, maid等)")
+    style_type: str = Field(
+        description="风格类型标识(jk_uniform, lolita, hanfu, maid等)"
+    )
     style_label: str = Field(description="风格中文标签")
     confidence: float = Field(ge=0, le=1, description="识别置信度")
     bounding_box: BoundingBox | None = Field(default=None, description="服装所在区域")
-    sub_category: str | None = Field(default=None, description="子类别(如:水手服JK、甜系Lolita)")
-    attributes: dict[str, Any] = Field(default_factory=dict, description="服装属性(颜色、款式等)")
+    sub_category: str | None = Field(
+        default=None, description="子类别(如:水手服JK、甜系Lolita)"
+    )
+    attributes: dict[str, Any] = Field(
+        default_factory=dict, description="服装属性(颜色、款式等)"
+    )
 
 
 class AccessoryDetection(ExtensibleModel):
@@ -578,9 +597,15 @@ class FashionDomainPayload(ExtensibleModel):
 
     domain: Literal["fashion"] = "fashion"
     schema_version: Literal["1.0"] = "1.0"
-    cosplay: list[CosplayDetection] = Field(default_factory=list, description="Cosplay 角色识别结果")
-    clothing_styles: list[ClothingStyle] = Field(default_factory=list, description="服装风格识别结果")
-    accessories: list[AccessoryDetection] = Field(default_factory=list, description="配饰识别结果")
+    cosplay: list[CosplayDetection] = Field(
+        default_factory=list, description="Cosplay 角色识别结果"
+    )
+    clothing_styles: list[ClothingStyle] = Field(
+        default_factory=list, description="服装风格识别结果"
+    )
+    accessories: list[AccessoryDetection] = Field(
+        default_factory=list, description="配饰识别结果"
+    )
     summary: str = Field(default="", description="识别结果摘要")
 
 
@@ -593,7 +618,13 @@ class GenericDomainPayload(ExtensibleModel):
 
 # 保持一方负载的强类型，同时允许插件引入自己的负载结构，
 # 无需修改平台模型联合类型。
-DomainPayload = PortraitDomainPayload | OcrDomainPayload | BehaviorDomainPayload | FashionDomainPayload | GenericDomainPayload
+DomainPayload = (
+    PortraitDomainPayload
+    | OcrDomainPayload
+    | BehaviorDomainPayload
+    | FashionDomainPayload
+    | GenericDomainPayload
+)
 
 
 class MediaUnitResult(StrictModel):
@@ -669,7 +700,9 @@ class ResultEnvelope(StrictModel):
     artifacts: list[ResultArtifact] = Field(default_factory=list)
     models: list[ModelProvenance] = Field(default_factory=list)
     timings: dict[str, float] = Field(default_factory=dict)
-    media_metadata: MediaTechnicalMetadata = Field(default_factory=MediaTechnicalMetadata)
+    media_metadata: MediaTechnicalMetadata = Field(
+        default_factory=MediaTechnicalMetadata
+    )
     warnings: list[str] = Field(default_factory=list)
     provenance: ProvenanceEvidence = Field(default_factory=ProvenanceEvidence)
     created_at: float
@@ -854,7 +887,9 @@ class ProductCatalogItem(StrictModel):
 
 
 type RepositoryId = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.-]{1,63}$")]
-type RepositoryResponsibilityId = Annotated[str, Field(pattern=r"^[a-z][a-z0-9_.-]{1,95}$")]
+type RepositoryResponsibilityId = Annotated[
+    str, Field(pattern=r"^[a-z][a-z0-9_.-]{1,95}$")
+]
 
 
 class RepositoryKind(StrEnum):
@@ -890,7 +925,9 @@ class RepositoryTopologyItem(StrictModel):
     primary_product_ids: list[ProductId] = Field(default_factory=list)
     integration_product_ids: list[ProductId] = Field(default_factory=list)
     responsibilities: list[RepositoryResponsibilityId] = Field(default_factory=list)
-    excluded_responsibilities: list[RepositoryResponsibilityId] = Field(default_factory=list)
+    excluded_responsibilities: list[RepositoryResponsibilityId] = Field(
+        default_factory=list
+    )
     next_gate: str
 
 
@@ -901,7 +938,9 @@ class RepositoryIntegrationContract(StrictModel):
     transport: RepositoryContractTransport
     payload_type: Annotated[str, Field(pattern=r"^[A-Z][A-Za-z0-9]{1,63}$")]
     release_version: Annotated[str, Field(pattern=r"^\d+\.\d+\.\d+$")]
-    schema_path: Annotated[str, Field(pattern=r"^contracts/repository/[^/]+/[^/]+\.schema\.json$")]
+    schema_path: Annotated[
+        str, Field(pattern=r"^contracts/repository/[^/]+/[^/]+\.schema\.json$")
+    ]
     compatibility: Literal["backward"] = "backward"
     invariants: list[RepositoryResponsibilityId] = Field(default_factory=list)
 
@@ -920,14 +959,24 @@ class RepositoryTopology(StrictModel):
             raise ValueError("repository identifiers must be unique")
         if self.current_repository_id not in repository_ids:
             raise ValueError("current repository must exist in repositories")
-        current = [repository.repository_id for repository in self.repositories if repository.current_repository]
+        current = [
+            repository.repository_id
+            for repository in self.repositories
+            if repository.current_repository
+        ]
         if current != [self.current_repository_id]:
-            raise ValueError("exactly the declared current repository must be marked current")
+            raise ValueError(
+                "exactly the declared current repository must be marked current"
+            )
         for contract in self.integration_contracts:
             if contract.producer_repository_id not in repository_ids:
-                raise ValueError(f"unknown producer repository: {contract.producer_repository_id}")
+                raise ValueError(
+                    f"unknown producer repository: {contract.producer_repository_id}"
+                )
             if contract.consumer_repository_id not in repository_ids:
-                raise ValueError(f"unknown consumer repository: {contract.consumer_repository_id}")
+                raise ValueError(
+                    f"unknown consumer repository: {contract.consumer_repository_id}"
+                )
         return self
 
 
@@ -951,7 +1000,9 @@ class AccessCapabilityItem(StrictModel):
 class AccessFoundationStatus(StrictModel):
     schema_version: Literal["1.0"] = "1.0"
     auth_mode: Literal["development_open", "single_bearer_token"]
-    principal_source: Literal["anonymous", "api_token", "service_account_api_key", "header"]
+    principal_source: Literal[
+        "anonymous", "api_token", "service_account_api_key", "header"
+    ]
     tenant_id: str
     project_id: str
     principal_id: str
@@ -1237,7 +1288,9 @@ class PortraitIntelligenceStatus(StrictModel):
     """
 
     schema_version: Literal["1.0"] = "1.0"
-    positioning: Literal["portrait_intelligence_foundation_platform"] = "portrait_intelligence_foundation_platform"
+    positioning: Literal["portrait_intelligence_foundation_platform"] = (
+        "portrait_intelligence_foundation_platform"
+    )
     modules: list[PortraitModuleItem]
     assets: list[PortraitAssetItem]
     capabilities: list[PortraitCapabilityItem]

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import inspect
 import time
 from typing import Any, Literal, Protocol, cast
 
+from scenara.domains.ocr.compliance import OcrComplianceChecker, OcrComplianceHit
 from scenara.platform.media_batch import DecodedMedia
 from scenara.platform.models import (
     BoundingBox,
@@ -20,7 +22,12 @@ from scenara.platform.models import (
     VisionObject,
 )
 from scenara.platform.artifacts import store_object_crop, store_unit_frame
-from scenara.platform.pipeline import DomainUnavailable, ExecutionContext, OperatorDefinition
+from scenara.platform.media import parse_roi
+from scenara.platform.pipeline import (
+    DomainUnavailable,
+    ExecutionContext,
+    OperatorDefinition,
+)
 
 
 class OcrEngine(Protocol):
@@ -58,11 +65,20 @@ class DevelopmentOcrEngine:
             width, height = image.size
         elif hasattr(image, "shape"):
             height, width = image.shape[:2]
+        x1 = max(5.0, min(50.0, width * 0.1))
+        y1 = max(5.0, min(50.0, height * 0.1))
+        x2 = max(x1 + 10.0, width - x1)
+        y2 = max(y1 + 10.0, min(y1 + 50.0, height - y1))
         return [
             {
                 "text": "Scenara 景枢 OCR 演示文本（本地未安装 paddleocr，处于开发回退模式）",
                 "score": 0.98,
-                "polygon": [[50.0, 50.0], [float(width - 50), 50.0], [float(width - 50), 100.0], [50.0, 100.0]],
+                "polygon": [
+                    [x1, y1],
+                    [x2, y1],
+                    [x2, y2],
+                    [x1, y2],
+                ],
                 "language": language_hint or "zh",
                 "block_type": "text",
             }
@@ -77,11 +93,13 @@ class PaddleOcrEngine:
 
     model_id = "paddleocr-production"
     production_ready = True
-    production_capabilities = frozenset([
-        "text_detection",
-        "text_recognition",
-        "multi_language",
-    ])
+    production_capabilities = frozenset(
+        [
+            "text_detection",
+            "text_recognition",
+            "multi_language",
+        ]
+    )
 
     def __init__(self) -> None:
         try:
@@ -92,6 +110,7 @@ class PaddleOcrEngine:
         self.version = str(getattr(paddleocr, "__version__", "unknown"))
 
         from pathlib import Path
+
         ocr_dir = Path("models/ocr")
         det_dir = ocr_dir / "ch_PP-OCRv4_det_infer"
         rec_dir = ocr_dir / "ch_PP-OCRv4_rec_infer"
@@ -221,7 +240,9 @@ def _merge_layout(
             **region,
             "polygon": _polygon(region.get("polygon")),
             "block_type": (
-                str(region.get("block_type")) if str(region.get("block_type")) in OCR_BLOCK_TYPES else "text"
+                str(region.get("block_type"))
+                if str(region.get("block_type")) in OCR_BLOCK_TYPES
+                else "text"
             ),
         }
         for region in regions
@@ -233,13 +254,16 @@ def _merge_layout(
         explicit_type = str(normalized.get("block_type", ""))
         if explicit_type not in OCR_BLOCK_TYPES:
             candidates = [
-                (index, region) for index, region in enumerate(normalized_regions) if _contains(region, normalized)
+                (index, region)
+                for index, region in enumerate(normalized_regions)
+                if _contains(region, normalized)
             ]
             if candidates:
                 index, region = min(
                     candidates,
                     key=lambda pair: (
-                        (_bounds(pair[1])[2] - _bounds(pair[1])[0]) * (_bounds(pair[1])[3] - _bounds(pair[1])[1])
+                        (_bounds(pair[1])[2] - _bounds(pair[1])[0])
+                        * (_bounds(pair[1])[3] - _bounds(pair[1])[1])
                     ),
                 )
                 normalized["block_type"] = region["block_type"]
@@ -253,6 +277,123 @@ def _merge_layout(
     return sorted(merged, key=lambda item: (_bounds(item)[1], _bounds(item)[0]))
 
 
+_parse_roi = parse_roi
+
+
+def _generate_html_layout(
+    width: int,
+    height: int,
+    objects_or_blocks: list[Any],
+    hits: list[Any] | None = None,
+) -> str:
+    """生成 1:1 自适应百分比绝对定位的 HTML 仿真排版页面，支持违规高亮与悬停提示"""
+    if width <= 0 or height <= 0 or not objects_or_blocks:
+        return ""
+
+    hit_map: dict[str, list[Any]] = {}
+    if hits:
+        for h in hits:
+            bid = getattr(h, "block_id", None)
+            if bid:
+                hit_map.setdefault(bid, []).append(h)
+
+    block_elements: list[str] = []
+    for item in objects_or_blocks:
+        text = ""
+        bid = ""
+        btype = "text"
+        bx, by, bw, bh = 0.0, 0.0, 0.0, 0.0
+
+        if isinstance(item, VisionObject):
+            bid = item.object_id
+            btype = item.object_type or "text"
+            text = str(item.attributes.get("text", "") or "")
+            if item.bbox is not None:
+                bx, by, bw, bh = (
+                    item.bbox.x,
+                    item.bbox.y,
+                    item.bbox.width,
+                    item.bbox.height,
+                )
+        elif isinstance(item, OcrTextBlock):
+            bid = item.block_id
+            btype = item.block_type or "text"
+            text = item.text or ""
+            if item.polygon:
+                xs = [p.x for p in item.polygon]
+                ys = [p.y for p in item.polygon]
+                bx, by, bw, bh = min(xs), min(ys), max(xs) - min(xs), max(ys) - min(ys)
+        elif isinstance(item, dict):
+            bid = str(item.get("block_id", ""))
+            btype = str(item.get("block_type", "text"))
+            text = str(item.get("text", "") or "")
+            b = _bounds(item)
+            if b[0] != float("inf"):
+                bx, by, bw, bh = b[0], b[1], b[2] - b[0], b[3] - b[1]
+
+        if not text.strip() or bw <= 0 or bh <= 0:
+            continue
+
+        left_pct = round((bx / width) * 100, 3)
+        top_pct = round((by / height) * 100, 3)
+        width_pct = round((bw / width) * 100, 3)
+        height_pct = round((bh / height) * 100, 3)
+
+        font_size_px = max(11, min(48, int(bh * 0.72)))
+        font_weight = "bold" if btype == "title" else "normal"
+        line_height = max(1.1, round(bh / max(1, font_size_px), 2))
+
+        display_text = html.escape(text)
+        block_hits = hit_map.get(bid, [])
+        if block_hits:
+            for h in block_hits:
+                h_word = html.escape(getattr(h, "word", ""))
+                h_sev = getattr(h, "severity", "suspect")
+                h_cat = html.escape(getattr(h, "rule_category", ""))
+                h_ref = html.escape(getattr(h, "legal_reference", ""))
+                h_sug = html.escape(getattr(h, "suggestion", ""))
+                mark_tag = (
+                    f'<mark class="ocr-compliance-mark ocr-compliance-{h_sev}" '
+                    f'title="{h_cat}: {h_ref} &#10;建议: {h_sug}">{h_word}</mark>'
+                )
+                display_text = display_text.replace(h_word, mark_tag)
+
+        elem = (
+            f'<div class="ocr-visual-block ocr-type-{btype}" '
+            f'data-block-id="{bid}" '
+            f'style="position: absolute; left: {left_pct}%; top: {top_pct}%; '
+            f"width: {width_pct}%; height: {height_pct}%; "
+            f"display: flex; align-items: center; justify-content: flex-start; "
+            f"font-size: clamp(10px, {font_size_px}px, 52px); font-weight: {font_weight}; "
+            f'line-height: {line_height}; overflow: hidden; word-break: break-word;">'
+            f'<span class="ocr-block-inner">{display_text}</span>'
+            f"</div>"
+        )
+        block_elements.append(elem)
+
+    content_html = "\n    ".join(block_elements)
+    styles = (
+        "<style>\n"
+        ".ocr-visual-container { position: relative; width: 100%; aspect-ratio: "
+        f"{width} / {height}; "
+        "background-color: #ffffff; color: #1e293b; box-shadow: 0 4px 20px rgba(0,0,0,0.06); "
+        "border-radius: 6px; overflow: hidden; user-select: text; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }\n"
+        ".ocr-visual-block { box-sizing: border-box; transition: background 0.15s ease; }\n"
+        ".ocr-visual-block:hover { background-color: rgba(59, 130, 246, 0.08); outline: 1px dashed rgba(59, 130, 246, 0.4); }\n"
+        ".ocr-type-title { color: #0f172a; }\n"
+        ".ocr-compliance-mark { border-radius: 2px; padding: 0 2px; cursor: help; }\n"
+        ".ocr-compliance-mark.ocr-compliance-block { background-color: rgba(239, 68, 68, 0.25); color: #dc2626; border-bottom: 2px wavy #dc2626; font-weight: bold; }\n"
+        ".ocr-compliance-mark.ocr-compliance-suspect { background-color: rgba(245, 158, 11, 0.25); color: #d97706; border-bottom: 2px wavy #d97706; }\n"
+        "</style>"
+    )
+    return (
+        f"{styles}\n"
+        f'<div class="ocr-visual-container" data-width="{width}" data-height="{height}">\n'
+        f"    {content_html}\n"
+        f"</div>"
+    )
+
+
 def _predict_blocks(
     engine: OcrEngine,
     image: Any,
@@ -262,7 +403,9 @@ def _predict_blocks(
 ) -> list[dict[str, Any]]:
     """Call both the 1.0 bare-image adapter and the extended OCR adapter safely."""
     parameters = inspect.signature(engine.predict).parameters.values()
-    accepts_kwargs = any(parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters)
+    accepts_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD for parameter in parameters
+    )
     names = {parameter.name for parameter in parameters}
     options: dict[str, Any] = {}
     if accepts_kwargs or "min_score" in names:
@@ -316,12 +459,18 @@ class OcrDocumentOperator:
         motion_filter_enabled = bool(parameters.get("motion_filter_enabled", True))
         motion_threshold = float(parameters.get("motion_threshold", 0.025))
         deduplicate_text = bool(parameters.get("deduplicate_text", True))
+        raw_roi = parameters.get("roi")
+        enable_compliance = bool(parameters.get("enable_compliance", True))
+        deduplicate_slides = bool(parameters.get("deduplicate_slides", True))
+        layout_reconstruction = bool(parameters.get("layout_reconstruction", True))
 
         # 检查生产就绪状态
         production_ready = bool(getattr(engine, "production_ready", False))
         layout_predictor = getattr(engine, "predict_layout", None)
         layout_capabilities = frozenset(getattr(engine, "production_capabilities", ()))
-        layout_ready = callable(layout_predictor) and "layout_analysis" in layout_capabilities
+        layout_ready = (
+            callable(layout_predictor) and "layout_analysis" in layout_capabilities
+        )
 
         if context.production and not production_ready:
             raise DomainUnavailable("OCR engine is not approved for production")
@@ -355,6 +504,8 @@ class OcrDocumentOperator:
         blocks: list[OcrTextBlock] = []
         units: list[MediaUnitResult] = []
         tracked_texts: list[dict[str, Any]] = []
+        slides_catalog: list[dict[str, Any]] = []
+        prev_unit_pts_ms: int | None = None
         reading_order = 0
         processed_units = 0
         detected_languages: dict[str, int] = {}
@@ -367,7 +518,10 @@ class OcrDocumentOperator:
             # 确定主要语言
             dominant_language = None
             if detected_languages:
-                dominant_language = max(detected_languages, key=lambda language: detected_languages[language])
+                dominant_language = max(
+                    detected_languages,
+                    key=lambda language: detected_languages[language],
+                )
 
             # 构建聚合文本展示（针对视频/时序流或多页文档进行去重与时间戳标记）
             is_time_series = decoded.kind in {MediaKind.VIDEO, MediaKind.STREAM}
@@ -384,14 +538,21 @@ class OcrDocumentOperator:
                     else:
                         formatted_lines.append(f"[{start_t}] {txt}")
                 aggregate_text = "\n".join(formatted_lines)
-            elif deduplicate_text and any(u.page_number for u in units) and len(units) > 1 and tracked_texts:
+            elif (
+                deduplicate_text
+                and any(u.page_number for u in units)
+                and len(units) > 1
+                and tracked_texts
+            ):
                 formatted_lines = []
                 for track in tracked_texts:
                     txt = track["text"].strip()
                     if not txt:
                         continue
                     if track["first_page"] != track["last_page"]:
-                        formatted_lines.append(f"[第 {track['first_page']}-{track['last_page']} 页] {txt}")
+                        formatted_lines.append(
+                            f"[第 {track['first_page']}-{track['last_page']} 页] {txt}"
+                        )
                     elif track["first_page"] is not None:
                         formatted_lines.append(f"[第 {track['first_page']} 页] {txt}")
                     else:
@@ -400,10 +561,36 @@ class OcrDocumentOperator:
             else:
                 aggregate_text = "\n".join(block.text for block in blocks if block.text)
 
+            # 文本合规性审核
+            compliance_report_dict: dict[str, Any] | None = None
+            hits_list: list[OcrComplianceHit] = []
+            if enable_compliance and aggregate_text.strip():
+                checker = OcrComplianceChecker()
+                rep = checker.inspect(aggregate_text, blocks=blocks)
+                compliance_report_dict = rep.model_dump()
+                hits_list = rep.hits
+                # 同步为各 Slide 也计算合规报告
+                for s in slides_catalog:
+                    s_rep = checker.inspect(s.get("text", ""))
+                    s["compliance"] = s_rep.model_dump()
+
+            # HTML 仿真排版生成
+            html_layout_str: str | None = None
+            if layout_reconstruction and units:
+                first_u = units[0]
+                html_layout_str = _generate_html_layout(
+                    first_u.width,
+                    first_u.height,
+                    first_u.objects,
+                    hits=hits_list,
+                )
+
             return ResultEnvelope(
                 run_id=context.run_id,
                 domain="ocr",
-                pipeline=PipelineRef(pipeline_id=context.pipeline_id, version=context.pipeline_version),
+                pipeline=PipelineRef(
+                    pipeline_id=context.pipeline_id, version=context.pipeline_version
+                ),
                 asset_id=context.asset_id,
                 source_id=context.source_id,
                 units=list(units),
@@ -411,9 +598,14 @@ class OcrDocumentOperator:
                     text=aggregate_text,
                     blocks=list(blocks),
                     language=dominant_language,
+                    compliance_report=compliance_report_dict,
+                    slides=list(slides_catalog),
+                    html_layout=html_layout_str,
                 ),
                 models=models,
-                media_metadata=decoded.metadata.model_copy(update={"sampled_units": processed_units}),
+                media_metadata=decoded.metadata.model_copy(
+                    update={"sampled_units": processed_units}
+                ),
                 warnings=warnings,
                 provenance=ProvenanceEvidence(development_substitutes=substitutes),
                 created_at=time.time(),
@@ -430,13 +622,24 @@ class OcrDocumentOperator:
 
             async for chunk, expected_units in decoded.iter_batches(batch_size):
                 for unit in chunk:
+                    # ROI 区域检测与局部裁剪
+                    crop_box = _parse_roi(raw_roi, unit.width, unit.height)
+                    if crop_box is not None:
+                        cx1, cy1, cx2, cy2 = crop_box
+                        pred_image = unit.image.crop((cx1, cy1, cx2, cy2))
+                    else:
+                        cx1, cy1 = 0, 0
+                        pred_image = unit.image
+
                     # 动静态画面检测：若画面无显著动态变化，直接复用上一帧识别结果，极速跳过深度推理
                     is_static_frame = False
                     curr_thumb = None
                     if motion_filter_enabled and is_time_series:
-                        curr_thumb = _get_gray_thumb(unit.image)
+                        curr_thumb = _get_gray_thumb(pred_image)
                         if prev_thumb is not None and cached_raw_blocks:
-                            diff = float(np.mean(np.abs(curr_thumb - prev_thumb))) / 255.0
+                            diff = (
+                                float(np.mean(np.abs(curr_thumb - prev_thumb))) / 255.0
+                            )
                             if diff < motion_threshold:
                                 is_static_frame = True
 
@@ -448,7 +651,7 @@ class OcrDocumentOperator:
                         raw_blocks = await asyncio.to_thread(
                             _predict_blocks,
                             engine,
-                            unit.image,
+                            pred_image,
                             min_score=min_score,
                             language_hint=language_hint,
                         )
@@ -456,23 +659,85 @@ class OcrDocumentOperator:
                         # 执行版面分析(如果需要且支持)
                         regions = []
                         if layout_required and callable(layout_predictor):
-                            predicted = await asyncio.to_thread(layout_predictor, unit.image)
+                            predicted = await asyncio.to_thread(
+                                layout_predictor, pred_image
+                            )
                             if not isinstance(predicted, list):
                                 raise TypeError("OCR layout engine must return a list")
-                            regions = [item for item in predicted if isinstance(item, dict)]
+                            regions = [
+                                item for item in predicted if isinstance(item, dict)
+                            ]
+
+                        # 若进行了 ROI 局部裁剪，将 polygon 坐标无损逆映射回原图全画幅坐标系
+                        if crop_box is not None and (cx1 > 0 or cy1 > 0):
+                            offset_blocks = []
+                            for b in raw_blocks:
+                                poly = b.get("polygon")
+                                if isinstance(poly, (list, tuple)):
+                                    offset_blocks.append(
+                                        {
+                                            **b,
+                                            "polygon": [
+                                                [float(p[0]) + cx1, float(p[1]) + cy1]
+                                                for p in poly
+                                                if len(p) >= 2
+                                            ],
+                                        }
+                                    )
+                                else:
+                                    offset_blocks.append(b)
+                            raw_blocks = offset_blocks
+
+                            offset_regions = []
+                            for r in regions:
+                                poly = r.get("polygon")
+                                if isinstance(poly, (list, tuple)):
+                                    offset_regions.append(
+                                        {
+                                            **r,
+                                            "polygon": [
+                                                [float(p[0]) + cx1, float(p[1]) + cy1]
+                                                for p in poly
+                                                if len(p) >= 2
+                                            ],
+                                        }
+                                    )
+                                else:
+                                    offset_regions.append(r)
+                            regions = offset_regions
 
                         cached_raw_blocks = raw_blocks
                         cached_regions = regions
-                        if motion_filter_enabled and is_time_series and curr_thumb is not None:
+                        if (
+                            motion_filter_enabled
+                            and is_time_series
+                            and curr_thumb is not None
+                        ):
                             prev_thumb = curr_thumb
 
                     # 合并版面信息
                     ordered_blocks = _merge_layout(raw_blocks, regions)
+                    if crop_box is not None:
+                        cx1, cy1, cx2, cy2 = crop_box
+                        filtered_blocks = []
+                        for b in ordered_blocks:
+                            b_left, b_top, b_right, b_bottom = _bounds(b)
+                            if b_left != float("inf"):
+                                bcx = (b_left + b_right) / 2.0
+                                bcy = (b_top + b_bottom) / 2.0
+                                if not (cx1 <= bcx <= cx2 and cy1 <= bcy <= cy2):
+                                    continue
+                            filtered_blocks.append(b)
+                        ordered_blocks = filtered_blocks
+
                     unit_objects: list[VisionObject] = []
 
                     # 构建结果块
                     for block_index, item in enumerate(ordered_blocks):
-                        points = [Point(x=point[0], y=point[1]) for point in _polygon(item.get("polygon"))]
+                        points = [
+                            Point(x=point[0], y=point[1])
+                            for point in _polygon(item.get("polygon"))
+                        ]
                         block_type = str(item.get("block_type", "text"))
                         if block_type not in OCR_BLOCK_TYPES:
                             block_type = "text"
@@ -483,7 +748,9 @@ class OcrDocumentOperator:
                         # 统计语言
                         lang = item.get("language")
                         if lang:
-                            detected_languages[lang] = detected_languages.get(lang, 0) + len(text)
+                            detected_languages[lang] = detected_languages.get(
+                                lang, 0
+                            ) + len(text)
 
                         # 计算包围盒
                         left, top, right, bottom = _bounds(item)
@@ -506,7 +773,8 @@ class OcrDocumentOperator:
                             score=score,
                             polygon=points,
                             block_type=cast(
-                                Literal["text", "title", "paragraph", "image", "table"], block_type
+                                Literal["text", "title", "paragraph", "image", "table"],
+                                block_type,
                             ),
                             reading_order=reading_order,
                         )
@@ -517,7 +785,9 @@ class OcrDocumentOperator:
 
                         # 添加表格结构信息(如果有)
                         if block_type == "table" and "table_structure" in item:
-                            ocr_block.__dict__["table_structure"] = item["table_structure"]
+                            ocr_block.__dict__["table_structure"] = item[
+                                "table_structure"
+                            ]
 
                         blocks.append(ocr_block)
 
@@ -527,8 +797,13 @@ class OcrDocumentOperator:
                             for track in reversed(tracked_texts):
                                 if track["text"] == text:
                                     if (
-                                        (track["last_pts_ms"] is not None and unit.pts_ms is not None and unit.pts_ms - track["last_pts_ms"] <= 4000)
-                                        or (track["last_page"] is not None and unit.page_number is not None and unit.page_number == track["last_page"] + 1)
+                                        track["last_pts_ms"] is not None
+                                        and unit.pts_ms is not None
+                                        and unit.pts_ms - track["last_pts_ms"] <= 4000
+                                    ) or (
+                                        track["last_page"] is not None
+                                        and unit.page_number is not None
+                                        and unit.page_number == track["last_page"] + 1
                                     ):
                                         matched_track = track
                                         break
@@ -571,8 +846,11 @@ class OcrDocumentOperator:
                         reading_order += 1
 
                     frame_artifact_id = (
-                        await store_unit_frame(getattr(context, "artifacts", None), unit.image)
-                        if unit_objects or decoded.kind not in {MediaKind.VIDEO, MediaKind.STREAM}
+                        await store_unit_frame(
+                            getattr(context, "artifacts", None), unit.image
+                        )
+                        if unit_objects
+                        or decoded.kind not in {MediaKind.VIDEO, MediaKind.STREAM}
                         else None
                     )
                     units.append(
@@ -588,11 +866,62 @@ class OcrDocumentOperator:
                             frame_artifact_id=frame_artifact_id,
                         )
                     )
+
+                    # 轮播海报聚类与生命周期追踪
+                    unit_text = "\n".join(
+                        str(o.attributes.get("text", "")).strip()
+                        for o in unit_objects
+                        if o.attributes.get("text")
+                    )
+                    if deduplicate_slides and unit_text.strip():
+                        matched_slide = None
+                        for s in reversed(slides_catalog):
+                            if s["text"].strip() == unit_text.strip():
+                                matched_slide = s
+                                break
+                        if matched_slide is not None:
+                            matched_slide["last_pts_ms"] = unit.pts_ms
+                            matched_slide["last_page"] = unit.page_number
+                            matched_slide["display_count"] += 1
+                            if (
+                                prev_unit_pts_ms is not None
+                                and unit.pts_ms is not None
+                                and unit.pts_ms > prev_unit_pts_ms
+                            ):
+                                delta_s = (unit.pts_ms - prev_unit_pts_ms) / 1000.0
+                                matched_slide["duration_seconds"] = round(
+                                    matched_slide["duration_seconds"] + delta_s, 2
+                                )
+                        else:
+                            slide_html = (
+                                _generate_html_layout(
+                                    unit.width, unit.height, unit_objects
+                                )
+                                if layout_reconstruction
+                                else ""
+                            )
+                            slides_catalog.append(
+                                {
+                                    "slide_id": f"slide_{len(slides_catalog) + 1}",
+                                    "first_pts_ms": unit.pts_ms,
+                                    "last_pts_ms": unit.pts_ms,
+                                    "first_page": unit.page_number,
+                                    "last_page": unit.page_number,
+                                    "display_count": 1,
+                                    "duration_seconds": 0.0,
+                                    "text": unit_text,
+                                    "frame_artifact_id": frame_artifact_id,
+                                    "html_layout": slide_html,
+                                    "object_count": len(unit_objects),
+                                }
+                            )
+                    prev_unit_pts_ms = unit.pts_ms
                 processed_units += len(chunk)
                 progress = (
                     None
                     if expected_units is None
-                    else 0.03 + 0.94 * min(1.0, processed_units / max(1, expected_units))
+                    else 0.03
+                    + 0.94 * min(1.0, processed_units / max(1, expected_units))
                 )
                 if decoded.kind in {MediaKind.VIDEO, MediaKind.STREAM}:
                     await context.publish_partial_result(build_result())

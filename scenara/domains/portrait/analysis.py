@@ -8,6 +8,7 @@ from uuid import uuid4
 from PIL import Image
 
 from scenara.platform.artifacts import store_object_crop, store_unit_frame
+from scenara.platform.media import is_box_in_roi, parse_roi
 from scenara.platform.media_batch import DecodedMedia
 from scenara.platform.model_runtime import current_runtime_binding
 from scenara.platform.models import (
@@ -376,6 +377,7 @@ async def _convert_analysis_chunk(
     kind: MediaKind,
     units: list[Any],
     analyses: list[dict[str, Any]],
+    raw_roi: Any = None,
 ) -> tuple[list[VisionObject], list[VisionObject], list[MediaUnitResult], list[ResultRelation], list[ResultIndexVector]]:
     persons: list[VisionObject] = []
     faces: list[VisionObject] = []
@@ -385,8 +387,14 @@ async def _convert_analysis_chunk(
     for unit, analysis in zip(units, analyses, strict=True):
         objects: list[VisionObject] = []
         unit_persons: list[VisionObject] = []
+        unit_roi = parse_roi(raw_roi, unit.width, unit.height)
         for item in analysis.get("persons", []):
             person_box = _box(item.get("box"))
+            if unit_roi is not None:
+                if person_box is None or not is_box_in_roi(
+                    person_box.x, person_box.y, person_box.width, person_box.height, unit_roi
+                ):
+                    continue
             person = VisionObject(
                 object_id=f"person_{uuid4().hex}",
                 object_type="person",
@@ -401,6 +409,11 @@ async def _convert_analysis_chunk(
             objects.append(person)
         for item in analysis.get("faces", []):
             face_box = _box(item.get("box"))
+            if unit_roi is not None:
+                if face_box is None or not is_box_in_roi(
+                    face_box.x, face_box.y, face_box.width, face_box.height, unit_roi
+                ):
+                    continue
             face = VisionObject(
                 object_id=f"face_{uuid4().hex}",
                 object_type="face",
@@ -439,6 +452,12 @@ async def _convert_analysis_chunk(
                 )
         for item in analysis.get("silhouettes", []):
             points = [Point(x=float(point[0]), y=float(point[1])) for point in item.get("polygon", [])]
+            if unit_roi is not None and points:
+                cx = sum(p.x for p in points) / len(points)
+                cy = sum(p.y for p in points) / len(points)
+                rx1, ry1, rx2, ry2 = unit_roi
+                if not (rx1 <= cx <= rx2 and ry1 <= cy <= ry2):
+                    continue
             silhouette = VisionObject(
                 object_id=f"silhouette_{uuid4().hex}",
                 object_type="silhouette",
@@ -515,120 +534,36 @@ class PortraitFullAnalysisOperator:
         missing = requested - self._backend.production_capabilities()
         if context.production and missing:
             raise DomainUnavailable("production portrait capabilities are unavailable: " + ", ".join(sorted(missing)))
+        raw_roi = parameters.get("roi")
         if decoded.stream is not None:
-            return await self._execute_progressive(context, decoded, requested)
+            return await self._execute_progressive(context, decoded, requested, raw_roi=raw_roi)
         output = await self._backend.analyze(
             [unit.image for unit in decoded.units],
             [context.filename for _ in decoded.units],
             requested,
         )
 
-        persons: list[VisionObject] = []
-        faces: list[VisionObject] = []
-        unit_results: list[MediaUnitResult] = []
-        relations: list[ResultRelation] = []
-        index_vectors: list[ResultIndexVector] = []
-        for unit, analysis in zip(decoded.units, output.units, strict=True):
-            objects: list[VisionObject] = []
-            unit_persons: list[VisionObject] = []
-            for item in analysis.get("persons", []):
-                person_box = _box(item.get("box"))
-                person = VisionObject(
-                    object_id=f"person_{uuid4().hex}",
-                    object_type="person",
-                    score=float(item["score"]) if item.get("score") is not None else None,
-                    bbox=person_box,
-                    track_id=str(item["track_id"]) if item.get("track_id") else None,
-                    attributes=_safe_attributes(item),
-                    crop_artifact_id=await store_object_crop(context.artifacts, unit.image, bbox=person_box),
-                )
-                persons.append(person)
-                unit_persons.append(person)
-                objects.append(person)
-            for item in analysis.get("faces", []):
-                face_box = _box(item.get("box"))
-                face = VisionObject(
-                    object_id=f"face_{uuid4().hex}",
-                    object_type="face",
-                    score=float(item["score"]) if item.get("score") is not None else None,
-                    bbox=face_box,
-                    attributes=_safe_attributes(item),
-                    crop_artifact_id=await store_object_crop(context.artifacts, unit.image, bbox=face_box),
-                )
-                faces.append(face)
-                objects.append(face)
-                embedding = item.get("embedding")
-                if isinstance(embedding, list) and embedding:
-                    model_id = str(item.get("embedding_model_id") or item.get("model_id") or "unknown")
-                    model_version = str(
-                        item.get("embedding_model_version") or item.get("model_version") or "unknown"
-                    )
-                    quality = item.get("quality")
-                    quality_score = None
-                    if isinstance(quality, dict) and quality.get("score") is not None:
-                        quality_score = max(0.0, min(1.0, float(quality["score"])))
-                    index_vectors.append(
-                        ResultIndexVector(
-                            object_id=face.object_id,
-                            feature_space_id=f"portrait.face.{model_id}.{model_version}",
-                            model_id=model_id,
-                            model_version=model_version,
-                            vector=[float(value) for value in embedding],
-                            quality=quality_score,
-                        )
-                    )
-                if unit_persons:
-                    relations.append(
-                        ResultRelation(
-                            relation_type="belongs_to",
-                            source_object_id=face.object_id,
-                            target_object_id=unit_persons[0].object_id,
-                        )
-                    )
-            for item in analysis.get("silhouettes", []):
-                points = [Point(x=float(point[0]), y=float(point[1])) for point in item.get("polygon", [])]
-                silhouette = VisionObject(
-                    object_id=f"silhouette_{uuid4().hex}",
-                    object_type="silhouette",
-                    score=float(item["score"]) if item.get("score") is not None else None,
-                    polygon=points,
-                    attributes=_safe_attributes(item),
-                    crop_artifact_id=await store_object_crop(context.artifacts, unit.image, polygon=points),
-                )
-                objects.append(silhouette)
-                if unit_persons:
-                    relations.append(
-                        ResultRelation(
-                            relation_type="segments",
-                            source_object_id=silhouette.object_id,
-                            target_object_id=unit_persons[0].object_id,
-                        )
-                    )
-            if not objects and decoded.kind in {MediaKind.VIDEO, MediaKind.STREAM}:
-                continue
-            unit_results.append(
-                MediaUnitResult(
-                    unit_id=unit.unit_id,
-                    unit_type=unit.unit_type,
-                    index=unit.index,
-                    pts_ms=unit.pts_ms,
-                    page_number=unit.page_number,
-                    width=unit.width,
-                    height=unit.height,
-                    objects=objects,
-                    frame_artifact_id=(
-                        await store_unit_frame(context.artifacts, unit.image)
-                        if objects
-                        else None
-                    ),
-                )
-            )
+        converted = await _convert_analysis_chunk(
+            context, decoded.kind, decoded.units, output.units, raw_roi=raw_roi
+        )
+        persons, faces, unit_results, relations, index_vectors = converted
 
         warnings = list(output.warnings)
         if decoded.termination_reason:
             warnings.append(f"media_termination:{decoded.termination_reason}")
         if output.development_substitutes:
             warnings.append("development_substitutes:" + ",".join(sorted(output.development_substitutes)))
+        valid_track_ids = {p.track_id for p in persons if p.track_id} if raw_roi else None
+        filtered_tracks = (
+            [
+                t
+                for t in output.tracks
+                if (getattr(t, "track_id", None) or (t.get("track_id") if isinstance(t, dict) else None))
+                in valid_track_ids
+            ]
+            if valid_track_ids is not None
+            else output.tracks
+        )
         result = ResultEnvelope(
             run_id=context.run_id,
             domain="portrait",
@@ -639,7 +574,7 @@ class PortraitFullAnalysisOperator:
             domain_payload=PortraitDomainPayload(
                 persons=persons,
                 faces=faces,
-                tracks=output.tracks,
+                tracks=filtered_tracks,
                 capabilities=sorted(requested),
             ),
             relations=relations,
@@ -659,6 +594,7 @@ class PortraitFullAnalysisOperator:
         context: ExecutionContext,
         decoded: DecodedMedia,
         requested: frozenset[str],
+        raw_roi: Any = None,
     ) -> dict[str, Any]:
         persons: list[VisionObject] = []
         faces: list[VisionObject] = []
@@ -731,15 +667,20 @@ class PortraitFullAnalysisOperator:
                     [context.filename for _ in chunk],
                     requested,
                 )
-                converted = await _convert_analysis_chunk(context, decoded.kind, chunk, output.units)
+                converted = await _convert_analysis_chunk(
+                    context, decoded.kind, chunk, output.units, raw_roi=raw_roi
+                )
                 chunk_persons, chunk_faces, chunk_units, chunk_relations, chunk_vectors = converted
                 persons.extend(chunk_persons)
                 faces.extend(chunk_faces)
                 unit_results.extend(chunk_units)
                 relations.extend(chunk_relations)
                 index_vectors.extend(chunk_vectors)
+                valid_track_ids = {p.track_id for p in chunk_persons if p.track_id} if raw_roi else None
                 for track in output.tracks:
                     track_id = str(track.get("track_id") or f"batch-{batch_index}-track-{len(tracks)}")
+                    if valid_track_ids is not None and track_id not in valid_track_ids:
+                        continue
                     incoming = {**track, "track_id": track_id}
                     position = track_positions.get(track_id)
                     if position is None:
@@ -749,6 +690,8 @@ class PortraitFullAnalysisOperator:
                         merge_track(tracks[position], incoming)
                 for track in _with_presentation_times(output.trajectory_tracks, chunk):
                     track_id = str(track.get("track_id") or f"batch-{batch_index}-trajectory-{len(trajectory_tracks)}")
+                    if valid_track_ids is not None and track_id not in valid_track_ids:
+                        continue
                     incoming = {**track, "track_id": track_id}
                     position = trajectory_positions.get(track_id)
                     if position is None:

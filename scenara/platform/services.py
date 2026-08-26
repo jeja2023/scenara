@@ -25,6 +25,7 @@ from scenara.platform.models import (
     TERMINAL_RUN_STATUSES,
     CreateMediaSourceRequest,
     CreateRunRequest,
+    GenericDomainPayload,
     MediaAsset,
     MediaKind,
     MediaSource,
@@ -918,10 +919,66 @@ class RunService:
     ) -> tuple[ResultEnvelope, ResultReference]:
         """Load the result index document without materialising sharded units."""
 
-        await self._get_run(context, run_id)
+        run = await self._get_run(context, run_id)
         reference = await self.state.get_result_reference(context.tenant_id, context.project_id, run_id)
         if reference is None:
+            if run.status in {
+                RunStatus.CANCELLED,
+                RunStatus.CANCELLING,
+                RunStatus.QUEUED,
+                RunStatus.RUNNING,
+                RunStatus.FAILED,
+            }:
+                synthetic_result = ResultEnvelope(
+                    run_id=run.run_id,
+                    domain=run.domain,
+                    pipeline=run.pipeline,
+                    asset_id=run.asset_id,
+                    source_id=run.source_id,
+                    units=[],
+                    domain_payload=GenericDomainPayload(domain=run.domain),
+                    relations=[],
+                    artifacts=[],
+                    models=[],
+                    timings={},
+                    media_metadata=MediaTechnicalMetadata(),
+                    warnings=[],
+                    created_at=run.created_at,
+                )
+                synthetic_reference = ResultReference(
+                    run_id=run.run_id,
+                    object_key="",
+                    sha256="0" * 64,
+                    unit_count=0,
+                    shard_keys=[],
+                    shard_sha256=[],
+                    shard_unit_counts=[],
+                    domain=run.domain,
+                    created_at=run.created_at,
+                    asset_id=run.asset_id,
+                    source_id=run.source_id,
+                    index_status="ready",
+                )
+                return synthetic_result, synthetic_reference
             raise ResourceNotFound("run result is not available")
+        if not reference.object_key and reference.unit_count == 0:
+            synthetic_result = ResultEnvelope(
+                run_id=run.run_id,
+                domain=run.domain,
+                pipeline=run.pipeline,
+                asset_id=run.asset_id,
+                source_id=run.source_id,
+                units=[],
+                domain_payload=GenericDomainPayload(domain=run.domain),
+                relations=[],
+                artifacts=[],
+                models=[],
+                timings={},
+                media_metadata=MediaTechnicalMetadata(),
+                warnings=[],
+                created_at=run.created_at,
+            )
+            return synthetic_result, reference
         document = await self.objects.get(reference.object_key, expected_sha256=reference.sha256)
         if hashlib.sha256(document).hexdigest() != reference.sha256:
             raise PipelineError("stored result checksum does not match its database reference")
@@ -1369,9 +1426,6 @@ class RunService:
             if run.source_id and run.stream_session_id and media_termination == "segment_window_completed":
                 await self._rollover_stream_segment(run)
         except ExecutionStopped:
-            await self._discard_partial_result(run)
-            if sink is not None:
-                await sink.discard()
             latest = await self.state.get_run(run.tenant_id, run.project_id, run.run_id)
             if latest and latest.status != RunStatus.CANCELLED:
                 cancelled = await self._set_status(
@@ -1391,6 +1445,28 @@ class RunService:
                     resource_id=run.run_id,
                     evidence={"status": cancelled.status.value},
                 )
+            try:
+                reference = await self.state.get_result_reference(run.tenant_id, run.project_id, run.run_id)
+                if reference is not None:
+                    if sink is not None:
+                        for record in sink.retention_records(
+                            created_at=run.created_at,
+                            expires_at=run.created_at + self.preview_retention_days * 86_400,
+                        ):
+                            await self.state.track_object(record)
+                    await self._event(
+                        run,
+                        "result.available",
+                        {
+                            "result_schema_version": reference.schema_version,
+                            "unit_count": reference.unit_count,
+                            "result_url": f"/api/v1/runs/{run.run_id}/result",
+                        },
+                    )
+                elif sink is not None:
+                    await sink.discard()
+            except Exception:
+                logger.exception("could not finalize retained partial result for cancelled run %s", run.run_id)
         except Exception as exc:
             logger.exception("run execution failed for %s", run.run_id)
             await self._discard_partial_result(run)

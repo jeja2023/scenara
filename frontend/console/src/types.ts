@@ -736,3 +736,49 @@ export interface TableColumn<T = any> {
   formatter?: (value: any, row: T, index: number) => any;
 }
 
+export interface OcrComplianceHit {
+  rule_id: string;
+  rule_category: string;
+  severity: "block" | "suspect" | "info" | string;
+  word: string;
+  start: number;
+  end: number;
+  block_id?: string | null;
+  legal_reference: string;
+  suggestion: string;
+}
+
+export interface OcrComplianceReport {
+  status: "pass" | "suspect" | "block" | string;
+  risk_score: number;
+  total_hits: number;
+  hits: OcrComplianceHit[];
+  summary: string;
+}
+
+export interface OcrSlideCard {
+  slide_id: string;
+  first_pts_ms?: number | null;
+  last_pts_ms?: number | null;
+  first_page?: number | null;
+  last_page?: number | null;
+  display_count: number;
+  duration_seconds: number;
+  text: string;
+  frame_artifact_id?: string | null;
+  html_layout?: string | null;
+  object_count: number;
+  compliance?: OcrComplianceReport | null;
+}
+
+export interface OcrDomainPayload {
+  domain: "ocr";
+  text?: string;
+  language?: string | null;
+  compliance_report?: OcrComplianceReport | null;
+  slides?: OcrSlideCard[];
+  html_layout?: string | null;
+  [key: string]: unknown;
+}
+
+

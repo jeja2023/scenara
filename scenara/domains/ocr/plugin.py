@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from scenara.domains.ocr.operators import OcrDocumentOperator, OcrEngine
 from scenara.platform.models import PipelineStatus
-from scenara.platform.pipeline import PipelineDefinition, PipelineNode, PipelineParameterDefinition
+from scenara.platform.pipeline import (
+    PipelineDefinition,
+    PipelineNode,
+    PipelineParameterDefinition,
+)
 from scenara.platform.plugins import DomainManifest
 
 
@@ -72,6 +76,10 @@ class OcrPlugin:
                     "scene_change_threshold",
                     "frame_max_edge",
                     "page_scale",
+                    "roi",
+                    "enable_compliance",
+                    "deduplicate_slides",
+                    "layout_reconstruction",
                 },
                 parameter_schema={
                     "layout_required": PipelineParameterDefinition(
@@ -79,6 +87,32 @@ class OcrPlugin:
                         control="boolean",
                         default=False,
                         description="是否对识别结果进行版面类型划分(段落、表格、标题等)",
+                    ),
+                    "enable_compliance": PipelineParameterDefinition(
+                        label="文本合规审查",
+                        control="boolean",
+                        default=True,
+                        description="开启《广告法》极限词、虚假承诺、不良导向与隐蔽引流等合规性检测",
+                    ),
+                    "layout_reconstruction": PipelineParameterDefinition(
+                        label="HTML排版还原",
+                        control="boolean",
+                        default=True,
+                        description="按画面真实坐标生成 1:1 自适应 HTML 视觉仿真排版",
+                    ),
+                    "deduplicate_slides": PipelineParameterDefinition(
+                        label="海报/版面去重",
+                        control="boolean",
+                        default=True,
+                        media_kinds={"video", "stream", "document"},
+                        description="感知大屏海报轮播切换，自动聚类去重并统计展示频次与累计时长",
+                    ),
+                    "roi": PipelineParameterDefinition(
+                        label="识别区域(ROI)",
+                        control="text",
+                        placeholder="[x1, y1, x2, y2] 归一化比例",
+                        advanced=True,
+                        description="指定感兴趣识别区域，例如 [0.1, 0.1, 0.9, 0.9]，只对圈定区域进行文字识别",
                     ),
                     "min_score": PipelineParameterDefinition(
                         label="最低置信度",

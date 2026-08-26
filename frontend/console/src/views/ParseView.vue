@@ -4,6 +4,7 @@ import {
   ChevronDown,
   ChevronUp,
   Clock3,
+  Crop,
   Eye,
   FileImage,
   FileText,
@@ -17,6 +18,7 @@ import {
   Square,
   Upload,
   Video,
+  X,
 } from "@lucide/vue";
 import {
   computed,
@@ -146,6 +148,159 @@ const connectTimeoutMs = ref(10_000);
 const readTimeoutMs = ref(10_000);
 const showAdvanced = ref(false);
 
+// 识别区域 (ROI) 圈选
+const mediaStageRef = ref<HTMLElement | null>(null);
+const stageRectVersion = ref(0);
+const isDrawingRoi = ref(false);
+const roiStart = ref<{ x: number; y: number } | null>(null);
+const roiCurrent = ref<{ x: number; y: number } | null>(null);
+const selectedRoi = ref<[number, number, number, number] | null>(null);
+
+function onStageResize(): void {
+  stageRectVersion.value += 1;
+}
+
+function toggleRoiDrawing(): void {
+  isDrawingRoi.value = !isDrawingRoi.value;
+  if (isDrawingRoi.value) {
+    roiStart.value = null;
+    roiCurrent.value = null;
+  }
+}
+
+function clearRoi(): void {
+  selectedRoi.value = null;
+  isDrawingRoi.value = false;
+  roiStart.value = null;
+  roiCurrent.value = null;
+  if (pipelineParameters.value.roi) {
+    delete pipelineParameters.value.roi;
+  }
+}
+
+interface MediaBounds {
+  renderLeft: number;
+  renderTop: number;
+  renderWidth: number;
+  renderHeight: number;
+}
+
+function getMediaContentBounds(stageEl: HTMLElement): MediaBounds {
+  const stage = stageEl.getBoundingClientRect();
+  const img = stageEl.querySelector("img") as HTMLImageElement | null;
+  const video = stageEl.querySelector("video") as HTMLVideoElement | null;
+  let naturalW = 0;
+  let naturalH = 0;
+  if (img && img.naturalWidth > 0 && img.naturalHeight > 0) {
+    naturalW = img.naturalWidth;
+    naturalH = img.naturalHeight;
+  } else if (video && video.videoWidth > 0 && video.videoHeight > 0) {
+    naturalW = video.videoWidth;
+    naturalH = video.videoHeight;
+  } else if (selectedUnit.value?.width && selectedUnit.value?.height) {
+    naturalW = selectedUnit.value.width;
+    naturalH = selectedUnit.value.height;
+  }
+
+  if (!naturalW || !naturalH || stage.width <= 0 || stage.height <= 0) {
+    return {
+      renderLeft: 0,
+      renderTop: 0,
+      renderWidth: stage.width || 1,
+      renderHeight: stage.height || 1,
+    };
+  }
+
+  const stageRatio = stage.width / stage.height;
+  const naturalRatio = naturalW / naturalH;
+  let renderWidth: number;
+  let renderHeight: number;
+  let renderLeft: number;
+  let renderTop: number;
+
+  if (naturalRatio > stageRatio) {
+    renderWidth = stage.width;
+    renderHeight = stage.width / naturalRatio;
+    renderLeft = 0;
+    renderTop = (stage.height - renderHeight) / 2;
+  } else {
+    renderHeight = stage.height;
+    renderWidth = stage.height * naturalRatio;
+    renderLeft = (stage.width - renderWidth) / 2;
+    renderTop = 0;
+  }
+
+  return { renderLeft, renderTop, renderWidth, renderHeight };
+}
+
+function handleRoiMouseDown(e: MouseEvent): void {
+  if (!isDrawingRoi.value || e.button !== 0) return;
+  e.preventDefault();
+  e.stopPropagation();
+  const stageEl = mediaStageRef.value;
+  if (!stageEl) return;
+  const stage = stageEl.getBoundingClientRect();
+  const bounds = getMediaContentBounds(stageEl);
+  const clientXRel = e.clientX - stage.left;
+  const clientYRel = e.clientY - stage.top;
+  const x = Math.max(0, Math.min(1, (clientXRel - bounds.renderLeft) / bounds.renderWidth));
+  const y = Math.max(0, Math.min(1, (clientYRel - bounds.renderTop) / bounds.renderHeight));
+  roiStart.value = { x, y };
+  roiCurrent.value = { x, y };
+
+  window.addEventListener("mousemove", handleRoiMouseMove);
+  window.addEventListener("mouseup", handleRoiMouseUp);
+}
+
+function handleRoiMouseMove(e: MouseEvent): void {
+  if (!isDrawingRoi.value || !roiStart.value) return;
+  e.preventDefault();
+  const stageEl = mediaStageRef.value;
+  if (!stageEl) return;
+  const stage = stageEl.getBoundingClientRect();
+  const bounds = getMediaContentBounds(stageEl);
+  const clientXRel = e.clientX - stage.left;
+  const clientYRel = e.clientY - stage.top;
+  const x = Math.max(0, Math.min(1, (clientXRel - bounds.renderLeft) / bounds.renderWidth));
+  const y = Math.max(0, Math.min(1, (clientYRel - bounds.renderTop) / bounds.renderHeight));
+  roiCurrent.value = { x, y };
+}
+
+function handleRoiMouseUp(e?: MouseEvent): void {
+  window.removeEventListener("mousemove", handleRoiMouseMove);
+  window.removeEventListener("mouseup", handleRoiMouseUp);
+  if (!isDrawingRoi.value || !roiStart.value) return;
+
+  if (e && mediaStageRef.value) {
+    const stage = mediaStageRef.value.getBoundingClientRect();
+    const bounds = getMediaContentBounds(mediaStageRef.value);
+    const clientXRel = e.clientX - stage.left;
+    const clientYRel = e.clientY - stage.top;
+    const x = Math.max(0, Math.min(1, (clientXRel - bounds.renderLeft) / bounds.renderWidth));
+    const y = Math.max(0, Math.min(1, (clientYRel - bounds.renderTop) / bounds.renderHeight));
+    roiCurrent.value = { x, y };
+  }
+
+  const current = roiCurrent.value || roiStart.value;
+  const minX = Math.max(0, Math.min(roiStart.value.x, current.x));
+  const maxX = Math.min(1, Math.max(roiStart.value.x, current.x));
+  const minY = Math.max(0, Math.min(roiStart.value.y, current.y));
+  const maxY = Math.min(1, Math.max(roiStart.value.y, current.y));
+
+  if (maxX - minX > 0.005 && maxY - minY > 0.005) {
+    selectedRoi.value = [
+      Math.round(minX * 1000) / 1000,
+      Math.round(minY * 1000) / 1000,
+      Math.round(maxX * 1000) / 1000,
+      Math.round(maxY * 1000) / 1000,
+    ];
+    pipelineParameters.value.roi = `[${selectedRoi.value.join(", ")}]`;
+  }
+  isDrawingRoi.value = false;
+  roiStart.value = null;
+  roiCurrent.value = null;
+}
+
 const loading = ref(false);
 const transitioning = ref(false);
 const loadingSources = ref(false);
@@ -158,6 +313,27 @@ const progressDetail = ref("");
 const showWarnings = ref(false);
 const historyRuns = ref<Run[]>([]);
 const loadingHistory = ref(false);
+
+function syncRunToHistory(r: Run): void {
+  if (!r?.run_id || !Array.isArray(historyRuns.value)) return;
+  const index = historyRuns.value.findIndex((item) => item.run_id === r.run_id);
+  if (index >= 0) {
+    historyRuns.value = historyRuns.value.map((item, idx) =>
+      idx === index
+        ? {
+            ...item,
+            status: r.status,
+            progress: r.progress,
+            finished_at: r.finished_at ?? item.finished_at,
+            termination_reason: r.termination_reason ?? item.termination_reason,
+            error_code: r.error_code ?? item.error_code,
+          }
+        : item,
+    );
+  } else {
+    historyRuns.value = [{ ...r }, ...historyRuns.value];
+  }
+}
 let pollGeneration = 0;
 let resultLoadSequence = 0;
 let sseAbort: AbortController | null = null;
@@ -276,6 +452,46 @@ const selectedUnit = computed(
   () => result.value?.units[selectedUnitIndex.value] ?? result.value?.units[0],
 );
 const selectedObjects = computed(() => selectedUnit.value?.objects ?? []);
+
+const roiBoxStyle = computed(() => {
+  void stageRectVersion.value;
+  let x1 = 0;
+  let y1 = 0;
+  let x2 = 0;
+  let y2 = 0;
+  if (isDrawingRoi.value && roiStart.value && roiCurrent.value) {
+    x1 = Math.min(roiStart.value.x, roiCurrent.value.x);
+    x2 = Math.max(roiStart.value.x, roiCurrent.value.x);
+    y1 = Math.min(roiStart.value.y, roiCurrent.value.y);
+    y2 = Math.max(roiStart.value.y, roiCurrent.value.y);
+  } else if (selectedRoi.value) {
+    [x1, y1, x2, y2] = selectedRoi.value;
+  } else {
+    return null;
+  }
+
+  const stageEl = mediaStageRef.value;
+  if (stageEl) {
+    const bounds = getMediaContentBounds(stageEl);
+    const left = bounds.renderLeft + x1 * bounds.renderWidth;
+    const top = bounds.renderTop + y1 * bounds.renderHeight;
+    const width = (x2 - x1) * bounds.renderWidth;
+    const height = (y2 - y1) * bounds.renderHeight;
+    return {
+      left: `${left.toFixed(1)}px`,
+      top: `${top.toFixed(1)}px`,
+      width: `${width.toFixed(1)}px`,
+      height: `${height.toFixed(1)}px`,
+    };
+  }
+
+  return {
+    left: `${(x1 * 100).toFixed(2)}%`,
+    top: `${(y1 * 100).toFixed(2)}%`,
+    width: `${((x2 - x1) * 100).toFixed(2)}%`,
+    height: `${((y2 - y1) * 100).toFixed(2)}%`,
+  };
+});
 
 const isTerminal = computed(
   () =>
@@ -408,9 +624,19 @@ function selectMode(value: MediaMode): void {
   file.value = null;
   assetId.value = "";
   showAdvanced.value = false;
+  clearRoi();
   clearMediaUrl();
   resetResult();
-  if (value === "stream") void refreshSources();
+  if (value === "stream") {
+    void refreshSources().then(() => {
+      if (sources.value.length && !sourceId.value) {
+        sourceId.value = sources.value[0]?.source_id ?? "";
+      }
+      if (sourceId.value) {
+        void loadStreamPreview(sourceId.value);
+      }
+    });
+  }
   navigateWorkspace(domain.value, value);
 }
 
@@ -418,6 +644,7 @@ function selectOrigin(value: InputOrigin): void {
   inputOrigin.value = value;
   file.value = null;
   assetId.value = "";
+  clearRoi();
   clearMediaUrl();
   resetResult();
 }
@@ -425,6 +652,7 @@ function selectOrigin(value: InputOrigin): void {
 function selectDomain(value: Domain): void {
   if (domain.value === value) return;
   domain.value = value;
+  clearRoi();
   pipelineId.value = "";
   domainSearch.value = "";
   resetResult();
@@ -434,14 +662,101 @@ function selectDomain(value: Domain): void {
   void refreshHistory();
 }
 
+function extractLocalVideoFrame(selectedFile: File): void {
+  const tempVideo = document.createElement("video");
+  tempVideo.preload = "auto";
+  tempVideo.src = URL.createObjectURL(selectedFile);
+  tempVideo.muted = true;
+  tempVideo.playsInline = true;
+  tempVideo.currentTime = 0.001;
+  tempVideo.onloadeddata = () => {
+    try {
+      tempVideo.currentTime = 0.001;
+    } catch {}
+  };
+  tempVideo.onseeked = () => {
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = tempVideo.videoWidth || 640;
+      canvas.height = tempVideo.videoHeight || 360;
+      const ctx = canvas.getContext("2d");
+      if (ctx) {
+        ctx.drawImage(tempVideo, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL("image/jpeg");
+        if (dataUrl && !serverPreviewUrl.value) {
+          serverPreviewUrl.value = dataUrl;
+        }
+      }
+    } catch {}
+    URL.revokeObjectURL(tempVideo.src);
+  };
+  tempVideo.onerror = () => {
+    URL.revokeObjectURL(tempVideo.src);
+  };
+}
+
+let preloadSequence = 0;
+async function autoPreloadAsset(selectedFile: File): Promise<void> {
+  const seq = ++preloadSequence;
+  try {
+    const form = new FormData();
+    form.append("file", selectedFile);
+    form.append("kind", mode.value);
+    const asset = await api<MediaAsset>("/api/v1/media/assets", {
+      method: "POST",
+      body: form,
+    });
+    if (seq !== preloadSequence || file.value !== selectedFile) return;
+    assets.value = [
+      asset,
+      ...assets.value.filter((item) => item.asset_id !== asset.asset_id),
+    ];
+    assetId.value = asset.asset_id;
+    await loadServerPreview(asset.asset_id);
+  } catch {
+    // 尽力而为预加载首帧，不阻断前端交互
+  }
+}
+
 function selectFile(event: Event): void {
   const selected = (event.target as HTMLInputElement).files?.[0] ?? null;
   inputOrigin.value = "upload";
   assetId.value = "";
   file.value = selected;
   clearMediaUrl();
-  mediaUrl.value = selected ? URL.createObjectURL(selected) : "";
   resetResult();
+  if (!selected) return;
+  mediaUrl.value = URL.createObjectURL(selected);
+
+  // 本地视频与文档添加后立即生成首帧预览，保障在解析前即可在底图上精准标注 ROI
+  if (mode.value === "video") {
+    extractLocalVideoFrame(selected);
+    void autoPreloadAsset(selected);
+  } else if (mode.value === "document") {
+    void autoPreloadAsset(selected);
+  }
+}
+
+async function previewNewStream(): Promise<void> {
+  if (!sourceUrl.value) return;
+  try {
+    const id = await ensureSource();
+    await loadStreamPreview(id);
+  } catch (caught) {
+    error.value = userFacingError(
+      caught,
+      "获取视频流首帧预览失败，请检查流地址与网络连通性",
+    );
+  }
+}
+
+function handleVideoLoadedData(): void {
+  const video = videoElement.value;
+  if (video && video.currentTime === 0) {
+    try {
+      video.currentTime = 0.001;
+    } catch {}
+  }
 }
 
 function selectLibraryAsset(): void {
@@ -490,6 +805,7 @@ async function loadResult(runId: string, ignoreMissing = false): Promise<void> {
       return;
     throw caught;
   }
+  if (!first?.result) return;
   const existingUnits =
     result.value?.run_id === runId ? result.value.units : [];
   let units =
@@ -500,7 +816,7 @@ async function loadResult(runId: string, ignoreMissing = false): Promise<void> {
     const page = await api<ResultPage>(
       `/api/v1/runs/${encodeURIComponent(runId)}/result?unit_offset=${units.length}&unit_limit=${pageSize}`,
     );
-    if (!page.result.units.length) break;
+    if (!page?.result?.units?.length) break;
     units.push(...page.result.units);
   }
   if (loadSequence !== resultLoadSequence) return;
@@ -562,12 +878,15 @@ function subscribeEvents(runId: string): EventSubscription {
           run.value = await api<Run>(
             "/api/v1/runs/" + encodeURIComponent(runId),
           );
+          syncRunToHistory(run.value);
+          void refreshHistory();
         } else if (run.value && !isTerminal.value) {
           run.value = {
             ...run.value,
             status: event.status ?? run.value.status,
             progress: event.payload?.progress ?? run.value.progress,
           };
+          syncRunToHistory(run.value);
         }
         if (event.payload?.processed_units != null) {
           progressDetail.value =
@@ -628,6 +947,7 @@ async function getRunWithNetworkRetry(
 async function pollRun(initial: Run): Promise<void> {
   const generation = ++pollGeneration;
   run.value = initial;
+  syncRunToHistory(initial);
   const subscription = subscribeEvents(initial.run_id);
   if (await subscription.connected) {
     await subscription.completed;
@@ -643,6 +963,7 @@ async function pollRun(initial: Run): Promise<void> {
     if (!refreshed) return;
     const progressChanged = refreshed.progress > run.value.progress;
     run.value = refreshed;
+    syncRunToHistory(refreshed);
     if (progressChanged && !isTerminal.value) {
       void loadResult(initial.run_id, true).catch(() => undefined);
     }
@@ -651,8 +972,12 @@ async function pollRun(initial: Run): Promise<void> {
     sseAbort.abort();
     sseAbort = null;
   }
-  if (generation !== pollGeneration || run.value.status !== "completed") return;
-  await loadResult(initial.run_id);
+  if (generation !== pollGeneration) return;
+  syncRunToHistory(run.value);
+  void refreshHistory();
+  if (run.value.status === "completed" || run.value.status === "cancelled") {
+    await loadResult(initial.run_id, true);
+  }
   if (mode.value === "stream" && run.value.next_run_id) {
     const next = await api<Run>(
       "/api/v1/runs/" + encodeURIComponent(run.value.next_run_id),
@@ -720,6 +1045,9 @@ function runParameters(): Record<string, unknown> {
     )
       params[key] = value;
   }
+  if (selectedRoi.value) {
+    params.roi = selectedRoi.value;
+  }
   return params;
 }
 
@@ -755,6 +1083,7 @@ async function execute(): Promise<void> {
       }),
     });
     run.value = created;
+    syncRunToHistory(created);
     await router.replace({
       path: workspacePath(domain.value, mode.value),
       query: {
@@ -805,8 +1134,26 @@ function applyRunParameters(parameters: Record<string, unknown>): void {
     maxReconnectAttempts.value = Number(parameters.max_reconnect_attempts);
   if (parameters.connect_timeout_ms != null)
     connectTimeoutMs.value = Number(parameters.connect_timeout_ms);
-  if (parameters.read_timeout_ms != null)
-    readTimeoutMs.value = Number(parameters.read_timeout_ms);
+  if (parameters.roi) {
+    if (Array.isArray(parameters.roi) && parameters.roi.length === 4) {
+      selectedRoi.value = [
+        Number(parameters.roi[0]),
+        Number(parameters.roi[1]),
+        Number(parameters.roi[2]),
+        Number(parameters.roi[3]),
+      ];
+    } else if (typeof parameters.roi === "string") {
+      const matches = parameters.roi.match(/[-+]?(?:\d*\.\d+|\d+)/g);
+      if (matches && matches.length === 4) {
+        selectedRoi.value = [
+          Number(matches[0]),
+          Number(matches[1]),
+          Number(matches[2]),
+          Number(matches[3]),
+        ];
+      }
+    }
+  }
   const schema = selectedPipeline.value?.parameter_schema ?? {};
   for (const key of Object.keys(schema)) {
     if (parameters[key] !== undefined)
@@ -863,9 +1210,9 @@ async function loadExistingRun(runId: string): Promise<void> {
     });
     run.value = existing;
     await refreshHistory();
-    if (existing.status === "completed") {
-      await loadResult(existing.run_id);
-    } else if (!["failed", "cancelled"].includes(existing.status)) {
+    if (existing.status === "completed" || existing.status === "cancelled") {
+      await loadResult(existing.run_id, true);
+    } else if (existing.status !== "failed") {
       void loadResult(existing.run_id, true).catch(() => undefined);
       followRun(existing);
     }
@@ -919,8 +1266,15 @@ async function transitionRun(
       { method: "POST" },
     );
     run.value = updated;
-    if (!["completed", "failed", "cancelled"].includes(updated.status))
+    syncRunToHistory(updated);
+    if (action === "cancel") {
+      await loadResult(current.run_id, true);
+      void refreshHistory();
+    } else if (!["completed", "failed", "cancelled"].includes(updated.status)) {
       followRun(updated);
+    } else {
+      void refreshHistory();
+    }
   } catch (caught) {
     error.value = userFacingError(caught, "运行状态更新失败，请刷新后重试");
   } finally {
@@ -1241,6 +1595,15 @@ watch(domain, () => {
 watch(pipelineId, () => syncPipelineParameterDefaults());
 watch(selectedUnitIndex, syncSelectedMediaFrame);
 watch(
+  () => [mode.value, sourceId.value],
+  ([currentMode, currentSourceId]) => {
+    if (currentMode === "stream" && currentSourceId) {
+      void loadStreamPreview(currentSourceId);
+    }
+  },
+  { immediate: true },
+);
+watch(
   () => [
     run.value?.run_id ?? "",
     selectedUnit.value?.unit_id ?? "",
@@ -1251,7 +1614,23 @@ watch(
   ],
   syncSelectedMediaFrame,
 );
+watch(
+  () => [run.value?.run_id, run.value?.status, run.value?.progress],
+  ([newId, newStatus]) => {
+    if (run.value) {
+      syncRunToHistory(run.value);
+      if (
+        newStatus &&
+        ["completed", "failed", "cancelled"].includes(newStatus as string)
+      ) {
+        void refreshHistory();
+      }
+    }
+  },
+  { deep: true },
+);
 onMounted(async () => {
+  window.addEventListener("resize", onStageResize);
   await refreshWorkspaceResources();
   await restoreRouteSelection();
   await refreshHistory();
@@ -1260,6 +1639,9 @@ useRefresh(async () => {
   await Promise.all([refreshWorkspaceResources(), refreshHistory()]);
 });
 onBeforeUnmount(() => {
+  window.removeEventListener("resize", onStageResize);
+  window.removeEventListener("mousemove", handleRoiMouseMove);
+  window.removeEventListener("mouseup", handleRoiMouseUp);
   pollGeneration += 1;
   if (sseAbort) {
     sseAbort.abort();
@@ -1439,11 +1821,52 @@ onBeforeUnmount(() => {
       </div>
       <div class="panel-body input-layout">
         <div class="media-preview-column">
-          <div class="media-stage">
+          <!-- 识别区域 (ROI) 圈选工具栏 -->
+          <div class="ocr-roi-toolbar">
+            <div class="roi-toolbar-left">
+              <button
+                type="button"
+                class="button small"
+                :class="isDrawingRoi ? 'primary' : 'secondary'"
+                @click="toggleRoiDrawing"
+              >
+                <Crop :size="13" />
+                {{ isDrawingRoi ? "正在拖拽圈选 (松开完成)" : (selectedRoi ? "重新圈选区域" : "圈选识别区域 (ROI)") }}
+              </button>
+              <span v-if="selectedRoi" class="roi-badge">
+                ROI: [{{ selectedRoi.map((v) => v.toFixed(3)).join(", ") }}]
+              </span>
+            </div>
+            <div v-if="selectedRoi" class="roi-toolbar-right">
+              <button
+                type="button"
+                class="button small ghost text-danger"
+                title="清除圈选区域，恢复全画幅识别"
+                @click="clearRoi"
+              >
+                <X :size="13" />
+                清除区域
+              </button>
+            </div>
+          </div>
+
+          <div
+            ref="mediaStageRef"
+            class="media-stage"
+            :class="{ 'roi-drawing-mode': isDrawingRoi }"
+            @mousedown="handleRoiMouseDown"
+          >
+            <!-- 圈选专用防劫持透明捕获层 -->
+            <div
+              v-if="isDrawingRoi"
+              class="roi-drawing-layer"
+            />
             <img
               v-if="mode === 'image' && displayedMediaUrl"
               :src="displayedMediaUrl"
               alt="待解析图片"
+              draggable="false"
+              @load="onStageResize"
               @error="handleImageError"
             />
             <template
@@ -1457,13 +1880,21 @@ onBeforeUnmount(() => {
                 alt="当前解析帧"
                 @load="handleResultFrameLoaded"
               />
+              <img
+                v-else-if="serverPreviewUrl && !result && !videoPlaying"
+                :src="serverPreviewUrl"
+                alt="视频首帧预览"
+                draggable="false"
+                @load="onStageResize"
+              />
               <video
                 v-else-if="mediaUrl && !videoPlaybackFailed"
                 ref="videoElement"
                 :src="mediaUrl"
                 controls
-                preload="metadata"
+                preload="auto"
                 @loadedmetadata="syncVideoToSelectedUnit"
+                @loadeddata="handleVideoLoadedData"
                 @seeked="handleVideoSeeked"
                 @play="handleVideoPlay"
                 @pause="handleVideoPause"
@@ -1473,6 +1904,8 @@ onBeforeUnmount(() => {
                 v-else-if="serverPreviewUrl"
                 :src="serverPreviewUrl"
                 alt="视频首帧预览"
+                draggable="false"
+                @load="onStageResize"
               />
               <div v-else class="empty">
                 视频文件无法在浏览器中播放，解析后将显示首帧
@@ -1485,12 +1918,15 @@ onBeforeUnmount(() => {
                 v-if="shouldUseResultFrame && resultFrameUrl"
                 :src="resultFrameUrl"
                 alt="当前解析页"
+                draggable="false"
                 @load="handleResultFrameLoaded"
               />
               <img
                 v-else-if="serverPreviewUrl"
                 :src="serverPreviewUrl"
                 alt="文档首页预览"
+                draggable="false"
+                @load="onStageResize"
               />
               <div v-else class="stream-stage">
                 <FileText :size="28" />
@@ -1512,12 +1948,15 @@ onBeforeUnmount(() => {
                 v-if="shouldUseResultFrame && resultFrameUrl"
                 :src="resultFrameUrl"
                 alt="当前解析帧"
+                draggable="false"
                 @load="handleResultFrameLoaded"
               />
               <img
                 v-else-if="streamPreviewUrl"
                 :src="streamPreviewUrl"
                 alt="实时流首帧预览"
+                draggable="false"
+                @load="onStageResize"
               />
               <div v-else class="stream-stage">
                 <Radio :size="28" />
@@ -1546,6 +1985,14 @@ onBeforeUnmount(() => {
               class="overlay"
               aria-hidden="true"
             />
+            <!-- 识别区域 (ROI) 选框覆层 -->
+            <div
+              v-if="roiBoxStyle"
+              class="roi-overlay-box"
+              :style="roiBoxStyle"
+            >
+              <span class="roi-box-label">ROI 识别区域</span>
+            </div>
           </div>
           <div v-if="overlayStatus" class="overlay-status" aria-live="polite">
             <Info :size="14" />
@@ -1672,11 +2119,23 @@ onBeforeUnmount(() => {
               </label>
               <label>
                 <span>视频流地址</span>
-                <input
-                  v-model.trim="sourceUrl"
-                  maxlength="4096"
-                  placeholder="rtsp://host/path"
-                />
+                <div class="stream-url-field">
+                  <input
+                    v-model.trim="sourceUrl"
+                    maxlength="4096"
+                    placeholder="rtsp://host/path"
+                  />
+                  <button
+                    type="button"
+                    class="button small secondary stream-preview-btn"
+                    :disabled="!sourceUrl"
+                    title="立即从视频流拉取首帧画面作为底图预览"
+                    @click="previewNewStream"
+                  >
+                    <Eye :size="13" />
+                    <span>预览首帧</span>
+                  </button>
+                </div>
               </label>
             </template>
           </template>
@@ -1959,6 +2418,22 @@ onBeforeUnmount(() => {
 <style scoped>
 .parse-workbench {
   gap: 14px;
+}
+.stream-url-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.stream-url-field input {
+  flex: 1;
+  min-width: 0;
+}
+.stream-preview-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
 }
 .parse-context-nav {
   display: flex;
@@ -2532,5 +3007,85 @@ pre {
   .result-counters div {
     padding-inline: 8px;
   }
+}
+
+/* OCR ROI Selection */
+.ocr-roi-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface-soft, #f8fafc);
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.roi-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.roi-badge {
+  font-size: 11px;
+  font-family: var(--font-mono, monospace);
+  background: #eff6ff;
+  color: #2563eb;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.roi-drawing-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  cursor: crosshair;
+  background: transparent;
+}
+
+.media-stage.roi-drawing-mode {
+  cursor: crosshair !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+.media-stage.roi-drawing-mode * {
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-user-drag: none !important;
+}
+
+.media-stage img,
+.media-stage video {
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.roi-overlay-box {
+  position: absolute;
+  border: 2px dashed #2563eb;
+  background: rgba(37, 99, 235, 0.18);
+  pointer-events: none;
+  z-index: 12;
+  box-sizing: border-box;
+  transition: none;
+}
+
+.roi-box-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-bottom-right-radius: 4px;
+  user-select: none;
+  pointer-events: none;
 }
 </style>

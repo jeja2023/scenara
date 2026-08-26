@@ -1,14 +1,24 @@
 <script setup lang="ts">
 import {
+  Check,
   Clock,
+  Columns2,
+  Copy,
   Download,
+  Eye,
+  EyeOff,
   FileText,
+  Film,
   Layers,
+  Layout,
+  Loader2,
   ScanFace,
+  ShieldAlert,
+  ShieldCheck,
   X,
 } from "@lucide/vue";
 import { computed, nextTick, ref, watch } from "vue";
-import { api, userFacingError } from "../api";
+import { api, apiImageDataUrl, userFacingError } from "../api";
 import DataTable from "./DataTable.vue";
 import FeatureCropGallery from "./FeatureCropGallery.vue";
 import GenericDomainResult from "./GenericDomainResult.vue";
@@ -20,6 +30,9 @@ import {
 } from "../labels";
 import type {
   MediaUnitResult,
+  OcrComplianceReport,
+  OcrDomainPayload,
+  OcrSlideCard,
   ResultEnvelope,
   ResultPage,
   ResultSummary,
@@ -60,6 +73,154 @@ const ocrText = computed(() =>
     ? String(selectedPayload.value.text ?? "")
     : "",
 );
+
+const activeOcrTab = ref<"layout" | "compliance" | "slides" | "raw">("layout");
+const underlayMode = ref(false);
+const underlayImageUrl = ref<string>("");
+const underlayLoading = ref(false);
+const underlayOpacity = ref(0.85);
+const underlayCompareMode = ref<"overlay" | "split">("overlay");
+const underlayCache = new Map<string, string>();
+const copiedText = ref(false);
+const activeSlideIndex = ref(0);
+
+function currentUnderlayArtifactId(): string | null {
+  if (
+    ocrSlides.value.length > 0 &&
+    activeSlideIndex.value >= 0 &&
+    activeSlideIndex.value < ocrSlides.value.length
+  ) {
+    const slide = ocrSlides.value[activeSlideIndex.value];
+    if (slide?.frame_artifact_id) return slide.frame_artifact_id;
+  }
+  if (selectedUnit.value?.frame_artifact_id) {
+    return selectedUnit.value.frame_artifact_id;
+  }
+  if (result.value?.units?.[0]?.frame_artifact_id) {
+    return result.value.units[0].frame_artifact_id;
+  }
+  return null;
+}
+
+async function loadUnderlayImage(): Promise<void> {
+  if (!result.value) return;
+  const runId = result.value.run_id;
+  const artifactId = currentUnderlayArtifactId();
+
+  let targetPath = "";
+  let cacheKey = "";
+  if (artifactId) {
+    targetPath = `/api/v1/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}`;
+    cacheKey = `artifact:${runId}:${artifactId}`;
+  } else {
+    const assetId = result.value.asset_id || currentSummary.value?.asset_id;
+    if (assetId) {
+      targetPath = `/api/v1/media/assets/${encodeURIComponent(assetId)}/preview`;
+      cacheKey = `asset:${assetId}`;
+    }
+  }
+
+  if (!targetPath) {
+    underlayImageUrl.value = "";
+    return;
+  }
+
+  const cached = underlayCache.get(cacheKey);
+  if (cached) {
+    underlayImageUrl.value = cached;
+    return;
+  }
+
+  underlayLoading.value = true;
+  try {
+    const dataUrl = await apiImageDataUrl(targetPath);
+    underlayCache.set(cacheKey, dataUrl);
+    underlayImageUrl.value = dataUrl;
+  } catch (err) {
+    console.error("加载底图失败:", err);
+    underlayImageUrl.value = "";
+  } finally {
+    underlayLoading.value = false;
+  }
+}
+
+async function toggleUnderlayMode(): Promise<void> {
+  underlayMode.value = !underlayMode.value;
+  if (underlayMode.value) {
+    await loadUnderlayImage();
+  }
+}
+
+watch([selectedUnit, activeSlideIndex, result], () => {
+  if (underlayMode.value) {
+    void loadUnderlayImage();
+  }
+});
+
+const ocrPayload = computed(() => {
+  if (selectedPayload.value?.domain !== "ocr") return null;
+  return selectedPayload.value as unknown as OcrDomainPayload;
+});
+
+const complianceReport = computed<OcrComplianceReport | null>(() => {
+  return ocrPayload.value?.compliance_report ?? null;
+});
+
+const ocrSlides = computed<OcrSlideCard[]>(() => {
+  return ocrPayload.value?.slides ?? [];
+});
+
+const currentHtmlLayout = computed<string>(() => {
+  if (
+    ocrSlides.value.length > 0 &&
+    activeSlideIndex.value >= 0 &&
+    activeSlideIndex.value < ocrSlides.value.length
+  ) {
+    const slide = ocrSlides.value[activeSlideIndex.value];
+    if (slide?.html_layout) return slide.html_layout;
+  }
+  return ocrPayload.value?.html_layout ?? "";
+});
+
+async function copyRawOcrText(): Promise<void> {
+  if (!ocrText.value) return;
+  try {
+    await navigator.clipboard.writeText(ocrText.value);
+    copiedText.value = true;
+    setTimeout(() => {
+      copiedText.value = false;
+    }, 2000);
+  } catch {}
+}
+
+function exportHtmlLayout(): void {
+  const content = currentHtmlLayout.value;
+  if (!content) return;
+  const fullHtml = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCR 版面排版还原 - ${result.value?.run_id ?? "scenara"}</title>
+  <style>
+    body { margin: 0; padding: 24px; background: #f8fafc; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .page-wrapper { width: 100%; max-width: 900px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; background: #fff; }
+  </style>
+</head>
+<body>
+  <div class="page-wrapper">
+    ${content}
+  </div>
+</body>
+</html>`;
+  const blob = new Blob([fullHtml], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `ocr_layout_${result.value?.run_id ?? "export"}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
 const objectCount = computed(
   () =>
     result.value?.units.reduce((sum, unit) => sum + unit.objects.length, 0) ??
@@ -512,21 +673,293 @@ watch(
                   </div>
                 </div>
 
-                <!-- OCR 文本预览（如适用） -->
+                <!-- OCR 综合展示面板（HTML 排版、合规审查、海报轮播、原始文本） -->
                 <div v-if="currentSummary.domain === 'ocr'" class="panel ocr-panel">
-                  <div class="panel-header">
-                    <div class="column-title">
-                      <FileText :size="15" />
-                      <strong>识别文本</strong>
+                  <div class="panel-header ocr-panel-header">
+                    <div class="ocr-tabs">
+                      <button
+                        type="button"
+                        class="ocr-tab-btn"
+                        :class="{ active: activeOcrTab === 'layout' }"
+                        @click="activeOcrTab = 'layout'"
+                      >
+                        <Layout :size="14" />
+                        <span>视觉排版</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="ocr-tab-btn"
+                        :class="{ active: activeOcrTab === 'compliance' }"
+                        @click="activeOcrTab = 'compliance'"
+                      >
+                        <ShieldAlert
+                          v-if="complianceReport?.status === 'block'"
+                          :size="14"
+                          class="text-danger"
+                        />
+                        <ShieldAlert
+                          v-else-if="complianceReport?.status === 'suspect'"
+                          :size="14"
+                          class="text-warning"
+                        />
+                        <ShieldCheck v-else :size="14" class="text-success" />
+                        <span>合规质检</span>
+                        <span
+                          v-if="complianceReport?.total_hits"
+                          class="tab-badge"
+                          :class="complianceReport.status"
+                        >
+                          {{ complianceReport.total_hits }}
+                        </span>
+                      </button>
+                      <button
+                        v-if="ocrSlides.length > 0"
+                        type="button"
+                        class="ocr-tab-btn"
+                        :class="{ active: activeOcrTab === 'slides' }"
+                        @click="activeOcrTab = 'slides'"
+                      >
+                        <Film :size="14" />
+                        <span>大屏海报集</span>
+                        <span class="tab-badge info">{{ ocrSlides.length }}</span>
+                      </button>
+                      <button
+                        type="button"
+                        class="ocr-tab-btn"
+                        :class="{ active: activeOcrTab === 'raw' }"
+                        @click="activeOcrTab = 'raw'"
+                      >
+                        <FileText :size="14" />
+                        <span>提取纯文本</span>
+                      </button>
+                    </div>
+
+                    <!-- 右侧操作栏 -->
+                    <div class="ocr-tab-actions">
+                      <template v-if="activeOcrTab === 'layout'">
+                        <button
+                          type="button"
+                          class="button small"
+                          :class="underlayMode ? 'primary' : 'secondary'"
+                          :title="underlayMode ? '关闭底图对照' : '开启底图对照'"
+                          :disabled="underlayLoading"
+                          @click="toggleUnderlayMode"
+                        >
+                          <Loader2 v-if="underlayLoading" :size="13" class="spin" />
+                          <EyeOff v-else-if="underlayMode" :size="13" />
+                          <Eye v-else :size="13" />
+                          {{ underlayLoading ? "加载底图中..." : underlayMode ? "关闭底图" : "底图对照" }}
+                        </button>
+                        <button
+                          type="button"
+                          class="button small secondary"
+                          title="一键导出为标准 HTML 独立单页"
+                          @click="exportHtmlLayout"
+                        >
+                          <Download :size="13" />
+                          导出 HTML
+                        </button>
+                      </template>
+                      <template v-else-if="activeOcrTab === 'raw'">
+                        <button
+                          type="button"
+                          class="button small secondary"
+                          title="复制全部纯文本"
+                          @click="copyRawOcrText"
+                        >
+                          <Check v-if="copiedText" :size="13" class="text-success" />
+                          <Copy v-else :size="13" />
+                          {{ copiedText ? "已复制" : "复制文本" }}
+                        </button>
+                      </template>
                     </div>
                   </div>
-                  <div class="panel-body">
-                    <textarea
-                      class="result-text-preview"
-                      readonly
-                      :value="ocrText"
-                      aria-label="OCR 结果文本"
-                    />
+
+                  <div class="panel-body ocr-panel-body">
+                    <!-- Tab 1: 视觉仿真排版 -->
+                    <div v-show="activeOcrTab === 'layout'" class="ocr-layout-view">
+                      <!-- 当开启底图对照时，展示底图对照控制条 -->
+                      <div v-if="underlayMode && currentHtmlLayout" class="underlay-controls-bar">
+                        <div class="underlay-controls-left">
+                          <span class="control-label">底图对照模式:</span>
+                          <div class="segmented small">
+                            <button
+                              type="button"
+                              :class="{ active: underlayCompareMode === 'overlay' }"
+                              @click="underlayCompareMode = 'overlay'"
+                            >
+                              <Layers :size="13" />
+                              <span>透视叠图</span>
+                            </button>
+                            <button
+                              type="button"
+                              :class="{ active: underlayCompareMode === 'split' }"
+                              @click="underlayCompareMode = 'split'"
+                            >
+                              <Columns2 :size="13" />
+                              <span>左右双屏</span>
+                            </button>
+                          </div>
+                        </div>
+                        <div class="underlay-controls-right">
+                          <span class="control-label">底图清晰度:</span>
+                          <input
+                            type="range"
+                            min="0.2"
+                            max="1"
+                            step="0.05"
+                            v-model.number="underlayOpacity"
+                            class="opacity-slider"
+                          />
+                          <span class="opacity-val">{{ Math.round(underlayOpacity * 100) }}%</span>
+                        </div>
+                      </div>
+
+                      <div
+                        v-if="currentHtmlLayout"
+                        class="ocr-layout-canvas-wrapper"
+                        :class="{
+                          'underlay-active': underlayMode && underlayImageUrl,
+                          'split-mode': underlayMode && underlayCompareMode === 'split' && underlayImageUrl,
+                        }"
+                        :style="{
+                          '--underlay-url': underlayImageUrl ? `url('${underlayImageUrl}')` : 'none',
+                          '--underlay-opacity': underlayOpacity,
+                        }"
+                      >
+                        <!-- 左右分栏模式下的左侧原始底图 -->
+                        <div
+                          v-if="underlayMode && underlayCompareMode === 'split' && underlayImageUrl"
+                          class="ocr-split-underlay-column"
+                        >
+                          <div class="split-column-header">
+                            <Eye :size="13" />
+                            <strong>原始文档 / 视频帧底图</strong>
+                          </div>
+                          <div class="split-image-container">
+                            <img
+                              :src="underlayImageUrl"
+                              alt="原始文档底图"
+                              class="underlay-split-img"
+                            />
+                          </div>
+                        </div>
+
+                        <!-- 仿真排版展示容器（叠图模式下直接透视叠加在底图上） -->
+                        <div class="ocr-split-rendered-column">
+                          <div
+                            v-if="underlayMode && underlayCompareMode === 'split' && underlayImageUrl"
+                            class="split-column-header"
+                          >
+                            <Layout :size="13" />
+                            <strong>1:1 视觉仿真排版还原</strong>
+                          </div>
+                          <div class="ocr-html-rendered" v-html="currentHtmlLayout" />
+                        </div>
+                      </div>
+                      <div v-else class="empty-state">
+                        <Layout :size="32" class="muted" />
+                        <p>当前单元未生成 HTML 排版，请确认流水线已开启版面排版还原。</p>
+                      </div>
+                    </div>
+
+                    <!-- Tab 2: 文本合规质检报告 -->
+                    <div v-show="activeOcrTab === 'compliance'" class="ocr-compliance-view">
+                      <div v-if="complianceReport" class="compliance-report-container">
+                        <div class="compliance-summary-card" :class="complianceReport.status">
+                          <div class="summary-icon">
+                            <ShieldAlert v-if="complianceReport.status === 'block'" :size="24" />
+                            <ShieldAlert v-else-if="complianceReport.status === 'suspect'" :size="24" />
+                            <ShieldCheck v-else :size="24" />
+                          </div>
+                          <div class="summary-content">
+                            <div class="summary-title-row">
+                              <span class="compliance-status-tag" :class="complianceReport.status">
+                                {{ complianceReport.status === 'block' ? '严重违规' : complianceReport.status === 'suspect' ? '疑似存疑' : '合规通过' }}
+                              </span>
+                              <span class="risk-score">风险评分: {{ (complianceReport.risk_score * 100).toFixed(0) }}</span>
+                            </div>
+                            <p class="summary-desc">{{ complianceReport.summary }}</p>
+                          </div>
+                        </div>
+
+                        <!-- 违规命中列表 -->
+                        <div v-if="complianceReport.hits?.length" class="compliance-hits-list">
+                          <div
+                            v-for="(hit, idx) in complianceReport.hits"
+                            :key="idx"
+                            class="compliance-hit-item"
+                            :class="hit.severity"
+                          >
+                            <div class="hit-header">
+                              <span class="hit-word-badge">{{ hit.word }}</span>
+                              <span class="hit-category">{{ hit.rule_category }}</span>
+                              <span class="hit-severity-badge" :class="hit.severity">
+                                {{ hit.severity === 'block' ? '禁止发布' : '建议修改' }}
+                              </span>
+                            </div>
+                            <div class="hit-body">
+                              <div class="hit-ref">
+                                <strong>法规依据:</strong> {{ hit.legal_reference }}
+                              </div>
+                              <div class="hit-sug">
+                                <strong>处置建议:</strong> {{ hit.suggestion }}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        <div v-else class="compliance-all-clear">
+                          <ShieldCheck :size="40" class="text-success" />
+                          <h4>未检测到违规极限词或风险信息</h4>
+                          <p class="muted">符合《中华人民共和国广告法》及公共内容安全要求</p>
+                        </div>
+                      </div>
+                      <div v-else class="empty-state">
+                        <p class="muted">未检测到合规分析结果</p>
+                      </div>
+                    </div>
+
+                    <!-- Tab 3: 大屏海报轮播集 -->
+                    <div v-show="activeOcrTab === 'slides'" class="ocr-slides-view">
+                      <div class="slides-grid">
+                        <div
+                          v-for="(slide, idx) in ocrSlides"
+                          :key="slide.slide_id"
+                          class="slide-card"
+                          :class="{ active: activeSlideIndex === idx }"
+                          @click="activeSlideIndex = idx; activeOcrTab = 'layout'"
+                        >
+                          <div class="slide-card-header">
+                            <span class="slide-title">海报 #{{ idx + 1 }}</span>
+                            <span
+                              v-if="slide.compliance"
+                              class="slide-status-tag"
+                              :class="slide.compliance.status"
+                            >
+                              {{ slide.compliance.status === 'block' ? '违规' : slide.compliance.status === 'suspect' ? '存疑' : '合规' }}
+                            </span>
+                          </div>
+                          <div class="slide-card-body">
+                            <p class="slide-text-snippet">{{ slide.text }}</p>
+                          </div>
+                          <div class="slide-card-footer">
+                            <span class="slide-count">轮播 {{ slide.display_count }} 次</span>
+                            <span v-if="slide.duration_seconds" class="slide-dur">展示 {{ slide.duration_seconds.toFixed(1) }}s</span>
+                            <span class="slide-action">查看排版 →</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- Tab 4: 提取纯文本 -->
+                    <div v-show="activeOcrTab === 'raw'" class="ocr-raw-view">
+                      <textarea
+                        class="result-text-preview"
+                        readonly
+                        :value="ocrText"
+                        aria-label="OCR 结果文本"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -919,5 +1352,484 @@ watch(
   .timeline-scroll-list {
     max-height: 240px;
   }
+}
+
+/* OCR Tabs & Multifunctional Views */
+.ocr-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--line, #e2e8f0);
+  padding: 10px 14px;
+}
+
+.ocr-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ocr-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ocr-tab-btn:hover {
+  background: var(--surface-soft, #f1f5f9);
+  color: var(--text);
+}
+
+.ocr-tab-btn.active {
+  background: var(--surface, #fff);
+  color: var(--brand, #3b82f6);
+  border-color: var(--line, #e2e8f0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tab-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.tab-badge.block {
+  background: #fee2e2;
+  color: #ef4444;
+}
+
+.tab-badge.suspect {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.tab-badge.pass {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.tab-badge.info {
+  background: #e0f2fe;
+  color: #0284c7;
+}
+
+.ocr-tab-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ocr-panel-body {
+  padding: 14px;
+}
+
+/* Underlay Control Toolbar */
+.underlay-controls-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 12px;
+}
+
+.underlay-controls-left,
+.underlay-controls-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.underlay-controls-bar .control-label {
+  font-weight: 600;
+  color: #1e40af;
+  font-size: 12px;
+}
+
+.opacity-slider {
+  width: 80px;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+.opacity-val {
+  font-family: var(--font-mono, monospace);
+  font-size: 11px;
+  font-weight: 700;
+  color: #2563eb;
+  min-width: 32px;
+}
+
+/* Layout View */
+.ocr-layout-canvas-wrapper {
+  width: 100%;
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px;
+  overflow: auto;
+  box-sizing: border-box;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+/* 透视叠图模式：利用 ::before 把底图精准置于 .ocr-visual-container 背景层 */
+.ocr-layout-canvas-wrapper.underlay-active:not(.split-mode) :deep(.ocr-visual-container) {
+  position: relative !important;
+  background-color: transparent !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12) !important;
+}
+
+.ocr-layout-canvas-wrapper.underlay-active:not(.split-mode) :deep(.ocr-visual-container)::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--underlay-url);
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: var(--underlay-opacity, 0.85);
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.ocr-layout-canvas-wrapper.underlay-active:not(.split-mode) :deep(.ocr-visual-block) {
+  z-index: 1;
+  background-color: rgba(255, 255, 255, 0.58);
+  backdrop-filter: blur(0.5px);
+  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.45);
+  border-radius: 2px;
+  color: #0f172a;
+  transition: all 0.15s ease;
+}
+
+.ocr-layout-canvas-wrapper.underlay-active:not(.split-mode) :deep(.ocr-visual-block:hover) {
+  background-color: rgba(255, 255, 255, 0.95);
+  box-shadow: inset 0 0 0 1.5px #2563eb, 0 2px 8px rgba(37, 99, 235, 0.3);
+  z-index: 10;
+}
+
+/* 左右双屏分栏模式 */
+.ocr-layout-canvas-wrapper.split-mode {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+  background: #f1f5f9;
+}
+
+.ocr-split-underlay-column,
+.ocr-split-rendered-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.split-column-header {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted, #64748b);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+}
+
+.split-image-container {
+  width: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8f0);
+}
+
+.underlay-split-img {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: contain;
+}
+
+.ocr-html-rendered {
+  width: 100%;
+}
+
+/* Compliance Report View */
+.compliance-report-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.compliance-summary-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+}
+
+.compliance-summary-card.block {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.compliance-summary-card.suspect {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
+}
+
+.compliance-summary-card.pass {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.summary-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+.compliance-status-tag {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.compliance-status-tag.block {
+  background: #ef4444;
+  color: #fff;
+}
+
+.compliance-status-tag.suspect {
+  background: #f59e0b;
+  color: #fff;
+}
+
+.compliance-status-tag.pass {
+  background: #22c55e;
+  color: #fff;
+}
+
+.risk-score {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.summary-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.compliance-hits-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.compliance-hit-item {
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--surface, #fff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.compliance-hit-item.block {
+  border-left: 4px solid #ef4444;
+}
+
+.compliance-hit-item.suspect {
+  border-left: 4px solid #f59e0b;
+}
+
+.hit-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.hit-word-badge {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.hit-category {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.hit-severity-badge {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.hit-severity-badge.block {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.hit-severity-badge.suspect {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.hit-body {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-soft, #475569);
+}
+
+.hit-ref,
+.hit-sug {
+  margin-top: 4px;
+}
+
+.compliance-all-clear {
+  text-align: center;
+  padding: 32px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Slides Grid */
+.slides-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.slide-card {
+  border: 1px solid var(--line, #e2e8f0);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--surface, #fff);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.slide-card:hover {
+  border-color: var(--brand, #3b82f6);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1);
+}
+
+.slide-card.active {
+  border-color: var(--brand, #3b82f6);
+  background: #eff6ff;
+}
+
+.slide-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.slide-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.slide-status-tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.slide-status-tag.block {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.slide-status-tag.suspect {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.slide-status-tag.pass {
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.slide-text-snippet {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.slide-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: auto;
+  border-top: 1px dashed var(--line, #e2e8f0);
+  padding-top: 6px;
+}
+
+.slide-action {
+  margin-left: auto;
+  color: var(--brand, #3b82f6);
+  font-weight: 600;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 36px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
 }
 </style>

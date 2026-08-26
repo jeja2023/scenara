@@ -21,7 +21,14 @@ class FixedOcrEngine:
     version = "1.0.0"
     production_ready = True
 
-    def predict(self, image: Any) -> list[dict[str, Any]]:
+    def predict(
+        self,
+        image: Any,
+        *,
+        min_score: float = 0.0,
+        language_hint: str | None = None,
+        **kwargs: Any,
+    ) -> list[dict[str, Any]]:
         assert image.size == (32, 24)
         return [
             {
@@ -30,6 +37,9 @@ class FixedOcrEngine:
                 "polygon": [[1, 1], [30, 1], [30, 10], [1, 10]],
             }
         ]
+
+    def predict_layout(self, image: Any) -> list[dict[str, Any]]:
+        return []
 
 
 def image_bytes() -> bytes:
@@ -851,3 +861,63 @@ async def test_pipeline_transition_is_persisted_and_retired_version_rejects_new_
     )
     assert rejected.status_code == 422
     assert "pipeline is not active" in rejected.text
+
+
+@pytest.mark.asyncio
+async def test_cancelled_run_result_endpoint_returns_200_not_404(client) -> None:
+    api, runtime = client
+    asset_id = await upload_image(api)
+    created = await api.post(
+        "/api/v1/runs",
+        json={
+            "domain": "ocr",
+            "pipeline": {"pipeline_id": "ocr.document", "version": "0.1.0"},
+            "asset_id": asset_id,
+            "wait_ms": 0,
+        },
+        headers={"Idempotency-Key": "cancel-empty-test-1"},
+    )
+    assert created.status_code == 202, created.text
+    run_id = created.json()["data"]["run_id"]
+
+    # Cancel the run
+    cancel_res = await api.post(f"/api/v1/runs/{run_id}/cancel")
+    assert cancel_res.status_code == 200
+
+    # Ensure /result returns 200 and does NOT 404
+    result_res = await api.get(f"/api/v1/runs/{run_id}/result?unit_limit=1000")
+    assert result_res.status_code == 200, result_res.text
+    page = result_res.json()["data"]
+    assert "unit_total" in page
+    assert page["unit_total"] >= 0
+    assert isinstance(page["result"]["units"], list)
+
+
+@pytest.mark.asyncio
+async def test_cancelled_run_retains_partial_results(client) -> None:
+    api, runtime = client
+    asset_id = await upload_image(api)
+    created = await api.post(
+        "/api/v1/runs",
+        json={
+            "domain": "ocr",
+            "pipeline": {"pipeline_id": "ocr.document", "version": "0.1.0"},
+            "asset_id": asset_id,
+            "wait_ms": 2000,
+        },
+        headers={"Idempotency-Key": "cancel-with-result-1"},
+    )
+    assert created.status_code == 202, created.text
+    run_id = created.json()["data"]["run_id"]
+
+    # Cancel the run
+    cancel_res = await api.post(f"/api/v1/runs/{run_id}/cancel")
+    assert cancel_res.status_code in {200, 409}
+
+    # Query result, must return 200 and retain results
+    result_res = await api.get(f"/api/v1/runs/{run_id}/result?unit_limit=1000")
+    assert result_res.status_code == 200, result_res.text
+    page = result_res.json()["data"]
+    assert page["unit_total"] >= 1
+    assert len(page["result"]["units"]) >= 1
+

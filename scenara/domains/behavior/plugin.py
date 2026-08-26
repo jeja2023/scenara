@@ -63,6 +63,7 @@ class BehaviorPlugin:
                     "temporal_window_ms",
                     "min_confidence",
                     "enable_anomaly_detection",
+                    "roi",
                     "sample_interval_ms",
                     "max_reconnect_attempts",
                     "connect_timeout_ms",
@@ -76,6 +77,13 @@ class BehaviorPlugin:
                     "frame_max_edge",
                 },
                 parameter_schema={
+                    "roi": PipelineParameterDefinition(
+                        label="识别区域(ROI)",
+                        control="text",
+                        placeholder="[x1, y1, x2, y2] 归一化比例",
+                        advanced=True,
+                        description="指定感兴趣识别区域，例如 [0.1, 0.1, 0.9, 0.9]，只对圈定区域内的人员进行行为识别",
+                    ),
                     "temporal_window_ms": PipelineParameterDefinition(
                         label="时序窗口(ms)",
                         control="number",

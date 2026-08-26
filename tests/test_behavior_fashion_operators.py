@@ -158,3 +158,112 @@ async def test_fashion_operator_real_execution() -> None:
     # 验证无开发替代警告
     assert not any("development_substitute" in w for w in result.warnings)
     assert len(result.domain_payload.clothing_styles) >= 1
+
+
+@pytest.mark.asyncio
+async def test_fashion_roi_filtering() -> None:
+    artifacts = DummyArtifacts()
+    context = ExecutionContext(
+        run_id="run_fashion_roi_test",
+        tenant_id="tenant_default",
+        project_id="project_default",
+        pipeline_id="fashion.recognition",
+        pipeline_version="1.0.0",
+        asset_id="asset_test_roi",
+        source_id=None,
+        filename="test_image.jpg",
+        content_type="image/jpeg",
+        artifacts=artifacts,
+    )
+
+    img = Image.new("RGB", (320, 400), (240, 240, 240))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([80, 80, 240, 220], fill=(255, 255, 255))
+    draw.rectangle([80, 220, 240, 360], fill=(20, 30, 60))
+
+    units = [
+        DecodedMediaUnit(
+            unit_id="unit_fashion_0",
+            unit_type="frame",
+            index=0,
+            pts_ms=0,
+            image=img,
+        )
+    ]
+    decoded = DecodedMedia(
+        kind=MediaKind.IMAGE,
+        units=units,
+        metadata=MediaTechnicalMetadata(width=320, height=400, sampled_units=1),
+    )
+    operator = FashionRecognitionOperator(ProductionFashionEngine())
+
+    # 1. 圈选包含人体的区域：应检测到目标
+    output_inside = await operator.execute(
+        context,
+        {"batch": decoded},
+        {"min_confidence": 0.3, "roi": [0.1, 0.1, 0.9, 0.9]},
+    )
+    assert len(output_inside["result"].units[0].objects) >= 1
+
+    # 2. 圈选与人体不相交的极小角落区域：应全部过滤，对象数为 0
+    output_outside = await operator.execute(
+        context,
+        {"batch": decoded},
+        {"min_confidence": 0.3, "roi": [0.0, 0.0, 0.1, 0.1]},
+    )
+    assert len(output_outside["result"].units[0].objects) == 0
+
+
+@pytest.mark.asyncio
+async def test_behavior_roi_filtering() -> None:
+    artifacts = DummyArtifacts()
+    context = ExecutionContext(
+        run_id="run_behavior_roi_test",
+        tenant_id="tenant_default",
+        project_id="project_default",
+        pipeline_id="behavior.recognition",
+        pipeline_version="1.0.0",
+        asset_id="asset_test_roi",
+        source_id=None,
+        filename="test_video.mp4",
+        content_type="video/mp4",
+        artifacts=artifacts,
+    )
+
+    img = Image.new("RGB", (320, 240), (200, 200, 200))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([100, 40, 220, 200], fill=(255, 0, 0))
+
+    units = [
+        DecodedMediaUnit(
+            unit_id="unit_b_0",
+            unit_type="frame",
+            index=0,
+            pts_ms=0,
+            image=img,
+        )
+    ]
+    decoded = DecodedMedia(
+        kind=MediaKind.VIDEO,
+        units=units,
+        metadata=MediaTechnicalMetadata(width=320, height=240, sampled_units=1),
+    )
+    operator = BehaviorRecognitionOperator(ProductionBehaviorEngine())
+
+    # 1. 圈选与人体不相交的区域：应过滤，帧对象数为 0
+    output_outside = await operator.execute(
+        context,
+        {"batch": decoded},
+        {"min_confidence": 0.3, "roi": [0.0, 0.0, 0.1, 0.1]},
+    )
+    # 因为 objects 为空且是视频模式，无检测对象的单元不生成空 unit_result
+    assert len(output_outside["result"].units) == 0 or len(output_outside["result"].units[0].objects) == 0
+
+    # 2. 圈选覆盖整图的区域：应检测出人体并保留
+    output_inside = await operator.execute(
+        context,
+        {"batch": decoded},
+        {"min_confidence": 0.3, "roi": [0.0, 0.0, 1.0, 1.0]},
+    )
+    assert len(output_inside["result"].units) >= 1
+    assert len(output_inside["result"].units[0].objects) >= 1

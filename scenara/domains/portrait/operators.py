@@ -5,6 +5,7 @@ from typing import Any
 from uuid import uuid4
 
 from scenara.platform.artifacts import store_object_crop, store_unit_frame
+from scenara.platform.media import is_box_in_roi, parse_roi
 from scenara.platform.media_batch import DecodedMedia
 from scenara.platform.models import (
     BoundingBox,
@@ -58,6 +59,7 @@ class PortraitPersonDetectionOperator:
             confidence = float(parameters.get("confidence", runtime_output_value(runtime, "confidence", 0.25)))
             iou = float(parameters.get("iou", runtime_output_value(runtime, "iou", 0.45)))
             max_detections = int(parameters.get("max_detections", runtime_output_value(runtime, "max_detections", 100)))
+            raw_roi = parameters.get("roi")
         except BaseException:
             await decoded.close()
             raise
@@ -95,18 +97,25 @@ class PortraitPersonDetectionOperator:
                     timing_totals[key] = timing_totals.get(key, 0.0) + float(value)
                 for unit_index, unit in enumerate(chunk):
                     frame = chunk_frames[unit_index] if unit_index < len(chunk_frames) else {}
+                    unit_roi = parse_roi(raw_roi, unit.width, unit.height)
                     unit_persons: list[VisionObject] = []
                     for item in frame.get("persons", []):
                         box = item.get("box", [])
                         bbox = None
                         if isinstance(box, list) and len(box) >= 4:
                             x1, y1, x2, y2 = (float(value) for value in box[:4])
+                            bw = max(0.0, x2 - x1)
+                            bh = max(0.0, y2 - y1)
+                            if unit_roi is not None and not is_box_in_roi(x1, y1, bw, bh, unit_roi):
+                                continue
                             bbox = BoundingBox(
                                 x=x1,
                                 y=y1,
-                                width=max(0.0, x2 - x1),
-                                height=max(0.0, y2 - y1),
+                                width=bw,
+                                height=bh,
                             )
+                        elif unit_roi is not None:
+                            continue
                         person = VisionObject(
                             object_id=f"person_{uuid4().hex}",
                             object_type="person",

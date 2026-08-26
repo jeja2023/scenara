@@ -64,6 +64,7 @@ class FashionPlugin:
                     "detect_cosplay",
                     "detect_clothing",
                     "detect_accessories",
+                    "roi",
                     "sample_interval_ms",
                     "max_reconnect_attempts",
                     "connect_timeout_ms",
@@ -78,6 +79,13 @@ class FashionPlugin:
                     "page_scale",
                 },
                 parameter_schema={
+                    "roi": PipelineParameterDefinition(
+                        label="识别区域(ROI)",
+                        control="text",
+                        placeholder="[x1, y1, x2, y2] 归一化比例",
+                        advanced=True,
+                        description="指定感兴趣识别区域，例如 [0.1, 0.1, 0.9, 0.9]，只对圈定区域内的人员进行服饰分析",
+                    ),
                     "min_confidence": PipelineParameterDefinition(
                         label="最低置信度",
                         control="number",

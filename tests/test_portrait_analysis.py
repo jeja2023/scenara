@@ -273,3 +273,69 @@ async def test_full_portrait_pipeline_exposes_all_capabilities_without_embedding
         )
         assert vector_records
         assert vector_records[0].vector is not None
+
+
+@pytest.mark.asyncio
+async def test_portrait_roi_filtering() -> None:
+    class TestBackend:
+        def production_capabilities(self) -> frozenset[str]:
+            return frozenset({"person_detection", "face_detection"})
+
+        async def analyze(self, images, filenames, capabilities):
+            return PortraitBackendOutput(
+                units=[
+                    {
+                        "persons": [{"box": [2, 3, 30, 22], "score": 0.98}],
+                        "faces": [{"box": [8, 4, 19, 15], "score": 0.97}],
+                    }
+                ]
+            )
+
+    decoded = DecodedMedia(
+        kind=MediaKind.IMAGE,
+        units=[
+            DecodedMediaUnit(
+                unit_id="frame_0",
+                unit_type="frame",
+                index=0,
+                pts_ms=0,
+                image=Image.new("RGB", (100, 100), "white"),
+            )
+        ],
+        metadata=MediaTechnicalMetadata(format="png", sampled_units=1),
+    )
+    context = ExecutionContext(
+        run_id="run_roi_portrait",
+        tenant_id="tenant",
+        project_id="project",
+        pipeline_id="portrait.analysis",
+        pipeline_version="0.4.0",
+        asset_id="asset",
+        source_id=None,
+        filename="portrait.png",
+        content_type="image/png",
+    )
+
+    operator = PortraitFullAnalysisOperator(TestBackend())
+
+    # 1. 圈选覆盖目标的 ROI：目标保留
+    out_inside = await operator.execute(
+        context,
+        {"batch": decoded},
+        {
+            "capabilities": ["person_detection", "face_detection"],
+            "roi": [0.0, 0.0, 0.4, 0.4],
+        },
+    )
+    assert len(out_inside["result"].units[0].objects) == 2
+
+    # 2. 圈选右下角的 ROI：目标被过滤，对象数为 0
+    out_outside = await operator.execute(
+        context,
+        {"batch": decoded},
+        {
+            "capabilities": ["person_detection", "face_detection"],
+            "roi": [0.5, 0.5, 1.0, 1.0],
+        },
+    )
+    assert len(out_outside["result"].units[0].objects) == 0

@@ -16,6 +16,7 @@ import numpy as np
 from PIL import Image
 
 from scenara.platform.artifacts import store_object_crop, store_unit_frame
+from scenara.platform.media import is_box_in_roi, parse_roi
 from scenara.platform.media_batch import DecodedMedia
 from scenara.platform.models import (
     BehaviorAction,
@@ -517,6 +518,7 @@ class BehaviorRecognitionOperator:
         enable_anomaly_detection = bool(
             parameters.get("enable_anomaly_detection", False)
         )
+        raw_roi = parameters.get("roi")
 
         production_ready = bool(getattr(engine, "production_ready", False))
         if context.production and not production_ready:
@@ -594,10 +596,28 @@ class BehaviorRecognitionOperator:
             async for chunk, expected_units in decoded.iter_batches(batch_size):
                 # 针对批次执行真实人体检测与时序行为分析
                 chunk_images = [unit.image for unit in chunk]
+                unit_rois = [parse_roi(raw_roi, u.width, u.height) for u in chunk]
                 if isinstance(engine, ProductionBehaviorEngine):
                     persons_per_frame = await engine.detect_frame_persons(
                         chunk_images, confidence=min_confidence
                     )
+                    # 过滤 ROI 外部人员
+                    filtered_persons_per_frame = []
+                    for p_list, u_roi in zip(persons_per_frame, unit_rois, strict=False):
+                        if u_roi is None:
+                            filtered_persons_per_frame.append(p_list)
+                            continue
+                        f_list = []
+                        for p in p_list:
+                            box = p.get("box", [])
+                            if len(box) >= 4:
+                                bw = max(0.0, float(box[2]) - float(box[0]))
+                                bh = max(0.0, float(box[3]) - float(box[1]))
+                                if is_box_in_roi(float(box[0]), float(box[1]), bw, bh, u_roi):
+                                    f_list.append(p)
+                        filtered_persons_per_frame.append(f_list)
+                    persons_per_frame = filtered_persons_per_frame
+
                     frames_meta = [
                         (unit.image, unit.pts_ms or 0, unit.index) for unit in chunk
                     ]
@@ -608,6 +628,26 @@ class BehaviorRecognitionOperator:
                             min_confidence=min_confidence,
                         )
                     )
+                    for u_idx, u_roi in enumerate(unit_rois):
+                        if u_roi is not None and u_idx < len(frame_objs):
+                            filtered = []
+                            for obj in frame_objs[u_idx]:
+                                bbox_data = obj.get("bbox")
+                                if not bbox_data:
+                                    filtered.append(obj)
+                                elif is_box_in_roi(
+                                    float(bbox_data["x"]),
+                                    float(bbox_data["y"]),
+                                    float(bbox_data["width"]),
+                                    float(bbox_data["height"]),
+                                    u_roi,
+                                ):
+                                    filtered.append(obj)
+                            frame_objs[u_idx] = filtered
+                    has_roi = any(u_roi is not None for u_roi in unit_rois)
+                    if has_roi and not any(frame_objs):
+                        chunk_actions = []
+                        chunk_anomalies = []
                     for act in chunk_actions:
                         action_counter += 1
                         actions.append(

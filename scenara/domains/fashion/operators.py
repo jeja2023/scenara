@@ -15,6 +15,7 @@ import numpy as np
 from PIL import Image
 
 from scenara.platform.artifacts import store_object_crop, store_unit_frame
+from scenara.platform.media import is_box_in_roi, parse_roi
 from scenara.platform.media_batch import DecodedMedia
 from scenara.platform.models import (
     AccessoryDetection,
@@ -386,6 +387,8 @@ class ProductionFashionEngine:
             crop = arr[y1:y2, x1:x2]
             if crop.size == 0:
                 continue
+            if float(np.std(crop)) < 5.0:
+                continue
 
             hsv = cv2.cvtColor(crop, cv2.COLOR_RGB2HSV)
             h_chan, s_chan, v_chan = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
@@ -717,6 +720,7 @@ class FashionRecognitionOperator:
         detect_cosplay = bool(parameters.get("detect_cosplay", True))
         detect_clothing = bool(parameters.get("detect_clothing", True))
         detect_accessories = bool(parameters.get("detect_accessories", True))
+        raw_roi = parameters.get("roi")
 
         production_ready = bool(getattr(engine, "production_ready", False))
         if context.production and not production_ready:
@@ -810,18 +814,62 @@ class FashionRecognitionOperator:
                         if u_idx < len(persons_per_frame)
                         else []
                     )
+                    unit_roi = parse_roi(raw_roi, unit.width, unit.height)
+                    if unit_roi is not None:
+                        filtered_persons = []
+                        for p in unit_persons:
+                            box = p.get("box", [])
+                            if len(box) >= 4:
+                                bw = max(0.0, float(box[2]) - float(box[0]))
+                                bh = max(0.0, float(box[3]) - float(box[1]))
+                                if is_box_in_roi(float(box[0]), float(box[1]), bw, bh, unit_roi):
+                                    filtered_persons.append(p)
+                        unit_persons = filtered_persons
 
                     if isinstance(engine, ProductionFashionEngine):
+                        if not unit_persons:
+                            if unit_roi is not None:
+                                targets = [
+                                    {
+                                        "box": [
+                                            float(unit_roi[0]),
+                                            float(unit_roi[1]),
+                                            float(unit_roi[2]),
+                                            float(unit_roi[3]),
+                                        ],
+                                        "score": 0.85,
+                                    }
+                                ]
+                            else:
+                                targets = []
+                        else:
+                            targets = unit_persons
+
                         c_list, cl_list, ac_list, raw_objs = (
                             engine.analyze_image_fashion(
                                 unit.image,
-                                unit_persons,
+                                targets,
                                 min_confidence=min_confidence,
                                 detect_cosplay=detect_cosplay,
                                 detect_clothing=detect_clothing,
                                 detect_accessories=detect_accessories,
                             )
                         )
+                        if unit_roi is not None:
+                            filtered = []
+                            for obj in raw_objs:
+                                bbox_data = obj.get("bbox")
+                                if not bbox_data:
+                                    filtered.append(obj)
+                                elif is_box_in_roi(
+                                    float(bbox_data["x"]),
+                                    float(bbox_data["y"]),
+                                    float(bbox_data["width"]),
+                                    float(bbox_data["height"]),
+                                    unit_roi,
+                                ):
+                                    filtered.append(obj)
+                            raw_objs = filtered
                         for item in c_list:
                             cosplay_counter += 1
                             cosplay_results.append(
