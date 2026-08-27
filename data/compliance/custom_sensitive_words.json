@@ -1,0 +1,44 @@
+{
+  "version": "1.0",
+  "description": "Scenara 景枢平台企业自定义内容合规与风控词库",
+  "whitelist": [
+    "第一人民医院",
+    "第一中学",
+    "第一附属医院",
+    "中国第一汽车",
+    "第一工程局",
+    "国家级非物质文化遗产",
+    "国家级风景名胜区",
+    "国家级自然保护区"
+  ],
+  "rules": [
+    {
+      "rule_id": "custom_internal_confidential",
+      "rule_category": "企业内部保密",
+      "severity": "block",
+      "keywords": [
+        "内部绝密",
+        "机密文件",
+        "严禁外传",
+        "保密级别",
+        "商业机密",
+        "绝密商机"
+      ],
+      "legal_reference": "《中华人民共和国反不正当竞争法》第九条及企业信息保密合规红线",
+      "suggestion": "检测到企业内部机密敏感标识，严禁在公开大屏或外部媒介展示，请立即撤回。"
+    },
+    {
+      "rule_id": "custom_competitor_defamation",
+      "rule_category": "商业竞品防范",
+      "severity": "suspect",
+      "keywords": [
+        "山寨劣质",
+        "盗版翻模",
+        "竞品黑料",
+        "虚假竞品"
+      ],
+      "legal_reference": "《中华人民共和国反不正当竞争法》第十一条：不得编造、传播虚假信息或者误导性信息，损害竞争对手商业信誉。",
+      "suggestion": "涉及针对同业竞品的非客观评价，建议复核事实依据并移除争议性表述。"
+    }
+  ]
+}

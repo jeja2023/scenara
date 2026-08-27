@@ -95,13 +95,6 @@ class PortraitPlugin:
                         step=1,
                         advanced=True,
                     ),
-                    "roi": PipelineParameterDefinition(
-                        label="识别区域(ROI)",
-                        control="text",
-                        placeholder="[x1, y1, x2, y2] 归一化比例",
-                        advanced=True,
-                        description="指定感兴趣识别区域，例如 [0.1, 0.1, 0.9, 0.9]，只对圈定区域内的人员进行检测",
-                    ),
                 },
                 pausable=True,
             ),
@@ -138,13 +131,6 @@ class PortraitPlugin:
                     "page_scale",
                 },
                 parameter_schema={
-                    "roi": PipelineParameterDefinition(
-                        label="识别区域(ROI)",
-                        control="text",
-                        placeholder="[x1, y1, x2, y2] 归一化比例",
-                        advanced=True,
-                        description="指定感兴趣识别区域，例如 [0.1, 0.1, 0.9, 0.9]，只对圈定区域内的人员进行分析",
-                    ),
                     "camera_id": PipelineParameterDefinition(
                         label="摄像头 ID",
                         control="text",

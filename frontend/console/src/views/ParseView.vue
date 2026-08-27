@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import {
   AlertTriangle,
-  ChevronDown,
-  ChevronUp,
   Clock3,
   Crop,
   Eye,
@@ -57,6 +55,7 @@ import type {
   MediaAsset,
   MediaSource,
   MediaUnitResult,
+  PipelineParameterDefinition,
   ResultEnvelope,
   ResultPage,
   Run,
@@ -146,7 +145,6 @@ const pageScale = ref(1.5);
 const maxReconnectAttempts = ref(3);
 const connectTimeoutMs = ref(10_000);
 const readTimeoutMs = ref(10_000);
-const showAdvanced = ref(false);
 
 // 识别区域 (ROI) 圈选
 const mediaStageRef = ref<HTMLElement | null>(null);
@@ -522,6 +520,69 @@ const warningPanelTitle = computed(() => {
   return hasInformational ? "解析提示" : "解析警告";
 });
 const hasResult = computed(() => !!result.value);
+
+const booleanParameterEntries = computed(() =>
+  parameterEntries.value.filter(([, def]) => def.control === "boolean"),
+);
+
+const fieldParameterEntries = computed(() =>
+  parameterEntries.value.filter(([, def]) => def.control !== "boolean"),
+);
+
+function isParameterWide(
+  key: string,
+  definition: PipelineParameterDefinition,
+): boolean {
+  if (["custom_sensitive_words", "compliance_whitelist", "roi"].includes(key)) {
+    return true;
+  }
+  if (
+    key === "language_hint" ||
+    key === "min_score" ||
+    key === "max_pages"
+  ) {
+    return false;
+  }
+  if (definition.control === "text") {
+    return Boolean(
+      definition.placeholder?.includes("，") ||
+        definition.placeholder?.includes(",") ||
+        definition.placeholder?.includes("换行"),
+    );
+  }
+  return false;
+}
+
+const compactFieldEntriesCount = computed(
+  () =>
+    fieldParameterEntries.value.filter(
+      ([key, def]) => !isParameterWide(key, def),
+    ).length,
+);
+
+const LANGUAGE_LABELS: Record<string, string> = {
+  zh: "中文 / 中英 (zh)",
+  en: "英文 (en)",
+  ja: "日文 (ja)",
+  ko: "韩文 (ko)",
+  chinese_cht: "繁体中文 (cht)",
+  fr: "法语 (fr)",
+  de: "德语 (de)",
+  ru: "俄语 (ru)",
+  es: "西班牙语 (es)",
+};
+
+function formatOptionLabel(key: string, option: string): string {
+  if (key === "language_hint") {
+    return LANGUAGE_LABELS[option] ?? option;
+  }
+  if (key === "sample_strategy") {
+    return STRATEGY_LABELS[option as SampleStrategy] ?? option;
+  }
+  return option;
+}
+
+
 const currentDomainLabel = computed(
   () => selectedDomainManifest.value?.display_name || labelDomain(domain.value),
 );
@@ -623,7 +684,6 @@ function selectMode(value: MediaMode): void {
   mode.value = value;
   file.value = null;
   assetId.value = "";
-  showAdvanced.value = false;
   clearRoi();
   clearMediaUrl();
   resetResult();
@@ -653,6 +713,10 @@ function selectDomain(value: Domain): void {
   if (domain.value === value) return;
   domain.value = value;
   clearRoi();
+  assetId.value = "";
+  file.value = null;
+  inputOrigin.value = "upload";
+  clearMediaUrl();
   pipelineId.value = "";
   domainSearch.value = "";
   resetResult();
@@ -711,7 +775,6 @@ async function autoPreloadAsset(selectedFile: File): Promise<void> {
       asset,
       ...assets.value.filter((item) => item.asset_id !== asset.asset_id),
     ];
-    assetId.value = asset.asset_id;
     await loadServerPreview(asset.asset_id);
   } catch {
     // 尽力而为预加载首帧，不阻断前端交互
@@ -1019,8 +1082,6 @@ async function uploadSelectedAsset(): Promise<MediaAsset> {
     asset,
     ...assets.value.filter((item) => item.asset_id !== asset.asset_id),
   ];
-  assetId.value = asset.asset_id;
-  inputOrigin.value = "library";
   void loadServerPreview(asset.asset_id);
   return asset;
 }
@@ -1227,6 +1288,8 @@ async function restoreRouteSelection(): Promise<void> {
   const runId = queryValue(route.query.run);
   if (runId) {
     await loadExistingRun(runId);
+    assetId.value = "";
+    inputOrigin.value = "upload";
     return;
   }
   const asset = queryValue(route.query.asset);
@@ -1585,6 +1648,11 @@ watch(
       mode.value = normalizedMode;
       if (normalizedMode === "stream") void refreshSources();
     }
+    assetId.value = "";
+    file.value = null;
+    inputOrigin.value = "upload";
+    clearRoi();
+    clearMediaUrl();
     resetResult();
     void refreshHistory();
   },
@@ -1708,15 +1776,6 @@ onBeforeUnmount(() => {
           <FileImage :size="16" />图片
         </button>
         <button
-          v-if="supportedMediaKinds.includes('video')"
-          :class="{ active: mode === 'video' }"
-          role="tab"
-          :aria-selected="mode === 'video'"
-          @click="selectMode('video')"
-        >
-          <Video :size="16" />视频
-        </button>
-        <button
           v-if="supportedMediaKinds.includes('document')"
           :class="{ active: mode === 'document' }"
           role="tab"
@@ -1724,6 +1783,15 @@ onBeforeUnmount(() => {
           @click="selectMode('document')"
         >
           <FileText :size="16" />文档
+        </button>
+        <button
+          v-if="supportedMediaKinds.includes('video')"
+          :class="{ active: mode === 'video' }"
+          role="tab"
+          :aria-selected="mode === 'video'"
+          @click="selectMode('video')"
+        >
+          <Video :size="16" />视频
         </button>
         <button
           v-if="supportedMediaKinds.includes('stream')"
@@ -2045,7 +2113,9 @@ onBeforeUnmount(() => {
                 "
                 @change="selectFile"
               />
-              <small>{{ file?.name || "尚未选择文件" }}</small>
+              <small v-if="file" class="file-info-hint">
+                已就绪 · {{ (file.size / (1024 * 1024)).toFixed(2) }} MB
+              </small>
             </label>
 
             <div v-else class="library-picker-row">
@@ -2178,17 +2248,6 @@ onBeforeUnmount(() => {
                   :disabled="sampleStrategy !== 'interval'"
                 />
               </label>
-            </div>
-            <button
-              class="button secondary advanced-toggle"
-              @click="showAdvanced = !showAdvanced"
-            >
-              <component
-                :is="showAdvanced ? ChevronUp : ChevronDown"
-                :size="15"
-              />{{ showAdvanced ? "收起高级参数" : "展开高级参数" }}
-            </button>
-            <div v-if="showAdvanced" class="parameter-grid">
               <label>
                 <span>{{
                   mode === "stream" ? "开始后跳过（毫秒）" : "起始时间（毫秒）"
@@ -2270,21 +2329,45 @@ onBeforeUnmount(() => {
           </template>
 
           <div v-if="parameterEntries.length" class="domain-parameters">
-            <span class="control-label domain-params-heading">领域参数</span>
-            <div class="parameter-grid">
-              <label
-                v-for="[key, definition] in parameterEntries"
+            <span class="control-label domain-params-heading">领域参数配置</span>
+            <!-- 紧凑水平开关胶囊行 -->
+            <div
+              v-if="booleanParameterEntries.length"
+              class="domain-switches-row"
+              role="group"
+              aria-label="领域参数选项"
+            >
+              <button
+                v-for="[key, definition] in booleanParameterEntries"
                 :key="key"
-                :class="{ 'parameter-wide': definition.control === 'text' }"
+                type="button"
+                class="switch-pill"
+                :class="{ active: Boolean(pipelineParameters[key]) }"
+                :aria-pressed="Boolean(pipelineParameters[key])"
+                :title="definition.description"
+                @click="pipelineParameters[key] = !Boolean(pipelineParameters[key])"
+              >
+                {{ definition.label }}
+              </button>
+            </div>
+
+            <!-- 数值与文本字段网格 -->
+            <div
+              v-if="fieldParameterEntries.length"
+              class="parameter-grid"
+              :class="{
+                'cols-3': compactFieldEntriesCount === 3,
+                'cols-2': compactFieldEntriesCount === 2,
+              }"
+            >
+              <label
+                v-for="[key, definition] in fieldParameterEntries"
+                :key="key"
+                :class="{ 'parameter-wide': isParameterWide(key, definition) }"
               >
                 <span>{{ definition.label }}</span>
                 <input
-                  v-if="definition.control === 'boolean'"
-                  v-model="pipelineParameters[key]"
-                  type="checkbox"
-                />
-                <input
-                  v-else-if="['integer', 'number'].includes(definition.control)"
+                  v-if="['integer', 'number'].includes(definition.control)"
                   v-model.number="pipelineParameters[key]"
                   type="number"
                   :min="definition.minimum ?? undefined"
@@ -2300,7 +2383,7 @@ onBeforeUnmount(() => {
                     :key="option"
                     :value="option"
                   >
-                    {{ option }}
+                    {{ formatOptionLabel(key, option) }}
                   </option>
                 </select>
                 <input
@@ -2606,6 +2689,56 @@ onBeforeUnmount(() => {
 .parameter-wide {
   grid-column: 1 / -1;
 }
+.domain-parameters .parameter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 10px;
+}
+.domain-parameters .parameter-grid.cols-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.domain-parameters .parameter-grid.cols-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* 紧凑领域布尔开关胶囊行 */
+.domain-switches-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.switch-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 12px;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--line, #cbd5e1);
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-soft, #475569);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+  line-height: 1.2;
+  box-sizing: border-box;
+}
+.switch-pill:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: var(--text, #1e293b);
+}
+.switch-pill.active,
+.switch-pill.checked {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #047857;
+  font-weight: 600;
+  box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.25);
+}
 .domain-search-picker {
   display: grid;
   gap: 7px;
@@ -2640,8 +2773,61 @@ onBeforeUnmount(() => {
   font-weight: 700;
   color: var(--muted);
 }
+.file-picker input[type="file"] {
+  display: flex;
+  align-items: center;
+  height: 36px;
+  min-height: 36px;
+  padding: 4px 6px;
+  border: 1px solid var(--line, #cbd5e1);
+  border-radius: 4px;
+  background: var(--surface, #ffffff);
+  font-size: 12px;
+  color: var(--muted, #64748b);
+  cursor: pointer;
+  box-sizing: border-box;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+.file-picker input[type="file"]:hover {
+  border-color: #94a3b8;
+}
+.file-picker input[type="file"]:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
+  outline: none;
+}
+.file-picker input[type="file"]::file-selector-button,
+.file-picker input[type="file"]::-webkit-file-upload-button {
+  height: 26px;
+  line-height: 24px;
+  padding: 0 12px;
+  margin-right: 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 150ms ease;
+  box-sizing: border-box;
+}
+.file-picker input[type="file"]::file-selector-button:hover,
+.file-picker input[type="file"]:hover::-webkit-file-upload-button {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #047857;
+}
 .file-picker small {
   overflow-wrap: anywhere;
+}
+.file-info-hint {
+  color: #047857;
+  font-weight: 600;
+  font-size: 11.5px;
 }
 .library-picker-row {
   display: grid;
@@ -2691,17 +2877,6 @@ onBeforeUnmount(() => {
   padding: 4px 8px;
   font-size: 12.5px;
   border-radius: 4px;
-}
-.advanced-toggle {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  min-height: 28px;
-  padding: 0 8px;
-  font-size: 12px;
-  margin: 2px 0;
 }
 .run-strip {
   display: grid;

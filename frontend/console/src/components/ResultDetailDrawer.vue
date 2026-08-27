@@ -894,6 +894,12 @@ watch(
                             <div class="hit-header">
                               <span class="hit-word-badge">{{ hit.word }}</span>
                               <span class="hit-category">{{ hit.rule_category }}</span>
+                              <span
+                                v-if="hit.rule_id?.startsWith('custom_')"
+                                class="hit-custom-tag"
+                              >
+                                企业自定义
+                              </span>
                               <span class="hit-severity-badge" :class="hit.severity">
                                 {{ hit.severity === 'block' ? '禁止发布' : '建议修改' }}
                               </span>
@@ -1692,6 +1698,16 @@ watch(
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);
+}
+
+.hit-custom-tag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #f0fdf4;
+  color: #166534;
+  border: 1px solid #bbf7d0;
 }
 
 .hit-severity-badge {

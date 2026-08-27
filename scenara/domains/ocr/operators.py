@@ -461,6 +461,11 @@ class OcrDocumentOperator:
         deduplicate_text = bool(parameters.get("deduplicate_text", True))
         raw_roi = parameters.get("roi")
         enable_compliance = bool(parameters.get("enable_compliance", True))
+        custom_sensitive_words = parameters.get("custom_sensitive_words")
+        compliance_whitelist = parameters.get("compliance_whitelist")
+        custom_sensitive_severity = str(
+            parameters.get("custom_sensitive_severity", "block")
+        )
         deduplicate_slides = bool(parameters.get("deduplicate_slides", True))
         layout_reconstruction = bool(parameters.get("layout_reconstruction", True))
 
@@ -566,12 +571,23 @@ class OcrDocumentOperator:
             hits_list: list[OcrComplianceHit] = []
             if enable_compliance and aggregate_text.strip():
                 checker = OcrComplianceChecker()
-                rep = checker.inspect(aggregate_text, blocks=blocks)
+                rep = checker.inspect(
+                    aggregate_text,
+                    blocks=blocks,
+                    custom_words=custom_sensitive_words,
+                    whitelist=compliance_whitelist,
+                    custom_severity=custom_sensitive_severity,
+                )
                 compliance_report_dict = rep.model_dump()
                 hits_list = rep.hits
                 # 同步为各 Slide 也计算合规报告
                 for s in slides_catalog:
-                    s_rep = checker.inspect(s.get("text", ""))
+                    s_rep = checker.inspect(
+                        s.get("text", ""),
+                        custom_words=custom_sensitive_words,
+                        whitelist=compliance_whitelist,
+                        custom_severity=custom_sensitive_severity,
+                    )
                     s["compliance"] = s_rep.model_dump()
 
             # HTML 仿真排版生成

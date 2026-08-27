@@ -93,12 +93,27 @@ export function useDomainCatalog(options: DomainCatalogOptions) {
       null,
   );
 
+  const BUILTIN_PLATFORM_PARAMS = new Set([
+    "roi",
+    "sample_strategy",
+    "sample_interval_ms",
+    "scene_change_threshold",
+    "frame_max_edge",
+    "sample_start_ms",
+    "sample_end_ms",
+    "max_reconnect_attempts",
+    "connect_timeout_ms",
+    "read_timeout_ms",
+    "page_scale",
+  ]);
+
   const parameterEntries = computed(
     () =>
       Object.entries(selectedPipeline.value?.parameter_schema ?? {}).filter(
-        ([, definition]) =>
-          !definition.media_kinds?.length ||
-          definition.media_kinds.includes(options.mode.value),
+        ([key, definition]) =>
+          !BUILTIN_PLATFORM_PARAMS.has(key) &&
+          (!definition.media_kinds?.length ||
+            definition.media_kinds.includes(options.mode.value)),
       ) as Array<[string, PipelineParameterDefinition]>,
   );
 
