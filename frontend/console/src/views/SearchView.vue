@@ -91,8 +91,10 @@ const savedName = ref("");
 const hitThumbnails = ref<Record<string, string>>({});
 const loadingThumbnails = ref<Record<string, boolean>>({});
 const lightboxHit = ref<SearchHit | null>(null);
+const previewLightboxOpen = ref(false);
 const drawerOpen = ref(false);
 const drawerRunId = ref<string | null>(null);
+
 
 const imageAssets = computed(() =>
   assets.value.filter((asset) => asset.kind === "image"),
@@ -456,14 +458,19 @@ useRefresh(runSearch);
             <div
               class="portrait-preview-box"
               :class="{ 'has-preview': preview }"
+              :title="preview ? '点击查看查询图片大图' : '人像特征查询图'"
+              @click="preview && (previewLightboxOpen = true)"
             >
               <template v-if="preview">
                 <img :src="preview" alt="查询图片预览" class="preview-img" />
+                <div class="thumbnail-zoom-hint" title="点击查看大图">
+                  <Eye :size="14" />
+                </div>
                 <button
                   class="preview-clear-btn"
                   title="清除已选图片"
                   aria-label="清除图片"
-                  @click="clearFile"
+                  @click.stop="clearFile"
                 >
                   <X :size="11" />
                 </button>
@@ -544,7 +551,7 @@ useRefresh(runSearch);
                 </template>
                 <template v-else>
                   <span class="status-hint-muted"
-                    >请上传一张包含清晰人脸或人体的照片，系统将提取特征向量进行全库多模态向量比对。</span
+                    >请上传一张包含清晰人脸或人体的照片，系统将提取人脸高维特征向量进行全库多模态特征比对。</span
                   >
                 </template>
               </div>
@@ -683,11 +690,11 @@ useRefresh(runSearch);
         >
       </div>
       <div v-if="response?.query_summary" class="query-summary">
-        <UserRound :size="17" /><span
-          >检测到 {{ response.query_summary.face_count }} 张人脸，使用
-          {{ response.query_summary.model_id }} ·
-          {{ response.query_summary.model_version }} 查询</span
-        >
+        <UserRound :size="17" />
+        <span>
+          人像生物特征比对：在查询图中定位到 {{ response.query_summary.face_count }} 张人脸，已提取
+          <strong>{{ response.query_summary.model_id }}</strong> 512 维特征向量进行全库比对。
+        </span>
       </div>
 
       <!-- 命中列表展示 -->
@@ -831,14 +838,19 @@ useRefresh(runSearch);
 
       <!-- 空状态提示 -->
       <div v-else class="empty search-empty">
-        <FileSearch :size="30" /><strong>{{
-          response ? "没有符合条件的结果" : "等待检索"
-        }}</strong
-        ><span>{{
-          response
-            ? "可以调整文字、数据类型或相似度阈值后重试。"
-            : "检索结果会按分数和来源位置排序。"
-        }}</span>
+        <FileSearch :size="32" />
+        <strong>{{ response ? "未检索到符合条件的匹配结果" : "等待检索" }}</strong>
+        <template v-if="response">
+          <div class="search-empty-tips">
+            <p><strong>排查与优化建议：</strong></p>
+            <ul>
+              <li><strong>调低相似度阈值</strong>：当前阈值为 <code>{{ threshold }}</code>，对于跨角度/低清监控人脸，建议调整至 <code>0.60 ~ 0.70</code> 后重试；</li>
+              <li><strong>确认目标数据已解析</strong>：请确保目标视频/图片已在【解析工作台】中完成【人像分析】并生成了向量索引；</li>
+              <li><strong>人体外貌/衣着检索</strong>：若需根据衣着颜色或人体特征查找，可切换至上方【文搜图/文搜视频】直接输入关键词（如：“深色上衣”、“白衬衫”）。</li>
+            </ul>
+          </div>
+        </template>
+        <span v-else>检索结果会按向量相似度或文本匹配度排序。</span>
       </div>
     </section>
 
@@ -924,6 +936,49 @@ useRefresh(runSearch);
             >
               <ExternalLink :size="14" />
               <span>跳转至结果工作台</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 查询输入原图大图查看模态框 -->
+    <div
+      v-if="previewLightboxOpen && preview"
+      class="lightbox-backdrop"
+      @click="previewLightboxOpen = false"
+    >
+      <div class="lightbox-modal" @click.stop>
+        <div class="lightbox-header">
+          <div>
+            <h3>查询原图大图预览</h3>
+            <p>{{ file?.name || imageAssets.find(a => a.asset_id === assetId)?.filename || assetId || '已选图片' }}</p>
+          </div>
+          <button
+            class="icon-button"
+            title="关闭大图预览"
+            aria-label="关闭预览"
+            @click="previewLightboxOpen = false"
+          >
+            <X :size="18" />
+          </button>
+        </div>
+        <div class="lightbox-body">
+          <img
+            :src="preview"
+            alt="查询原图"
+            class="lightbox-img"
+          />
+        </div>
+        <div class="lightbox-footer">
+          <div class="lightbox-meta">
+            <span v-if="file" class="hit-badge local">本地文件: {{ file.name }}</span>
+            <span v-else-if="assetId" class="hit-badge asset">资产库图片: {{ assetId }}</span>
+            <span v-if="threshold" class="hit-badge score">设定相似度阈值: {{ threshold }}</span>
+          </div>
+          <div class="lightbox-actions">
+            <button class="button primary" @click="previewLightboxOpen = false">
+              <span>确定</span>
             </button>
           </div>
         </div>
@@ -1792,6 +1847,39 @@ useRefresh(runSearch);
   align-items: center;
   gap: 6px;
 }
+.search-empty-tips {
+  margin-top: 8px;
+  max-width: 580px;
+  text-align: left;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #334155;
+  line-height: 1.6;
+}
+.search-empty-tips p {
+  margin: 0 0 6px;
+  font-weight: 600;
+  color: #0f172a;
+}
+.search-empty-tips ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.search-empty-tips li {
+  margin-bottom: 4px;
+}
+.search-empty-tips code {
+  background: #e2e8f0;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: inherit;
+  color: #0f172a;
+  font-weight: 600;
+}
+
 
 @media (max-width: 768px) {
   .portrait-query-card {
