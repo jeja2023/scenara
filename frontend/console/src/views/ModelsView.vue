@@ -469,19 +469,25 @@ useRefresh(refresh);
   color: #17211f;
 }
 
-/* 固定表格区域最小高度，防止切换页码（如10条切到8条）或筛选时表格区域发生高度抖动 */
+/* 固定表格区域最小高度（10条数据），防止切换页码或筛选时表格区域发生高度抖动 */
 :deep(.models-table-wrapper .table-scroll) {
-  min-height: 428px;
+  min-height: 310px;
 }
 
-/* 单行表格列样式 */
+/* 严格使用全局统一的 28px 表格行高与 3px 8px 内边距 */
 :deep(.models-table td),
 :deep(.models-table th) {
   white-space: nowrap !important;
   vertical-align: middle;
-  padding: 8px 12px;
-  height: 39px;
+  padding: 3px 8px !important;
+  height: 28px !important;
+  min-height: 28px !important;
   box-sizing: border-box;
+  line-height: 1.3;
+}
+
+:deep(.models-table tr) {
+  height: 28px;
 }
 
 .model-name-text {
@@ -489,15 +495,17 @@ useRefresh(refresh);
   font-weight: 600;
   color: var(--graphite, #17211f);
   white-space: nowrap;
+  line-height: 20px;
 }
 
 .domain-tag {
   display: inline-block;
-  padding: 2px 7px;
-  font-size: 11px;
+  padding: 1px 6px;
+  font-size: 10.5px;
   font-weight: 600;
-  border-radius: 4px;
+  border-radius: 3px;
   white-space: nowrap;
+  line-height: 16px;
 }
 
 .domain-badge-portrait {
@@ -525,6 +533,7 @@ useRefresh(refresh);
   font-weight: 500;
   color: var(--graphite, #17211f);
   white-space: nowrap;
+  line-height: 20px;
 }
 
 .adapter-text {
@@ -532,17 +541,19 @@ useRefresh(refresh);
   font-weight: 500;
   color: var(--graphite, #17211f);
   white-space: nowrap;
+  line-height: 20px;
 }
 
 .license-tag {
-  font-size: 11px;
-  padding: 2px 6px;
+  font-size: 10.5px;
+  padding: 1px 5px;
   background: #f1f5f4;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 4px;
+  border-radius: 3px;
   color: var(--muted, #64716d);
   font-family: var(--font-mono, monospace);
   white-space: nowrap;
+  line-height: 16px;
 }
 
 .vram-text {
@@ -550,15 +561,31 @@ useRefresh(refresh);
   font-weight: 500;
   color: var(--graphite, #17211f);
   white-space: nowrap;
+  line-height: 20px;
 }
 
+/* 按钮、徽章尺寸严格控制，绝不撑大表格行高 */
+:deep(.models-table .badge),
 .status-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 6px;
   font-size: 11px;
   white-space: nowrap;
 }
+
+:deep(.models-table .button),
+:deep(.models-table .icon-button) {
+  height: 20px !important;
+  min-height: 20px !important;
+  padding: 0 5px !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
+}
+
 
 .status-dot {
   width: 6px;
