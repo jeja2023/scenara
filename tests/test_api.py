@@ -336,7 +336,9 @@ async def test_pipeline_and_model_catalog_endpoints_use_state_store(client) -> N
     assert ocr_pipeline["parameter_schema"]["layout_required"]["control"] == "boolean"
     models = await api.get("/api/v1/models")
     assert models.status_code == 200
-    assert models.json()["data"] == []
+    assert len(models.json()["data"]) >= 6
+    assert any(m["model_id"] == "scenara.portrait.yolov8n" for m in models.json()["data"])
+
 
 
 @pytest.mark.asyncio

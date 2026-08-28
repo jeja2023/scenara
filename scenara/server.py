@@ -185,7 +185,8 @@ from scenara.platform.index import (
     IndexTextQueryRequest,
     IndexVectorQueryRequest,
 )
-from scenara.platform.model_runtime import ModelPackageManifest
+from scenara.platform.model_runtime import ModelPackageManifest, builtin_model_packages
+
 from scenara.platform.objects import (
     ObjectAlreadyExistsError,
     ObjectIntegrityError,
@@ -2286,8 +2287,12 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request, context: PrincipalContext = Depends(principal_context)
     ) -> ApiEnvelope[list[dict[str, object]]]:
         await require_allowed(runtime.policy, context, "list", "model_package")
-        rows = [package.model_dump(mode="json") for package in await runtime.state.list_model_packages()]
+        packages = await runtime.state.list_model_packages()
+        if not packages:
+            packages = builtin_model_packages()
+        rows = [package.model_dump(mode="json") for package in packages]
         return _envelope(request, rows)  # type: ignore[return-value]
+
 
     @app.get("/api/v1/domains", tags=["Domains"])
     async def list_domains(
