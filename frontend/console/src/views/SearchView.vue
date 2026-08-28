@@ -839,19 +839,27 @@ useRefresh(runSearch);
       <!-- 空状态提示 -->
       <div v-else class="empty search-empty">
         <FileSearch :size="32" />
-        <strong>{{ response ? "未检索到符合条件的匹配结果" : "等待检索" }}</strong>
+        <strong v-if="response && !response.searched_indexes.length">
+          当前库中暂无可用的人像特征索引（已提取查询图特征，但底库无数据）
+        </strong>
+        <strong v-else>{{ response ? "未检索到符合条件的匹配结果" : "等待检索" }}</strong>
         <template v-if="response">
           <div class="search-empty-tips">
-            <p><strong>排查与优化建议：</strong></p>
+            <p><strong>排查与说明：</strong></p>
             <ul>
-              <li><strong>调低相似度阈值</strong>：当前阈值为 <code>{{ threshold }}</code>，对于跨角度/低清监控人脸，建议调整至 <code>0.60 ~ 0.70</code> 后重试；</li>
-              <li><strong>确认目标数据已解析</strong>：请确保目标视频/图片已在【解析工作台】中完成【人像分析】并生成了向量索引；</li>
+              <li v-if="!response.searched_indexes.length">
+                <strong style="color: #b91c1c;">底库暂无已解析数据</strong>：查询图中已成功提取到 512 维人脸特征，但系统中目前<strong>尚未对目标视频/图片运行过【人像解析】任务</strong>，因此底库中暂无可供比对的特征索引。请先前往左侧<strong>【解析工作台】</strong>对目标视频执行一次【人像解析】。
+              </li>
+              <li v-else>
+                <strong>调低相似度阈值</strong>：当前阈值为 <code>{{ threshold }}</code>，对于跨角度/低清监控人脸，建议调整至 <code>0.60 ~ 0.70</code> 后重试；
+              </li>
               <li><strong>人体外貌/衣着检索</strong>：若需根据衣着颜色或人体特征查找，可切换至上方【文搜图/文搜视频】直接输入关键词（如：“深色上衣”、“白衬衫”）。</li>
             </ul>
           </div>
         </template>
         <span v-else>检索结果会按向量相似度或文本匹配度排序。</span>
       </div>
+
     </section>
 
     <!-- 1. 结构化结果抽屉 -->
