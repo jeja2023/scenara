@@ -7,11 +7,12 @@ import re
 import sys
 import tempfile
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, TypeVar
 from uuid import uuid4
+
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.exceptions import RequestValidationError
@@ -288,7 +289,7 @@ from scenara.platform.store import StateConflict
 from scenara.platform.webhook_service import WebhookNotFound
 from scenara.settings import Settings
 
-if sys.platform == "win32":
+if sys.platform == "win32" and sys.version_info < (3, 14):
     # psycopg's async connection pool requires selector-based I/O on Windows.
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
@@ -310,8 +311,12 @@ def _request_id(request: Request) -> str:
     return str(getattr(request.state, "request_id", f"req_{uuid4().hex}"))
 
 
-def _envelope(request: Request, data: object) -> ApiEnvelope[object]:
+_T = TypeVar("_T")
+
+
+def _envelope(request: Request, data: _T) -> ApiEnvelope[_T]:
     return ApiEnvelope(request_id=_request_id(request), data=data)
+
 
 
 def _media_source_view(source: MediaSource) -> MediaSourceView:
@@ -407,12 +412,13 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     runtime = runtime or build_runtime(settings)
 
     @asynccontextmanager
-    async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
         await runtime.open()
         try:
             yield
         finally:
             await runtime.close()
+
 
     app = FastAPI(
         title="Scenara API",
@@ -553,7 +559,9 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
 
     @app.exception_handler(HTTPException)
     async def http_error(request: Request, exc: HTTPException) -> JSONResponse:
-        return error_response(request, exc.status_code, "HTTP_ERROR", str(exc.detail))
+        detail_msg = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+        return error_response(request, exc.status_code, "HTTP_ERROR", detail_msg)
+
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:

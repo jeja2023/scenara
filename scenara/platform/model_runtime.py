@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 from enum import StrEnum
@@ -141,7 +141,7 @@ def current_runtime_binding(capability: str) -> RuntimeModelBinding | None:
 
 
 @contextmanager
-def runtime_binding_scope(bindings: dict[str, RuntimeModelBinding]) -> Iterator[None]:
+def runtime_binding_scope(bindings: dict[str, RuntimeModelBinding]) -> Generator[None, None, None]:
     reset_handle = _ACTIVE_RUNTIME_BINDINGS.set(dict(bindings))
     try:
         yield
