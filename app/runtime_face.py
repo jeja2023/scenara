@@ -226,10 +226,11 @@ async def run_scrfd_face_detection(
         else runtime_output_value(runtime, "iou", runtime.capability.get("iou", 0.45))
     )
     max_detections = (
-        int(max_detections_override)
-        if max_detections_override is not None and int(max_detections_override) > 0
+        max_detections_override
+        if max_detections_override is not None and max_detections_override > 0
         else None
     )
+
     keep_mask = scores >= confidence
     boxes = boxes[keep_mask]
     scores = scores[keep_mask]

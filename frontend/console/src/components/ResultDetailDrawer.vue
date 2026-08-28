@@ -6,7 +6,6 @@ import {
   Copy,
   Download,
   Eye,
-  EyeOff,
   FileText,
   Film,
   Layers,
@@ -17,6 +16,7 @@ import {
   ShieldCheck,
   X,
 } from "@lucide/vue";
+
 import { computed, nextTick, ref, watch } from "vue";
 import { api, apiImageDataUrl, userFacingError } from "../api";
 import DataTable from "./DataTable.vue";
@@ -603,7 +603,7 @@ watch(
           </dl>
 
           <!-- 媒体技术元数据网格（如有） -->
-          <dl v-if="hasMediaMetadataItems" class="metadata-grid">
+          <dl v-if="mediaMetadata && hasMediaMetadataItems" class="metadata-grid">
             <div v-if="mediaMetadata.width && mediaMetadata.height">
               <dt>画面尺寸</dt>
               <dd>{{ mediaMetadata.width }} × {{ mediaMetadata.height }}</dd>
@@ -641,6 +641,7 @@ watch(
               <dd>{{ labelTimestampSource(mediaMetadata.timestamp_source) }}</dd>
             </div>
           </dl>
+
 
           <template v-if="result">
             <!-- 两栏式科学布局：左侧时间轴，右侧特征图片与目标明细 -->

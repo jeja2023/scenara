@@ -93,7 +93,7 @@ def _safe_attributes(value: dict[str, Any]) -> dict[str, Any]:
 
 
 def _box_center(box: list[float]) -> tuple[float, float]:
-    return ((float(box[0]) + float(box[2])) / 2.0, (float(box[1]) + float(box[3])) / 2.0)
+    return ((box[0] + box[2]) / 2.0, (box[1] + box[3]) / 2.0)
 
 
 def _contains(person_box: list[float], face_box: list[float]) -> float:
@@ -102,7 +102,7 @@ def _contains(person_box: list[float], face_box: list[float]) -> float:
     if len(person_box) < 4 or len(face_box) < 4:
         return 0.0
     center_x, center_y = _box_center(face_box)
-    left, top, right, bottom = (float(person_box[index]) for index in range(4))
+    left, top, right, bottom = person_box[:4]
     if not (left <= center_x <= right and top <= center_y <= bottom):
         return 0.0
     width = max(1e-6, right - left)
@@ -111,6 +111,7 @@ def _contains(person_box: list[float], face_box: list[float]) -> float:
     horizontal = 1.0 - abs(center_x - (left + right) / 2.0) / (width / 2.0)
     vertical = 1.0 - (center_y - top) / height
     return max(0.0, min(1.0, 0.5 * horizontal + 0.5 * vertical))
+
 
 
 def _assign_face_embeddings(persons: list[dict[str, Any]], faces: list[dict[str, Any]]) -> None:
@@ -622,10 +623,20 @@ class PortraitFullAnalysisOperator:
                     target[name] = max(float(target.get(name, 0.0) or 0.0), float(incoming[name]))
             first_pts = incoming.get("first_pts_ms")
             if first_pts is not None:
-                target["first_pts_ms"] = min(float(target.get("first_pts_ms", first_pts)), float(first_pts))
+                existing_first = target.get("first_pts_ms")
+                target["first_pts_ms"] = (
+                    min(float(existing_first), float(first_pts))
+                    if existing_first is not None
+                    else float(first_pts)
+                )
             last_pts = incoming.get("last_pts_ms")
             if last_pts is not None:
-                target["last_pts_ms"] = max(float(target.get("last_pts_ms", last_pts)), float(last_pts))
+                existing_last = target.get("last_pts_ms")
+                target["last_pts_ms"] = (
+                    max(float(existing_last), float(last_pts))
+                    if existing_last is not None
+                    else float(last_pts)
+                )
             for name, value in incoming.items():
                 if name not in target and name not in {"frame_count", "first_pts_ms", "last_pts_ms"}:
                     target[name] = value
@@ -702,7 +713,8 @@ class PortraitFullAnalysisOperator:
                         merge_track(trajectory_tracks[position], incoming)
                 models = output.models
                 for key, value in output.timings.items():
-                    timings[key] = timings.get(key, 0.0) + float(value)
+                    timings[key] = timings.get(key, 0.0) + (float(value) if isinstance(value, (int, float, str)) else 0.0)
+
                 warnings.extend(output.warnings)
                 substitutes.update(output.development_substitutes)
                 processed_units += len(chunk)

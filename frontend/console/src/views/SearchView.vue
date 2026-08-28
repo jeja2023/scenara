@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {
-  ArrowRight,
   Bookmark,
   Clock,
   ExternalLink,
@@ -20,6 +19,7 @@ import {
   Video,
   X,
 } from "@lucide/vue";
+
 import { computed, ref, watch } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { useRouter } from "vue-router";
