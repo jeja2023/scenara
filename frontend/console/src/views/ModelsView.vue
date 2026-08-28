@@ -9,6 +9,7 @@ import {
   Search,
   Shirt,
   User,
+  X,
 } from "@lucide/vue";
 import { computed, onMounted, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
@@ -30,7 +31,6 @@ const searchQuery = ref("");
 const selectedDomain = ref<string>("all");
 const pageSize = ref(10);
 
-
 const domainTabs = [
   { id: "all", label: "全部模型", icon: Layers },
   { id: "portrait", label: "人像视觉", icon: User },
@@ -40,10 +40,10 @@ const domainTabs = [
 ];
 
 const columns: TableColumn<ModelPackage>[] = [
-  { key: "model", label: "模型名称与标识" },
+  { key: "model", label: "模型名称" },
   { key: "domain", label: "业务领域" },
-  { key: "capability", label: "核心算法能力" },
-  { key: "adapter", label: "运行时适配器" },
+  { key: "capability", label: "算法能力" },
+  { key: "adapter", label: "适配器" },
   { key: "license_id", label: "授权许可" },
   { key: "vram_mb", label: "显存占用" },
   { key: "status", label: "准入状态" },
@@ -54,7 +54,7 @@ const filteredModels = computed(() => {
   let list = models.value;
   if (selectedDomain.value !== "all") {
     list = list.filter(
-      (m) => (m.domain || inferDomain(m.model_id)) === selectedDomain.value
+      (m) => (m.domain || inferDomain(m.model_id)) === selectedDomain.value,
     );
   }
   const q = searchQuery.value.trim().toLowerCase();
@@ -74,6 +74,10 @@ const filteredModels = computed(() => {
   }
   return list;
 });
+
+function clearSearch(): void {
+  searchQuery.value = "";
+}
 
 function inferDomain(modelId: string): string {
   if (modelId.includes(".ocr.") || modelId.includes("/ocr")) return "ocr";
@@ -161,7 +165,7 @@ useRefresh(refresh);
     </div>
 
     <!-- 模型清单主卡片 -->
-    <section class="panel">
+    <section class="panel models-panel">
       <div class="panel-header-custom">
         <div class="header-left">
           <h2>已装配模型库</h2>
@@ -193,6 +197,15 @@ useRefresh(refresh);
               placeholder="搜索模型、能力或适配器..."
               class="search-input"
             />
+            <button
+              v-if="searchQuery"
+              type="button"
+              class="search-clear-btn"
+              title="清空搜索"
+              @click="clearSearch"
+            >
+              <X :size="11" />
+            </button>
           </div>
         </div>
       </div>
@@ -202,24 +215,17 @@ useRefresh(refresh);
         :items="filteredModels"
         :loading="loading"
         :page-size="pageSize"
-        :page-size-options="[5, 10, 20, 50]"
+        :page-size-options="[10, 20, 50, 100]"
         :show-page-size-selector="true"
         :show-jumper="true"
+        table-class="models-table"
         empty-text="暂无匹配的模型数据"
       >
-
-        <!-- 1. 模型名称与元信息 -->
+        <!-- 1. 模型名称 -->
         <template #model="{ row }">
-          <div class="model-cell">
-            <div class="model-title">{{ labelModelName(row.model_id) }}</div>
-            <div class="model-subtitle mono">
-              <span>{{ row.model_id }}</span>
-              <span class="dot-sep">·</span>
-              <span class="ver-tag">v{{ row.version }}</span>
-              <span class="dot-sep">·</span>
-              <span title="SHA256 完整哈希" class="hash-tag">{{ row.sha256.slice(0, 8) }}</span>
-            </div>
-          </div>
+          <span class="model-name-text" :title="`${row.model_id} (v${row.version})`">
+            {{ labelModelName(row.model_id) }}
+          </span>
         </template>
 
         <!-- 2. 领域 -->
@@ -241,38 +247,26 @@ useRefresh(refresh);
 
         <!-- 4. 适配器 -->
         <template #adapter="{ row }">
-          <div class="adapter-cell">
-            <span class="adapter-name">{{ labelAdapter(row.adapter) }}</span>
-            <span class="adapter-code mono">({{ row.adapter }})</span>
-          </div>
+          <span class="adapter-text" :title="row.adapter">
+            {{ labelAdapter(row.adapter) }}
+          </span>
         </template>
 
         <!-- 5. 许可证 -->
         <template #license_id="{ row }">
-          <span class="license-tag mono">
-            {{ labelLicense(row.license_id) }}
+          <span class="license-tag" :title="labelLicense(row.license_id)">
+            {{ row.license_id }}
           </span>
         </template>
 
         <!-- 6. 显存 -->
         <template #vram_mb="{ row }">
-          <div class="vram-cell">
-            <span class="vram-text">{{ row.vram_mb }} MiB</span>
-            <div class="vram-bar-wrap">
-              <div
-                class="vram-bar-fill"
-                :style="{ width: `${Math.min(100, (row.vram_mb / 512) * 100)}%` }"
-              />
-            </div>
-          </div>
+          <span class="vram-text">{{ row.vram_mb }} MiB</span>
         </template>
 
-        <!-- 7. 状态 -->
+        <!-- 7. 准入状态 -->
         <template #status="{ row }">
-          <span
-            class="badge status-badge"
-            :class="row.production_ready ? 'active' : ''"
-          >
+          <span class="badge status-badge" :class="row.production_ready ? 'active' : ''">
             <span class="status-dot" :class="row.production_ready ? 'dot-active' : 'dot-dev'" />
             {{ row.production_ready ? "生产准入" : "开发测试" }}
           </span>
@@ -283,82 +277,129 @@ useRefresh(refresh);
 </template>
 
 <style scoped>
-.model-stats {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-bottom: 20px;
-}
-.stat-unit {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--muted, #64748b);
-  margin-left: 4px;
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
+/* 统计卡片微调 */
+.model-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.stat-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.stat-icon-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.04);
+  color: inherit;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 2px;
+}
+
+.stat-unit {
+  font-size: 13px;
+  font-weight: 500;
+  margin-left: 2px;
+  opacity: 0.8;
+}
+
+.stat-desc {
+  font-size: 11.5px;
+  color: var(--muted, #64716d);
+}
+
+/* 主面板头部 */
 .panel-header-custom {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line, #e2e8e6);
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 16px;
+  background: #fafbfb;
+  border-top-left-radius: var(--radius-md, 8px);
+  border-top-right-radius: var(--radius-md, 8px);
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .header-left h2 {
-  margin: 0;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
+  margin: 0;
+  color: var(--graphite, #17211f);
 }
 
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
+/* 领域分类 Tabs */
 .domain-tabs {
   display: inline-flex;
   align-items: center;
-  background: var(--surface-subtle, rgba(0, 0, 0, 0.04));
-  border: 1px solid var(--border-color, #e2e8f0);
-  border-radius: 8px;
+  background: #eef2f1;
   padding: 2px;
+  border-radius: 6px;
   gap: 2px;
 }
 
 .domain-tab-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 10px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--muted, #64748b);
-  background: transparent;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 4px;
   border: none;
-  border-radius: 6px;
+  background: transparent;
+  color: var(--muted, #64716d);
+  font-size: 11.5px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .domain-tab-btn:hover {
-  color: var(--text-color, #0f172a);
-  background: rgba(255, 255, 255, 0.5);
+  color: var(--graphite, #17211f);
+  background: rgba(255, 255, 255, 0.6);
 }
 
 .domain-tab-btn.active {
-  color: var(--primary, #0284c7);
-  background: var(--surface, #ffffff);
+  color: var(--primary, #0ea5e9);
+  background: #ffffff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   font-weight: 600;
 }
 
+/* 搜索框 */
 .search-box {
   position: relative;
   display: flex;
@@ -368,68 +409,79 @@ useRefresh(refresh);
 .search-icon {
   position: absolute;
   left: 10px;
-  color: var(--muted, #94a3b8);
+  color: var(--muted, #64716d);
   pointer-events: none;
 }
 
 .search-input {
-  padding: 6px 12px 6px 30px;
+  height: 30px;
+  padding: 0 28px 0 30px;
   font-size: 12px;
-  border: 1px solid var(--border-color, #cbd5e1);
+  border: 1px solid var(--line, #e2e8e6);
   border-radius: 6px;
-  background: var(--surface, #ffffff);
-  color: var(--text-color, #0f172a);
+  background: #ffffff;
+  color: var(--graphite, #17211f);
+  width: 210px;
   outline: none;
-  width: 220px;
-  transition: border-color 0.2s ease;
+  transition: all 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .search-input:focus {
-  border-color: var(--primary, #0284c7);
+  border-color: var(--primary, #0ea5e9);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.12);
+  width: 230px;
 }
 
-/* 表格列样式 */
-.model-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+.search-input::placeholder {
+  color: #94a3b8;
+  font-size: 11.5px;
 }
 
-.model-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-color, #0f172a);
-}
-
-.model-subtitle {
-  font-size: 11px;
-  color: var(--muted, #64748b);
-  display: flex;
+.search-clear-btn {
+  position: absolute;
+  right: 7px;
+  display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: #e2e8e6;
+  color: #64716d;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.12s ease;
 }
 
-.dot-sep {
-  opacity: 0.5;
+.search-clear-btn:hover {
+  background: #cbd5e1;
+  color: #17211f;
 }
 
-.ver-tag {
-  color: var(--primary, #0284c7);
-  font-weight: 500;
+/* 单行表格列样式 */
+:deep(.models-table td),
+:deep(.models-table th) {
+  white-space: nowrap !important;
+  vertical-align: middle;
+  padding: 9px 12px;
 }
 
-.hash-tag {
-  background: var(--surface-subtle, rgba(0, 0, 0, 0.04));
-  padding: 1px 4px;
-  border-radius: 3px;
+.model-name-text {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--graphite, #17211f);
+  white-space: nowrap;
 }
 
 .domain-tag {
   display: inline-block;
-  padding: 3px 8px;
+  padding: 2px 7px;
   font-size: 11px;
   font-weight: 600;
   border-radius: 4px;
+  white-space: nowrap;
 }
 
 .domain-badge-portrait {
@@ -455,78 +507,53 @@ useRefresh(refresh);
 .cap-tag {
   font-size: 12px;
   font-weight: 500;
-  color: var(--text-color, #1e293b);
+  color: var(--graphite, #17211f);
+  white-space: nowrap;
 }
 
-.adapter-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.adapter-name {
+.adapter-text {
   font-size: 12px;
   font-weight: 500;
-  color: var(--text-color, #0f172a);
-}
-
-.adapter-code {
-  font-size: 11px;
-  color: var(--muted, #94a3b8);
+  color: var(--graphite, #17211f);
+  white-space: nowrap;
 }
 
 .license-tag {
   font-size: 11px;
   padding: 2px 6px;
-  background: var(--surface-subtle, rgba(0, 0, 0, 0.04));
-  border: 1px solid var(--border-color, #e2e8f0);
+  background: #f1f5f4;
+  border: 1px solid var(--line, #e2e8e6);
   border-radius: 4px;
-  color: var(--muted, #475569);
-}
-
-.vram-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  width: 90px;
+  color: var(--muted, #64716d);
+  font-family: var(--font-mono, monospace);
+  white-space: nowrap;
 }
 
 .vram-text {
   font-size: 12px;
-  font-weight: 600;
-  color: var(--text-color, #0f172a);
-}
-
-.vram-bar-wrap {
-  height: 4px;
-  background: var(--surface-subtle, rgba(0, 0, 0, 0.08));
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.vram-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #38bdf8, #818cf8);
-  border-radius: 2px;
+  font-weight: 500;
+  color: var(--graphite, #17211f);
+  white-space: nowrap;
 }
 
 .status-badge {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   font-size: 11px;
-  font-weight: 500;
+  white-space: nowrap;
 }
 
 .status-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
+  display: inline-block;
 }
 
 .dot-active {
   background: #22c55e;
-  box-shadow: 0 0 6px rgba(34, 197, 94, 0.6);
+  box-shadow: 0 0 5px rgba(34, 197, 94, 0.6);
 }
 
 .dot-dev {
@@ -552,4 +579,3 @@ useRefresh(refresh);
   }
 }
 </style>
-
