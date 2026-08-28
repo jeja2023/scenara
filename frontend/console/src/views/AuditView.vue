@@ -392,33 +392,64 @@ useRefresh(refresh);
 }
 
 .export-btn {
-  height: 28px;
-  padding: 0 10px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0 8px;
   font-size: 11.5px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 
+
 /* 锁定表格容器最小高度防止跳动 */
 :deep(.audit-table-wrapper .table-scroll) {
-  min-height: 440px;
+  min-height: 480px;
 }
 
-/* 单行表格单元格样式（绝对不换行） */
+/* 严格使用全局统一的 28px 表格行高与 3px 8px 内边距 */
 :deep(.audit-table td),
 :deep(.audit-table th) {
   white-space: nowrap !important;
   vertical-align: middle;
-  padding: 8px 12px;
-  height: 38px;
+  padding: 3px 8px !important;
+  height: 28px !important;
+  min-height: 28px !important;
   box-sizing: border-box;
+  line-height: 1.3;
+}
+
+:deep(.audit-table tr) {
+  height: 28px;
+}
+
+/* 按钮及徽章严格控制高度，绝不撑大表格行高 */
+:deep(.audit-table .badge),
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 6px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+:deep(.audit-table .button),
+:deep(.audit-table .icon-button) {
+  height: 20px !important;
+  min-height: 20px !important;
+  padding: 0 5px !important;
+  font-size: 11px !important;
+  line-height: 1 !important;
 }
 
 .time-text {
   font-size: 11.5px;
   color: var(--muted, #64716d);
   white-space: nowrap;
+  line-height: 20px;
 }
 
 .action-name {
@@ -426,18 +457,21 @@ useRefresh(refresh);
   font-weight: 600;
   color: var(--graphite, #17211f);
   white-space: nowrap;
+  line-height: 20px;
 }
 
 .resource-name {
   font-size: 12px;
   color: var(--graphite, #17211f);
   white-space: nowrap;
+  line-height: 20px;
 }
 
 .principal-name {
   font-size: 11.5px;
   color: var(--graphite, #17211f);
   white-space: nowrap;
+  line-height: 20px;
 }
 
 .evidence-text {
@@ -448,7 +482,9 @@ useRefresh(refresh);
   white-space: nowrap;
   font-size: 11px;
   color: var(--muted, #64716d);
+  line-height: 20px;
 }
+
 
 .status-badge {
   display: inline-flex;
