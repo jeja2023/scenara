@@ -3,7 +3,10 @@ from typing import Any
 
 import numpy as np
 import numpy.typing as npt
+
+import app.dll_helper  # noqa: F401
 import onnxruntime as ort
+
 
 from app.exception_utils import exception_log_summary
 from app.metrics import record_cpu_fallback, record_session_provider
