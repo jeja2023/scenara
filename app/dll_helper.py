@@ -22,20 +22,24 @@ def setup_nvidia_dll_directories() -> list[str]:
     # 1. 收集 site-packages 根路径
     if hasattr(site, "getsitepackages"):
         try:
-            search_roots.extend(site.getsitepackages())
+            site_packages = site.getsitepackages()
+            if isinstance(site_packages, list):
+                search_roots.extend([str(p) for p in site_packages if isinstance(p, (str, bytes))])
         except Exception:
             pass
 
-    user_site = getattr(site, "getusersitepackages", None)
-    if callable(user_site):
+    if hasattr(site, "getusersitepackages"):
         try:
-            search_roots.append(user_site())
+            user_site = site.getusersitepackages()
+            if isinstance(user_site, str):
+                search_roots.append(user_site)
         except Exception:
             pass
 
     venv_site = os.path.join(sys.prefix, "Lib", "site-packages")
     if venv_site not in search_roots:
         search_roots.append(venv_site)
+
 
     # 2. 扫描所有 nvidia/*/bin 目录
     for root in search_roots:
