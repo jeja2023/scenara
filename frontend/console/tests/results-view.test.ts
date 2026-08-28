@@ -126,9 +126,10 @@ describe("results view feature images", () => {
       history: createMemoryHistory(),
       routes: [{ path: "/", component: { template: "<div />" } }],
     });
-    await router.push("/");
+    await router.push("/?run=run-result");
     await router.isReady();
     const wrapper = mount(ResultsView, {
+
       attachTo: document.body,
       global: { plugins: [router] },
     });
@@ -154,4 +155,23 @@ describe("results view feature images", () => {
     );
     wrapper.unmount();
   });
+
+  it("does not automatically open detail drawer on plain page load", async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: "/", component: { template: "<div />" } }],
+    });
+    await router.push("/");
+    await router.isReady();
+    const wrapper = mount(ResultsView, {
+      attachTo: document.body,
+      global: { plugins: [router] },
+    });
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain("特征图片");
+    expect(wrapper.find(".drawer-backdrop").exists()).toBe(false);
+    wrapper.unmount();
+  });
 });
+

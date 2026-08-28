@@ -113,14 +113,16 @@ async function refresh(): Promise<void> {
       selected.value = next ?? null;
     }
     const requestedRun =
-      typeof route.query.run === "string" ? route.query.run : "";
-    const requestedItem = requestedRun
-      ? items.value.find((item) => item.run_id === requestedRun)
-      : null;
-    if (requestedItem) {
-      showDetail(requestedItem);
-    } else if (!selected.value && items.value[0]) {
-      showDetail(items.value[0]);
+      typeof route.query.run === "string" ? route.query.run.trim() : "";
+    if (requestedRun) {
+      const requestedItem = items.value.find(
+        (item) => item.run_id === requestedRun,
+      );
+      if (requestedItem) {
+        selected.value = requestedItem;
+      }
+      detailRunId.value = requestedRun;
+      isDetailOpen.value = true;
     }
   } catch (caught) {
     error.value = userFacingError(caught, "解析结果加载失败，请稍后重试");
@@ -137,6 +139,8 @@ function showDetail(item: ResultSummary): void {
 
 function onDetailClosed(): void {
   isDetailOpen.value = false;
+  selected.value = null;
+  detailRunId.value = null;
   if (route.query.run || route.query.unit) {
     const q = { ...route.query };
     delete q.run;
@@ -144,6 +148,7 @@ function onDetailClosed(): void {
     void router.replace({ query: q });
   }
 }
+
 
 function openWorkspace(item: ResultSummary): void {
   void router.push({ path: "/parse", query: { run: item.run_id } });
