@@ -37,14 +37,15 @@ import type {
 const pageSize = ref(20);
 
 const columns: TableColumn<ResultSummary>[] = [
-  { key: "title", label: "标识 / 资源名称" },
-  { key: "domain", label: "领域" },
-  { key: "media_kind", label: "资产类型" },
+  { key: "title", label: "标识 / 资源名称", width: "240px" },
+  { key: "domain", label: "领域", width: "100px" },
+  { key: "media_kind", label: "资产类型", width: "100px" },
   { key: "summary", label: "解析成果概况" },
-  { key: "status", label: "状态" },
-  { key: "created_at", label: "解析时间", class: "muted time-cell" },
-  { key: "actions", label: "操作", align: "right", headerAlign: "right", width: "140px" },
+  { key: "status", label: "状态", width: "90px" },
+  { key: "created_at", label: "解析时间", class: "muted time-cell", width: "150px" },
+  { key: "actions", label: "操作", align: "right", headerAlign: "right", width: "120px" },
 ];
+
 
 const router: Router = useRouter();
 const route = useRoute();
@@ -245,7 +246,7 @@ useRefresh(refresh);
     <section class="panel result-filter-panel">
       <div class="panel-body result-filters">
         <div class="search-field result-search">
-          <Search :size="15" />
+          <Search :size="13" />
           <input
             v-model.trim="query"
             type="search"
@@ -255,7 +256,7 @@ useRefresh(refresh);
         </div>
 
         <div class="select-field">
-          <select v-model="domain" aria-label="筛选领域" @change="onFilterChange">
+          <select v-model="domain" class="filter-select" aria-label="筛选领域" @change="onFilterChange">
             <option value="">全部领域</option>
             <option
               v-for="item in domains"
@@ -270,6 +271,7 @@ useRefresh(refresh);
         <div class="select-field">
           <select
             v-model="mediaKind"
+            class="filter-select"
             aria-label="筛选资产类型"
             @change="onFilterChange"
           >
@@ -282,19 +284,19 @@ useRefresh(refresh);
         </div>
 
         <button
-          class="button secondary"
+          class="button secondary filter-btn"
           title="重置所有筛选"
           @click="clearFilters"
         >
-          <RotateCcw :size="14" />重置
+          <RotateCcw :size="13" />重置
         </button>
 
         <button
-          class="button primary"
+          class="button primary parse-btn"
           style="margin-left: auto"
           @click="navigateToParse()"
         >
-          <Plus :size="14" />发起新解析
+          <Plus :size="13" />发起新解析
         </button>
       </div>
     </section>
@@ -310,24 +312,30 @@ useRefresh(refresh);
         :offset="offset"
         :page-size="pageSize"
         :page-size-options="[10, 20, 50, 100]"
+        table-class="results-table"
+        wrapper-class="results-table-wrapper"
         @page-change="goToPage"
         @page-size-change="onPageSizeChange"
       >
+        <!-- 1. 标识 / 资源名称（严格单行） -->
         <template #title="{ row }">
-          <div class="result-title-cell">
-            <component :is="resultIcon(row)" :size="16" class="result-kind-icon" />
-            <div class="result-name-col">
-              <strong class="result-name" :title="resultTitle(row)">{{ resultTitle(row) }}</strong>
-              <small class="mono muted">{{ row.run_id }}</small>
-            </div>
+          <div class="result-title-cell" :title="`${resultTitle(row)} (${row.run_id})`">
+            <component :is="resultIcon(row)" :size="14" class="result-kind-icon" />
+            <strong class="result-name">{{ resultTitle(row) }}</strong>
           </div>
         </template>
+
+        <!-- 2. 领域 -->
         <template #domain="{ row }">
-          <span class="badge" :class="row.domain">{{ labelDomain(row.domain) }}</span>
+          <span class="badge status-badge" :class="row.domain">{{ labelDomain(row.domain) }}</span>
         </template>
+
+        <!-- 3. 资产类型 -->
         <template #media_kind="{ row }">
-          <span class="badge media-badge">{{ labelMediaKind(row.media_kind) }}</span>
+          <span class="badge status-badge media-badge">{{ labelMediaKind(row.media_kind) }}</span>
         </template>
+
+        <!-- 4. 解析成果概况（严格单行） -->
         <template #summary="{ row }">
           <span class="result-summary-text">
             <template v-if="row.domain === 'portrait'">
@@ -343,32 +351,39 @@ useRefresh(refresh);
             </template>
           </span>
         </template>
+
+        <!-- 5. 状态 -->
         <template #status="{ row }">
-          <span class="badge" :class="row.status">{{ labelRunStatus(row.status) }}</span>
+          <span class="badge status-badge" :class="row.status">{{ labelRunStatus(row.status) }}</span>
         </template>
+
+        <!-- 6. 解析时间 -->
         <template #created_at="{ row }">
-          <span class="muted time-cell">{{ formatDate(row.created_at) }}</span>
+          <span class="muted time-cell mono">{{ formatDate(row.created_at) }}</span>
         </template>
+
+        <!-- 7. 操作（微型按钮 20px） -->
         <template #actions="{ row }">
-          <div class="toolbar compact table-actions">
+          <div class="row-actions">
             <button
-              class="button secondary compact-btn detail-btn"
+              class="button secondary table-btn detail-btn"
               title="查看详情"
               aria-label="查看详情"
               @click="showDetail(row)"
             >
-              <Eye :size="12" />详情
+              <Eye :size="11" />详情
             </button>
             <button
-              class="button secondary compact-btn"
+              class="button secondary table-btn"
               title="回到解析工作台"
               aria-label="回到解析工作台"
               @click="openWorkspace(row)"
             >
-              <Play :size="12" />处理
+              <Play :size="11" />处理
             </button>
           </div>
         </template>
+
         <template #empty>
           <div class="empty result-list-empty">
             <FileSearch :size="32" />
@@ -396,36 +411,45 @@ useRefresh(refresh);
 .results-page {
   max-width: 1500px;
 }
+
 .result-stats {
   margin-bottom: 14px;
 }
+
 .result-filter-panel {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
+  background: #ffffff;
 }
+
 .result-filter-panel .panel-body {
-  padding: 10px 16px;
+  padding: 8px 14px;
 }
+
 .result-filters {
   display: flex;
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
 }
+
 .result-search {
-  flex: 1 1 280px;
+  flex: 1 1 240px;
   display: flex;
   align-items: center;
   gap: 8px;
-  background: var(--color-surface);
-  border: 1px solid var(--line);
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8e6);
   border-radius: 5px;
-  padding: 0 10px;
-  height: 34px;
+  padding: 0 8px;
+  height: 28px;
+  box-sizing: border-box;
 }
+
 .result-search svg {
-  color: var(--muted);
+  color: var(--muted, #64716d);
   flex-shrink: 0;
 }
+
 .result-search input {
   min-width: 0;
   width: 100%;
@@ -434,59 +458,137 @@ useRefresh(refresh);
   height: 100%;
   min-height: 0;
   background: transparent;
-  font-size: 13px;
+  font-size: 11.5px;
+  outline: none;
 }
+
+.filter-select {
+  height: 28px;
+  line-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 5px;
+  background: #ffffff;
+  color: var(--graphite, #17211f);
+  font-size: 11.5px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.filter-btn,
+.parse-btn {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .result-list-panel {
   flex: 1;
-  min-height: 420px;
-  display: flex;
-  flex-direction: column;
+  background: #ffffff;
 }
+
+:deep(.results-table-wrapper .table-scroll) {
+  min-height: 480px;
+}
+
+/* 全局统一 28px 数据表格行高与 3px 8px 内边距（严格单行不折行） */
+:deep(.results-table td),
+:deep(.results-table th) {
+  white-space: nowrap !important;
+  vertical-align: middle;
+  padding: 3px 8px !important;
+  height: 28px !important;
+  min-height: 28px !important;
+  box-sizing: border-box;
+  line-height: 1.3;
+}
+
+:deep(.results-table tr) {
+  height: 28px;
+}
+
 .result-title-cell {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-width: 0;
+  gap: 6px;
+  max-width: 230px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+
 .result-kind-icon {
-  color: var(--muted);
+  color: var(--muted, #64716d);
   flex-shrink: 0;
 }
-.result-name-col {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
+
 .result-name {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
+  color: var(--graphite, #17211f);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.result-summary-text {
+  display: inline-block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
+  font-size: 11.5px;
+  line-height: 20px;
+}
+
 .media-badge {
   background: #f0f4f3;
   color: #3b504b;
 }
+
 .time-cell {
-  font-size: 12px;
+  font-size: 11px;
+  color: var(--muted, #64716d);
   white-space: nowrap;
 }
-.table-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
+
+:deep(.results-table .badge),
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 6px;
+  font-size: 10.5px;
+  white-space: nowrap;
 }
-.compact-btn {
-  height: 26px;
-  min-height: 26px;
-  padding: 0 8px;
-  font-size: 11.5px;
+
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
   gap: 4px;
 }
-.detail-btn {
-  border-color: var(--line-strong);
+
+.table-btn {
+  height: 20px !important;
+  min-height: 20px !important;
+  padding: 0 6px !important;
+  font-size: 10.5px !important;
+  line-height: 1 !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
+
+.detail-btn {
+  border-color: var(--line, #e2e8e6);
+}
+
 .result-list-empty {
   height: calc(100% - 34px);
   min-height: 240px;
@@ -498,7 +600,9 @@ useRefresh(refresh);
   padding: 36px;
   text-align: center;
 }
+
 .result-list-empty svg {
-  color: var(--accent-strong);
+  color: var(--accent-strong, #0ea5e9);
 }
 </style>
+
