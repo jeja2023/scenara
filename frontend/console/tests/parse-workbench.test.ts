@@ -327,11 +327,10 @@ describe("media parse workbench", () => {
       attachTo: document.body,
     });
     await flushPromises();
-    await wrapper.get('[role="tab"]:nth-child(2)').trigger("click");
+    await wrapper.get('[role="tab"]:nth-child(3)').trigger("click");
     await wrapper
       .findAll(".input-controls select")[0]!
       .setValue("scene_change");
-    await wrapper.get("button.advanced-toggle").trigger("click");
     const fields = wrapper.findAll(".parameter-grid input");
     await fields[1]!.setValue("500");
     await fields[2]!.setValue("2500");
@@ -472,7 +471,7 @@ describe("media parse workbench", () => {
       attachTo: document.body,
     });
     await flushPromises();
-    await documentWrapper.get('[role="tab"]:nth-child(3)').trigger("click");
+    await documentWrapper.get('[role="tab"]:nth-child(2)').trigger("click");
     const documentFields = documentWrapper.findAll(".parameter-grid input");
     await documentFields[0]!.setValue("2.5");
     const documentInput = documentWrapper.get('input[type="file"]');
@@ -753,7 +752,6 @@ describe("media parse workbench", () => {
       .get('input[placeholder="rtsp://host/path"]')
       .setValue("rtsp://camera.example/live");
     await wrapper.findAll(".input-controls select")[1]!.setValue("keyframe");
-    await wrapper.get("button.advanced-toggle").trigger("click");
     const fields = wrapper.findAll(".parameter-grid input");
     await fields[1]!.setValue("250");
     await fields[2]!.setValue("5000");
@@ -782,7 +780,7 @@ describe("media parse workbench", () => {
       read_timeout_ms: 2000,
     });
     expect(body.parameters).not.toHaveProperty("max_units");
-    expect(apiBlobMock).not.toHaveBeenCalledWith(
+    expect(apiBlobMock).toHaveBeenCalledWith(
       "/api/v1/media/sources/source-1/preview",
     );
     wrapper.unmount();
@@ -804,10 +802,15 @@ describe("media parse workbench", () => {
       }
       if (path.endsWith("/cancel") && init?.method === "POST") {
         status = "cancelled";
-        return runRecord("run-control", "cancelling");
+        return runRecord("run-control", "cancelled");
       }
       if (path === "/api/v1/runs/run-control")
         return runRecord("run-control", status);
+      if (path.includes("/result"))
+        return {
+          result: { run_id: "run-control", domain: "ocr", units: [] },
+          unit_total: 0,
+        };
       throw new Error(`unexpected API path: ${path}`);
     });
 
@@ -816,7 +819,7 @@ describe("media parse workbench", () => {
       attachTo: document.body,
     });
     await flushPromises();
-    await wrapper.get('[role="tab"]:nth-child(2)').trigger("click");
+    await wrapper.get('[role="tab"]:nth-child(3)').trigger("click");
     const input = wrapper.get('input[type="file"]');
     Object.defineProperty(input.element, "files", {
       configurable: true,

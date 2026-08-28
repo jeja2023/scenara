@@ -4,12 +4,15 @@ import {
   Bookmark,
   FileSearch,
   FileText,
+  Image as ImageIcon,
+  RotateCcw,
   ScanFace,
   Search as SearchIcon,
   Trash2,
   Upload,
   UserRound,
   Video,
+  X,
 } from "@lucide/vue";
 import { computed, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
@@ -318,97 +321,182 @@ useRefresh(runSearch);
       </div>
       <div class="panel-body">
         <div class="mode-tabs" role="tablist" aria-label="检索方式">
-          <button :class="{ active: mode === 'text' }" @click="setMode('text')">
-            <SearchIcon :size="16" />文搜图 / 文搜视频
+          <button
+            class="mode-tab-btn"
+            :class="{ active: mode === 'text' }"
+            @click="setMode('text')"
+          >
+            <SearchIcon :size="15" />文搜图 / 文搜视频
           </button>
           <button
+            class="mode-tab-btn"
             :class="{ active: mode === 'portrait' }"
             @click="setMode('portrait')"
           >
-            <ScanFace :size="16" />人搜图
+            <ScanFace :size="15" />人搜图
           </button>
         </div>
+
+        <!-- 1. 文搜图 / 文搜视频 检索行 -->
         <div v-if="mode === 'text'" class="text-query-row">
-          <SearchIcon :size="17" />
+          <SearchIcon :size="16" class="text-search-icon" />
           <input
             v-model.trim="query"
             type="search"
-            placeholder="输入文字，例如：红色车辆、合同编号、人员姓名"
+            class="text-search-input"
+            placeholder="输入文字关键词，例如：红色车辆、安全帽、园区东门人员、合同"
             @keyup.enter="runSearch"
           />
+          <button
+            v-if="query"
+            class="query-clear-icon-btn"
+            title="清空文字"
+            @click="query = ''"
+          >
+            <X :size="14" />
+          </button>
         </div>
-        <div v-else class="portrait-query-row">
-          <div class="query-preview">
-            <img v-if="preview" :src="preview" alt="查询图片预览" />
-            <ScanFace v-else :size="28" />
+
+        <!-- 2. 人搜图 优雅多源输入卡片 -->
+        <div v-else class="portrait-query-card">
+          <!-- 左侧：图像缩略图预览 / 空状态 -->
+          <div class="portrait-preview-box" :class="{ 'has-preview': preview }">
+            <template v-if="preview">
+              <img :src="preview" alt="查询图片预览" class="preview-img" />
+              <button
+                class="preview-clear-btn"
+                title="清除已选图片"
+                aria-label="清除图片"
+                @click="clearFile"
+              >
+                <X :size="11" />
+              </button>
+            </template>
+            <div v-else class="preview-placeholder">
+              <ScanFace :size="22" class="preview-scan-icon" />
+              <span class="preview-tip">人像特征</span>
+            </div>
           </div>
-          <label class="button secondary upload-button"
-            ><Upload :size="16" />选择查询图片<input
-              type="file"
-              accept="image/*"
-              @change="setFile"
-          /></label>
-          <button
-            v-if="file || assetId"
-            class="button secondary"
-            @click="clearFile"
-          >
-            清除图片
-          </button>
-          <select
-            :value="assetId"
-            aria-label="从图片资产选择查询图片"
-            @change="setAsset(($event.target as HTMLSelectElement).value)"
-          >
-            <option value="">从图片资产选择</option>
-            <option
-              v-for="asset in imageAssets"
-              :key="asset.asset_id"
-              :value="asset.asset_id"
-            >
-              {{ asset.filename || asset.asset_id }}
-            </option>
-          </select>
-          <label class="threshold"
-            ><span>相似度阈值</span
-            ><input
-              v-model="threshold"
-              type="number"
-              min="-1"
-              max="1"
-              step="0.01"
-          /></label>
+
+          <!-- 中间：上传本地图片 + 从资产库选择 -->
+          <div class="portrait-inputs-area">
+            <div class="portrait-source-bar">
+              <label class="button secondary portrait-upload-btn">
+                <Upload :size="14" />
+                <span>上传本地图片</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  aria-label="上传本地查询图片"
+                  @change="setFile"
+                />
+              </label>
+
+              <span class="portrait-source-sep">或</span>
+
+              <div class="portrait-asset-dropdown">
+                <ImageIcon :size="14" class="asset-select-icon" />
+                <select
+                  :value="assetId"
+                  class="portrait-asset-select"
+                  aria-label="从图片资产库选择查询图片"
+                  @change="setAsset(($event.target as HTMLSelectElement).value)"
+                >
+                  <option value="">从图片资产库选择 (共 {{ imageAssets.length }} 张图片)</option>
+                  <option
+                    v-for="asset in imageAssets"
+                    :key="asset.asset_id"
+                    :value="asset.asset_id"
+                  >
+                    {{ asset.filename || asset.asset_id }}
+                  </option>
+                </select>
+              </div>
+
+              <button
+                v-if="file || assetId"
+                class="button secondary portrait-clear-btn"
+                title="重置已选图片"
+                @click="clearFile"
+              >
+                <RotateCcw :size="12" />
+                <span>重置</span>
+              </button>
+            </div>
+
+            <!-- 当前所选源状态提示 -->
+            <div class="portrait-status-hint">
+              <template v-if="file">
+                <span class="status-badge local">本地文件</span>
+                <span class="status-text">{{ file.name }} ({{ (file.size / 1024).toFixed(1) }} KB)</span>
+              </template>
+              <template v-else-if="assetId">
+                <span class="status-badge asset">资产库图片</span>
+                <span class="status-text">{{ imageAssets.find(a => a.asset_id === assetId)?.filename || assetId }}</span>
+              </template>
+              <template v-else>
+                <span class="status-hint-muted">请上传一张包含清晰人脸或人体的照片，系统将提取特征向量进行全库多模态向量比对。</span>
+              </template>
+            </div>
+          </div>
+
+          <!-- 右侧：相似度阈值控件 -->
+          <div class="portrait-threshold-box">
+            <div class="threshold-header">
+              <span class="threshold-title">相似度阈值</span>
+              <span class="threshold-hint">[-1 ~ 1]</span>
+            </div>
+            <div class="threshold-input-group">
+              <input
+                v-model="threshold"
+                type="number"
+                min="-1"
+                max="1"
+                step="0.01"
+                class="threshold-field"
+                aria-label="相似度阈值"
+              />
+            </div>
+          </div>
         </div>
+
+        <!-- 3. 数据类型过滤与检索发起栏 -->
         <div class="filter-row">
-          <span>限定数据类型</span>
-          <button
-            v-for="kind in [
-              'image',
-              'video',
-              'document',
-              'stream',
-            ] as MediaKind[]"
-            :key="kind"
-            class="filter-chip"
-            :class="{ active: mediaKinds.includes(kind) }"
-            @click="toggleMediaKind(kind)"
-          >
-            {{
-              kind === "image"
-                ? "图片"
-                : kind === "video"
-                  ? "视频"
-                  : kind === "document"
-                    ? "文档"
-                    : "视频流"
-            }}
-          </button>
+          <div class="filter-group">
+            <span class="filter-label">限定数据类型</span>
+            <div class="filter-chips">
+              <button
+                v-for="kind in [
+                  'image',
+                  'video',
+                  'document',
+                  'stream',
+                ] as MediaKind[]"
+                :key="kind"
+                class="filter-chip"
+                :class="{ active: mediaKinds.includes(kind) }"
+                @click="toggleMediaKind(kind)"
+              >
+                <span class="chip-dot" />
+                {{
+                  kind === "image"
+                    ? "图片"
+                    : kind === "video"
+                      ? "视频"
+                      : kind === "document"
+                        ? "文档"
+                        : "视频流"
+                }}
+              </button>
+            </div>
+          </div>
           <button
             class="button primary search-submit"
             :disabled="loading || !hasQuery"
             @click="runSearch"
           >
-            <SearchIcon :size="16" />开始检索
+            <SearchIcon :size="15" :class="{ spin: loading }" />
+            <span>{{ loading ? '正在检索...' : '开始检索' }}</span>
           </button>
         </div>
       </div>
@@ -540,7 +628,7 @@ useRefresh(runSearch);
 .eyebrow {
   display: block;
   margin-bottom: 5px;
-  color: var(--text-muted);
+  color: var(--text-muted, #64716d);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -548,164 +636,496 @@ useRefresh(runSearch);
 }
 .notice {
   padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 6px;
   margin-bottom: 12px;
-  font-size: 13px;
+  font-size: 12.5px;
 }
 .notice.error {
-  color: #963d32;
-  background: #fff5f2;
-  border-color: #edc5be;
+  color: #991b1b;
+  background: #fef2f2;
+  border-color: #fecaca;
 }
 .search-controls {
   padding: 0;
   overflow: hidden;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
 .mode-tabs {
   display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--line);
+  gap: 4px;
+  padding: 8px 14px 0;
+  border-bottom: 1px solid var(--line, #e2e8e6);
+  background: #fafbfb;
 }
-.mode-tabs button {
+.mode-tab-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
-  border: 0;
-  border-bottom: 2px solid transparent;
+  padding: 8px 16px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 6px 6px 0 0;
   background: transparent;
-  color: var(--muted);
+  color: var(--muted, #64716d);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  position: relative;
+  top: 1px;
+  transition: all 140ms ease;
 }
-.mode-tabs button.active {
-  border-bottom-color: var(--teal);
-  color: var(--graphite);
-  background: #f6faf8;
-  font-weight: 700;
+.mode-tab-btn:hover:not(.active) {
+  color: var(--color-text, #17211f);
+  background: rgba(0, 0, 0, 0.03);
 }
+.mode-tab-btn.active {
+  border-color: var(--line, #e2e8e6);
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #17211f);
+  font-weight: 600;
+  border-top: 2px solid var(--primary, #0ea5e9);
+}
+
+/* 1. 文搜图行 */
 .text-query-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin: 10px 14px;
-  padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  min-height: 36px;
+  gap: 10px;
+  margin: 14px;
+  padding: 0 12px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 6px;
+  min-height: 40px;
+  background: var(--color-surface, #fff);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
 }
-.text-query-row input {
+.text-query-row:focus-within {
+  border-color: var(--primary, #0ea5e9);
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.12);
+}
+.text-search-icon {
+  color: var(--muted, #64716d);
+  flex-shrink: 0;
+}
+.text-search-input {
   flex: 1;
   min-width: 0;
   border: 0;
   outline: 0;
   background: transparent;
-  font-size: 12px;
+  font-size: 13px;
+  color: var(--color-text, #17211f);
 }
-.portrait-query-row {
+.query-clear-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #f1f5f4;
+  color: var(--muted, #64716d);
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.query-clear-icon-btn:hover {
+  background: #e2e8e6;
+  color: var(--color-text, #17211f);
+}
+
+/* 2. 人搜图卡片 */
+.portrait-query-card {
+  display: flex;
+  align-items: stretch;
+  gap: 16px;
+  margin: 14px;
+  padding: 14px 16px;
+  background: #f8faf9;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 8px;
+  transition: border-color 140ms ease;
+}
+.portrait-query-card:focus-within {
+  border-color: #cbd5e1;
+}
+
+/* 缩略图 */
+.portrait-preview-box {
+  width: 66px;
+  height: 66px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+  border: 1.5px dashed #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: all 140ms ease;
+}
+.portrait-preview-box.has-preview {
+  border: 1.5px solid var(--primary, #0ea5e9);
+  background: #0f172a;
+  box-shadow: 0 2px 6px rgba(14, 165, 233, 0.18);
+}
+.preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.preview-clear-btn {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 120ms ease, background 120ms ease;
+}
+.preview-clear-btn:hover {
+  background: #ef4444;
+  transform: scale(1.1);
+}
+.preview-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  color: var(--muted, #64716d);
+}
+.preview-scan-icon {
+  color: #0ea5e9;
+  opacity: 0.85;
+}
+.preview-tip {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--muted, #64716d);
+}
+
+/* 中间输入区 */
+.portrait-inputs-area {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 8px;
+}
+.portrait-source-bar {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 10px 14px;
+  flex-wrap: wrap;
 }
-.query-preview {
-  display: grid;
-  place-items: center;
-  width: 60px;
-  height: 44px;
-  overflow: hidden;
-  border-radius: 4px;
-  background: #0d1917;
-  color: #8ba09a;
-}
-.query-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-.upload-button {
+.portrait-upload-btn {
   position: relative;
   overflow: hidden;
+  height: 32px;
+  min-height: 32px;
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--color-text, #17211f);
+  cursor: pointer;
+  transition: all 120ms ease;
 }
-.upload-button input {
+.portrait-upload-btn:hover {
+  border-color: #0ea5e9;
+  color: #0284c7;
+  background: #f0f9ff;
+}
+.portrait-upload-btn input {
   position: absolute;
   inset: 0;
   opacity: 0;
   cursor: pointer;
 }
-.threshold {
+.portrait-source-sep {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 2px;
+}
+.portrait-asset-dropdown {
+  flex: 1;
+  min-width: 240px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.asset-select-icon {
+  position: absolute;
+  left: 10px;
+  color: #64748b;
+  pointer-events: none;
+}
+.portrait-asset-select {
+  width: 100%;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 10px 0 30px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--color-text, #17211f);
+  font-size: 12px;
+  outline: none;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.portrait-asset-select:hover {
+  border-color: #cbd5e1;
+}
+.portrait-asset-select:focus {
+  border-color: var(--primary, #0ea5e9);
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.12);
+}
+.portrait-clear-btn {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 11.5px;
   display: inline-flex;
   align-items: center;
+  gap: 4px;
+  color: #b91c1c;
+  background: #fff;
+  border: 1px solid #fecaca;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+.portrait-clear-btn:hover {
+  background: #fef2f2;
+  border-color: #f87171;
+}
+
+/* 状态提示 */
+.portrait-status-hint {
+  display: flex;
+  align-items: center;
   gap: 8px;
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 12px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted, #64716d);
+  min-height: 20px;
 }
-.threshold input {
-  width: 72px;
-  min-height: 32px;
+.status-badge {
+  padding: 1px 7px;
+  border-radius: 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.status-badge.local {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+.status-badge.asset {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+.status-text {
+  font-weight: 500;
+  color: var(--color-text, #17211f);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.status-hint-muted {
+  color: #64748b;
+  font-size: 11.5px;
+}
+
+/* 阈值控件 */
+.portrait-threshold-box {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  padding-left: 16px;
+  border-left: 1px solid var(--line, #e2e8e6);
+  min-width: 120px;
+  flex-shrink: 0;
+}
+.threshold-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px;
+}
+.threshold-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--color-text, #17211f);
+  white-space: nowrap;
+}
+.threshold-hint {
+  font-size: 10px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+.threshold-input-group {
+  display: flex;
+  align-items: center;
+}
+.threshold-field {
+  width: 100%;
   height: 32px;
-  padding: 2px 6px;
+  min-height: 32px;
+  padding: 2px 8px;
+  text-align: center;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 4px;
   font-size: 12px;
+  font-weight: 600;
+  background: #fff;
+  color: var(--color-text, #17211f);
+  outline: none;
+  transition: all 120ms ease;
 }
+.threshold-field:hover {
+  border-color: #cbd5e1;
+}
+.threshold-field:focus {
+  border-color: var(--primary, #0ea5e9);
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.12);
+}
+
+/* 3. 数据类型过滤与检索发起栏 */
 .filter-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 12px;
   flex-wrap: wrap;
-  padding: 0 14px 10px;
-  color: var(--muted);
+  padding: 10px 14px 12px;
+  border-top: 1px solid #f1f5f4;
+  background: #fff;
+}
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.filter-label {
+  color: var(--muted, #64716d);
   font-size: 11.5px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.filter-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .filter-chip {
-  padding: 4px 9px;
-  border: 1px solid var(--line);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid var(--line, #e2e8e6);
   border-radius: 4px;
   background: #fff;
-  color: var(--muted);
+  color: var(--muted, #64716d);
   cursor: pointer;
   font-size: 11.5px;
+  font-weight: 500;
+  transition: all 120ms ease;
+}
+.filter-chip:hover {
+  border-color: #cbd5e1;
+  color: var(--color-text, #17211f);
 }
 .filter-chip.active {
-  border-color: var(--teal);
-  background: #e9f5f2;
-  color: #16665c;
+  border-color: #10b981;
+  background: #ecfdf5;
+  color: #047857;
+  font-weight: 600;
+}
+.chip-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #cbd5e1;
+  transition: background 120ms ease;
+}
+.filter-chip.active .chip-dot {
+  background: #10b981;
 }
 .search-submit {
-  margin-left: auto;
   min-height: 32px;
   height: 32px;
   font-size: 12px;
-  padding: 0 12px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 4px;
+  margin-left: auto;
 }
+
+/* 保存检索与结果列表 */
 .result-panel {
-  margin-top: 12px;
+  margin-top: 14px;
 }
 .saved-panel {
-  margin-top: 12px;
+  margin-top: 14px;
 }
 .saved-create {
   display: flex;
   gap: 8px;
-  padding: 8px 14px;
-  border-bottom: 1px solid var(--line);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line, #e2e8e6);
+  background: #fafbfb;
 }
 .saved-create input {
   flex: 1;
   min-width: 0;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line, #e2e8e6);
   border-radius: 4px;
   padding: 5px 10px;
   min-height: 32px;
   height: 32px;
   font-size: 12px;
+  background: #fff;
+  outline: none;
+}
+.saved-create input:focus {
+  border-color: var(--primary, #0ea5e9);
 }
 .saved-create button {
   min-height: 32px;
   height: 32px;
   font-size: 12px;
-  padding: 0 10px;
+  padding: 0 12px;
 }
 .saved-list {
   display: flex;
@@ -717,7 +1137,7 @@ useRefresh(runSearch);
   justify-content: space-between;
   gap: 10px;
   padding: 8px 14px;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--line, #e2e8e6);
 }
 .saved-item > span:first-child {
   display: grid;
@@ -725,7 +1145,7 @@ useRefresh(runSearch);
   min-width: 0;
 }
 .saved-item small {
-  color: var(--muted);
+  color: var(--muted, #64716d);
   font-size: 11px;
 }
 .saved-actions {
@@ -733,8 +1153,8 @@ useRefresh(runSearch);
   gap: 4px;
 }
 .saved-empty {
-  padding: 10px 14px;
-  color: var(--muted);
+  padding: 12px 14px;
+  color: var(--muted, #64716d);
   text-align: center;
   font-size: 11.5px;
 }
@@ -743,9 +1163,10 @@ useRefresh(runSearch);
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  color: var(--muted);
+  border-top: 1px solid var(--line, #e2e8e6);
+  border-bottom: 1px solid var(--line, #e2e8e6);
+  background: #f8fafc;
+  color: #0369a1;
   font-size: 12px;
 }
 .hit-list {
@@ -755,31 +1176,33 @@ useRefresh(runSearch);
 .hit-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
-  padding: 10px 14px;
+  padding: 12px 14px;
   border: 0;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--line, #e2e8e6);
   background: transparent;
   color: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background 120ms ease;
 }
 .hit-item:hover {
-  background: #f7faf9;
+  background: #f8fafc;
 }
 .hit-icon {
   display: grid;
   place-items: center;
-  flex: 0 0 30px;
-  height: 30px;
-  border-radius: 4px;
-  background: #eaf4f1;
-  color: var(--teal);
+  flex: 0 0 32px;
+  height: 32px;
+  border-radius: 6px;
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #dcfce7;
 }
 .hit-main {
   display: grid;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
   flex: 1;
 }
@@ -787,16 +1210,17 @@ useRefresh(runSearch);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 13px;
 }
 .hit-main small,
 .location {
-  color: var(--muted);
+  color: var(--muted, #64716d);
   font-size: 11px;
 }
 .snippet {
   display: -webkit-box;
   overflow: hidden;
-  color: var(--graphite);
+  color: var(--graphite, #17211f);
   font-size: 12.5px;
   line-height: 1.45;
   -webkit-box-orient: vertical;
@@ -804,11 +1228,13 @@ useRefresh(runSearch);
 }
 .search-empty {
   min-height: 130px;
-  padding: 20px 14px;
+  padding: 24px 14px;
   gap: 6px;
+  color: var(--muted, #64716d);
 }
 .search-empty strong {
-  font-size: 12.5px;
+  font-size: 13px;
+  color: var(--color-text, #17211f);
 }
 .search-empty span {
   font-size: 11.5px;
@@ -821,21 +1247,23 @@ useRefresh(runSearch);
     transform: rotate(360deg);
   }
 }
-@media (max-width: 720px) {
-  .portrait-query-row {
-    align-items: flex-start;
-    flex-wrap: wrap;
+@media (max-width: 768px) {
+  .portrait-query-card {
+    flex-direction: column;
   }
-  .threshold {
-    margin-left: 0;
-    width: 100%;
+  .portrait-threshold-box {
+    border-left: 0;
+    border-top: 1px solid var(--line, #e2e8e6);
+    padding-left: 0;
+    padding-top: 10px;
+  }
+  .filter-row {
+    flex-direction: column;
+    align-items: stretch;
   }
   .search-submit {
     margin-left: 0;
     width: 100%;
-  }
-  .saved-create {
-    flex-direction: column;
   }
 }
 </style>
