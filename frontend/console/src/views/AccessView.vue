@@ -5,8 +5,12 @@ import {
   Clipboard,
   KeyRound,
   Plus,
+  Settings,
+  Shield,
+  ShieldCheck,
   ShieldOff,
   Trash2,
+  Users,
   X,
 } from "@lucide/vue";
 import { computed, onMounted, reactive, ref } from "vue";
@@ -74,14 +78,15 @@ const eventOptions = [
   "run.failed",
   "run.cancelled",
 ];
-const tabs: Array<{ id: AccessTab; label: string }> = [
-  { id: "foundation", label: "访问底座" },
-  { id: "identity", label: "成员与角色" },
-  { id: "credentials", label: "服务凭据" },
-  { id: "products", label: "产品授权" },
-  { id: "events", label: "事件回调" },
-  { id: "connection", label: "连接设置" },
+const tabs: Array<{ id: AccessTab; label: string; icon: any }> = [
+  { id: "foundation", label: "访问底座", icon: Shield },
+  { id: "identity", label: "成员与角色", icon: Users },
+  { id: "credentials", label: "服务凭据", icon: KeyRound },
+  { id: "products", label: "产品授权", icon: ShieldCheck },
+  { id: "events", label: "事件回调", icon: BellPlus },
+  { id: "connection", label: "连接设置", icon: Settings },
 ];
+
 
 const activeTab = ref<AccessTab>("foundation");
 const form = reactive<ConnectionSettings>(loadConnection());
@@ -482,18 +487,24 @@ useRefresh(refresh);
   <section class="page">
     <p v-if="error" class="callout error">{{ error }}</p>
 
-    <div class="access-tabs" role="tablist" aria-label="接入管理视图">
-      <button
-        v-for="tab in tabs"
-        :key="tab.id"
-        :class="{ active: activeTab === tab.id }"
-        role="tab"
-        :aria-selected="activeTab === tab.id"
-        @click="activeTab = tab.id"
-      >
-        {{ tab.label }}
-      </button>
+    <div class="tabs-header-bar">
+      <div class="domain-tabs" role="tablist" aria-label="接入管理视图">
+        <button
+          v-for="tab in tabs"
+          :key="tab.id"
+          type="button"
+          class="domain-tab-btn"
+          :class="{ active: activeTab === tab.id }"
+          role="tab"
+          :aria-selected="activeTab === tab.id"
+          @click="activeTab = tab.id"
+        >
+          <component :is="tab.icon" :size="13" />
+          <span>{{ tab.label }}</span>
+        </button>
+      </div>
     </div>
+
 
     <template v-if="activeTab === 'foundation'">
       <div class="inventory-grid">
@@ -1266,168 +1277,288 @@ useRefresh(refresh);
 </template>
 
 <style scoped>
-.access-tabs {
+/* 顶部统一样式的分类 Tabs 导航条 */
+.tabs-header-bar {
   display: flex;
-  gap: 4px;
-  margin-bottom: 16px;
-  padding-bottom: 1px;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--line);
+  align-items: center;
+  margin-bottom: 6px;
 }
-.access-tabs button {
-  flex: 0 0 auto;
-  height: 38px;
-  padding: 0 13px;
-  border: 0;
-  border-bottom: 2px solid transparent;
+
+.domain-tabs {
+  display: inline-flex;
+  align-items: center;
+  background: #eef2f1;
+  padding: 3px;
+  border-radius: 6px;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.domain-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  border: none;
   background: transparent;
-  color: var(--muted);
-  cursor: pointer;
+  color: var(--muted, #64716d);
   font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
 }
-.access-tabs button.active {
-  border-bottom-color: var(--teal);
-  color: var(--graphite);
-  font-weight: 700;
+
+.domain-tab-btn:hover {
+  color: var(--graphite, #17211f);
+  background: rgba(255, 255, 255, 0.6);
 }
+
+.domain-tab-btn.active {
+  color: var(--primary, #0ea5e9);
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  font-weight: 600;
+}
+
 .access-panel {
-  margin-top: 16px;
+  margin-top: 14px;
 }
+
 .inventory-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
+
 .foundation-meta {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1px;
-  background: var(--line);
-  border-bottom: 1px solid var(--line);
+  background: var(--line, #e2e8e6);
+  border-bottom: 1px solid var(--line, #e2e8e6);
 }
+
 .foundation-meta div {
   min-width: 0;
-  padding: 14px 16px;
+  padding: 12px 14px;
   background: #fff;
 }
+
 .foundation-meta span,
 .record-row small {
   display: block;
-  color: var(--muted);
+  color: var(--muted, #64716d);
   font-size: 11px;
 }
+
 .foundation-meta strong {
   display: block;
-  margin-top: 6px;
+  margin-top: 4px;
   overflow-wrap: anywhere;
-  font-size: 13px;
+  font-size: 12.5px;
 }
+
 .capability-list {
   display: grid;
-  gap: 10px;
-  padding: 16px;
+  gap: 8px;
+  padding: 14px;
 }
+
 .capability-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(220px, 0.55fr);
   gap: 12px;
-  align-items: start;
-  padding: 12px;
-  border: 1px solid var(--line);
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line, #e2e8e6);
   border-radius: 5px;
+  background: #ffffff;
 }
+
 .capability-row p {
-  margin: 4px 0 0;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.45;
+  margin: 2px 0 0;
+  color: var(--muted, #64716d);
+  font-size: 11.5px;
+  line-height: 1.4;
 }
+
 .capability-row small {
-  color: var(--muted);
+  color: var(--muted, #64716d);
   font-size: 11px;
-  line-height: 1.45;
+  line-height: 1.4;
 }
+
 .badge.available {
   background: #e4f2e9;
   color: #226a42;
 }
+
 .badge.seed {
-  background: var(--teal-soft);
+  background: var(--teal-soft, #e0f2fe);
   color: #08636c;
 }
+
 .badge.planned {
   background: #edf0ef;
   color: #45534f;
 }
+
 .badge.gated {
   background: #fbf0de;
   color: #8b5a14;
 }
+
 .form-stack {
   display: grid;
-  gap: 13px;
+  gap: 10px;
 }
+
 .inline-form {
   display: grid;
   grid-template-columns: 1fr 1.2fr 1.4fr auto;
   gap: 10px;
   align-items: end;
+  margin-bottom: 12px;
 }
+
 .record-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 42px;
-  padding: 9px 0;
+  min-height: 36px;
+  padding: 6px 0;
   border-top: 1px solid #e8ecea;
-  font-size: 12px;
+  font-size: 11.5px;
 }
+
 .record-row > div {
   min-width: 0;
 }
+
 .record-row small {
-  margin-top: 4px;
+  margin-top: 2px;
   overflow-wrap: anywhere;
 }
+
 select[multiple] {
-  min-height: 92px;
+  min-height: 76px;
 }
+
 .entitlement-form {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) minmax(160px, 0.6fr) auto;
   gap: 12px;
   align-items: end;
+  margin-bottom: 12px;
 }
+
 .event-options {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px 12px;
-  margin: 14px 0;
+  margin: 12px 0;
 }
+
 .event-options label {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   font-family: "SFMono-Regular", Consolas, monospace;
   font-size: 11px;
 }
+
 .event-options input {
-  width: 15px;
-  min-height: 15px;
+  width: 14px;
+  min-height: 14px;
 }
+
 .connection-form {
   display: grid;
   grid-template-columns: 1.5fr 1fr 1fr 1.5fr auto;
   gap: 12px;
   align-items: end;
 }
+
 .compact-empty {
   min-height: 90px;
 }
+
 .danger-icon {
-  color: var(--coral);
+  color: var(--coral, #ef4444);
 }
+
+/* 全局统一 28px 数据表格行高与 3px 8px 内边距 */
+.table-scroll {
+  overflow-x: auto;
+}
+
+.data-table th {
+  height: 28px !important;
+  padding: 3px 8px !important;
+  font-size: 11.5px !important;
+  font-weight: 600;
+  white-space: nowrap !important;
+  background: #fafbfb;
+  color: var(--muted, #64716d);
+  border: 1px solid var(--line, #e2e8e6);
+}
+
+.data-table td {
+  min-height: 28px !important;
+  height: 28px !important;
+  padding: 3px 8px !important;
+  vertical-align: middle;
+  line-height: 1.3;
+  font-size: 11.5px !important;
+  white-space: nowrap !important;
+  border: 1px solid var(--line, #e2e8e6);
+  color: var(--graphite, #17211f);
+}
+
+.data-table tr {
+  height: 28px;
+}
+
+.data-table td strong {
+  font-weight: 600;
+  display: inline !important;
+}
+
+.data-table td .mono.muted {
+  margin-left: 6px;
+  display: inline !important;
+  font-size: 11px;
+  color: var(--muted, #64716d);
+}
+
+/* 按钮及胶囊高度严格微型化 */
+.data-table .button,
+.data-table .icon-button {
+  height: 20px !important;
+  min-height: 20px !important;
+  width: 20px !important;
+  min-width: 20px !important;
+  padding: 0 !important;
+  font-size: 10.5px !important;
+  display: inline-grid;
+  place-items: center;
+}
+
+.data-table .badge,
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 6px;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
 @media (max-width: 1080px) {
   .inventory-grid,
   .foundation-meta {
@@ -1441,6 +1572,7 @@ select[multiple] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
 @media (max-width: 700px) {
   .inventory-grid,
   .foundation-meta,
@@ -1453,10 +1585,11 @@ select[multiple] {
     grid-template-columns: 1fr;
   }
   .capability-list {
-    padding: 12px;
+    padding: 10px;
   }
   .event-options {
     grid-template-columns: 1fr;
   }
 }
 </style>
+
