@@ -24,7 +24,8 @@ def setup_nvidia_dll_directories() -> list[str]:
         try:
             site_packages = site.getsitepackages()
             if isinstance(site_packages, list):
-                search_roots.extend([str(p) for p in site_packages if isinstance(p, (str, bytes))])
+                search_roots.extend([p for p in site_packages if isinstance(p, str)])
+
         except Exception:
             pass
 
