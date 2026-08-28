@@ -32,7 +32,7 @@ def cuda_providers_for_device(device_id: int | None = None) -> list[Any]:
     for provider in CUDA_PROVIDERS:
         if isinstance(provider, tuple) and provider[0] == "CUDAExecutionProvider":
             options = dict(provider[1])
-            options["device_id"] = int(device_id)
+            options["device_id"] = device_id
             providers.append((provider[0], options))
         else:
             providers.append(provider)
@@ -99,7 +99,8 @@ def session_providers(
         return cuda_providers
 
     config = model_config(cache_key_value)
-    runtime = str(config.get("runtime") or "onnxruntime").strip().lower()
+    raw_runtime = config.get("runtime") or "onnxruntime"
+    runtime = raw_runtime.strip().lower() if isinstance(raw_runtime, str) else str(raw_runtime).strip().lower()
     if runtime not in {"tensorrt", "onnxruntime-tensorrt", "trt"}:
         return cuda_providers
     if not ENABLE_TENSORRT:
@@ -126,7 +127,7 @@ def session_providers(
             {
                 "trt_engine_cache_enable": TENSORRT_ENGINE_CACHE_ENABLE,
                 "trt_engine_cache_path": TENSORRT_ENGINE_CACHE_PATH,
-                **({"device_id": int(device_id)} if device_id is not None else {}),
+                **({"device_id": device_id} if device_id is not None else {}),
             },
         ),
         *cuda_providers,
@@ -138,9 +139,11 @@ def _finalize_session(session: ort.InferenceSession, *, fallback_reason: str | N
     if fallback_reason is not None:
         record_cpu_fallback(fallback_reason)
     get_providers = getattr(session, "get_providers", None)
-    active = get_providers() if callable(get_providers) else []
+    raw_active = get_providers() if callable(get_providers) else []
+    active: list[str] = [str(p) for p in raw_active] if isinstance(raw_active, (list, tuple)) else []
     record_session_provider(primary_execution_provider(active) if active else "unknown")
     return session
+
 
 
 def create_session(
