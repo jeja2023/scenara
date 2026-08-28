@@ -5,13 +5,15 @@
 """
 
 import asyncio
+import io
 import sys
 import time
 from pathlib import Path
 
 # 设置标准输出编码为 UTF-8
-if sys.platform == "win32":
+if sys.platform == "win32" and isinstance(sys.stdout, io.TextIOWrapper):
     sys.stdout.reconfigure(encoding="utf-8")
+
 
 # 添加项目根目录到路径
 project_root = Path(__file__).parent.parent
