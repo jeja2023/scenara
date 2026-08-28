@@ -291,7 +291,11 @@ from scenara.settings import Settings
 
 if sys.platform == "win32" and sys.version_info < (3, 14):
     # psycopg's async connection pool requires selector-based I/O on Windows.
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    _set_policy = getattr(asyncio, "set_event_loop_policy", None)
+    _selector_policy = getattr(asyncio, "WindowsSelectorEventLoopPolicy", None)
+    if callable(_set_policy) and callable(_selector_policy):
+        _set_policy(_selector_policy())
+
 
 CONTEXT_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,63}")
 PRESIGN_UPLOAD_EXPIRY_GRACE_SECONDS = 60
