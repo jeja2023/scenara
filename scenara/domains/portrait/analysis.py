@@ -428,6 +428,7 @@ async def _convert_analysis_chunk(
             if isinstance(embedding, list) and embedding:
                 model_id = str(item.get("embedding_model_id") or item.get("model_id") or "unknown")
                 model_version = str(item.get("embedding_model_version") or item.get("model_version") or "unknown")
+                safe_model_id = model_id.replace("/", ".")
                 quality = item.get("quality")
                 quality_score = None
                 if isinstance(quality, dict) and quality.get("score") is not None:
@@ -435,7 +436,7 @@ async def _convert_analysis_chunk(
                 index_vectors.append(
                     ResultIndexVector(
                         object_id=face.object_id,
-                        feature_space_id=f"portrait.face.{model_id}.{model_version}",
+                        feature_space_id=f"portrait.face.{safe_model_id}.{model_version}",
                         model_id=model_id,
                         model_version=model_version,
                         vector=[float(value) for value in embedding],

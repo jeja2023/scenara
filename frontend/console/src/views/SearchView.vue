@@ -2,9 +2,15 @@
 import {
   ArrowRight,
   Bookmark,
+  Clock,
+  ExternalLink,
+  Eye,
   FileSearch,
   FileText,
   Image as ImageIcon,
+  Layers,
+  Loader2,
+  Maximize2,
   RotateCcw,
   ScanFace,
   Search as SearchIcon,
@@ -14,11 +20,20 @@ import {
   Video,
   X,
 } from "@lucide/vue";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { useRouter } from "vue-router";
 
-import { api, apiBlob, apiForm, blobToDataUrl, revokeBlobUrl, userFacingError } from "../api";
+import {
+  api,
+  apiBlob,
+  apiForm,
+  apiImageDataUrl,
+  blobToDataUrl,
+  revokeBlobUrl,
+  userFacingError,
+} from "../api";
+import ResultDetailDrawer from "../components/ResultDetailDrawer.vue";
 import { labelDomain, labelMediaKind } from "../labels";
 import type { MediaAsset, MediaKind, SavedSearch } from "../types";
 
@@ -71,6 +86,13 @@ const error = ref("");
 const response = ref<SearchResponse | null>(null);
 const savedSearches = ref<SavedSearch[]>([]);
 const savedName = ref("");
+
+// 图像缩略图缓存与大图/抽屉状态
+const hitThumbnails = ref<Record<string, string>>({});
+const loadingThumbnails = ref<Record<string, boolean>>({});
+const lightboxHit = ref<SearchHit | null>(null);
+const drawerOpen = ref(false);
+const drawerRunId = ref<string | null>(null);
 
 const imageAssets = computed(() =>
   assets.value.filter((asset) => asset.kind === "image"),
@@ -155,6 +177,55 @@ function setMode(next: SearchMode): void {
   response.value = null;
   error.value = "";
 }
+
+function hitImagePath(hit: SearchHit): string | null {
+  const runId = typeof hit.source.run_id === "string" ? hit.source.run_id : "";
+  const artifactId =
+    typeof hit.source.artifact_id === "string" ? hit.source.artifact_id : "";
+  const assetIdVal =
+    typeof hit.source.asset_id === "string" ? hit.source.asset_id : "";
+
+  if (runId && artifactId) {
+    return `/api/v1/runs/${encodeURIComponent(runId)}/artifacts/${encodeURIComponent(artifactId)}`;
+  }
+  if (assetIdVal && hit.media_kind === "image") {
+    return `/api/v1/assets/${encodeURIComponent(assetIdVal)}/content`;
+  }
+  return null;
+}
+
+async function fetchThumbnail(hit: SearchHit): Promise<void> {
+  const path = hitImagePath(hit);
+  if (
+    !path ||
+    hitThumbnails.value[hit.record_id] ||
+    loadingThumbnails.value[hit.record_id]
+  )
+    return;
+  loadingThumbnails.value[hit.record_id] = true;
+  try {
+    const url = await apiImageDataUrl(path);
+    if (url) {
+      hitThumbnails.value[hit.record_id] = url;
+    }
+  } catch {
+    // 忽略加载失败，回退到图标
+  } finally {
+    loadingThumbnails.value[hit.record_id] = false;
+  }
+}
+
+watch(
+  () => response.value?.hits,
+  (hits) => {
+    if (hits?.length) {
+      for (const hit of hits) {
+        void fetchThumbnail(hit);
+      }
+    }
+  },
+  { immediate: true },
+);
 
 async function runSearch(): Promise<void> {
   if (!hasQuery.value) {
@@ -271,7 +342,17 @@ async function deleteSavedSearch(item: SavedSearch): Promise<void> {
 
 void Promise.all([loadAssets(), loadSavedSearches()]);
 
-function openHit(hit: SearchHit): void {
+function openHitDetail(hit: SearchHit): void {
+  const runId = typeof hit.source.run_id === "string" ? hit.source.run_id : "";
+  if (runId) {
+    drawerRunId.value = runId;
+    drawerOpen.value = true;
+  } else {
+    lightboxHit.value = hit;
+  }
+}
+
+function navigateToResults(hit: SearchHit): void {
   const runId = typeof hit.source.run_id === "string" ? hit.source.run_id : "";
   if (!runId) return;
   const unitId =
@@ -301,8 +382,17 @@ function hitIcon(hit: SearchHit): typeof FileText {
 }
 
 function scoreLabel(hit: SearchHit): string {
-  if (hit.score == null) return "文本命中";
-  return `相似度 ${hit.score.toFixed(4)}`;
+  if (hit.score == null) return "文本匹配";
+  return `相似度 ${(hit.score * 100).toFixed(1)}% (${hit.score.toFixed(4)})`;
+}
+
+function formatPts(ptsMs: unknown): string {
+  if (typeof ptsMs !== "number" || Number.isNaN(ptsMs)) return "";
+  const totalSeconds = Math.floor(ptsMs / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  const ms = Math.floor(ptsMs % 1000);
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${String(ms).padStart(3, "0")}`;
 }
 
 useRefresh(runSearch);
@@ -319,7 +409,7 @@ useRefresh(runSearch);
           <p>支持文字检索图像/视频，或选择人像特征检索相似目标。</p>
         </div>
       </div>
-      <div class="panel-body">
+      <div class="panel-body search-panel-body">
         <div class="mode-tabs" role="tablist" aria-label="检索方式">
           <button
             class="mode-tab-btn"
@@ -363,7 +453,10 @@ useRefresh(runSearch);
           <!-- 2. 人搜图 优雅多源输入卡片 -->
           <div v-else class="portrait-query-card">
             <!-- 左侧：图像缩略图预览 / 空状态 -->
-            <div class="portrait-preview-box" :class="{ 'has-preview': preview }">
+            <div
+              class="portrait-preview-box"
+              :class="{ 'has-preview': preview }"
+            >
               <template v-if="preview">
                 <img :src="preview" alt="查询图片预览" class="preview-img" />
                 <button
@@ -403,9 +496,13 @@ useRefresh(runSearch);
                     :value="assetId"
                     class="portrait-asset-select"
                     aria-label="从图片资产库选择查询图片"
-                    @change="setAsset(($event.target as HTMLSelectElement).value)"
+                    @change="
+                      setAsset(($event.target as HTMLSelectElement).value)
+                    "
                   >
-                    <option value="">从图片资产库选择 (共 {{ imageAssets.length }} 张图片)</option>
+                    <option value="">
+                      从图片资产库选择 (共 {{ imageAssets.length }} 张图片)
+                    </option>
                     <option
                       v-for="asset in imageAssets"
                       :key="asset.asset_id"
@@ -431,14 +528,24 @@ useRefresh(runSearch);
               <div class="portrait-status-hint">
                 <template v-if="file">
                   <span class="status-badge local">本地文件</span>
-                  <span class="status-text">{{ file.name }} ({{ (file.size / 1024).toFixed(1) }} KB)</span>
+                  <span class="status-text"
+                    >{{ file.name }} ({{
+                      (file.size / 1024).toFixed(1)
+                    }}
+                    KB)</span
+                  >
                 </template>
                 <template v-else-if="assetId">
                   <span class="status-badge asset">资产库图片</span>
-                  <span class="status-text">{{ imageAssets.find(a => a.asset_id === assetId)?.filename || assetId }}</span>
+                  <span class="status-text">{{
+                    imageAssets.find((a) => a.asset_id === assetId)?.filename ||
+                    assetId
+                  }}</span>
                 </template>
                 <template v-else>
-                  <span class="status-hint-muted">请上传一张包含清晰人脸或人体的照片，系统将提取特征向量进行全库多模态向量比对。</span>
+                  <span class="status-hint-muted"
+                    >请上传一张包含清晰人脸或人体的照片，系统将提取特征向量进行全库多模态向量比对。</span
+                  >
                 </template>
               </div>
             </div>
@@ -499,7 +606,7 @@ useRefresh(runSearch);
               @click="runSearch"
             >
               <SearchIcon :size="15" :class="{ spin: loading }" />
-              <span>{{ loading ? '正在检索...' : '开始检索' }}</span>
+              <span>{{ loading ? "正在检索..." : "开始检索" }}</span>
             </button>
           </div>
         </div>
@@ -560,6 +667,7 @@ useRefresh(runSearch);
       </div>
     </section>
 
+    <!-- 检索结果面板 -->
     <section class="panel result-panel">
       <div class="panel-header">
         <div>
@@ -581,36 +689,147 @@ useRefresh(runSearch);
           {{ response.query_summary.model_version }} 查询</span
         >
       </div>
+
+      <!-- 命中列表展示 -->
       <div v-if="response?.hits.length" class="hit-list">
-        <button
+        <div
           v-for="hit in response.hits"
           :key="hit.record_id"
-          class="hit-item"
-          @click="openHit(hit)"
+          class="hit-card"
+          @click="openHitDetail(hit)"
         >
-          <span class="hit-icon"
-            ><component :is="hitIcon(hit)" :size="18"
-          /></span>
-          <span class="hit-main"
-            ><strong>{{ hitTitle(hit) }}</strong
-            ><small
-              >{{ labelDomain(hit.domain) }} ·
-              {{ labelMediaKind(hit.media_kind || "") }} ·
-              {{ scoreLabel(hit) }}</small
-            ><span v-if="hit.text_snippet" class="snippet">{{
-              hit.text_snippet
-            }}</span
-            ><small class="location"
-              >{{
-                hit.source.unit_id ? `单元 ${hit.source.unit_id}` : "来源结果"
-              }}{{
-                hit.source.object_id ? ` · 对象 ${hit.source.object_id}` : ""
-              }}</small
-            ></span
+          <!-- 缩略图与快速放大 -->
+          <div
+            class="hit-thumbnail-box"
+            :title="
+              hitThumbnails[hit.record_id]
+                ? '点击查看原图大图'
+                : '无预览图像'
+            "
+            @click.stop="
+              hitThumbnails[hit.record_id]
+                ? (lightboxHit = hit)
+                : openHitDetail(hit)
+            "
           >
-          <ArrowRight :size="16" />
-        </button>
+            <img
+              v-if="hitThumbnails[hit.record_id]"
+              :src="hitThumbnails[hit.record_id]"
+              alt="命中预览"
+              class="hit-thumbnail-img"
+            />
+            <span
+              v-else-if="loadingThumbnails[hit.record_id]"
+              class="hit-thumbnail-loading"
+            >
+              <Loader2 :size="18" class="spin" />
+            </span>
+            <span v-else class="hit-fallback-icon">
+              <component :is="hitIcon(hit)" :size="22" />
+            </span>
+            <div
+              v-if="hitThumbnails[hit.record_id]"
+              class="thumbnail-zoom-hint"
+            >
+              <Eye :size="14" />
+            </div>
+          </div>
+
+          <!-- 主信息区域 -->
+          <div class="hit-main-info">
+            <div class="hit-header-row">
+              <strong class="hit-title">{{ hitTitle(hit) }}</strong>
+              <div class="hit-badges">
+                <span
+                  class="hit-badge"
+                  :class="{
+                    portrait: hit.domain === 'portrait',
+                    ocr: hit.domain === 'ocr',
+                  }"
+                >
+                  {{ labelDomain(hit.domain) }}
+                </span>
+                <span class="hit-badge media-kind">
+                  {{ labelMediaKind(hit.media_kind || "") }}
+                </span>
+                <span v-if="hit.score != null" class="hit-badge score">
+                  {{ scoreLabel(hit) }}
+                </span>
+                <span
+                  v-if="hit.source.pts_ms != null"
+                  class="hit-badge timestamp"
+                  title="视频时间戳"
+                >
+                  <Clock :size="11" />
+                  {{ formatPts(hit.source.pts_ms) }} ({{
+                    hit.source.pts_ms
+                  }}ms)
+                </span>
+                <span
+                  v-if="hit.source.page_number != null"
+                  class="hit-badge page"
+                >
+                  第 {{ hit.source.page_number }} 页
+                </span>
+              </div>
+            </div>
+
+            <!-- 文字片段或详细描述 -->
+            <p v-if="hit.text_snippet" class="hit-snippet">
+              {{ hit.text_snippet }}
+            </p>
+
+            <!-- 来源定位 -->
+            <div class="hit-source-location">
+              <span v-if="hit.source.run_id" class="loc-item"
+                >任务: {{ hit.source.run_id }}</span
+              >
+              <span v-if="hit.source.unit_id" class="loc-item"
+                >单元: {{ hit.source.unit_id }}</span
+              >
+              <span v-if="hit.source.object_id" class="loc-item"
+                >目标: {{ hit.source.object_id }}</span
+              >
+              <span v-if="hit.source.artifact_id" class="loc-item"
+                >产物: {{ hit.source.artifact_id }}</span
+              >
+            </div>
+          </div>
+
+          <!-- 操作按钮组 -->
+          <div class="hit-action-group" @click.stop>
+            <button
+              v-if="hitThumbnails[hit.record_id]"
+              class="button secondary hit-action-btn"
+              title="全屏查看原图/裁剪图"
+              @click="lightboxHit = hit"
+            >
+              <Maximize2 :size="13" />
+              <span>查看大图</span>
+            </button>
+            <button
+              v-if="hit.source.run_id"
+              class="button secondary hit-action-btn"
+              title="在抽屉中查看结构化结果详情"
+              @click="openHitDetail(hit)"
+            >
+              <Layers :size="13" />
+              <span>结果详情</span>
+            </button>
+            <button
+              v-if="hit.source.run_id"
+              class="button primary hit-action-btn"
+              title="跳转至完整结果工作台"
+              @click="navigateToResults(hit)"
+            >
+              <ExternalLink :size="13" />
+              <span>跳转结果页</span>
+            </button>
+          </div>
+        </div>
       </div>
+
+      <!-- 空状态提示 -->
       <div v-else class="empty search-empty">
         <FileSearch :size="30" /><strong>{{
           response ? "没有符合条件的结果" : "等待检索"
@@ -622,6 +841,94 @@ useRefresh(runSearch);
         }}</span>
       </div>
     </section>
+
+    <!-- 1. 结构化结果抽屉 -->
+    <ResultDetailDrawer
+      :open="drawerOpen"
+      :run-id="drawerRunId"
+      @close="drawerOpen = false"
+    />
+
+    <!-- 2. 单张命中图片大图查看模态框 -->
+    <div
+      v-if="lightboxHit"
+      class="lightbox-backdrop"
+      @click="lightboxHit = null"
+    >
+      <div class="lightbox-modal" @click.stop>
+        <div class="lightbox-header">
+          <div>
+            <h3>检索命中图像查看</h3>
+            <p>{{ hitTitle(lightboxHit) }}</p>
+          </div>
+          <button
+            class="icon-button"
+            title="关闭大图预览"
+            aria-label="关闭预览"
+            @click="lightboxHit = null"
+          >
+            <X :size="18" />
+          </button>
+        </div>
+        <div class="lightbox-body">
+          <img
+            v-if="hitThumbnails[lightboxHit.record_id]"
+            :src="hitThumbnails[lightboxHit.record_id]"
+            alt="检索匹配大图"
+            class="lightbox-img"
+          />
+          <div v-else class="lightbox-no-img">
+            <ImageIcon :size="48" />
+            <p>暂无可用大图数据</p>
+          </div>
+        </div>
+        <div class="lightbox-footer">
+          <div class="lightbox-meta">
+            <span v-if="lightboxHit.score != null" class="hit-badge score">
+              {{ scoreLabel(lightboxHit) }}
+            </span>
+            <span
+              v-if="lightboxHit.source.pts_ms != null"
+              class="hit-badge timestamp"
+            >
+              时间戳: {{ formatPts(lightboxHit.source.pts_ms) }} ({{
+                lightboxHit.source.pts_ms
+              }}ms)
+            </span>
+            <span
+              v-if="lightboxHit.source.object_id"
+              class="hit-badge location"
+            >
+              目标: {{ lightboxHit.source.object_id }}
+            </span>
+          </div>
+          <div class="lightbox-actions">
+            <button
+              v-if="lightboxHit.source.run_id"
+              class="button secondary"
+              @click="
+                openHitDetail(lightboxHit!);
+                lightboxHit = null;
+              "
+            >
+              <Layers :size="14" />
+              <span>查看结构化抽屉</span>
+            </button>
+            <button
+              v-if="lightboxHit.source.run_id"
+              class="button primary"
+              @click="
+                navigateToResults(lightboxHit!);
+                lightboxHit = null;
+              "
+            >
+              <ExternalLink :size="14" />
+              <span>跳转至结果工作台</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 </template>
 
@@ -1202,58 +1509,166 @@ useRefresh(runSearch);
   display: flex;
   flex-direction: column;
 }
-.hit-item {
+.hit-card {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  align-items: center;
+  gap: 16px;
   width: 100%;
-  padding: 12px 14px;
-  border: 0;
+  padding: 12px 16px;
   border-top: 1px solid var(--line, #e2e8e6);
-  background: transparent;
+  background: #fff;
   color: inherit;
   text-align: left;
   cursor: pointer;
   transition: background 120ms ease;
 }
-.hit-item:hover {
+.hit-card:hover {
   background: #f8fafc;
 }
-.hit-icon {
-  display: grid;
-  place-items: center;
-  flex: 0 0 32px;
-  height: 32px;
+.hit-thumbnail-box {
+  position: relative;
+  width: 64px;
+  height: 64px;
   border-radius: 6px;
-  background: #f0fdf4;
-  color: #16a34a;
-  border: 1px solid #dcfce7;
+  overflow: hidden;
+  background: #0f172a;
+  border: 1px solid var(--line, #e2e8e6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
-.hit-main {
-  display: grid;
-  gap: 3px;
+.hit-thumbnail-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.hit-thumbnail-loading {
+  color: #94a3b8;
+}
+.hit-fallback-icon {
+  color: #10b981;
+}
+.thumbnail-zoom-hint {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.hit-thumbnail-box:hover .thumbnail-zoom-hint {
+  opacity: 1;
+}
+.hit-main-info {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
   min-width: 0;
   flex: 1;
 }
-.hit-main strong {
+.hit-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.hit-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text, #17211f);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
 }
-.hit-main small,
-.location {
-  color: var(--muted, #64716d);
+.hit-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.hit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 4px;
   font-size: 11px;
+  font-weight: 500;
+  background: #f1f5f9;
+  color: #475569;
 }
-.snippet {
-  display: -webkit-box;
-  overflow: hidden;
+.hit-badge.portrait {
+  background: #fdf4ff;
+  color: #a21caf;
+  border: 1px solid #f5d0fe;
+}
+.hit-badge.ocr {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+.hit-badge.score {
+  background: #ecfdf5;
+  color: #047857;
+  font-weight: 600;
+  border: 1px solid #a7f3d0;
+}
+.hit-badge.timestamp {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #fed7aa;
+  font-weight: 600;
+}
+.hit-badge.page {
+  background: #f8fafc;
+  color: #334155;
+  border: 1px solid #e2e8e6;
+}
+.hit-snippet {
+  margin: 0;
   color: var(--graphite, #17211f);
-  font-size: 12.5px;
+  font-size: 12px;
   line-height: 1.45;
+  display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.hit-source-location {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--muted, #64716d);
+}
+.loc-item {
+  background: #f8faf9;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid #eef2f1;
+}
+.hit-action-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.hit-action-btn {
+  height: 30px;
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 4px;
 }
 .search-empty {
   min-height: 130px;
@@ -1276,6 +1691,108 @@ useRefresh(runSearch);
     transform: rotate(360deg);
   }
 }
+
+/* Lightbox 大图预览弹窗 */
+.lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.lightbox-modal {
+  background: #fff;
+  border-radius: 10px;
+  max-width: 720px;
+  width: 100%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.3),
+    0 8px 10px -6px rgba(0, 0, 0, 0.3);
+}
+.lightbox-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--line, #e2e8e6);
+}
+.lightbox-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text, #17211f);
+}
+.lightbox-header p {
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: var(--muted, #64716d);
+}
+.lightbox-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #090d16;
+  min-height: 320px;
+  max-height: 60vh;
+  overflow: auto;
+}
+.lightbox-img {
+  max-width: 100%;
+  max-height: 56vh;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+.lightbox-no-img {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  gap: 8px;
+}
+.lightbox-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line, #e2e8e6);
+  background: #f8fafc;
+  flex-wrap: wrap;
+}
+.lightbox-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.lightbox-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+.lightbox-actions .button {
+  height: 32px;
+  min-height: 32px;
+  font-size: 12px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 @media (max-width: 768px) {
   .portrait-query-card {
     flex-direction: column;
@@ -1294,5 +1811,14 @@ useRefresh(runSearch);
     margin-left: 0;
     width: 100%;
   }
+  .hit-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .hit-action-group {
+    width: 100%;
+    justify-content: flex-end;
+  }
 }
 </style>
+

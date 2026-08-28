@@ -178,31 +178,45 @@ class SearchService:
         profile = await self._profile(context, profile_id)
         encoded = await self._encode(data)
         selected_space = feature_space_id or encoded.feature_space_id
-        index_id = f"result.{selected_space}"
-        definition = await self.indexes.get_index(index_id)
+        safe_space = selected_space.replace("/", ".")
+        candidate_ids = [f"result.{selected_space}"]
+        if f"result.{safe_space}" not in candidate_ids:
+            candidate_ids.append(f"result.{safe_space}")
+
+        all_definitions = await self.indexes.list_indexes(context.tenant_id, context.project_id)
+        for defn in all_definitions:
+            if defn.record_kind == IndexRecordKind.VECTOR and defn.index_id.startswith("result."):
+                if defn.index_id.replace("/", ".") == f"result.{safe_space}":
+                    if defn.index_id not in candidate_ids:
+                        candidate_ids.append(defn.index_id)
+
         hits: list[SearchResultHit] = []
-        if definition is not None and definition.record_kind == IndexRecordKind.VECTOR:
-            self._validate_vector_contract(encoded, definition)
-            for hit in await self.indexes.query_vector(
-                context.tenant_id,
-                context.project_id,
-                index_id,
-                encoded.embedding,
-                limit=min(200, limit),
-                threshold=threshold,
-            ):
-                enriched = await self._enrich(context, hit)
-                if enriched.score is not None:
-                    enriched = enriched.model_copy(update={"score": enriched.score * profile[1]})
-                if media_kinds and enriched.media_kind not in set(media_kinds):
-                    continue
-                hits.append(enriched)
+        searched_indexes: list[str] = []
+        for index_id in candidate_ids:
+            definition = await self.indexes.get_index(index_id)
+            if definition is not None and definition.record_kind == IndexRecordKind.VECTOR:
+                self._validate_vector_contract(encoded, definition)
+                searched_indexes.append(index_id)
+                for hit in await self.indexes.query_vector(
+                    context.tenant_id,
+                    context.project_id,
+                    index_id,
+                    encoded.embedding,
+                    limit=min(200, limit),
+                    threshold=threshold,
+                ):
+                    enriched = await self._enrich(context, hit)
+                    if enriched.score is not None:
+                        enriched = enriched.model_copy(update={"score": enriched.score * profile[1]})
+                    if media_kinds and enriched.media_kind not in set(media_kinds):
+                        continue
+                    hits.append(enriched)
         hits = self._sort_hits(hits)[:limit]
         await self.audit.record(
             context,
             action="search.portrait",
             resource_type="search_index",
-            resource_id=index_id,
+            resource_id=searched_indexes[0] if searched_indexes else f"result.{safe_space}",
             evidence={
                 "feature_space_id": selected_space,
                 "face_count": encoded.face_count,
@@ -227,7 +241,7 @@ class SearchService:
             ),
             hits=hits,
             total=len(hits),
-            searched_indexes=[index_id] if definition is not None else [],
+            searched_indexes=searched_indexes,
         )
 
     async def create_saved_search(
@@ -389,6 +403,10 @@ class SearchService:
             if source is not None:
                 media_kind = MediaKind.STREAM
                 resource_name = source.name
+        if media_kind is None and hit.source.pts_ms is not None:
+            media_kind = MediaKind.VIDEO
+        if media_kind is None and hit.source.page_number is not None:
+            media_kind = MediaKind.DOCUMENT
         return SearchResultHit(
             record_id=hit.record_id,
             index_id=hit.index_id,

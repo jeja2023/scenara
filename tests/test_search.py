@@ -181,3 +181,59 @@ async def test_portrait_result_search_rejects_model_contract_mismatch(search_cli
     )
     assert response.status_code == 409, response.text
     assert response.json()["error"]["code"] == "INDEX_CONTRACT_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_portrait_result_search_matches_video_frame(search_client) -> None:
+    api, runtime = search_client
+    image = _image_bytes()
+    encoded = await runtime.portrait.encoder.encode(decode_portrait_image(image))
+    safe_model = encoded.model_id.replace("/", ".")
+    index_id = f"result.portrait.face.{safe_model}.{encoded.model_version}"
+    await runtime.indexes.create_index(
+        IndexDefinition(
+            index_id=index_id,
+            domain="portrait",
+            record_kind=IndexRecordKind.VECTOR,
+            vector_dimension=len(encoded.embedding),
+            vector_model_id=encoded.model_id,
+            vector_model_version=encoded.model_version,
+            distance_metric="cosine",
+            threshold=0.8,
+        )
+    )
+    await runtime.indexes.upsert(
+        IndexRecord(
+            record_id="idxv_run_video_001_face_01",
+            tenant_id="default",
+            project_id="default",
+            index_id=index_id,
+            domain="portrait",
+            kind=IndexRecordKind.VECTOR,
+            source=IndexSourceRef(
+                source_type="run_result",
+                source_id="run_video_001",
+                asset_id="asset_video_001",
+                run_id="run_video_001",
+                unit_id="unit_12",
+                object_id="face_01",
+                artifact_id="art_crop_face_01",
+                pts_ms=12400,
+            ),
+            vector=encoded.embedding,
+            metadata={"object_type": "face", "source_id": "src_cam_01"},
+        )
+    )
+
+    response = await api.post(
+        "/api/v1/search/image",
+        files={"file": ("query.png", image, "image/png")},
+        data={"media_kinds": "video"},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()["data"]
+    assert payload["total"] == 1
+    assert payload["hits"][0]["source"]["run_id"] == "run_video_001"
+    assert payload["hits"][0]["source"]["pts_ms"] == 12400
+    assert payload["hits"][0]["source"]["artifact_id"] == "art_crop_face_01"
+
