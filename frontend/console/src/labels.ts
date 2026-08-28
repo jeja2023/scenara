@@ -15,41 +15,113 @@ const domainDescriptionLabels: Record<string, string> = {
 };
 
 const capabilityLabels: Record<string, string> = {
-  apparel_attributes: "服饰属性",
+  // 人像视觉
+  person_detection: "人员检测",
+  body_embedding: "人体重识别",
   body_reid: "人体重识别",
-  face_alignment: "人脸对齐",
   face_detection: "人脸检测",
   face_embedding: "人脸特征",
-  gait: "步态分析",
-  human_parsing: "人体解析",
-  image_region: "图片区域",
-  person_detection: "人员检测",
+  face_alignment: "人脸对齐",
   pose: "姿态估计",
-  quality_fusion: "质量融合",
-  reading_order: "阅读顺序",
+
+  gait: "步态时序分析",
+  appearance: "服饰体貌属性",
+  apparel_attributes: "服饰属性识别",
+  tracking: "跨帧目标跟踪",
   silhouette_segmentation: "轮廓分割",
+  human_parsing: "人体解析",
+  quality_fusion: "质量融合",
+
+  // OCR 智能文档
+  text_detection: "文本行定位",
+  text_recognition: "文本字符识别",
+  ocr_recognition: "文本字符识别",
+  text_orientation: "文字方向纠偏",
+  reading_order: "阅读顺序分析",
+  layout_analysis: "版面结构分析",
+  ocr_engine: "OCR 识别引擎",
+  ocr_layout: "OCR 版面引擎",
   table_region: "表格区域",
-  text_detection: "文字检测",
-  text_recognition: "文字识别",
-  title: "标题",
-  paragraph: "段落",
-  tracking: "目标跟踪",
-  action_recognition: "动作识别",
-  activity_detection: "活动检测",
-  temporal_segmentation: "时序分割",
-  anomaly_detection: "异常检测",
-  cosplay_recognition: "Cosplay 识别",
-  clothing_style_detection: "服装风格检测",
-  accessory_detection: "配饰识别",
-  fashion_attribute_analysis: "服饰属性分析",
-  ocr_engine: "OCR 文字识别引擎",
-  ocr_layout: "OCR 版面分析引擎",
-  ocr_recognition: "OCR 文本识别",
-  behavior_engine: "行为识别引擎",
-  fashion_engine: "服饰识别引擎",
+  title: "标题区域",
+  paragraph: "正文段落",
+  image_region: "插图区域",
+
+  // 行为识别
+  action_recognition: "视频动作识别",
+  activity_detection: "综合活动检测",
+  temporal_segmentation: "时序片段分割",
+  anomaly_detection: "异常行为检测",
+  behavior_engine: "行为分析引擎",
+
+  // 服饰风格与文化
+  cosplay_recognition: "Cosplay 角色识别",
+  clothing_style_detection: "服装风格分类",
+  accessory_detection: "服饰配饰检测",
+  fashion_attribute_analysis: "时尚属性分析",
+  fashion_engine: "服饰分析引擎",
+};
+
+const modelNameLabels: Record<string, string> = {
+  // 人像视觉
+  "scenara.portrait.yolov8n": "YOLOv8n 人体目标检测",
+  "scenara.portrait.yolov8n-pose": "YOLOv8-Pose 17点骨架姿态估计",
+  "scenara.portrait.scrfd-10g": "SCRFD 10G 高精人脸检测定位",
+  "scenara.portrait.arcface-r100": "ArcFace R100 人脸特征抽取",
+  "scenara.portrait.osnet-ibn-x1-0": "OSNet IBN x1.0 人体重识别 (Re-ID)",
+  "scenara.portrait.attribute-reid": "Attribute ReID 服饰体貌属性识别",
+  "scenara.portrait.opengait-gait3d": "OpenGait 3D 步态时序分析",
+  "scenara.portrait.bytetrack": "ByteTrack 跨帧轨迹追踪器",
+
+  // OCR 智能文档
+  "scenara.ocr.paddleocr-v4": "PP-OCRv4 文本识别综合引擎",
+  "scenara.ocr.paddleocr-det": "PP-OCRv4 文本行定位检测模型",
+  "scenara.ocr.paddleocr-rec": "PP-OCRv4 文本字符高精识别",
+  "scenara.ocr.paddleocr-cls": "PP-OCR 文本方向自适应纠偏",
+  "scenara.ocr.pp-structure-layout": "PP-Structure 版面结构与顺序分析",
+
+  // 行为动作识别
+  "scenara.behavior.timesformer": "TimeSformer 视频动作模式识别",
+  "scenara.behavior.stgcn-pose": "ST-GCN 时空骨架图卷积动作识别",
+
+  // 服饰风格与文化
+  "scenara.fashion.cosplay-clip": "Fashion CLIP 二次元角色识别",
+  "scenara.fashion.clothing-classifier": "多标签服装风格分类网络",
+  "scenara.fashion.accessory-detector": "服饰配饰定位与检测模型",
+};
+
+const adapterLabels: Record<string, string> = {
+  yolo: "YOLO 目标检测器",
+  yolo_pose: "YOLO-Pose 姿态估计器",
+  scrfd: "SCRFD 快速人脸检测器",
+  arcface: "ArcFace 生物特征提取器",
+  reid: "OSNet 行人重识别网络",
+  attribute_reid: "服饰体貌属性提取器",
+  opengait: "OpenGait 时序步态网络",
+  bytetrack: "ByteTrack 轨迹追踪器",
+  paddle_ocr: "PaddleOCR 综合引擎",
+  paddle_ocr_det: "Paddle DB 文本定位器",
+  paddle_ocr_rec: "Paddle SVTR 字符识别器",
+  paddle_ocr_cls: "Paddle 方向角度纠偏器",
+  layout_analysis: "PP-Structure 版面分析器",
+  timesformer: "TimeSformer 时序 Transformer",
+  stgcn: "ST-GCN 骨架图卷积网络",
+  fashion_clip: "CLIP 多模态角色匹配器",
+  clothing_classifier: "服装风格分类器",
+  accessory_detector: "配饰目标检测器",
+};
+
+const licenseLabels: Record<string, string> = {
+  "Apache-2.0": "开源 Apache 2.0",
+  "MIT": "开源 MIT",
+  "AGPL-3.0": "开源 AGPL 3.0",
+  "GPL-3.0": "开源 GPL 3.0",
+  "BSD-3-Clause": "开源 BSD 3-Clause",
+  "Proprietary": "商业专有协议",
+  "Commercial": "商业授权许可",
 };
 
 const pipelineLabels: Record<string, string> = {
+
   "ocr.document": "OCR 文档识别",
   "portrait.analysis": "人像综合分析",
   "portrait.person-detection": "人员检测",
@@ -563,7 +635,21 @@ export function labelCapability(value: string): string {
   return capabilityLabels[value] ?? "未命名能力";
 }
 
+export function labelModelName(modelId: string): string {
+
+  return modelNameLabels[modelId] ?? humanizeIdentifier(modelId.replace(/^scenara\.[^.]+\./, ""));
+}
+
+export function labelAdapter(adapter: string): string {
+  return adapterLabels[adapter] ?? humanizeIdentifier(adapter);
+}
+
+export function labelLicense(licenseId: string): string {
+  return licenseLabels[licenseId] ?? licenseId;
+}
+
 export function labelPipeline(value: string): string {
+
   return pipelineLabels[value] ?? humanizeIdentifier(value);
 }
 
