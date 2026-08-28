@@ -218,6 +218,7 @@ class MemoryStateStore:
         tenant_id: str,
         project_id: str,
         *,
+        domain: str | None = None,
         include_deleted: bool = True,
         offset: int = 0,
         limit: int | None = None,
@@ -229,11 +230,19 @@ class MemoryStateStore:
                 if row_tenant == tenant_id
                 and row_project == project_id
                 and (include_deleted or item.deleted_at is None)
+                and (domain is None or item.domain == domain)
             ]
         rows.sort(key=lambda item: (item.created_at, item.asset_id), reverse=True)
         return rows[offset:] if limit is None else rows[offset : offset + limit]
 
-    async def count_assets(self, tenant_id: str, project_id: str, *, include_deleted: bool = True) -> int:
+    async def count_assets(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        domain: str | None = None,
+        include_deleted: bool = True,
+    ) -> int:
         async with self._lock:
             return sum(
                 1
@@ -241,6 +250,7 @@ class MemoryStateStore:
                 if row_tenant == tenant_id
                 and row_project == project_id
                 and (include_deleted or item.deleted_at is None)
+                and (domain is None or item.domain == domain)
             )
 
     async def create_source(self, source: MediaSource) -> MediaSource:

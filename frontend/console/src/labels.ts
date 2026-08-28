@@ -76,6 +76,12 @@ const objectTypeLabels: Record<string, string> = {
   paragraph: "段落",
   image_region: "图片区域",
   table_region: "表格区域",
+  cosplay: "Cosplay",
+  clothing: "服装风格",
+  accessory: "服饰配饰",
+  action: "行为动作",
+  behavior: "行为分析",
+  anomaly: "异常行为",
 };
 
 const runStatusLabels: Record<RunStatus, string> = {
@@ -780,3 +786,90 @@ export function labelVersion(value: string): string {
     ? `${development[1]} 开发版${development[2] === "0" ? "" : ` ${development[2]}`}`
     : value;
 }
+
+const fieldKeyLabels: Record<string, string> = {
+  // 服饰风格领域
+  clothing_styles: "服装风格明细",
+  clothing: "服装风格",
+  cosplay: "Cosplay 角色",
+  cosplay_characters: "Cosplay 角色明细",
+  accessories: "服饰配饰明细",
+  accessory: "服饰配饰",
+  style_id: "风格编号",
+  style_type: "风格分类",
+  style_label: "风格标签",
+  dominant_colors: "主色调",
+  dominant_color: "主色调",
+  contrast: "对比度",
+  saturation: "饱和度",
+  character_id: "角色编号",
+  character_name: "角色名称",
+  series_name: "作品来源",
+  is_cosplay: "是否 Cosplay",
+  outfit_match: "契合度",
+  color_signature: "色彩特征",
+  accessory_id: "配饰编号",
+  accessory_type: "配饰类型",
+  accessory_label: "配饰名称",
+  color: "颜色",
+  material: "材质",
+  confidence: "置信度",
+  score: "置信度",
+  summary: "结果摘要",
+  attributes: "属性明细",
+  bounding_box: "检测区域",
+  bbox: "坐标位置",
+
+  // 行为分析领域
+  actions: "行为动作明细",
+  action: "行为动作",
+  action_id: "动作编号",
+  action_type: "动作类型",
+  action_label: "动作名称",
+  intensity: "动作强度",
+  duration_seconds: "持续时间(秒)",
+  temporal_segments: "时序片段",
+  start_time_offset: "起始时间",
+  end_time_offset: "结束时间",
+  behavior_summary: "行为综合分析",
+  activities: "综合活动",
+  anomalies: "异常行为",
+
+  // 人像与通用分析
+  persons: "人员列表",
+  faces: "人脸列表",
+  person_count: "人员数量",
+  face_count: "人脸数量",
+  gender: "性别",
+  age: "年龄",
+  emotion: "表情",
+  gait: "步态特征",
+  pose: "姿态",
+  quality: "质量评分",
+
+  // OCR 与文档分析
+  ocr_blocks: "文本块明细",
+  ocr_block_count: "文本块数量",
+  text_length: "字符总数",
+  text: "识别文字",
+  reading_order: "阅读顺序",
+  compliance_report: "合规审查报告",
+  slides: "海报轮播集",
+
+  // 通用技术字段
+  created_at: "创建时间",
+  updated_at: "更新时间",
+  run_id: "运行编号",
+  unit_id: "单元编号",
+  domain: "业务领域",
+  status: "状态",
+  schema_version: "结构版本",
+};
+
+export function labelFieldKey(value: string): string {
+  if (fieldKeyLabels[value]) return fieldKeyLabels[value];
+  const normalized = value.toLowerCase().replace(/[-.]/g, "_");
+  if (fieldKeyLabels[normalized]) return fieldKeyLabels[normalized];
+  return value.replace(/[_.-]+/g, " ");
+}
+

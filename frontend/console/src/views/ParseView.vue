@@ -766,6 +766,7 @@ async function autoPreloadAsset(selectedFile: File): Promise<void> {
     const form = new FormData();
     form.append("file", selectedFile);
     form.append("kind", mode.value);
+    if (domain.value) form.append("domain", domain.value);
     const asset = await api<MediaAsset>("/api/v1/media/assets", {
       method: "POST",
       body: form,
@@ -1074,6 +1075,7 @@ async function uploadSelectedAsset(): Promise<MediaAsset> {
   const form = new FormData();
   form.append("file", file.value as File);
   form.append("kind", mode.value);
+  if (domain.value) form.append("domain", domain.value);
   const asset = await api<MediaAsset>("/api/v1/media/assets", {
     method: "POST",
     body: form,

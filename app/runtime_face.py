@@ -225,10 +225,10 @@ async def run_scrfd_face_detection(
         if iou_override is not None
         else runtime_output_value(runtime, "iou", runtime.capability.get("iou", 0.45))
     )
-    max_detections = int(
-        max_detections_override
-        if max_detections_override is not None
-        else runtime_output_value(runtime, "max_detections", runtime.capability.get("max_detections", 32))
+    max_detections = (
+        int(max_detections_override)
+        if max_detections_override is not None and int(max_detections_override) > 0
+        else None
     )
     keep_mask = scores >= confidence
     boxes = boxes[keep_mask]
@@ -238,7 +238,9 @@ async def run_scrfd_face_detection(
         return []
     restored_boxes = restore_boxes(boxes, meta)
     restored_landmarks = restore_landmarks(landmarks, meta)
-    keep = nms(restored_boxes, scores, iou_threshold)[:max_detections]
+    keep = nms(restored_boxes, scores, iou_threshold)
+    if max_detections is not None and max_detections > 0:
+        keep = keep[:max_detections]
     faces: list[dict[str, Any]] = []
     for face_index, raw_index in enumerate(keep):
         box = restored_boxes[raw_index].tolist()

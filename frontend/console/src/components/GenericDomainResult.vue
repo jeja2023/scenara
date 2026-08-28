@@ -2,6 +2,7 @@
 import { computed } from "vue";
 import DataTable from "./DataTable.vue";
 import type { TableColumn } from "../types";
+import { labelFieldKey } from "../labels";
 
 const props = defineProps<{
   payload: Record<string, unknown>;
@@ -44,10 +45,6 @@ function formatScalar(value: Scalar): string {
   return String(value);
 }
 
-function formatKey(value: string): string {
-  return value.replace(/[_.-]+/g, " ");
-}
-
 function tableColumns(rows: Array<Record<string, unknown>>): string[] {
   return [...new Set(rows.flatMap((row) => Object.keys(row)))].slice(0, 8);
 }
@@ -60,7 +57,7 @@ function formatCell(value: unknown): string {
 function getDynamicColumns(rows: Array<Record<string, unknown>>): TableColumn<Record<string, unknown>>[] {
   return tableColumns(rows).map((column) => ({
     key: column,
-    label: formatKey(column),
+    label: labelFieldKey(column),
   }));
 }
 </script>
@@ -68,20 +65,25 @@ function getDynamicColumns(rows: Array<Record<string, unknown>>): TableColumn<Re
 <template>
   <div class="generic-domain-result">
     <div class="generic-result-heading">
-      <strong>领域结果</strong>
-      <span>已使用通用结果渲染器</span>
+      <strong>领域解析结果</strong>
+      <span>结构化数据明细</span>
     </div>
     <dl v-if="scalarEntries.length" class="generic-fields">
       <div v-for="[key, value] in scalarEntries" :key="key">
-        <dt>{{ formatKey(key) }}</dt>
+        <dt>{{ labelFieldKey(key) }}</dt>
         <dd>{{ formatScalar(value as Scalar) }}</dd>
       </div>
     </dl>
     <div v-for="[key, rows] in tableEntries" :key="key" class="generic-table">
-      <div class="generic-subheading">{{ formatKey(key) }}</div>
+      <div class="generic-subheading">
+        <strong>{{ labelFieldKey(key) }}</strong>
+        <span class="badge">{{ rows.length }} 项</span>
+      </div>
       <DataTable
         :columns="getDynamicColumns(rows)"
-        :items="rows.slice(0, 100)"
+        :items="rows"
+        :page-size="10"
+        :page-size-options="[5, 10, 20, 50, 100]"
         empty-text="暂无数据"
       >
         <template
@@ -98,7 +100,7 @@ function getDynamicColumns(rows: Array<Record<string, unknown>>): TableColumn<Re
       :key="key"
       class="generic-object"
     >
-      <summary>{{ formatKey(key) }}</summary>
+      <summary>{{ labelFieldKey(key) }}</summary>
       <pre>{{ JSON.stringify(value, null, 2) }}</pre>
     </details>
     <p v-if="!entries.length" class="empty">该领域没有返回附加结果字段</p>

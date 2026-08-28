@@ -39,7 +39,7 @@ DEFAULT_CAPABILITIES = {
         "input_size": [640, 640],
         "confidence": 0.25,
         "iou": 0.45,
-        "max_detections": 8,
+        "max_detections": 100,
         "fallback_model_id": "scenara.development.whole_image_person",
     },
     "gait": {

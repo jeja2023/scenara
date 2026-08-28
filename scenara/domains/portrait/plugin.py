@@ -75,7 +75,7 @@ class PortraitPlugin:
                 },
                 parameter_schema={
                     "confidence": PipelineParameterDefinition(
-                        label="最低置信度", control="number", default=0.5, minimum=0, maximum=1, step=0.05
+                        label="最低置信度", control="number", default=0.25, minimum=0, maximum=1, step=0.05
                     ),
                     "iou": PipelineParameterDefinition(
                         label="重叠阈值",

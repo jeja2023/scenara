@@ -921,3 +921,47 @@ async def test_cancelled_run_retains_partial_results(client) -> None:
     assert page["unit_total"] >= 1
     assert len(page["result"]["units"]) >= 1
 
+
+@pytest.mark.asyncio
+async def test_media_asset_domain_isolation(client) -> None:
+    api, _ = client
+
+    # 1. Upload fashion asset with domain="fashion"
+    fashion_res = await api.post(
+        "/api/v1/media/assets",
+        files={"file": ("fashion_dress.png", image_bytes(), "image/png")},
+        data={"kind": "image", "domain": "fashion"},
+    )
+    assert fashion_res.status_code == 201
+    fashion_asset = fashion_res.json()["data"]
+    assert fashion_asset["domain"] == "fashion"
+    fashion_id = fashion_asset["asset_id"]
+
+    # 2. Upload portrait asset with domain="portrait"
+    portrait_res = await api.post(
+        "/api/v1/media/assets",
+        files={"file": ("portrait_face.png", image_bytes(), "image/png")},
+        data={"kind": "image", "domain": "portrait"},
+    )
+    assert portrait_res.status_code == 201
+    portrait_asset = portrait_res.json()["data"]
+    assert portrait_asset["domain"] == "portrait"
+    portrait_id = portrait_asset["asset_id"]
+
+    # 3. List assets with domain="fashion", should only return fashion assets
+    fashion_list = await api.get("/api/v1/media/assets?domain=fashion")
+    assert fashion_list.status_code == 200
+    fashion_items = fashion_list.json()["data"]["items"]
+    fashion_ids = [item["asset_id"] for item in fashion_items]
+    assert fashion_id in fashion_ids
+    assert portrait_id not in fashion_ids
+
+    # 4. List assets with domain="portrait", should only return portrait assets
+    portrait_list = await api.get("/api/v1/media/assets?domain=portrait")
+    assert portrait_list.status_code == 200
+    portrait_items = portrait_list.json()["data"]["items"]
+    portrait_ids = [item["asset_id"] for item in portrait_items]
+    assert portrait_id in portrait_ids
+    assert fashion_id not in portrait_ids
+
+

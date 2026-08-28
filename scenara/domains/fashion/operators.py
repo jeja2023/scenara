@@ -307,7 +307,7 @@ class ProductionFashionEngine:
                     [None] * len(images),
                     confidence=confidence,
                     iou=0.45,
-                    max_detections=10,
+                    max_detections=None,
                 )
                 return [frame.get("persons", []) for frame in chunk_frames]
         except Exception:
@@ -321,10 +321,10 @@ class ProductionFashionEngine:
                 [
                     {
                         "box": [
-                            float(w * 0.1),
-                            float(h * 0.05),
-                            float(w * 0.9),
-                            float(h * 0.95),
+                            w * 0.1,
+                            h * 0.05,
+                            w * 0.9,
+                            h * 0.95,
                         ],
                         "score": 0.85,
                     }
@@ -341,6 +341,7 @@ class ProductionFashionEngine:
         detect_cosplay: bool = True,
         detect_clothing: bool = True,
         detect_accessories: bool = True,
+        filter_casual: bool = True,
     ) -> tuple[
         list[dict[str, Any]],
         list[dict[str, Any]],
@@ -374,11 +375,16 @@ class ProductionFashionEngine:
         )
 
         for idx, person in enumerate(targets):
-            box = person.get("box", [0, 0, img_w, img_h])
-            x1, y1, x2, y2 = [
-                int(max(0, min(v, img_w if i % 2 == 0 else img_h)))
-                for i, v in enumerate(box[:4])
-            ]
+            raw_box = person.get("box") if isinstance(person, dict) else None
+            box = (
+                raw_box
+                if isinstance(raw_box, (list, tuple)) and len(raw_box) >= 4
+                else [0, 0, img_w, img_h]
+            )
+            x1 = int(max(0, min(float(box[0]), img_w)))
+            y1 = int(max(0, min(float(box[1]), img_h)))
+            x2 = int(max(0, min(float(box[2]), img_w)))
+            y2 = int(max(0, min(float(box[3]), img_h)))
             bw = max(1, x2 - x1)
             bh = max(1, y2 - y1)
             if bw < 10 or bh < 10:
@@ -396,13 +402,20 @@ class ProductionFashionEngine:
             mean_s = float(np.mean(s_chan))
             mean_v = float(np.mean(v_chan))
 
-            # 分区色彩分析：头部（0-25%）、上身（25-60%）、下身（60-100%）
-            top_h = int(bh * 0.25)
-            mid_h = int(bh * 0.60)
+            # 分区色彩分析：头部（顶部0-15%，水平居中25%-75%，排除肩膀/衣领/背心）、上身（15-55%）、下身（55-100%）
+            hair_h = max(1, int(bh * 0.15))
+            hair_x1 = int(bw * 0.25)
+            hair_x2 = max(hair_x1 + 1, int(bw * 0.75))
+            head_patch = (
+                hsv[:hair_h, hair_x1:hair_x2]
+                if hair_x2 > hair_x1 and hair_h > 0
+                else hsv[:hair_h, :]
+            )
+            top_h = hair_h
+            mid_h = max(top_h + 1, int(bh * 0.55))
 
             upper_patch = hsv[top_h:mid_h, :] if mid_h > top_h else hsv
             lower_patch = hsv[mid_h:, :] if bh > mid_h else hsv
-            head_patch = hsv[:top_h, :] if top_h > 0 else hsv
 
             upper_v = (
                 float(np.mean(upper_patch[:, :, 2])) if upper_patch.size > 0 else mean_v
@@ -410,94 +423,564 @@ class ProductionFashionEngine:
             lower_v = (
                 float(np.mean(lower_patch[:, :, 2])) if lower_patch.size > 0 else mean_v
             )
-            head_s = (
-                float(np.mean(head_patch[:, :, 1])) if head_patch.size > 0 else mean_s
+            head_v = (
+                float(np.mean(head_patch[:, :, 2])) if head_patch.size > 0 else mean_v
             )
-            head_h = float(np.mean(head_patch[:, :, 0])) if head_patch.size > 0 else 0.0
 
-            # 颜色掩码比例
+            # 头部像素特征分析（假发 vs 自然发色）
+            head_px_total = max(1, head_patch.shape[0] * head_patch.shape[1])
+            hp_h, hp_s, hp_v = (
+                head_patch[:, :, 0],
+                head_patch[:, :, 1],
+                head_patch[:, :, 2],
+            )
+
+            # 银白发：高明度低饱和度
+            head_white_ratio = (
+                float(np.sum((hp_v > 150) & (hp_s < 50))) / head_px_total
+            )
+            # 葱绿/青绿发 (初音绿)：高饱和青绿色
+            head_cyan_ratio = (
+                float(
+                    np.sum(
+                        (hp_h >= 75)
+                        & (hp_h <= 105)
+                        & (hp_s > 60)
+                        & (hp_v > 60)
+                    )
+                )
+                / head_px_total
+            )
+            # 宝蓝发：高饱和蓝色
+            head_blue_ratio = (
+                float(
+                    np.sum(
+                        (hp_h >= 100)
+                        & (hp_h <= 130)
+                        & (hp_s > 65)
+                        & (hp_v > 55)
+                    )
+                )
+                / head_px_total
+            )
+            # 紫发/紫罗兰发 (雷电将军/刻晴)：高饱和紫色
+            head_purple_ratio = (
+                float(
+                    np.sum(
+                        (hp_h >= 125)
+                        & (hp_h <= 155)
+                        & (hp_s > 50)
+                        & (hp_v > 60)
+                    )
+                )
+                / head_px_total
+            )
+            # 粉发：高明度粉红
+            head_pink_ratio = (
+                float(
+                    np.sum(
+                        (hp_h >= 150)
+                        & (hp_h <= 175)
+                        & (hp_s > 50)
+                        & (hp_v > 75)
+                    )
+                )
+                / head_px_total
+            )
+            # 金发/亮黄橙 (Saber/金发角色)：高饱和金黄色
+            head_gold_ratio = (
+                float(
+                    np.sum(
+                        (hp_h >= 15)
+                        & (hp_h <= 38)
+                        & (hp_s > 75)
+                        & (hp_v > 95)
+                    )
+                )
+                / head_px_total
+            )
+            # 亮绿发：高饱和绿色
+            head_green_ratio = (
+                float(
+                    np.sum(
+                        (hp_h >= 40)
+                        & (hp_h <= 75)
+                        & (hp_s > 70)
+                        & (hp_v > 60)
+                    )
+                )
+                / head_px_total
+            )
+            # 亮红发：高饱和红色
+            head_red_ratio = (
+                float(
+                    np.sum(
+                        ((hp_h < 12) | (hp_h > 168))
+                        & (hp_s > 75)
+                        & (hp_v > 75)
+                    )
+                )
+                / head_px_total
+            )
+            # 自然黑/深褐发：低明度或低饱和暗色
+            head_dark_ratio = (
+                float(np.sum((hp_v < 65) | ((hp_s < 45) & (hp_v < 110))))
+                / head_px_total
+            )
+
+            # 分区颜色比例（聚焦人体中轴线中心区域，彻底排除左右背景与边缘干扰）
+            cx1 = int(bw * 0.20)
+            cx2 = max(cx1 + 1, int(bw * 0.80))
+            upper_center = upper_patch[:, cx1:cx2] if cx2 > cx1 else upper_patch
+            lower_center = lower_patch[:, cx1:cx2] if cx2 > cx1 else lower_patch
+
+            upper_px = max(1, upper_center.shape[0] * upper_center.shape[1])
+            lower_px = max(1, lower_center.shape[0] * lower_center.shape[1])
+            upper_white_ratio = (
+                float(np.sum((upper_center[:, :, 2] > 185) & (upper_center[:, :, 1] < 50)))
+                / upper_px
+            )
+            upper_blue_ratio = (
+                float(
+                    np.sum(
+                        (upper_center[:, :, 0] >= 95)
+                        & (upper_center[:, :, 0] <= 130)
+                        & (upper_center[:, :, 1] > 60)
+                    )
+                )
+                / upper_px
+            )
+            upper_cyan_ratio = (
+                float(
+                    np.sum(
+                        (upper_center[:, :, 0] >= 80)
+                        & (upper_center[:, :, 0] <= 100)
+                        & (upper_center[:, :, 1] > 60)
+                    )
+                )
+                / upper_px
+            )
+            upper_purple_ratio = (
+                float(
+                    np.sum(
+                        (upper_center[:, :, 0] >= 125)
+                        & (upper_center[:, :, 0] <= 155)
+                        & (upper_center[:, :, 1] > 50)
+                    )
+                )
+                / upper_px
+            )
+
+            lower_white_ratio = (
+                float(np.sum((lower_center[:, :, 2] > 185) & (lower_center[:, :, 1] < 50)))
+                / lower_px
+            )
+            lower_dark_ratio = (
+                float(
+                    np.sum(
+                        (lower_center[:, :, 2] < 65)
+                        | (
+                            (lower_center[:, :, 0] >= 95)
+                            & (lower_center[:, :, 0] <= 130)
+                            & (lower_center[:, :, 1] > 50)
+                        )
+                    )
+                )
+                / lower_px
+            )
+            lower_blue_ratio = (
+                float(
+                    np.sum(
+                        (lower_center[:, :, 0] >= 95)
+                        & (lower_center[:, :, 0] <= 130)
+                        & (lower_center[:, :, 1] > 60)
+                    )
+                )
+                / lower_px
+            )
+            lower_cyan_ratio = (
+                float(
+                    np.sum(
+                        (lower_center[:, :, 0] >= 80)
+                        & (lower_center[:, :, 0] <= 100)
+                        & (lower_center[:, :, 1] > 60)
+                    )
+                )
+                / lower_px
+            )
+            lower_purple_ratio = (
+                float(
+                    np.sum(
+                        (lower_center[:, :, 0] >= 125)
+                        & (lower_center[:, :, 0] <= 155)
+                        & (lower_center[:, :, 1] > 50)
+                    )
+                )
+                / lower_px
+            )
+            lower_black_ratio = (
+                float(np.sum(lower_center[:, :, 2] < 55)) / lower_px
+            )
+
+            # 全身颜色掩码比例
+            crop_px_total = max(1, crop.shape[0] * crop.shape[1])
             red_mask = ((h_chan < 10) | (h_chan > 170)) & (s_chan > 70)
             blue_mask = (h_chan >= 95) & (h_chan <= 130) & (s_chan > 60)
             green_mask = (h_chan >= 35) & (h_chan <= 85) & (s_chan > 50)
             cyan_mask = (h_chan >= 80) & (h_chan <= 100) & (s_chan > 60)
-            orange_mask = (h_chan >= 10) & (h_chan <= 25) & (s_chan > 90)
+            purple_mask = (h_chan >= 125) & (h_chan <= 155) & (s_chan > 50)
+            pink_mask = (h_chan >= 150) & (h_chan <= 175) & (s_chan > 45)
+            orange_mask = (h_chan >= 10) & (h_chan <= 25) & (s_chan > 85)
             black_mask = v_chan < 55
             white_mask = (v_chan > 185) & (s_chan < 50)
 
-            red_ratio = float(np.sum(red_mask)) / max(1, crop.shape[0] * crop.shape[1])
-            blue_ratio = float(np.sum(blue_mask)) / max(
-                1, crop.shape[0] * crop.shape[1]
-            )
-            green_ratio = float(np.sum(green_mask)) / max(
-                1, crop.shape[0] * crop.shape[1]
-            )
-            cyan_ratio = float(np.sum(cyan_mask)) / max(
-                1, crop.shape[0] * crop.shape[1]
-            )
-            orange_ratio = float(np.sum(orange_mask)) / max(
-                1, crop.shape[0] * crop.shape[1]
-            )
-            black_ratio = float(np.sum(black_mask)) / max(
-                1, crop.shape[0] * crop.shape[1]
-            )
-            white_ratio = float(np.sum(white_mask)) / max(
-                1, crop.shape[0] * crop.shape[1]
-            )
+            red_ratio = float(np.sum(red_mask)) / crop_px_total
+            blue_ratio = float(np.sum(blue_mask)) / crop_px_total
+            green_ratio = float(np.sum(green_mask)) / crop_px_total
+            cyan_ratio = float(np.sum(cyan_mask)) / crop_px_total
+            purple_ratio = float(np.sum(purple_mask)) / crop_px_total
+            pink_ratio = float(np.sum(pink_mask)) / crop_px_total
+            orange_ratio = float(np.sum(orange_mask)) / crop_px_total
+            black_ratio = float(np.sum(black_mask)) / crop_px_total
+            white_ratio = float(np.sum(white_mask)) / crop_px_total
 
-            # 1. 服装风格识别
+            # 1. 服装风格识别（精准规则，严密保护日常休闲装，杜绝误判）
             detected_style = "casual"
             style_label = "日常休闲"
             style_conf = 0.88
             dominant_color = "混色"
 
-            if black_ratio > 0.35 and white_ratio > 0.15 and upper_v > lower_v:
+            if (
+                black_ratio > 0.40
+                and white_ratio > 0.18
+                and upper_v > lower_v
+                and (head_blue_ratio > 0.12 or head_pink_ratio > 0.12 or head_white_ratio > 0.18 or white_ratio > 0.30)
+            ):
                 detected_style = "maid"
                 style_label = "女仆装"
                 style_conf = 0.94
                 dominant_color = "黑白"
             elif (
-                (black_ratio > 0.30 or blue_ratio > 0.20)
-                and white_ratio > 0.20
-                and abs(upper_v - lower_v) > 60
+                upper_white_ratio > 0.38
+                and lower_dark_ratio > 0.35
+                and (upper_v - lower_v) > 60
+                and bh / bw > 1.6
             ):
                 detected_style = "jk_uniform"
                 style_label = "JK制服"
                 style_conf = 0.92
                 dominant_color = "藏青/白"
             elif (
-                (cyan_ratio > 0.15 or red_ratio > 0.18 or green_ratio > 0.18)
-                and mean_s > 75
-                and bh / bw > 1.8
+                (cyan_ratio > 0.14 or red_ratio > 0.16 or green_ratio > 0.16 or (orange_ratio > 0.14 and white_ratio > 0.12))
+                and mean_s > 45
+                and bh / bw > 1.6
+            ) or (
+                (upper_blue_ratio > 0.25 or upper_cyan_ratio > 0.20 or upper_purple_ratio > 0.20)
+                and (lower_blue_ratio > 0.25 or lower_cyan_ratio > 0.20 or lower_purple_ratio > 0.20)
+                and bh / bw > 1.7
             ):
                 detected_style = "hanfu"
-                style_label = "汉服"
-                style_conf = 0.90
+                style_label = "国风战袍/汉服"
+                style_conf = 0.92
                 dominant_color = "国风华彩"
-            elif black_ratio > 0.45 and mean_s < 60:
+            elif black_ratio > 0.45 and mean_s < 45 and head_dark_ratio > 0.45 and white_ratio > 0.08:
                 detected_style = "suit"
                 style_label = "正装西装"
                 style_conf = 0.91
                 dominant_color = "纯黑/深灰"
-            elif black_ratio > 0.40 and red_ratio > 0.08:
+            elif (
+                black_ratio > 0.52
+                and (red_ratio > 0.10 or purple_ratio > 0.10 or head_white_ratio > 0.25 or head_purple_ratio > 0.15)
+                and mean_s < 50
+            ):
                 detected_style = "gothic"
                 style_label = "哥特风"
-                style_conf = 0.89
+                style_conf = 0.91
                 dominant_color = "暗黑红"
-            elif mean_s > 60 and white_ratio > 0.25:
+            elif (
+                (pink_ratio > 0.18 and white_ratio > 0.20)
+                or (head_pink_ratio > 0.15 and white_ratio > 0.18)
+                or (black_ratio > 0.35 and (head_purple_ratio > 0.15 or pink_ratio > 0.10))
+                or (
+                    upper_white_ratio > 0.40
+                    and lower_white_ratio > 0.40
+                    and bh / bw > 1.5
+                    and black_ratio < 0.20
+                )
+            ):
                 detected_style = "lolita"
                 style_label = "洛丽塔"
-                style_conf = 0.87
+                style_conf = 0.90
                 dominant_color = "甜系粉白"
-            elif red_ratio > 0.30 and bh / bw > 2.0:
+            elif red_ratio > 0.30 and bh / bw > 2.0 and mean_s > 70:
                 detected_style = "qipao"
                 style_label = "旗袍"
-                style_conf = 0.89
+                style_conf = 0.90
                 dominant_color = "中国红"
-            elif mean_s < 40 and 60 < mean_v < 180:
+            elif mean_s < 35 and 60 < mean_v < 160 and head_dark_ratio > 0.50 and (orange_ratio > 0.20 or black_ratio > 0.30):
                 detected_style = "vintage"
                 style_label = "复古风"
                 style_conf = 0.86
                 dominant_color = "大地色"
+
+            # 2. Cosplay 角色识别（全面支持全色系二次元假发与经典/战袍/洛丽塔动漫装束）
+            person_cosplay = None
+            if detect_cosplay:
+                char_name = None
+                series_name = None
+                char_conf = 0.0
+
+                # 优先识别高饱和度特征假发色系，避免浅色/白色背景干扰
+                if head_cyan_ratio > 0.15:
+                    # 葱绿/青绿双马尾假发 -> 初音未来
+                    char_name, series_name, char_conf = (
+                        "初音未来",
+                        "VOCALOID",
+                        0.96,
+                    )
+                elif head_purple_ratio > 0.15:
+                    # 紫发二次元角色 (如雷电将军、刻晴、紫发动漫角色)
+                    char_name, series_name, char_conf = (
+                        "雷电将军 / 刻晴 / 紫发角色",
+                        "原神 / 动漫二次元",
+                        0.95,
+                    )
+                elif head_gold_ratio > 0.18 and head_dark_ratio < 0.35:
+                    # 金发二次元角色 (如Saber、阿尔托莉雅、金发魔法少女)
+                    if blue_ratio > 0.18:
+                        char_name, series_name, char_conf = (
+                            "Saber / 阿尔托莉雅",
+                            "Fate系列",
+                            0.95,
+                        )
+                    else:
+                        char_name, series_name, char_conf = (
+                            "金发二次元角色 / 魔法少女",
+                            "动漫二次元",
+                            0.93,
+                        )
+                elif head_pink_ratio > 0.15:
+                    # 粉发二次元角色 (如拉姆、阿尼亚)
+                    if detected_style == "maid":
+                        char_name, series_name, char_conf = (
+                            "拉姆",
+                            "Re:从零开始的异世界生活",
+                            0.95,
+                        )
+                    else:
+                        char_name, series_name, char_conf = (
+                            "阿尼亚 / 粉发二次元",
+                            "间谍过家家 / 动漫二次元",
+                            0.93,
+                        )
+                elif head_blue_ratio > 0.15:
+                    # 蓝发二次元角色 (如蕾姆)
+                    if detected_style == "maid":
+                        char_name, series_name, char_conf = (
+                            "蕾姆",
+                            "Re:从零开始的异世界生活",
+                            0.96,
+                        )
+                    else:
+                        char_name, series_name, char_conf = (
+                            "蓝发二次元角色",
+                            "动漫二次元",
+                            0.93,
+                        )
+                elif head_green_ratio > 0.15:
+                    char_name, series_name, char_conf = "索隆 / 绿发角色", "海贼王 / 动漫二次元", 0.93
+                elif head_red_ratio > 0.18:
+                    char_name, series_name, char_conf = "红发二次元角色", "动漫二次元", 0.92
+                elif (
+                    head_white_ratio > 0.25
+                    and head_dark_ratio < 0.35
+                    and head_v > 140
+                ):
+                    # 银白发二次元角色 (如艾米莉亚、2B、白发动漫角色)
+                    if detected_style in {"gothic", "maid"} or black_ratio > 0.28:
+                        char_name, series_name, char_conf = (
+                            "2B / 哥特角色",
+                            "尼尔:机械纪元",
+                            0.95,
+                        )
+                    else:
+                        char_name, series_name, char_conf = (
+                            "艾米莉亚 / 白发二次元",
+                            "Re:从零开始的异世界生活",
+                            0.94,
+                        )
+                elif red_ratio > 0.22 and blue_ratio > 0.18 and head_gold_ratio > 0.15:
+                    char_name, series_name, char_conf = "路飞", "海贼王", 0.93
+                elif green_ratio > 0.18 and black_ratio > 0.25:
+                    char_name, series_name, char_conf = "炭治郎 / 鬼灭羽织", "鬼灭之刃", 0.93
+                elif orange_ratio > 0.25 and (blue_ratio > 0.15 or black_ratio > 0.15) and head_gold_ratio > 0.15:
+                    char_name, series_name, char_conf = "鸣人", "火影忍者", 0.92
+                elif (
+                    (
+                        upper_cyan_ratio > 0.12
+                        or upper_purple_ratio > 0.12
+                        or (
+                            upper_blue_ratio > 0.20
+                            and (upper_cyan_ratio > 0.06 or upper_purple_ratio > 0.06 or (upper_white_ratio > 0.08 and lower_black_ratio > 0.25))
+                        )
+                    )
+                    and (lower_black_ratio > 0.20 or lower_white_ratio > 0.08)
+                    and bh / bw > 1.6
+                ) or (
+                    detected_style in {"hanfu", "qipao"}
+                    and (blue_ratio > 0.12 or cyan_ratio > 0.12 or purple_ratio > 0.10 or red_ratio > 0.16)
+                ):
+                    # 蓝黑/紫黑/青黑交领二次元战袍 (如原神、国漫、二次元ACG角色)
+                    char_name, series_name, char_conf = (
+                        "二次元战袍 / ACG角色",
+                        "原神 / 动漫ACG",
+                        0.94,
+                    )
+                elif (
+                    detected_style == "lolita"
+                    and (upper_white_ratio > 0.35 or head_pink_ratio > 0.10 or white_ratio > 0.35)
+                ):
+                    char_name, series_name, char_conf = (
+                        "洛丽塔少女 / 动漫角色",
+                        "二次元ACG",
+                        0.93,
+                    )
+
+                if char_name and char_conf >= min_confidence:
+                    person_cosplay = {
+                        "character_name": char_name,
+                        "series_name": series_name,
+                        "confidence": round(char_conf, 2),
+                        "character_id": f"char_{char_name}",
+                        "attributes": {
+                            "outfit_match": "高契合度",
+                            "color_signature": dominant_color,
+                            "is_cosplay": True,
+                        },
+                    }
+
+            # 3. 配饰检测
+            person_accessories = []
+            if detect_accessories:
+                if head_cyan_ratio > 0.15:
+                    person_accessories.append(
+                        {
+                            "accessory_type": "wig",
+                            "accessory_label": "二次元假发 (青绿双马尾)",
+                            "confidence": 0.95,
+                            "color": "青绿",
+                            "material": "高温丝",
+                        }
+                    )
+                elif head_purple_ratio > 0.15:
+                    person_accessories.append(
+                        {
+                            "accessory_type": "wig",
+                            "accessory_label": "二次元假发 (紫罗兰/浅紫)",
+                            "confidence": 0.94,
+                            "color": "紫色",
+                            "material": "高温丝",
+                        }
+                    )
+                elif head_gold_ratio > 0.18 and head_dark_ratio < 0.35:
+                    person_accessories.append(
+                        {
+                            "accessory_type": "wig",
+                            "accessory_label": "二次元假发 (金色/金发双马尾)",
+                            "confidence": 0.94,
+                            "color": "金色",
+                            "material": "高温丝",
+                        }
+                    )
+                elif head_blue_ratio > 0.15:
+                    person_accessories.append(
+                        {
+                            "accessory_type": "wig",
+                            "accessory_label": "二次元假发 (宝蓝/天蓝)",
+                            "confidence": 0.93,
+                            "color": "宝蓝",
+                            "material": "高温丝",
+                        }
+                    )
+                elif head_pink_ratio > 0.15:
+                    person_accessories.append(
+                        {
+                            "accessory_type": "wig",
+                            "accessory_label": "二次元假发 (粉色/樱花粉)",
+                            "confidence": 0.94,
+                            "color": "粉色",
+                            "material": "高温丝",
+                        }
+                    )
+                elif head_green_ratio > 0.15:
+                    person_accessories.append(
+                        {
+                            "accessory_type": "wig",
+                            "accessory_label": "二次元假发 (草绿/翡翠绿)",
+                            "confidence": 0.93,
+                            "color": "草绿",
+                            "material": "高温丝",
+                        }
+                    )
+                elif head_red_ratio > 0.18:
+                    person_accessories.append(
+                        {
+                            "accessory_type": "wig",
+                            "accessory_label": "二次元假发 (亮红/火红)",
+                            "confidence": 0.92,
+                            "color": "红色",
+                            "material": "高温丝",
+                        }
+                    )
+                elif head_white_ratio > 0.25 and head_dark_ratio < 0.35:
+                    person_accessories.append(
+                        {
+                            "accessory_type": "wig",
+                            "accessory_label": "二次元假发 (银白)",
+                            "confidence": 0.94,
+                            "color": "银白",
+                            "material": "高温丝",
+                        }
+                    )
+                if white_ratio > 0.15 and detected_style in {"jk_uniform", "suit"}:
+                    person_accessories.append(
+                        {
+                            "accessory_type": "tie",
+                            "accessory_label": "领结/领带",
+                            "confidence": 0.86,
+                            "color": "深色",
+                            "material": "丝织",
+                        }
+                    )
+                if orange_ratio > 0.10 or red_ratio > 0.10:
+                    person_accessories.append(
+                        {
+                            "accessory_type": "hat",
+                            "accessory_label": "头饰/帽子",
+                            "confidence": 0.84,
+                            "color": dominant_color,
+                            "material": "织物/草编",
+                        }
+                    )
+
+            # 4. 过滤普通路人与无二次元特征目标
+            is_cosplay = person_cosplay is not None
+            is_special_fashion = detect_clothing and detected_style not in {
+                "casual",
+                "suit",
+            }
+            has_anime_acc = any(
+                a.get("accessory_type") == "wig" for a in person_accessories
+            )
+
+            if filter_casual and not (
+                is_cosplay or is_special_fashion or has_anime_acc
+            ):
+                continue  # 自动过滤普通日常路人
+
+            # 5. 保存有效目标
+            if person_cosplay is not None:
+                cosplay_list.append(person_cosplay)
 
             if detect_clothing and style_conf >= min_confidence:
                 clothing_list.append(
@@ -513,94 +996,18 @@ class ProductionFashionEngine:
                     }
                 )
 
-            # 2. Cosplay 角色识别
-            if detect_cosplay:
-                char_name = None
-                series_name = None
-                char_conf = 0.0
+            if person_accessories:
+                accessory_list.extend(person_accessories)
 
-                if red_ratio > 0.20 and (blue_ratio > 0.15 or orange_mask.sum() > 0.1):
-                    char_name, series_name, char_conf = "路飞", "海贼王", 0.93
-                elif green_ratio > 0.25 and black_ratio > 0.20:
-                    char_name, series_name, char_conf = "索隆", "海贼王", 0.91
-                elif cyan_ratio > 0.20 or (
-                    head_h >= 80 and head_h <= 105 and head_s > 50
-                ):
-                    char_name, series_name, char_conf = "初音未来", "VOCALOID", 0.95
-                elif orange_ratio > 0.20:
-                    char_name, series_name, char_conf = "鸣人", "火影忍者", 0.92
-                elif blue_ratio > 0.20 and detected_style == "maid":
-                    char_name, series_name, char_conf = (
-                        "蕾姆",
-                        "从零开始的异世界生活",
-                        0.94,
-                    )
-                elif red_ratio > 0.20 and detected_style == "maid":
-                    char_name, series_name, char_conf = (
-                        "拉姆",
-                        "从零开始的异世界生活",
-                        0.94,
-                    )
-                elif green_ratio > 0.15 and black_ratio > 0.30:
-                    char_name, series_name, char_conf = "炭治郎", "鬼灭之刃", 0.90
-
-                if char_name and char_conf >= min_confidence:
-                    cosplay_list.append(
-                        {
-                            "character_name": char_name,
-                            "series_name": series_name,
-                            "confidence": round(char_conf, 2),
-                            "character_id": f"char_{char_name}",
-                            "attributes": {
-                                "outfit_match": "高契合度",
-                                "color_signature": dominant_color,
-                            },
-                        }
-                    )
-
-            # 3. 配饰检测
-            if detect_accessories:
-                if head_s > 50 and head_h > 15:
-                    accessory_list.append(
-                        {
-                            "accessory_type": "wig",
-                            "accessory_label": "二次元假发",
-                            "confidence": 0.88,
-                            "color": dominant_color,
-                            "material": "高温丝",
-                        }
-                    )
-                if white_ratio > 0.15 and detected_style in {"jk_uniform", "suit"}:
-                    accessory_list.append(
-                        {
-                            "accessory_type": "tie",
-                            "accessory_label": "领结/领带",
-                            "confidence": 0.86,
-                            "color": "深色",
-                            "material": "丝织",
-                        }
-                    )
-                if orange_ratio > 0.10 or red_ratio > 0.10:
-                    accessory_list.append(
-                        {
-                            "accessory_type": "hat",
-                            "accessory_label": "头饰/帽子",
-                            "confidence": 0.84,
-                            "color": dominant_color,
-                            "material": "织物/草编",
-                        }
-                    )
-
-            # 构建标注对象 VisionObject 数据
-            display_label = style_label
-            display_type = "clothing"
-            obj_score = style_conf
-
-            if cosplay_list:
-                latest_cos = cosplay_list[-1]
-                display_label = f"{latest_cos['character_name']} ({style_label})"
+            # 构建当前人员对应的 VisionObject 标注数据
+            if person_cosplay is not None:
                 display_type = "cosplay"
-                obj_score = latest_cos["confidence"]
+                display_label = f"Cosplay · {person_cosplay['character_name']}"
+                obj_score = person_cosplay["confidence"]
+            else:
+                display_type = "clothing"
+                display_label = style_label
+                obj_score = style_conf
 
             objects.append(
                 {
@@ -618,11 +1025,12 @@ class ProductionFashionEngine:
                         "style_type": detected_style,
                         "style_label": style_label,
                         "dominant_color": dominant_color,
-                        "character_name": cosplay_list[-1]["character_name"]
-                        if cosplay_list
+                        "is_cosplay": person_cosplay is not None,
+                        "character_name": person_cosplay["character_name"]
+                        if person_cosplay
                         else None,
-                        "series_name": cosplay_list[-1]["series_name"]
-                        if cosplay_list
+                        "series_name": person_cosplay["series_name"]
+                        if person_cosplay
                         else None,
                     },
                 }
@@ -720,6 +1128,7 @@ class FashionRecognitionOperator:
         detect_cosplay = bool(parameters.get("detect_cosplay", True))
         detect_clothing = bool(parameters.get("detect_clothing", True))
         detect_accessories = bool(parameters.get("detect_accessories", True))
+        filter_casual = bool(parameters.get("filter_casual", True))
         raw_roi = parameters.get("roi")
 
         production_ready = bool(getattr(engine, "production_ready", False))
@@ -803,7 +1212,7 @@ class FashionRecognitionOperator:
                 # 检测批次帧中的人体
                 if isinstance(engine, ProductionFashionEngine):
                     persons_per_frame = await engine.detect_frame_persons(
-                        chunk_images, confidence=min_confidence
+                        chunk_images, confidence=min(0.25, min_confidence)
                     )
                 else:
                     persons_per_frame = [[] for _ in chunk]
@@ -853,6 +1262,7 @@ class FashionRecognitionOperator:
                                 detect_cosplay=detect_cosplay,
                                 detect_clothing=detect_clothing,
                                 detect_accessories=detect_accessories,
+                                filter_casual=filter_casual,
                             )
                         )
                         if unit_roi is not None:

@@ -52,6 +52,7 @@ export interface MediaTechnicalMetadata {
 export interface MediaAsset {
   asset_id: string;
   kind: MediaKind;
+  domain?: string | null;
   filename?: string;
   content_type: string;
   size_bytes: number;

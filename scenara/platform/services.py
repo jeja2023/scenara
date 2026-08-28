@@ -161,6 +161,7 @@ class RunService:
         filename: str | None,
         content_type: str,
         kind: MediaKind,
+        domain: str | None = None,
         temporary: bool = False,
     ) -> MediaAsset:
         await require_allowed(self.policy, context, "create", "media_asset", {"kind": kind.value})
@@ -193,6 +194,7 @@ class RunService:
             tenant_id=context.tenant_id,
             project_id=context.project_id,
             kind=kind,
+            domain=domain,
             filename=filename,
             content_type=content_type or "application/octet-stream",
             size_bytes=len(data),
@@ -285,6 +287,7 @@ class RunService:
         filename: str | None,
         content_type: str,
         kind: MediaKind,
+        domain: str | None = None,
         temporary: bool = False,
     ) -> MediaAsset:
         await require_allowed(self.policy, context, "create", "media_asset", {"kind": kind.value})
@@ -321,6 +324,7 @@ class RunService:
             tenant_id=context.tenant_id,
             project_id=context.project_id,
             kind=kind,
+            domain=domain,
             filename=filename,
             content_type=content_type or "application/octet-stream",
             size_bytes=size_bytes,

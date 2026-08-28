@@ -56,9 +56,19 @@ class PortraitPersonDetectionOperator:
             runtime = await get_capability_runtime("person_detection", {"yolo", "yolov8"})
             if runtime is None:
                 raise DomainUnavailable("a production-ready person detection model is not installed")
-            confidence = float(parameters.get("confidence", runtime_output_value(runtime, "confidence", 0.25)))
-            iou = float(parameters.get("iou", runtime_output_value(runtime, "iou", 0.45)))
-            max_detections = int(parameters.get("max_detections", runtime_output_value(runtime, "max_detections", 100)))
+            raw_conf = parameters.get("confidence")
+            conf_val = raw_conf if raw_conf is not None else runtime_output_value(runtime, "confidence", 0.25)
+            confidence = float(conf_val if conf_val is not None else 0.25)
+
+            raw_iou = parameters.get("iou")
+            iou_val = raw_iou if raw_iou is not None else runtime_output_value(runtime, "iou", 0.45)
+            iou = float(iou_val if iou_val is not None else 0.45)
+            raw_max_det = parameters.get("max_detections")
+            max_detections = (
+                int(raw_max_det)
+                if raw_max_det is not None and int(raw_max_det) > 0
+                else None
+            )
             raw_roi = parameters.get("roi")
         except BaseException:
             await decoded.close()
@@ -91,7 +101,7 @@ class PortraitPersonDetectionOperator:
                     [context.filename for _ in chunk],
                     confidence=max(0.0, min(1.0, confidence)),
                     iou=max(0.0, min(1.0, iou)),
-                    max_detections=max(1, max_detections),
+                    max_detections=max_detections,
                 )
                 for key, value in runtime_meta.get("timing", {}).items():
                     timing_totals[key] = timing_totals.get(key, 0.0) + float(value)

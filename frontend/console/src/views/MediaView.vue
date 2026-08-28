@@ -11,7 +11,7 @@ import {
   Video,
   X,
 } from "@lucide/vue";
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { useRouter, type Router } from "vue-router";
 import { api, apiBlob, userFacingError } from "../api";
@@ -20,10 +20,14 @@ import DataTable from "../components/DataTable.vue";
 import type { MediaAsset, MediaSource, MediaSourceProbe, TableColumn } from "../types";
 
 type AssetKindFilter = "" | "image" | "video" | "document";
+type AssetDomainFilter = "" | "fashion" | "portrait" | "behavior" | "ocr";
+
+const PAGE_SIZE = 20;
 
 const assetColumns: TableColumn<MediaAsset>[] = [
   { key: "select", label: "", width: "32px", class: "check-col", headerClass: "check-col" },
   { key: "asset_id", label: "标识", class: "mono truncate" },
+  { key: "domain", label: "所属领域" },
   { key: "kind", label: "类型" },
   { key: "filename", label: "文件名", class: "truncate" },
   { key: "size_bytes", label: "大小" },
@@ -52,14 +56,31 @@ const selectedAsset = ref<MediaAsset | null>(null);
 const previewUrl = ref("");
 const previewDialog = ref<HTMLDialogElement | null>(null);
 const kindFilter = ref<AssetKindFilter>("");
+const domainFilter = ref<AssetDomainFilter>("");
+const offset = ref(0);
 const expandedAssets = reactive<Set<string>>(new Set());
 const selectedForDelete = reactive<Set<string>>(new Set());
 
 const filteredAssets = computed(() =>
-  kindFilter.value
-    ? assets.value.filter((item) => item.kind === kindFilter.value)
-    : assets.value,
+  assets.value.filter((item) => {
+    const matchKind = !kindFilter.value || item.kind === kindFilter.value;
+    const matchDomain =
+      !domainFilter.value || item.domain === domainFilter.value;
+    return matchKind && matchDomain;
+  }),
 );
+
+const paginatedAssets = computed(() =>
+  filteredAssets.value.slice(offset.value, offset.value + PAGE_SIZE),
+);
+
+function onPageChange(newOffset: number): void {
+  offset.value = Math.max(0, newOffset);
+}
+
+watch([kindFilter, domainFilter], () => {
+  offset.value = 0;
+});
 
 const totalSizeBytes = computed(() =>
   filteredAssets.value.reduce((sum, item) => sum + item.size_bytes, 0),
@@ -130,6 +151,9 @@ async function upload(event: Event): Promise<void> {
         kind = "document";
       else kind = "video";
       form.append("kind", kind);
+      if (domainFilter.value) {
+        form.append("domain", domainFilter.value);
+      }
       await api<MediaAsset>("/api/v1/media/assets", {
         method: "POST",
         body: form,
@@ -328,12 +352,44 @@ useRefresh(refresh);
         <div class="header-left">
           <h2>文件资产</h2>
           <div class="filter-row">
+            <div class="segmented" role="group" aria-label="所属领域筛选">
+              <button
+                :class="{ active: domainFilter === '' }"
+                @click="domainFilter = ''"
+              >
+                全部领域
+              </button>
+              <button
+                :class="{ active: domainFilter === 'fashion' }"
+                @click="domainFilter = 'fashion'"
+              >
+                服饰风格
+              </button>
+              <button
+                :class="{ active: domainFilter === 'portrait' }"
+                @click="domainFilter = 'portrait'"
+              >
+                人像解析
+              </button>
+              <button
+                :class="{ active: domainFilter === 'behavior' }"
+                @click="domainFilter = 'behavior'"
+              >
+                行为分析
+              </button>
+              <button
+                :class="{ active: domainFilter === 'ocr' }"
+                @click="domainFilter = 'ocr'"
+              >
+                文字识别
+              </button>
+            </div>
             <div class="segmented" role="group" aria-label="类型筛选">
               <button
                 :class="{ active: kindFilter === '' }"
                 @click="kindFilter = ''"
               >
-                全部
+                全部类型
               </button>
               <button
                 :class="{ active: kindFilter === 'image' }"
@@ -380,9 +436,15 @@ useRefresh(refresh);
       </div>
       <DataTable
         :columns="assetColumns"
-        :items="filteredAssets"
+        :items="paginatedAssets"
+        :loading="loading"
+        :total="filteredAssets.length"
+        :offset="offset"
+        :page-size="PAGE_SIZE"
+        :index-offset="offset"
         :row-class="(asset: MediaAsset) => ({ 'selected-row': selectedForDelete.has(asset.asset_id) })"
-        :empty-text="kindFilter ? `没有 ${labelMediaKind(kindFilter)} 类型的资产` : '暂无文件资产'"
+        :empty-text="kindFilter || domainFilter ? '没有符合当前筛选条件的资产' : '暂无文件资产'"
+        @page-change="onPageChange"
       >
         <template #header-select>
           <span class="check-col"></span>
@@ -394,6 +456,13 @@ useRefresh(refresh);
             :aria-label="`选择 ${row.filename || row.asset_id}`"
             @change="toggleSelect(row.asset_id)"
           />
+        </template>
+        <template #domain="{ row }">
+          <span v-if="row.domain === 'fashion'" class="badge domain-badge-fashion">服饰风格</span>
+          <span v-else-if="row.domain === 'portrait'" class="badge domain-badge-portrait">人像解析</span>
+          <span v-else-if="row.domain === 'behavior'" class="badge domain-badge-behavior">行为分析</span>
+          <span v-else-if="row.domain === 'ocr'" class="badge domain-badge-ocr">文字识别</span>
+          <span v-else class="badge domain-badge-general">通用公共</span>
         </template>
         <template #kind="{ row }">
           <span class="badge" :class="row.kind">{{
@@ -627,35 +696,46 @@ useRefresh(refresh);
   display: flex;
   flex-direction: column;
 }
-.asset-panel .table-scroll {
-  height: 380px;
+.asset-panel :deep(.data-table-container) {
+  display: flex;
+  flex-direction: column;
+}
+.asset-panel :deep(.table-scroll) {
+  height: 560px;
+  min-height: 560px;
+  max-height: 560px;
   overflow-y: auto;
   scrollbar-width: thin;
+  background: #fff;
 }
 .source-panel {
   margin-top: 16px;
   display: flex;
   flex-direction: column;
 }
-.source-panel .table-scroll {
-  height: 240px;
+.source-panel :deep(.data-table-container) {
+  display: flex;
+  flex-direction: column;
+}
+.source-panel :deep(.table-scroll) {
+  height: 220px;
+  min-height: 220px;
+  max-height: 220px;
   overflow-y: auto;
   scrollbar-width: thin;
+  background: #fff;
 }
-.table-scroll thead th {
+:deep(.table-scroll thead th) {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--color-table-header);
+  background: var(--color-table-header, #fafbfb);
   box-shadow: inset 0 -1px 0 var(--line);
 }
-.table-scroll .empty {
-  height: calc(100% - 34px);
-  min-height: 140px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
+:deep(.table-empty-cell) {
+  height: 180px;
+  vertical-align: middle;
+  text-align: center;
   color: var(--muted);
   font-size: 13px;
 }
@@ -779,6 +859,35 @@ useRefresh(refresh);
   to {
     transform: rotate(360deg);
   }
+}
+.domain-badge-fashion {
+  background: rgba(139, 92, 246, 0.12);
+  color: #8b5cf6;
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  font-weight: 600;
+}
+.domain-badge-portrait {
+  background: rgba(59, 130, 246, 0.12);
+  color: #3b82f6;
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  font-weight: 600;
+}
+.domain-badge-behavior {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  font-weight: 600;
+}
+.domain-badge-ocr {
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+  font-weight: 600;
+}
+.domain-badge-general {
+  background: var(--surface-soft, rgba(148, 163, 184, 0.12));
+  color: var(--muted, #94a3b8);
+  border: 1px solid var(--line, rgba(148, 163, 184, 0.2));
 }
 @media (max-width: 760px) {
   .source-create-bar {

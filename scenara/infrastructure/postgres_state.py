@@ -367,6 +367,7 @@ class PostgresStateStore:
         tenant_id: str,
         project_id: str,
         *,
+        domain: str | None = None,
         include_deleted: bool = True,
         offset: int = 0,
         limit: int | None = None,
@@ -375,6 +376,9 @@ class PostgresStateStore:
         parameters: list[Any] = [tenant_id, project_id]
         if not include_deleted:
             conditions.append("document ->> 'deleted_at' IS NULL")
+        if domain is not None:
+            conditions.append("document ->> 'domain' = %s")
+            parameters.append(domain)
         query = f"""SELECT document FROM scenara_media_assets
                     WHERE {" AND ".join(conditions)}
                     ORDER BY created_at DESC, asset_id DESC"""
@@ -390,13 +394,26 @@ class PostgresStateStore:
         rows = [row[0] for row in result]
         return [MediaAsset.model_validate(row) for row in rows]
 
-    async def count_assets(self, tenant_id: str, project_id: str, *, include_deleted: bool = True) -> int:
-        deleted_filter = "" if include_deleted else " AND document ->> 'deleted_at' IS NULL"
+    async def count_assets(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        domain: str | None = None,
+        include_deleted: bool = True,
+    ) -> int:
+        conditions = ["tenant_id = %s", "project_id = %s"]
+        parameters: list[Any] = [tenant_id, project_id]
+        if not include_deleted:
+            conditions.append("document ->> 'deleted_at' IS NULL")
+        if domain is not None:
+            conditions.append("document ->> 'domain' = %s")
+            parameters.append(domain)
         async with self._pool.connection() as conn:
             cursor = await conn.execute(
                 f"""SELECT count(*) FROM scenara_media_assets
-                    WHERE tenant_id = %s AND project_id = %s{deleted_filter}""",
-                (tenant_id, project_id),
+                    WHERE {" AND ".join(conditions)}""",
+                parameters,
             )
             row = await cursor.fetchone()
         return int(row[0])

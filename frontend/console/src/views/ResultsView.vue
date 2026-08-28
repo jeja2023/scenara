@@ -34,7 +34,7 @@ import type {
   TableColumn,
 } from "../types";
 
-const PAGE_SIZE = 20;
+const pageSize = ref(20);
 
 const columns: TableColumn<ResultSummary>[] = [
   { key: "title", label: "标识 / 资源名称" },
@@ -82,12 +82,18 @@ function resultIcon(item: ResultSummary): typeof FileText {
   return FileText;
 }
 
+function onPageSizeChange(newSize: number): void {
+  pageSize.value = newSize;
+  offset.value = 0;
+  void refresh();
+}
+
 async function refresh(): Promise<void> {
   loading.value = true;
   error.value = "";
   try {
     const params = new URLSearchParams({
-      limit: String(PAGE_SIZE),
+      limit: String(pageSize.value),
       offset: String(offset.value),
     });
     if (query.value.trim()) params.set("query", query.value.trim());
@@ -297,8 +303,10 @@ useRefresh(refresh);
         :loading="loading"
         :total="total"
         :offset="offset"
-        :page-size="PAGE_SIZE"
+        :page-size="pageSize"
+        :page-size-options="[10, 20, 50, 100]"
         @page-change="goToPage"
+        @page-size-change="onPageSizeChange"
       >
         <template #title="{ row }">
           <div class="result-title-cell">

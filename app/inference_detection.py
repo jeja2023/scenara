@@ -40,12 +40,12 @@ async def infer_person_frames(
     filenames: list[str | None],
     confidence: float,
     iou: float,
-    max_detections: int,
+    max_detections: int | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     session = bundle["session"]
     config = model_config(key, default_type="yolo")
     input_height, input_width = configured_input_size(key, session, default=(640, 640))
-    person_class_id = int(config.get("person_class_id", 0))
+    person_class_id = config.get("person_class_id", 0)
 
     preprocess_start = now()
     input_array, image_metas = await asyncio.to_thread(_letterbox_batch, images, input_height, input_width)

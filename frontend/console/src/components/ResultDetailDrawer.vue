@@ -25,6 +25,7 @@ import GenericDomainResult from "./GenericDomainResult.vue";
 import {
   labelDomain,
   labelMediaKind,
+  labelObjectType,
   labelRunStatus,
   labelSampleStrategy,
 } from "../labels";
@@ -78,8 +79,6 @@ const activeOcrTab = ref<"layout" | "compliance" | "slides" | "raw">("layout");
 const underlayMode = ref(false);
 const underlayImageUrl = ref<string>("");
 const underlayLoading = ref(false);
-const underlayOpacity = ref(0.85);
-const underlayCompareMode = ref<"overlay" | "split">("overlay");
 const underlayCache = new Map<string, string>();
 const copiedText = ref(false);
 const activeSlideIndex = ref(0);
@@ -232,10 +231,32 @@ const resultDescription = computed(() => {
   if (currentSummary.value.domain === "ocr") {
     return `${currentSummary.value.ocr_block_count ?? 0} 个文本块 · ${currentSummary.value.text_length ?? 0} 个字符`;
   }
+  if (currentSummary.value.domain === "fashion") {
+    return `服饰风格解析 · ${objectCount.value} 个识别目标`;
+  }
+  if (currentSummary.value.domain === "behavior") {
+    return `行为动作识别 · ${objectCount.value} 个动作时序`;
+  }
   return `${currentSummary.value.person_count ?? 0} 个人员 · ${currentSummary.value.face_count ?? 0} 张人脸`;
 });
 
 const mediaMetadata = computed(() => result.value?.media_metadata ?? null);
+const hasMediaMetadataItems = computed(() => {
+  const m = mediaMetadata.value;
+  if (!m) return false;
+  return Boolean(
+    (m.width && m.height) ||
+      m.duration_ms != null ||
+      m.fps != null ||
+      m.codec ||
+      m.format ||
+      m.sample_strategy ||
+      m.frames_read != null ||
+      m.reconnect_count != null ||
+      m.elapsed_ms != null ||
+      m.timestamp_source,
+  );
+});
 const genericPayload = computed<Record<string, unknown> | null>(() => {
   const payload = result.value?.domain_payload;
   if (!payload || typeof payload !== "object") return null;
@@ -272,10 +293,10 @@ const objectColumns: TableColumn<{
   score?: number | null;
   bbox?: { x: number; y: number; width: number; height: number } | null;
 }>[] = [
-  { key: "object_id", label: "标识", class: "mono truncate" },
+  { key: "object_id", label: "目标编号", class: "mono truncate" },
   { key: "object_type", label: "类别" },
   { key: "score", label: "置信度" },
-  { key: "bbox", label: "边界框 (x, y, w, h)", class: "mono" },
+  { key: "bbox", label: "坐标位置 (x, y, w, h)", class: "mono" },
 ];
 
 function formatBox(
@@ -571,10 +592,18 @@ watch(
               <dt>文本块 / 字符</dt>
               <dd>{{ currentSummary.ocr_block_count ?? 0 }} / {{ currentSummary.text_length ?? 0 }}</dd>
             </div>
+            <div v-else-if="currentSummary.domain === 'fashion'">
+              <dt>识别目标</dt>
+              <dd>{{ objectCount }} 个</dd>
+            </div>
+            <div v-else-if="currentSummary.domain === 'behavior'">
+              <dt>动作对象</dt>
+              <dd>{{ objectCount }} 个</dd>
+            </div>
           </dl>
 
           <!-- 媒体技术元数据网格（如有） -->
-          <dl v-if="mediaMetadata" class="metadata-grid">
+          <dl v-if="hasMediaMetadataItems" class="metadata-grid">
             <div v-if="mediaMetadata.width && mediaMetadata.height">
               <dt>画面尺寸</dt>
               <dd>{{ mediaMetadata.width }} × {{ mediaMetadata.height }}</dd>
@@ -741,14 +770,13 @@ watch(
                           type="button"
                           class="button small"
                           :class="underlayMode ? 'primary' : 'secondary'"
-                          :title="underlayMode ? '关闭底图对照' : '开启底图对照'"
+                          :title="underlayMode ? '退出左右双屏对照' : '开启左右双屏对照'"
                           :disabled="underlayLoading"
                           @click="toggleUnderlayMode"
                         >
                           <Loader2 v-if="underlayLoading" :size="13" class="spin" />
-                          <EyeOff v-else-if="underlayMode" :size="13" />
-                          <Eye v-else :size="13" />
-                          {{ underlayLoading ? "加载底图中..." : underlayMode ? "关闭底图" : "底图对照" }}
+                          <Columns2 v-else :size="13" />
+                          {{ underlayLoading ? "加载原图中..." : underlayMode ? "退出双屏" : "左右双屏" }}
                         </button>
                         <button
                           type="button"
@@ -778,77 +806,35 @@ watch(
                   <div class="panel-body ocr-panel-body">
                     <!-- Tab 1: 视觉仿真排版 -->
                     <div v-show="activeOcrTab === 'layout'" class="ocr-layout-view">
-                      <!-- 当开启底图对照时，展示底图对照控制条 -->
-                      <div v-if="underlayMode && currentHtmlLayout" class="underlay-controls-bar">
-                        <div class="underlay-controls-left">
-                          <span class="control-label">底图对照模式:</span>
-                          <div class="segmented small">
-                            <button
-                              type="button"
-                              :class="{ active: underlayCompareMode === 'overlay' }"
-                              @click="underlayCompareMode = 'overlay'"
-                            >
-                              <Layers :size="13" />
-                              <span>透视叠图</span>
-                            </button>
-                            <button
-                              type="button"
-                              :class="{ active: underlayCompareMode === 'split' }"
-                              @click="underlayCompareMode = 'split'"
-                            >
-                              <Columns2 :size="13" />
-                              <span>左右双屏</span>
-                            </button>
-                          </div>
-                        </div>
-                        <div class="underlay-controls-right">
-                          <span class="control-label">底图清晰度:</span>
-                          <input
-                            type="range"
-                            min="0.2"
-                            max="1"
-                            step="0.05"
-                            v-model.number="underlayOpacity"
-                            class="opacity-slider"
-                          />
-                          <span class="opacity-val">{{ Math.round(underlayOpacity * 100) }}%</span>
-                        </div>
-                      </div>
-
                       <div
                         v-if="currentHtmlLayout"
                         class="ocr-layout-canvas-wrapper"
                         :class="{
-                          'underlay-active': underlayMode && underlayImageUrl,
-                          'split-mode': underlayMode && underlayCompareMode === 'split' && underlayImageUrl,
-                        }"
-                        :style="{
-                          '--underlay-url': underlayImageUrl ? `url('${underlayImageUrl}')` : 'none',
-                          '--underlay-opacity': underlayOpacity,
+                          'split-mode': underlayMode && underlayImageUrl,
                         }"
                       >
-                        <!-- 左右分栏模式下的左侧原始底图 -->
+                        <!-- 左右分栏模式下的左侧原始原图 -->
                         <div
-                          v-if="underlayMode && underlayCompareMode === 'split' && underlayImageUrl"
+                          v-if="underlayMode && underlayImageUrl"
                           class="ocr-split-underlay-column"
                         >
                           <div class="split-column-header">
                             <Eye :size="13" />
-                            <strong>原始文档 / 视频帧底图</strong>
+                            <strong>原始文档 / 视频帧原图</strong>
                           </div>
                           <div class="split-image-container">
                             <img
                               :src="underlayImageUrl"
-                              alt="原始文档底图"
+                              alt="原始文档原图"
                               class="underlay-split-img"
                             />
                           </div>
                         </div>
 
-                        <!-- 仿真排版展示容器（叠图模式下直接透视叠加在底图上） -->
+                        <!-- 仿真排版展示容器 -->
                         <div class="ocr-split-rendered-column">
                           <div
-                            v-if="underlayMode && underlayCompareMode === 'split' && underlayImageUrl"
+                            v-if="underlayMode && underlayImageUrl"
                             class="split-column-header"
                           >
                             <Layout :size="13" />
@@ -988,8 +974,14 @@ watch(
                     <DataTable
                       :columns="objectColumns"
                       :items="selectedUnit.objects"
+                      :page-size="10"
+                      :page-size-options="[5, 10, 20, 50]"
                       table-class="bordered-table"
+                      empty-text="当前单元未检出目标"
                     >
+                      <template #object_type="{ row }">
+                        {{ labelObjectType(row.object_type) }}
+                      </template>
                       <template #score="{ row }">
                         {{ row.score?.toFixed(3) ?? "-" }}
                       </template>
@@ -1146,33 +1138,42 @@ watch(
   color: #17211f;
 }
 
-/* Metadata Grid */
+/* Metadata Strip */
 .metadata-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 1px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 24px;
   margin: 0;
-  background: var(--line);
-  border: 1px solid var(--line);
+  padding: 8px 14px;
+  background: #f8fafc;
+  border: 1px solid var(--line, #e2e8f0);
   border-radius: 6px;
-  overflow: hidden;
+  box-sizing: border-box;
   flex-shrink: 0;
 }
 .metadata-grid div {
-  padding: 8px 12px;
-  background: var(--surface, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: transparent;
+  padding: 0;
 }
 .metadata-grid .metadata-wide {
-  grid-column: 1 / -1;
+  width: 100%;
 }
 .metadata-grid dt {
-  color: var(--muted);
+  color: var(--muted, #64748b);
   font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
 }
 .metadata-grid dd {
-  margin: 2px 0 0;
+  margin: 0;
   font-size: 12.5px;
-  font-weight: 700;
+  font-weight: 650;
+  color: var(--text, #1e293b);
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 
@@ -1443,47 +1444,6 @@ watch(
   padding: 14px;
 }
 
-/* Underlay Control Toolbar */
-.underlay-controls-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 12px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 6px;
-  margin-bottom: 12px;
-  font-size: 12px;
-}
-
-.underlay-controls-left,
-.underlay-controls-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.underlay-controls-bar .control-label {
-  font-weight: 600;
-  color: #1e40af;
-  font-size: 12px;
-}
-
-.opacity-slider {
-  width: 80px;
-  accent-color: #2563eb;
-  cursor: pointer;
-}
-
-.opacity-val {
-  font-family: var(--font-mono, monospace);
-  font-size: 11px;
-  font-weight: 700;
-  color: #2563eb;
-  min-width: 32px;
-}
-
 /* Layout View */
 .ocr-layout-canvas-wrapper {
   width: 100%;
@@ -1495,43 +1455,6 @@ watch(
   box-sizing: border-box;
   position: relative;
   transition: all 0.2s ease;
-}
-
-/* 透视叠图模式：利用 ::before 把底图精准置于 .ocr-visual-container 背景层 */
-.ocr-layout-canvas-wrapper.underlay-active:not(.split-mode) :deep(.ocr-visual-container) {
-  position: relative !important;
-  background-color: transparent !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12) !important;
-}
-
-.ocr-layout-canvas-wrapper.underlay-active:not(.split-mode) :deep(.ocr-visual-container)::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image: var(--underlay-url);
-  background-size: 100% 100%;
-  background-position: center;
-  background-repeat: no-repeat;
-  opacity: var(--underlay-opacity, 0.85);
-  pointer-events: none;
-  z-index: 0;
-  border-radius: inherit;
-}
-
-.ocr-layout-canvas-wrapper.underlay-active:not(.split-mode) :deep(.ocr-visual-block) {
-  z-index: 1;
-  background-color: rgba(255, 255, 255, 0.58);
-  backdrop-filter: blur(0.5px);
-  box-shadow: inset 0 0 0 1px rgba(37, 99, 235, 0.45);
-  border-radius: 2px;
-  color: #0f172a;
-  transition: all 0.15s ease;
-}
-
-.ocr-layout-canvas-wrapper.underlay-active:not(.split-mode) :deep(.ocr-visual-block:hover) {
-  background-color: rgba(255, 255, 255, 0.95);
-  box-shadow: inset 0 0 0 1.5px #2563eb, 0 2px 8px rgba(37, 99, 235, 0.3);
-  z-index: 10;
 }
 
 /* 左右双屏分栏模式 */

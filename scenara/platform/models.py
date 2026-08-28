@@ -107,6 +107,7 @@ class MediaAsset(StrictModel):
     tenant_id: str
     project_id: str
     kind: MediaKind
+    domain: str | None = None
     filename: str | None = None
     content_type: str
     size_bytes: int = Field(ge=0)
@@ -127,6 +128,7 @@ class PresignMediaUploadRequest(StrictModel):
     filename: str | None = Field(default=None, max_length=512)
     content_type: str = Field(min_length=1, max_length=256)
     kind: MediaKind
+    domain: str | None = Field(default=None, max_length=64)
     size_bytes: int = Field(gt=0)
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 

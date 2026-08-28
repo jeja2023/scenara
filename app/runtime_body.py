@@ -93,7 +93,7 @@ async def detect_body_embedding_crop(
         max_detections = int(
             max_detections_override
             if max_detections_override is not None
-            else runtime_output_value(runtime, "max_detections", runtime.capability.get("max_detections", 8))
+            else runtime_output_value(runtime, "max_detections", runtime.capability.get("max_detections", 100))
         )
         frames, meta = await infer_person_frames(
             runtime.bundle,

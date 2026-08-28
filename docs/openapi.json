@@ -4607,6 +4607,17 @@
       },
       "Body_create_media_asset_api_v1_media_assets_post": {
         "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
           "file": {
             "contentMediaType": "application/octet-stream",
             "title": "File",
@@ -5234,6 +5245,18 @@
             "minLength": 1,
             "title": "Content Type",
             "type": "string"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
           },
           "expires_at": {
             "title": "Expires At",
@@ -9161,6 +9184,17 @@
             ],
             "title": "Deleted At"
           },
+          "domain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
+          },
           "expires_at": {
             "anyOf": [
               {
@@ -10518,11 +10552,34 @@
             "title": "Blocks",
             "type": "array"
           },
+          "compliance_report": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Compliance Report"
+          },
           "domain": {
             "const": "ocr",
             "default": "ocr",
             "title": "Domain",
             "type": "string"
+          },
+          "html_layout": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Html Layout"
           },
           "language": {
             "anyOf": [
@@ -10540,6 +10597,14 @@
             "default": "1.0",
             "title": "Schema Version",
             "type": "string"
+          },
+          "slides": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Slides",
+            "type": "array"
           },
           "text": {
             "default": "",
@@ -11857,6 +11922,18 @@
             "minLength": 1,
             "title": "Content Type",
             "type": "string"
+          },
+          "domain": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Domain"
           },
           "filename": {
             "anyOf": [
@@ -15739,7 +15816,7 @@
   "info": {
     "description": "Scenara 景枢视觉 AI 中枢平台",
     "title": "Scenara API",
-    "version": "0.3.0.dev34"
+    "version": "0.3.0.dev35"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -21563,6 +21640,22 @@
       "get": {
         "operationId": "list_media_assets_api_v1_media_assets_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "domain",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Domain"
+            }
+          },
           {
             "in": "query",
             "name": "offset",

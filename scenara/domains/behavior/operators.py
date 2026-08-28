@@ -197,7 +197,7 @@ class ProductionBehaviorEngine:
                     [None] * len(images),
                     confidence=confidence,
                     iou=0.45,
-                    max_detections=10,
+                    max_detections=None,
                 )
                 return [frame.get("persons", []) for frame in chunk_frames]
         except Exception:
@@ -239,10 +239,10 @@ class ProductionBehaviorEngine:
             persons.append(
                 {
                     "box": [
-                        float(w * 0.15),
-                        float(h * 0.1),
-                        float(w * 0.85),
-                        float(h * 0.9),
+                        w * 0.15,
+                        h * 0.1,
+                        w * 0.85,
+                        h * 0.9,
                     ],
                     "score": 0.70,
                 }
@@ -338,7 +338,7 @@ class ProductionBehaviorEngine:
                     action_conf = 0.90
 
                 det_score = float(person.get("score", 0.85))
-                final_conf = round(float(action_conf * 0.6 + det_score * 0.4), 2)
+                final_conf = round(action_conf * 0.6 + det_score * 0.4, 2)
 
                 if final_conf >= min_confidence:
                     action_label = ACTION_LABELS_ZH.get(
@@ -684,14 +684,14 @@ class BehaviorRecognitionOperator:
                     )
                     for pred in predictions:
                         action_counter += 1
+                        act_type = str(pred.get("action_type") or "standing")
+                        act_label = str(pred.get("action_label") or act_type)
                         actions.append(
                             BehaviorAction(
                                 action_id=f"action_{action_counter}",
-                                action_type=pred["action_type"],
-                                action_label=pred.get(
-                                    "action_label", pred["action_type"]
-                                ),
-                                confidence=pred["confidence"],
+                                action_type=act_type,
+                                action_label=act_label,
+                                confidence=float(pred.get("confidence", 0.85)),
                                 start_ms=chunk[0].pts_ms or 0,
                                 end_ms=chunk[-1].pts_ms or 0,
                             )

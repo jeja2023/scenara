@@ -322,7 +322,7 @@ class LegacyPortraitAnalysisBackend:
             [filename],
             confidence=float(runtime_output_value(runtime, "confidence", 0.25)),
             iou=float(runtime_output_value(runtime, "iou", 0.45)),
-            max_detections=int(runtime_output_value(runtime, "max_detections", 100)),
+            max_detections=None,
         )
         if not frames:
             return []

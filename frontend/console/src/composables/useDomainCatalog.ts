@@ -126,7 +126,11 @@ export function useDomainCatalog(options: DomainCatalogOptions) {
   );
 
   const filteredAssets = computed(() =>
-    options.assets.value.filter((item) => item.kind === options.mode.value),
+    options.assets.value.filter(
+      (item) =>
+        item.kind === options.mode.value &&
+        (!item.domain || item.domain === options.domain.value),
+    ),
   );
 
   const selectedAsset = computed(

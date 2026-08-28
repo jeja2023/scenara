@@ -90,12 +90,20 @@ class StateStore(Protocol):
         tenant_id: str,
         project_id: str,
         *,
+        domain: str | None = None,
         include_deleted: bool = True,
         offset: int = 0,
         limit: int | None = None,
     ) -> list[MediaAsset]: ...
 
-    async def count_assets(self, tenant_id: str, project_id: str, *, include_deleted: bool = True) -> int: ...
+    async def count_assets(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        domain: str | None = None,
+        include_deleted: bool = True,
+    ) -> int: ...
 
     async def delete_asset(self, tenant_id: str, project_id: str, asset_id: str) -> MediaAsset | None: ...
 

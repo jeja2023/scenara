@@ -16,7 +16,7 @@ import { labelDomain, labelPipeline, labelRunStatus } from "../labels";
 import DataTable from "../components/DataTable.vue";
 import type { Domain, DomainManifest, Run, RunPage, RunStatus, TableColumn } from "../types";
 
-const PAGE_SIZE = 20;
+const pageSize = ref(20);
 const runs = ref<Run[]>([]);
 const domains = ref<DomainManifest[]>([]);
 const total = ref(0);
@@ -60,11 +60,17 @@ const completedCount = computed(
   () => runs.value.filter((item) => item.status === "completed").length,
 );
 
+function onPageSizeChange(newSize: number): void {
+  pageSize.value = newSize;
+  offset.value = 0;
+  void refresh();
+}
+
 async function refresh(): Promise<void> {
   loading.value = true;
   error.value = "";
   const query = new URLSearchParams({
-    limit: String(PAGE_SIZE),
+    limit: String(pageSize.value),
     offset: String(offset.value),
   });
   if (status.value) query.set("status", status.value);
@@ -78,11 +84,11 @@ async function refresh(): Promise<void> {
     total.value = page.total;
     domains.value = manifests;
     if (page.items.length === 0 && offset.value > 0) {
-      offset.value = Math.max(0, total.value - PAGE_SIZE);
+      offset.value = Math.max(0, total.value - pageSize.value);
       const retry = await api<RunPage>(
         "/api/v1/runs?" +
           new URLSearchParams({
-            limit: String(PAGE_SIZE),
+            limit: String(pageSize.value),
             offset: String(offset.value),
             ...(status.value ? { status: status.value } : {}),
             ...(domain.value ? { domain: domain.value } : {}),
@@ -279,10 +285,12 @@ onBeforeUnmount(() => {
         :loading="loading"
         :total="total"
         :offset="offset"
-        :page-size="PAGE_SIZE"
+        :page-size="pageSize"
+        :page-size-options="[10, 20, 50, 100]"
         :index-offset="offset"
         empty-text="暂无运行记录"
         @page-change="onPageChange"
+        @page-size-change="onPageSizeChange"
       >
         <template #domain="{ row }">
           {{ domainLabel(row.domain) }}

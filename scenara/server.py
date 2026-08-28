@@ -724,6 +724,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
         request: Request,
         file: Annotated[UploadFile, File()],
         kind: Annotated[MediaKind, Form()] = MediaKind.IMAGE,
+        domain: Annotated[str | None, Form()] = None,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[MediaAsset]:
         max_read = (
@@ -738,6 +739,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
                     filename=file.filename,
                     content_type=file.content_type or "application/octet-stream",
                     kind=kind,
+                    domain=domain,
                 )
             finally:
                 with suppress(FileNotFoundError, PermissionError):
@@ -750,6 +752,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
                 filename=file.filename,
                 content_type=file.content_type or "application/octet-stream",
                 kind=kind,
+                domain=domain,
             )
         return _envelope(request, asset)  # type: ignore[return-value]
 
@@ -855,6 +858,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
     @app.get("/api/v1/media/assets", tags=["Media"])
     async def list_media_assets(
         request: Request,
+        domain: Annotated[str | None, Query()] = None,
         offset: Annotated[int, Query(ge=0)] = 0,
         limit: Annotated[int, Query(ge=1, le=200)] = 50,
         context: PrincipalContext = Depends(principal_context),
@@ -864,6 +868,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             runtime.state.list_assets(
                 context.tenant_id,
                 context.project_id,
+                domain=domain,
                 include_deleted=False,
                 offset=offset,
                 limit=limit,
@@ -871,6 +876,7 @@ def create_app(settings: Settings | None = None, *, runtime: Runtime | None = No
             runtime.state.count_assets(
                 context.tenant_id,
                 context.project_id,
+                domain=domain,
                 include_deleted=False,
             ),
         )

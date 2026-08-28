@@ -9,7 +9,7 @@ capabilities:
     output:
       confidence: 0.25
       iou: 0.45
-      max_detections: 8
+      max_detections: 100
     fallback_model_id: scenara.development.whole_image_person
   body_embedding:
     status: ready

@@ -16,7 +16,7 @@ def yolo_detections(
     meta: LetterboxMeta,
     confidence_threshold: float,
     iou_threshold: float,
-    max_detections: int,
+    max_detections: int | None = None,
     class_filter_ids: set[int] | None = None,
     labels: list[str] | None = None,
 ) -> list[dict[str, Any]]:
@@ -70,7 +70,9 @@ def yolo_detections(
     boxes = boxes[valid_boxes]
     scores = scores[valid_boxes]
     class_ids = class_ids[valid_boxes]
-    keep = nms(boxes, scores, iou_threshold)[:max_detections]
+    keep = nms(boxes, scores, iou_threshold)
+    if max_detections is not None and max_detections > 0:
+        keep = keep[:max_detections]
 
     detections: list[dict[str, Any]] = []
     for index in keep:
@@ -91,7 +93,7 @@ def yolo_person_detections(
     meta: LetterboxMeta,
     confidence_threshold: float,
     iou_threshold: float,
-    max_detections: int,
+    max_detections: int | None = None,
     person_class_id: int = 0,
 ) -> list[dict[str, Any]]:
     detections = yolo_detections(

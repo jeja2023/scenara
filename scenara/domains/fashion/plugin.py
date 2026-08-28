@@ -61,6 +61,7 @@ class FashionPlugin:
                 output="fashion.result",
                 allowed_parameters={
                     "min_confidence",
+                    "filter_casual",
                     "detect_cosplay",
                     "detect_clothing",
                     "detect_accessories",
@@ -89,29 +90,35 @@ class FashionPlugin:
                     "min_confidence": PipelineParameterDefinition(
                         label="最低置信度",
                         control="number",
-                        default=0.5,
+                        default=0.25,
                         minimum=0,
                         maximum=1,
                         step=0.05,
                         description="识别结果的最小置信度阈值,低于此值的结果将被过滤",
                     ),
+                    "filter_casual": PipelineParameterDefinition(
+                        label="过滤普通路人",
+                        control="boolean",
+                        default=True,
+                        description="自动过滤日常休闲、正装西装等普通路人，仅提取 Cosplay 角色与特色服饰 (汉服/JK/Lolita等)",
+                    ),
                     "detect_cosplay": PipelineParameterDefinition(
                         label="识别 Cosplay",
                         control="boolean",
                         default=True,
-                        description="是否进行 Cosplay 角色识别",
+                        description="是否进行 Cosplay 二次元角色识别 (初音未来、艾米莉亚、蕾姆等)",
                     ),
                     "detect_clothing": PipelineParameterDefinition(
                         label="识别服装风格",
                         control="boolean",
                         default=True,
-                        description="是否进行服装风格检测(JK、Lolita、汉服等)",
+                        description="是否进行服装风格检测 (汉服、JK制服、洛丽塔、女仆装等)",
                     ),
                     "detect_accessories": PipelineParameterDefinition(
                         label="识别配饰",
                         control="boolean",
                         default=True,
-                        description="是否进行配饰识别(假发、道具、首饰等)",
+                        description="是否进行配饰识别 (二次元假发、头饰、领结等)",
                     ),
                     "sample_strategy": PipelineParameterDefinition(
                         label="采样策略",
