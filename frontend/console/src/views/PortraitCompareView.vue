@@ -2,8 +2,10 @@
 import {
   CheckCircle2,
   FileImage,
+  RotateCcw,
   ScanFace,
   Upload,
+  X,
   XCircle,
 } from "@lucide/vue";
 import { computed, onMounted, reactive, ref } from "vue";
@@ -58,8 +60,8 @@ const hasLeft = computed(() => Boolean(leftFile.value || leftAssetId.value));
 const hasRight = computed(() => Boolean(rightFile.value || rightAssetId.value));
 const verdictLabel = computed(() => {
   if (!result.value) return "等待比对";
-  if (result.value.matched === true) return "同一人概率较高";
-  if (result.value.matched === false) return "未达到当前阈值";
+  if (result.value.matched === true) return "同一人判定通过";
+  if (result.value.matched === false) return "未达到匹配阈值";
   return "未设置判定阈值";
 });
 
@@ -146,9 +148,16 @@ function clearSide(side: "left" | "right"): void {
   }
 }
 
+function resetAll(): void {
+  clearSide("left");
+  clearSide("right");
+  result.value = null;
+  clearFeedback();
+}
+
 function summaryLabel(value: PortraitInputSummary | null | undefined): string {
   if (!value) return "未提取";
-  return `${value.face_count} 张人脸 · 选中 ${value.selected_face_index + 1} · ${value.embedding_dimension} 维`;
+  return `${value.face_count} 张人脸 · 选中第 ${value.selected_face_index + 1} · ${value.embedding_dimension} 维`;
 }
 
 async function compare(): Promise<void> {
@@ -205,13 +214,13 @@ async function compare(): Promise<void> {
     result.value = data;
     contract.featureSpaceId = data.feature_space_id;
     contract.model = data.left
-      ? `${data.left.model_id} · ${data.left.model_version}`
+      ? `${data.left.model_id} (v${data.left.model_version})`
       : "已按索引契约完成比对";
-    message.value = "比对完成，结果已记录审计事件";
+    message.value = "人像特征比对完成，结果已记录审计事件";
   } catch (caught) {
     error.value = userFacingError(
       caught,
-      "人像比对失败，请检查图片质量和索引契约",
+      "人像比对失败，请检查图片质量和特征服务状态",
     );
   } finally {
     comparing.value = false;
@@ -224,18 +233,25 @@ useRefresh(refreshAssets);
 
 <template>
   <section class="page portrait-compare-page">
-    <div class="page-header">
-      <div class="toolbar">
-        <label class="threshold-control">
-          <span>判定阈值</span>
+    <!-- 顶部单行紧凑控制栏 -->
+    <div class="panel filters-panel">
+      <div class="filter-toolbar">
+        <div class="filter-item">
+          <span class="filter-label">判定阈值</span>
           <input
             v-model="threshold"
             type="number"
             min="-1"
             max="1"
             step="0.01"
+            class="filter-input threshold-input"
           />
-        </label>
+        </div>
+        <div class="filter-actions">
+          <button class="button secondary filter-btn" @click="resetAll">
+            <RotateCcw :size="13" />重置对比
+          </button>
+        </div>
       </div>
     </div>
 
@@ -243,6 +259,7 @@ useRefresh(refreshAssets);
     <div v-if="message" class="callout success">{{ message }}</div>
 
     <div class="compare-layout">
+      <!-- 左右输入源卡片 -->
       <div class="compare-sources">
         <article
           v-for="side in ['left', 'right']"
@@ -250,41 +267,48 @@ useRefresh(refreshAssets);
           class="panel source-panel"
         >
           <div class="panel-header">
-            <div>
-              <h2>{{ side === "left" ? "输入 A" : "输入 B" }}</h2>
-              <span class="muted">{{
-                side === "left" ? "待核验的人像" : "参照人像"
+            <div class="header-left">
+              <h2>{{ side === "left" ? "输入源 A" : "输入源 B" }}</h2>
+              <span class="muted-text">{{
+                side === "left" ? "待核验的人像" : "参照标准人像"
               }}</span>
             </div>
             <button
-              class="icon-button"
+              v-if="side === 'left' ? hasLeft : hasRight"
+              class="icon-button close-btn"
               title="清除输入"
               @click="clearSide(side as 'left' | 'right')"
             >
-              <XCircle :size="17" />
+              <X :size="13" />
             </button>
           </div>
+
           <div class="source-preview">
             <img
               v-if="side === 'left' ? leftPreview : rightPreview"
               :src="side === 'left' ? leftPreview : rightPreview"
-              alt=""
+              alt="人像预览"
+              class="preview-img"
             />
             <div v-else class="source-empty">
-              <ScanFace :size="30" /><span>未选择图片</span>
+              <ScanFace :size="28" class="text-muted" />
+              <span>未选择人像图片</span>
             </div>
           </div>
+
           <div class="source-actions">
-            <label class="button secondary upload-button">
-              <Upload :size="15" />上传图片
+            <label class="button secondary upload-btn">
+              <Upload :size="13" />本地上传
               <input
                 type="file"
                 accept="image/*"
+                class="hidden-file-input"
                 @change="setFile(side as 'left' | 'right', $event)"
               />
             </label>
             <select
               :value="side === 'left' ? leftAssetId : rightAssetId"
+              class="field-select"
               @change="
                 setAsset(
                   side as 'left' | 'right',
@@ -292,7 +316,7 @@ useRefresh(refreshAssets);
                 )
               "
             >
-              <option value="">从图片资产选择</option>
+              <option value="">从数据资产选择</option>
               <option
                 v-for="asset in imageAssets"
                 :key="asset.asset_id"
@@ -305,326 +329,500 @@ useRefresh(refreshAssets);
         </article>
       </div>
 
+      <!-- 右侧比对结论面板 -->
       <aside class="panel compare-result-panel">
         <div class="panel-header">
-          <h2>比对结论</h2>
-          <span class="badge">{{
-            result?.mode === "asset"
-              ? "资产"
-              : result?.mode === "mixed"
-                ? "混合输入"
-                : "图片"
-          }}</span>
+          <div class="header-left">
+            <h2>比对结论</h2>
+          </div>
+          <span class="badge status-badge" :class="result?.mode ? 'active' : ''">
+            {{
+              result?.mode === "asset"
+                ? "资产比对"
+                : result?.mode === "mixed"
+                  ? "混合输入"
+                  : "图片比对"
+            }}
+          </span>
         </div>
+
         <div v-if="result" class="result-body">
           <div
-            class="verdict"
+            class="verdict-banner"
             :class="{
               matched: result.matched === true,
               unmatched: result.matched === false,
             }"
           >
-            <CheckCircle2 v-if="result.matched === true" :size="25" />
-            <XCircle v-else-if="result.matched === false" :size="25" />
-            <ScanFace v-else :size="25" />
+            <CheckCircle2 v-if="result.matched === true" :size="20" />
+            <XCircle v-else-if="result.matched === false" :size="20" />
+            <ScanFace v-else :size="20" />
             <strong>{{ verdictLabel }}</strong>
           </div>
-          <div class="score-value">
-            <strong>{{ result.score.toFixed(4) }}</strong
-            ><span>相似度分数</span>
+
+          <div class="score-card">
+            <span class="score-num">{{ result.score.toFixed(4) }}</span>
+            <span class="score-label">余弦相似度分数</span>
           </div>
-          <div class="result-metrics">
-            <div>
-              <span>距离</span><strong>{{ result.distance.toFixed(4) }}</strong>
+
+          <div class="result-metrics-grid">
+            <div class="metric-item">
+              <span class="metric-label">特征距离</span>
+              <strong class="metric-val">{{ result.distance.toFixed(4) }}</strong>
             </div>
-            <div>
-              <span>阈值</span
-              ><strong>{{ result.threshold?.toFixed(2) ?? "未设置" }}</strong>
+            <div class="metric-item">
+              <span class="metric-label">判定阈值</span>
+              <strong class="metric-val">{{ result.threshold?.toFixed(2) ?? "未设置" }}</strong>
             </div>
-            <div>
-              <span>索引契约</span
-              ><strong class="mono">{{ result.feature_space_id }}</strong>
+            <div class="metric-item span-full">
+              <span class="metric-label">特征空间契约</span>
+              <strong class="metric-val mono">{{ result.feature_space_id }}</strong>
             </div>
           </div>
-          <div class="input-summary">
-            <div>
-              <span>输入 A</span
-              ><strong>{{ summaryLabel(result.left) }}</strong>
+
+          <div class="input-summary-box">
+            <div class="summary-row">
+              <span class="summary-label">输入 A</span>
+              <span class="summary-val">{{ summaryLabel(result.left) }}</span>
             </div>
-            <div>
-              <span>输入 B</span
-              ><strong>{{ summaryLabel(result.right) }}</strong>
+            <div class="summary-row">
+              <span class="summary-label">输入 B</span>
+              <span class="summary-val">{{ summaryLabel(result.right) }}</span>
             </div>
           </div>
         </div>
-        <div v-else class="empty result-empty">
-          <ScanFace :size="28" /><span>完成两侧输入后开始比对</span>
+
+        <div v-else class="result-empty-box">
+          <ScanFace :size="32" class="text-muted" />
+          <span>在左侧完成两侧人像输入后开始比对</span>
         </div>
+
         <div class="panel-footer">
           <button
-            class="button primary compare-button"
+            class="button primary compare-btn"
             :disabled="comparing || !hasLeft || !hasRight"
             @click="compare"
           >
-            <ScanFace :size="16" />{{ comparing ? "分析中…" : "开始比对" }}
+            <ScanFace :size="14" />{{ comparing ? "特征提取与比对中…" : "开始人像比对" }}
           </button>
         </div>
       </aside>
     </div>
 
+    <!-- 底部索引契约摘要栏 -->
     <div class="contract-strip">
-      <FileImage :size="18" />
-      <div>
-        <strong>当前索引契约</strong><span>{{ contract.featureSpaceId }}</span>
+      <FileImage :size="15" class="contract-icon" />
+      <div class="contract-item">
+        <strong class="contract-label">索引契约：</strong>
+        <span class="mono">{{ contract.featureSpaceId }}</span>
       </div>
-      <div>
-        <strong>模型</strong><span>{{ contract.model }}</span>
+      <div class="contract-item">
+        <strong class="contract-label">模型版本：</strong>
+        <span>{{ contract.model }}</span>
       </div>
       <div class="contract-note">
-        原始特征仅在服务端参与计算，控制台只展示脱敏摘要。
+        原始人脸生物特征仅在安全服务内存中计算，控制台绝不存储原始向量。
       </div>
     </div>
   </section>
 </template>
 
 <style scoped>
-.portrait-compare-page {
-  padding-bottom: 28px;
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
-.threshold-control {
+
+/* 顶部紧凑控制栏 */
+.filters-panel {
+  padding: 10px 14px;
+  background: #ffffff;
+}
+
+.filter-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.filter-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filter-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--graphite, #17211f);
+  white-space: nowrap;
+}
+
+.filter-input {
+  height: 28px;
+  line-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 5px;
+  background: #ffffff;
+  color: var(--graphite, #17211f);
+  font-size: 11.5px;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.threshold-input {
+  width: 90px;
+}
+
+.filter-input:focus {
+  border-color: var(--primary, #0ea5e9);
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.12);
+}
+
+.filter-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.filter-btn {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 对比布局 */
+.compare-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(300px, 0.8fr);
+  gap: 14px;
+}
+
+.compare-sources {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+.source-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line, #e2e8e6);
+  margin-bottom: 12px;
+}
+
+.header-left {
   display: flex;
   align-items: center;
   gap: 8px;
-  white-space: nowrap;
 }
-.threshold-control input {
-  width: 84px;
-  min-height: 34px;
+
+.panel-header h2 {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--graphite, #17211f);
+  margin: 0;
 }
-.notice {
-  padding: 10px 12px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  margin-bottom: 12px;
-  font-size: 13px;
-}
-.notice.error {
-  color: #963d32;
-  background: #fff5f2;
-  border-color: #edc5be;
-}
-.notice.success {
-  color: #2b6d4a;
-  background: #f0f8f2;
-  border-color: #c5e0cc;
-}
-.compare-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(330px, 0.85fr);
-  gap: 16px;
-  align-items: start;
-}
-.compare-sources {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-.source-panel {
-  overflow: hidden;
-}
-.panel-header > div {
-  display: grid;
-  gap: 3px;
-}
-.panel-header .muted {
+
+.muted-text {
   font-size: 11px;
+  color: var(--muted, #64716d);
 }
-.source-preview {
-  aspect-ratio: 4 / 3;
-  margin: 14px;
-  background: #0d1917;
-  border-radius: 4px;
-  overflow: hidden;
-  display: grid;
+
+.close-btn {
+  height: 20px;
+  width: 20px;
+  min-height: 20px;
+  min-width: 20px;
+  padding: 0;
+  display: inline-grid;
   place-items: center;
 }
-.source-preview img {
+
+.source-preview {
+  height: 220px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 5px;
+  background: #fafbfb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.preview-img {
   width: 100%;
   height: 100%;
   object-fit: contain;
 }
+
 .source-empty {
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 8px;
-  color: #8ba09a;
-  font-size: 12px;
+  font-size: 11.5px;
+  color: var(--muted, #64716d);
 }
+
 .source-actions {
   display: grid;
+  grid-template-columns: auto 1fr;
   gap: 8px;
-  padding: 0 14px 14px;
 }
-.upload-button {
-  position: relative;
-  overflow: hidden;
-}
-.upload-button input {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
+
+.upload-btn {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   cursor: pointer;
+  margin: 0;
 }
-.source-actions select {
-  min-height: 34px;
+
+.hidden-file-input {
+  display: none;
 }
+
+.field-select {
+  height: 28px;
+  line-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 5px;
+  background: #ffffff;
+  color: var(--graphite, #17211f);
+  font-size: 11.5px;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.field-select:focus {
+  border-color: var(--primary, #0ea5e9);
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.12);
+}
+
+/* 结论面板 */
 .compare-result-panel {
-  min-height: 100%;
+  display: flex;
+  flex-direction: column;
 }
+
 .result-body {
-  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
 }
-.verdict {
+
+.verdict-banner {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  min-height: 44px;
-  padding: 0 12px;
-  color: #5f6d69;
-  background: #f1f4f3;
+  padding: 10px;
   border-radius: 5px;
+  background: #fafbfb;
+  border: 1px solid var(--line, #e2e8e6);
+  color: var(--graphite, #17211f);
+  font-size: 13px;
 }
-.verdict.matched {
-  color: #216640;
-  background: #eaf7ee;
+
+.verdict-banner.matched {
+  background: #e4f5ed;
+  border-color: #a7e1c8;
+  color: #0b7557;
 }
-.verdict.unmatched {
-  color: #963d32;
-  background: #fff0ed;
+
+.verdict-banner.unmatched {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #dc2626;
 }
-.score-value {
-  display: grid;
-  gap: 4px;
-  margin: 24px 0;
+
+.score-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: #fafbfb;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 5px;
   text-align: center;
 }
-.score-value strong {
-  font-size: 42px;
-  line-height: 1;
-  color: var(--graphite);
+
+.score-num {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--graphite, #17211f);
+  line-height: 1.1;
+  font-family: var(--font-mono, monospace);
 }
-.score-value span,
-.result-metrics span,
-.input-summary span {
-  color: var(--muted);
+
+.score-label {
+  font-size: 11px;
+  color: var(--muted, #64716d);
+  margin-top: 4px;
+}
+
+.result-metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.metric-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  background: #fafbfb;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 4px;
+}
+
+.span-full {
+  grid-column: span 2;
+}
+
+.metric-label {
+  font-size: 10.5px;
+  color: var(--muted, #64716d);
+}
+
+.metric-val {
+  font-size: 11.5px;
+  color: var(--graphite, #17211f);
+}
+
+.input-summary-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  background: #fafbfb;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 4px;
+}
+
+.summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 11px;
 }
-.result-metrics {
-  display: grid;
-  gap: 10px;
-  padding: 12px 0;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+
+.summary-label {
+  font-weight: 600;
+  color: var(--graphite, #17211f);
 }
-.result-metrics div,
-.input-summary div {
+
+.summary-val {
+  color: var(--muted, #64716d);
+}
+
+.result-empty-box {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 10px;
-  align-items: baseline;
+  min-height: 220px;
+  color: var(--muted, #64716d);
+  font-size: 11.5px;
+  flex: 1;
 }
-.result-metrics strong {
-  text-align: right;
-}
-.input-summary {
-  display: grid;
-  gap: 9px;
-  padding-top: 14px;
-}
-.input-summary strong {
-  font-size: 12px;
-  text-align: right;
-}
+
 .panel-footer {
-  padding: 12px 16px;
-  border-top: 1px solid var(--line);
+  margin-top: 14px;
 }
-.compare-button {
+
+.compare-btn {
   width: 100%;
+  height: 30px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
 }
-.result-empty {
-  min-height: 300px;
-  gap: 10px;
-}
+
+/* 底部契约栏 */
 .contract-strip {
-  display: grid;
-  grid-template-columns: auto minmax(150px, 1fr) minmax(150px, 1fr) minmax(
-      220px,
-      1.3fr
-    );
+  display: flex;
   align-items: center;
   gap: 14px;
-  margin-top: 16px;
-  padding: 14px 16px;
-  background: #f8faf9;
-  border: 1px solid var(--line);
+  padding: 8px 14px;
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8e6);
   border-radius: 6px;
-  color: var(--muted);
+  font-size: 11.5px;
+  flex-wrap: wrap;
 }
-.contract-strip > svg {
-  color: var(--teal);
+
+.contract-icon {
+  color: var(--primary, #0ea5e9);
 }
-.contract-strip div {
-  display: grid;
+
+.contract-item {
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
-  min-width: 0;
 }
-.contract-strip strong {
-  color: var(--graphite);
-  font-size: 11px;
+
+.contract-label {
+  color: var(--graphite, #17211f);
 }
-.contract-strip span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 12px;
-}
+
 .contract-note {
-  font-size: 12px;
-  line-height: 1.5;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted, #64716d);
 }
-.spin {
-  animation: spin 1s linear infinite;
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 6px;
+  font-size: 10.5px;
+  white-space: nowrap;
 }
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-@media (max-width: 980px) {
+
+@media (max-width: 900px) {
   .compare-layout {
     grid-template-columns: 1fr;
-  }
-  .contract-strip {
-    grid-template-columns: auto 1fr 1fr;
-  }
-  .contract-note {
-    grid-column: 2 / -1;
-  }
-}
-@media (max-width: 640px) {
-  .page-header {
-    flex-direction: column;
   }
   .compare-sources {
     grid-template-columns: 1fr;
   }
-  .contract-strip {
-    grid-template-columns: auto 1fr;
-  }
-  .contract-strip > div:nth-of-type(2),
   .contract-note {
-    grid-column: 2;
+    margin-left: 0;
+    width: 100%;
   }
 }
 </style>

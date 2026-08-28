@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
-import { Check, Plus, UploadCloud } from "@lucide/vue";
+import { Check, Database, Plus, UploadCloud } from "@lucide/vue";
 import { api, userFacingError } from "../api";
 import type { DatasetRecord, DatasetVersion, MediaAsset } from "../types";
 
@@ -184,6 +184,13 @@ function statusLabel(status: string): string {
   );
 }
 
+function statusClass(status: string): string {
+  if (status === "active" || status === "published") return "active";
+  if (status === "validated") return "dot-dev";
+  if (status === "retired" || status === "archived") return "warn-badge";
+  return "";
+}
+
 onMounted(refresh);
 useRefresh(refresh);
 </script>
@@ -192,43 +199,55 @@ useRefresh(refresh);
   <section class="page">
     <p v-if="error" class="callout error">{{ error }}</p>
     <p v-if="message" class="callout success">{{ message }}</p>
+
     <div class="governance-grid">
+      <!-- 1. 新建数据集 -->
       <section class="panel create-panel">
         <div class="panel-header">
           <h2>新建数据集</h2>
         </div>
         <div class="panel-body form-stack">
-          <label
-            >名称<input
+          <label class="form-field">
+            <span class="field-label">数据集名称</span>
+            <input
               v-model="datasetForm.name"
+              class="field-input"
               maxlength="120"
               placeholder="例如：2026 年园区人像样本"
-          /></label>
-          <label
-            >说明<textarea
+            />
+          </label>
+          <label class="form-field">
+            <span class="field-label">用途与授权边界说明</span>
+            <textarea
               v-model="datasetForm.description"
+              class="field-textarea"
               maxlength="1000"
-              placeholder="记录数据用途和授权边界"
+              placeholder="记录数据用途、标注规范和授权边界"
             />
           </label>
           <button
-            class="button primary"
+            class="button primary submit-btn"
             :disabled="saving || !datasetForm.name.trim()"
             @click="createDataset"
           >
-            <Plus :size="16" />创建数据集
+            <Plus :size="14" />创建数据集
           </button>
         </div>
       </section>
-      <section class="panel">
+
+      <!-- 2. 数据集目录 -->
+      <section class="panel list-panel">
         <div class="panel-header">
-          <h2>数据集目录</h2>
-          <span class="muted">{{ datasets.length }} 个</span>
+          <div class="header-left">
+            <h2>数据集目录</h2>
+            <span class="badge">{{ datasets.length }}</span>
+          </div>
         </div>
         <div class="dataset-list">
           <button
             v-for="dataset in datasets"
             :key="dataset.dataset_id"
+            type="button"
             class="dataset-row"
             :class="{ selected: dataset.dataset_id === selectedDatasetId }"
             @click="
@@ -236,124 +255,149 @@ useRefresh(refresh);
               loadVersions();
             "
           >
-            <span
-              ><strong>{{ dataset.name }}</strong
-              ><small>{{ dataset.description || "未填写说明" }}</small></span
-            >
-            <em :class="['status', dataset.status]">{{
-              statusLabel(dataset.status)
-            }}</em>
+            <div class="dataset-meta">
+              <strong class="dataset-title">{{ dataset.name }}</strong>
+              <small class="dataset-desc">{{ dataset.description || "未填写说明" }}</small>
+            </div>
+            <span class="badge status-badge" :class="statusClass(dataset.status)">
+              {{ statusLabel(dataset.status) }}
+            </span>
           </button>
-          <div v-if="!datasets.length" class="empty">还没有数据集</div>
+          <div v-if="!datasets.length" class="empty-tip">还没有数据集</div>
         </div>
       </section>
     </div>
-    <section v-if="selectedDataset" class="panel">
+
+    <!-- 3. 选定数据集的版本治理 -->
+    <section v-if="selectedDataset" class="panel version-panel">
       <div class="panel-header">
-        <div>
+        <div class="header-left">
           <h2>{{ selectedDataset.name }} · 版本治理</h2>
-          <p>{{ selectedDataset.description || "未填写说明" }}</p>
+          <span class="badge">{{ versions.length }} 个版本</span>
         </div>
-        <span class="muted">{{ versions.length }} 个版本</span>
+        <p class="header-desc">{{ selectedDataset.description || "未填写说明" }}</p>
       </div>
+
       <div class="version-layout">
-        <div class="asset-picker">
+        <!-- 资产选择器 -->
+        <div class="asset-picker-box">
           <div class="subhead">
-            <strong>选择资产</strong
-            ><span>{{ selectedAssets.length }} 已选</span>
+            <strong>选择资产</strong>
+            <span class="muted-text">{{ selectedAssets.length }} 项已选</span>
           </div>
-          <label
-            v-for="asset in assets"
-            :key="asset.asset_id"
-            class="asset-option"
-          >
-            <input
-              type="checkbox"
-              :checked="selectedAssetIds.includes(asset.asset_id)"
-              @change="toggleAsset(asset.asset_id)"
-            />
-            <span
-              >{{ asset.filename || asset.asset_id
-              }}<small>{{ asset.kind }} · {{ asset.asset_id }}</small></span
+          <div class="asset-scroll">
+            <label
+              v-for="asset in assets"
+              :key="asset.asset_id"
+              class="asset-option"
             >
-          </label>
-          <div v-if="!assets.length" class="empty">
-            请先在数据资产中上传文件
+              <input
+                type="checkbox"
+                class="checkbox-input"
+                :checked="selectedAssetIds.includes(asset.asset_id)"
+                @change="toggleAsset(asset.asset_id)"
+              />
+              <div class="asset-info">
+                <span class="asset-name">{{ asset.filename || asset.asset_id }}</span>
+                <small class="asset-sub">{{ asset.kind }} · {{ asset.asset_id }}</small>
+              </div>
+            </label>
+            <div v-if="!assets.length" class="empty-tip">
+              请先在数据资产中上传文件
+            </div>
           </div>
         </div>
-        <div class="version-form form-stack">
-          <label
-            >版本号<input
-              v-model="versionForm.version"
-              placeholder="例如：2026.08.03"
-          /></label>
-          <label
-            >Manifest SHA-256<input
-              v-model="versionForm.manifest_sha256"
-              minlength="64"
-              maxlength="64"
-              placeholder="64 位十六进制摘要"
-          /></label>
-          <label
-            >质量评分<input
-              v-model="versionForm.quality_score"
-              type="number"
-              min="0"
-              max="1"
-              step="0.01"
-              placeholder="可选，0 到 1"
-          /></label>
-          <button
-            class="button primary"
-            :disabled="
-              saving ||
-              !versionForm.version.trim() ||
-              versionForm.manifest_sha256.length !== 64
-            "
-            @click="createVersion"
-          >
-            <UploadCloud :size="16" />创建版本
-          </button>
+
+        <!-- 版本创建表单 -->
+        <div class="version-form-box">
+          <div class="subhead"><strong>创建新版本</strong></div>
+          <div class="form-stack">
+            <label class="form-field">
+              <span class="field-label">版本号</span>
+              <input
+                v-model="versionForm.version"
+                class="field-input"
+                placeholder="例如：2026.08.03"
+              />
+            </label>
+            <label class="form-field">
+              <span class="field-label">Manifest SHA-256 摘要</span>
+              <input
+                v-model="versionForm.manifest_sha256"
+                class="field-input mono"
+                minlength="64"
+                maxlength="64"
+                placeholder="64 位十六进制摘要"
+              />
+            </label>
+            <label class="form-field">
+              <span class="field-label">质量评分 (0~1 可选)</span>
+              <input
+                v-model="versionForm.quality_score"
+                class="field-input"
+                type="number"
+                min="0"
+                max="1"
+                step="0.01"
+                placeholder="可选，0 到 1"
+              />
+            </label>
+            <button
+              class="button primary submit-btn"
+              :disabled="
+                saving ||
+                !versionForm.version.trim() ||
+                versionForm.manifest_sha256.length !== 64
+              "
+              @click="createVersion"
+            >
+              <UploadCloud :size="14" />创建版本
+            </button>
+          </div>
         </div>
       </div>
+
+      <!-- 版本列表 -->
       <div class="version-list">
         <div
           v-for="version in versions"
           :key="version.version_id"
           class="version-row"
         >
-          <div>
-            <strong>v{{ version.version }}</strong
-            ><small
-              >{{ version.item_count }} 项资产 · 质量
+          <div class="version-meta">
+            <strong class="version-tag">v{{ version.version }}</strong>
+            <small class="version-details">
+              {{ version.item_count }} 项资产 · 质量评分
               {{
                 version.quality_score === null
                   ? "未评分"
                   : version.quality_score.toFixed(2)
-              }}</small
-            >
+              }}
+            </small>
           </div>
           <div class="version-actions">
-            <em :class="['status', version.status]">{{
-              statusLabel(version.status)
-            }}</em
-            ><button
+            <span class="badge status-badge" :class="statusClass(version.status)">
+              {{ statusLabel(version.status) }}
+            </span>
+            <button
               v-if="version.status === 'draft'"
-              class="button tiny"
+              class="button secondary table-action-btn"
               :disabled="saving"
               @click="transition(version, 'validated')"
             >
-              <Check :size="14" />校验</button
-            ><button
+              <Check :size="12" />校验
+            </button>
+            <button
               v-if="version.status === 'validated'"
-              class="button tiny primary"
+              class="button primary table-action-btn"
               :disabled="saving"
               @click="transition(version, 'published')"
             >
-              发布</button
-            ><button
+              发布
+            </button>
+            <button
               v-if="version.status === 'published'"
-              class="button tiny"
+              class="button secondary table-action-btn"
               :disabled="saving"
               @click="transition(version, 'retired')"
             >
@@ -361,177 +405,314 @@ useRefresh(refresh);
             </button>
           </div>
         </div>
-        <div v-if="!versions.length" class="empty">尚未创建版本</div>
+        <div v-if="!versions.length" class="empty-tip">尚未创建版本</div>
       </div>
     </section>
   </section>
 </template>
 
 <style scoped>
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .governance-grid {
   display: grid;
-  grid-template-columns: minmax(260px, 0.8fr) minmax(0, 1.2fr);
-  gap: 16px;
+  grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr);
+  gap: 14px;
 }
-.panel-header h2 {
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line, #e2e8e6);
+  margin-bottom: 12px;
+}
+
+.header-left {
   display: flex;
   align-items: center;
   gap: 8px;
 }
+
+.panel-header h2 {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--graphite, #17211f);
+  margin: 0;
+}
+
+.header-desc {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--muted, #64716d);
+}
+
 .form-stack {
-  display: grid;
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
-label {
-  display: grid;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--muted);
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
-input,
-textarea {
-  width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 9px 10px;
-  font: inherit;
-  color: var(--text);
-  background: var(--surface);
+
+.field-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--graphite, #17211f);
 }
-textarea {
-  min-height: 80px;
+
+.field-input {
+  height: 28px;
+  line-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 5px;
+  background: #ffffff;
+  color: var(--graphite, #17211f);
+  font-size: 11.5px;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.15s ease;
+}
+
+.field-input:focus {
+  border-color: var(--primary, #0ea5e9);
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.12);
+}
+
+.field-textarea {
+  min-height: 72px;
+  padding: 6px 8px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 5px;
+  background: #ffffff;
+  color: var(--graphite, #17211f);
+  font-size: 11.5px;
+  outline: none;
+  box-sizing: border-box;
   resize: vertical;
+  transition: all 0.15s ease;
 }
-.dataset-list,
-.version-list {
-  display: grid;
-  gap: 1px;
-  background: var(--line);
+
+.field-textarea:focus {
+  border-color: var(--primary, #0ea5e9);
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.12);
 }
-.dataset-row,
-.version-row {
-  border: 0;
-  background: var(--surface);
-  padding: 13px 15px;
+
+.submit-btn {
+  height: 28px;
+  padding: 0 12px;
+  font-size: 11.5px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 数据集目录列表 */
+.dataset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.dataset-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  text-align: left;
-  gap: 12px;
-}
-.dataset-row {
+  padding: 8px 10px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 5px;
+  background: #ffffff;
   cursor: pointer;
+  text-align: left;
+  transition: all 0.15s ease;
 }
+
+.dataset-row:hover {
+  background: #fafbfb;
+  border-color: #cbd5e1;
+}
+
 .dataset-row.selected {
-  background: var(--color-accent-soft);
-  box-shadow: inset 3px 0 var(--teal);
+  background: var(--teal-soft, #e0f2fe);
+  border-color: var(--primary, #0ea5e9);
 }
-.dataset-row span,
-.version-row > div:first-child {
-  display: grid;
-  gap: 4px;
+
+.dataset-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
 }
-small {
-  color: var(--muted);
+
+.dataset-title {
   font-size: 12px;
+  font-weight: 600;
+  color: var(--graphite, #17211f);
+}
+
+.dataset-desc {
+  font-size: 11px;
+  color: var(--muted, #64716d);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.status {
-  font-size: 12px;
-  font-style: normal;
-  white-space: nowrap;
-  padding: 3px 7px;
-  border-radius: 4px;
-  background: #eef1f2;
-  color: var(--muted);
-}
-.status.active,
-.status.published {
-  color: #0b7557;
-  background: #e4f5ed;
-}
-.status.validated {
-  color: #2264a6;
-  background: #e8f1fb;
-}
-.status.archived,
-.status.retired {
-  color: #7c8386;
-  background: #f0f1f1;
-}
+
+/* 版本治理区域 */
 .version-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 0.8fr);
-  gap: 20px;
-  padding: 18px;
-  border-bottom: 1px solid var(--line);
+  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line, #e2e8e6);
+  margin-bottom: 14px;
 }
-.asset-picker {
-  display: grid;
-  align-content: start;
-  gap: 7px;
-  max-height: 270px;
-  overflow: auto;
-}
+
 .subhead {
   display: flex;
   justify-content: space-between;
-  color: var(--muted);
-  font-size: 13px;
-  margin-bottom: 5px;
+  align-items: center;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--graphite, #17211f);
+  margin-bottom: 8px;
 }
+
+.asset-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .asset-option {
   display: flex;
-  grid-template-columns: auto 1fr;
-  align-items: start;
-  grid-template-rows: auto;
+  align-items: center;
   gap: 8px;
-  padding: 8px;
-  background: #f7f9f9;
-  border-radius: 5px;
+  padding: 6px 8px;
+  background: #fafbfb;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s ease;
 }
-.asset-option input {
-  width: auto;
-  margin-top: 3px;
+
+.asset-option:hover {
+  background: #f1f5f4;
 }
-.asset-option span {
-  display: grid;
-  gap: 2px;
+
+.asset-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 }
-.asset-option small {
-  white-space: normal;
+
+.asset-name {
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--graphite, #17211f);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.version-actions {
+
+.asset-sub {
+  font-size: 10.5px;
+  color: var(--muted, #64716d);
+}
+
+.checkbox-input {
+  cursor: pointer;
+}
+
+/* 版本列表 */
+.version-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.version-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 4px;
+  background: #ffffff;
+}
+
+.version-meta {
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.button.tiny {
-  min-height: 30px;
-  padding: 5px 9px;
+
+.version-tag {
   font-size: 12px;
+  font-weight: 600;
+  color: var(--graphite, #17211f);
 }
-.muted {
-  color: var(--muted);
-  font-size: 12px;
+
+.version-details {
+  font-size: 11px;
+  color: var(--muted, #64716d);
 }
-.empty {
-  padding: 22px;
-  color: var(--muted);
+
+.version-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 6px;
+  font-size: 10.5px;
+  white-space: nowrap;
+}
+
+.table-action-btn {
+  height: 20px !important;
+  min-height: 20px !important;
+  padding: 0 6px !important;
+  font-size: 10.5px !important;
+  line-height: 1 !important;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.empty-tip {
+  font-size: 11.5px;
+  color: var(--muted, #64716d);
+  padding: 14px;
   text-align: center;
-  background: var(--surface);
 }
+
 @media (max-width: 850px) {
   .governance-grid,
   .version-layout {
     grid-template-columns: 1fr;
-  }
-  .version-row {
-    align-items: flex-start;
-    flex-direction: column;
   }
 }
 </style>
