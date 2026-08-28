@@ -37,14 +37,15 @@ import type {
 const pageSize = ref(20);
 
 const columns: TableColumn<ResultSummary>[] = [
-  { key: "title", label: "标识 / 资源名称", width: "240px" },
-  { key: "domain", label: "领域", width: "100px" },
-  { key: "media_kind", label: "资产类型", width: "100px" },
-  { key: "summary", label: "解析成果概况" },
-  { key: "status", label: "状态", width: "90px" },
-  { key: "created_at", label: "解析时间", class: "muted time-cell", width: "150px" },
-  { key: "actions", label: "操作", align: "right", headerAlign: "right", width: "120px" },
+  { key: "title", label: "标识 / 资源名称" },
+  { key: "domain", label: "领域", width: "90px" },
+  { key: "media_kind", label: "资产类型", width: "80px" },
+  { key: "summary", label: "解析成果概况", width: "200px" },
+  { key: "status", label: "状态", width: "80px" },
+  { key: "created_at", label: "解析时间", class: "muted time-cell", width: "140px" },
+  { key: "actions", label: "操作", align: "right", headerAlign: "right", width: "110px" },
 ];
+
 
 
 const router: Router = useRouter();
@@ -511,10 +512,11 @@ useRefresh(refresh);
 }
 
 .result-title-cell {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 6px;
-  max-width: 230px;
+  width: 100%;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -539,10 +541,11 @@ useRefresh(refresh);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 320px;
+  max-width: 190px;
   font-size: 11.5px;
   line-height: 20px;
 }
+
 
 .media-badge {
   background: #f0f4f3;
