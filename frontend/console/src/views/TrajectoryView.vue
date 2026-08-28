@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, type Ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { Check, GitMerge, RotateCcw, Scissors, Trash2, X } from "@lucide/vue";
 import { api, userFacingError } from "../api";
@@ -246,11 +246,15 @@ async function splitOut(): Promise<void> {
   }
 }
 
-function toggle(target: Ref<string[]>, id: string): void {
-  target.value = target.value.includes(id)
-    ? target.value.filter((item) => item !== id)
-    : [...target.value, id];
+function toggle(target: string[], id: string): void {
+  const index = target.indexOf(id);
+  if (index >= 0) {
+    target.splice(index, 1);
+  } else {
+    target.push(id);
+  }
 }
+
 
 onMounted(refresh);
 useRefresh(refresh);
