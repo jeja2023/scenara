@@ -234,6 +234,10 @@ export interface ModelPackage {
   vram_mb: number;
   regression_samples: string[];
   production_ready: boolean;
+  domain?: string | null;
+  artifact_format?: "onnx" | "paddle" | "pytorch" | "bundle";
+  input_schema?: string | null;
+  output_schema?: string | null;
 }
 export interface WebhookSubscription {
   endpoint_id: string;
