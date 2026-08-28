@@ -337,167 +337,171 @@ useRefresh(runSearch);
           </button>
         </div>
 
-        <!-- 1. 文搜图 / 文搜视频 检索行 -->
-        <div v-if="mode === 'text'" class="text-query-row">
-          <SearchIcon :size="16" class="text-search-icon" />
-          <input
-            v-model.trim="query"
-            type="search"
-            class="text-search-input"
-            placeholder="输入文字关键词，例如：红色车辆、安全帽、园区东门人员、合同"
-            @keyup.enter="runSearch"
-          />
-          <button
-            v-if="query"
-            class="query-clear-icon-btn"
-            title="清空文字"
-            @click="query = ''"
-          >
-            <X :size="14" />
-          </button>
-        </div>
-
-        <!-- 2. 人搜图 优雅多源输入卡片 -->
-        <div v-else class="portrait-query-card">
-          <!-- 左侧：图像缩略图预览 / 空状态 -->
-          <div class="portrait-preview-box" :class="{ 'has-preview': preview }">
-            <template v-if="preview">
-              <img :src="preview" alt="查询图片预览" class="preview-img" />
+        <div class="search-form-section">
+          <!-- 1. 文搜图 / 文搜视频 检索行 -->
+          <div v-if="mode === 'text'" class="text-search-box">
+            <div class="text-query-bar">
+              <SearchIcon :size="17" class="text-search-icon" />
+              <input
+                v-model.trim="query"
+                type="search"
+                class="text-search-input"
+                placeholder="输入文字关键词，例如：红色车辆、安全帽、园区东门人员、合同"
+                @keyup.enter="runSearch"
+              />
               <button
-                class="preview-clear-btn"
-                title="清除已选图片"
-                aria-label="清除图片"
-                @click="clearFile"
+                v-if="query"
+                class="query-clear-icon-btn"
+                title="清空文字"
+                @click="query = ''"
               >
-                <X :size="11" />
+                <X :size="14" />
               </button>
-            </template>
-            <div v-else class="preview-placeholder">
-              <ScanFace :size="22" class="preview-scan-icon" />
-              <span class="preview-tip">人像特征</span>
             </div>
           </div>
 
-          <!-- 中间：上传本地图片 + 从资产库选择 -->
-          <div class="portrait-inputs-area">
-            <div class="portrait-source-bar">
-              <label class="button secondary portrait-upload-btn">
-                <Upload :size="14" />
-                <span>上传本地图片</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  aria-label="上传本地查询图片"
-                  @change="setFile"
-                />
-              </label>
-
-              <span class="portrait-source-sep">或</span>
-
-              <div class="portrait-asset-dropdown">
-                <ImageIcon :size="14" class="asset-select-icon" />
-                <select
-                  :value="assetId"
-                  class="portrait-asset-select"
-                  aria-label="从图片资产库选择查询图片"
-                  @change="setAsset(($event.target as HTMLSelectElement).value)"
+          <!-- 2. 人搜图 优雅多源输入卡片 -->
+          <div v-else class="portrait-query-card">
+            <!-- 左侧：图像缩略图预览 / 空状态 -->
+            <div class="portrait-preview-box" :class="{ 'has-preview': preview }">
+              <template v-if="preview">
+                <img :src="preview" alt="查询图片预览" class="preview-img" />
+                <button
+                  class="preview-clear-btn"
+                  title="清除已选图片"
+                  aria-label="清除图片"
+                  @click="clearFile"
                 >
-                  <option value="">从图片资产库选择 (共 {{ imageAssets.length }} 张图片)</option>
-                  <option
-                    v-for="asset in imageAssets"
-                    :key="asset.asset_id"
-                    :value="asset.asset_id"
+                  <X :size="11" />
+                </button>
+              </template>
+              <div v-else class="preview-placeholder">
+                <ScanFace :size="24" class="preview-scan-icon" />
+                <span class="preview-tip">人像特征</span>
+              </div>
+            </div>
+
+            <!-- 中间：上传本地图片 + 从资产库选择 -->
+            <div class="portrait-inputs-area">
+              <div class="portrait-source-bar">
+                <label class="button secondary portrait-upload-btn">
+                  <Upload :size="14" />
+                  <span>上传本地图片</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    aria-label="上传本地查询图片"
+                    @change="setFile"
+                  />
+                </label>
+
+                <span class="portrait-source-sep">或</span>
+
+                <div class="portrait-asset-dropdown">
+                  <ImageIcon :size="14" class="asset-select-icon" />
+                  <select
+                    :value="assetId"
+                    class="portrait-asset-select"
+                    aria-label="从图片资产库选择查询图片"
+                    @change="setAsset(($event.target as HTMLSelectElement).value)"
                   >
-                    {{ asset.filename || asset.asset_id }}
-                  </option>
-                </select>
+                    <option value="">从图片资产库选择 (共 {{ imageAssets.length }} 张图片)</option>
+                    <option
+                      v-for="asset in imageAssets"
+                      :key="asset.asset_id"
+                      :value="asset.asset_id"
+                    >
+                      {{ asset.filename || asset.asset_id }}
+                    </option>
+                  </select>
+                </div>
+
+                <button
+                  v-if="file || assetId"
+                  class="button secondary portrait-clear-btn"
+                  title="重置已选图片"
+                  @click="clearFile"
+                >
+                  <RotateCcw :size="12" />
+                  <span>重置</span>
+                </button>
               </div>
 
-              <button
-                v-if="file || assetId"
-                class="button secondary portrait-clear-btn"
-                title="重置已选图片"
-                @click="clearFile"
-              >
-                <RotateCcw :size="12" />
-                <span>重置</span>
-              </button>
+              <!-- 当前所选源状态提示 -->
+              <div class="portrait-status-hint">
+                <template v-if="file">
+                  <span class="status-badge local">本地文件</span>
+                  <span class="status-text">{{ file.name }} ({{ (file.size / 1024).toFixed(1) }} KB)</span>
+                </template>
+                <template v-else-if="assetId">
+                  <span class="status-badge asset">资产库图片</span>
+                  <span class="status-text">{{ imageAssets.find(a => a.asset_id === assetId)?.filename || assetId }}</span>
+                </template>
+                <template v-else>
+                  <span class="status-hint-muted">请上传一张包含清晰人脸或人体的照片，系统将提取特征向量进行全库多模态向量比对。</span>
+                </template>
+              </div>
             </div>
 
-            <!-- 当前所选源状态提示 -->
-            <div class="portrait-status-hint">
-              <template v-if="file">
-                <span class="status-badge local">本地文件</span>
-                <span class="status-text">{{ file.name }} ({{ (file.size / 1024).toFixed(1) }} KB)</span>
-              </template>
-              <template v-else-if="assetId">
-                <span class="status-badge asset">资产库图片</span>
-                <span class="status-text">{{ imageAssets.find(a => a.asset_id === assetId)?.filename || assetId }}</span>
-              </template>
-              <template v-else>
-                <span class="status-hint-muted">请上传一张包含清晰人脸或人体的照片，系统将提取特征向量进行全库多模态向量比对。</span>
-              </template>
+            <!-- 右侧：相似度阈值控件 -->
+            <div class="portrait-threshold-box">
+              <div class="threshold-header">
+                <span class="threshold-title">相似度阈值</span>
+                <span class="threshold-hint">[-1 ~ 1]</span>
+              </div>
+              <div class="threshold-input-group">
+                <input
+                  v-model="threshold"
+                  type="number"
+                  min="-1"
+                  max="1"
+                  step="0.01"
+                  class="threshold-field"
+                  aria-label="相似度阈值"
+                />
+              </div>
             </div>
           </div>
 
-          <!-- 右侧：相似度阈值控件 -->
-          <div class="portrait-threshold-box">
-            <div class="threshold-header">
-              <span class="threshold-title">相似度阈值</span>
-              <span class="threshold-hint">[-1 ~ 1]</span>
+          <!-- 3. 数据类型过滤与检索发起栏 -->
+          <div class="filter-row">
+            <div class="filter-group">
+              <span class="filter-label">限定数据类型</span>
+              <div class="filter-chips">
+                <button
+                  v-for="kind in [
+                    'image',
+                    'video',
+                    'document',
+                    'stream',
+                  ] as MediaKind[]"
+                  :key="kind"
+                  class="filter-chip"
+                  :class="{ active: mediaKinds.includes(kind) }"
+                  @click="toggleMediaKind(kind)"
+                >
+                  <span class="chip-dot" />
+                  {{
+                    kind === "image"
+                      ? "图片"
+                      : kind === "video"
+                        ? "视频"
+                        : kind === "document"
+                          ? "文档"
+                          : "视频流"
+                  }}
+                </button>
+              </div>
             </div>
-            <div class="threshold-input-group">
-              <input
-                v-model="threshold"
-                type="number"
-                min="-1"
-                max="1"
-                step="0.01"
-                class="threshold-field"
-                aria-label="相似度阈值"
-              />
-            </div>
+            <button
+              class="button primary search-submit"
+              :disabled="loading || !hasQuery"
+              @click="runSearch"
+            >
+              <SearchIcon :size="15" :class="{ spin: loading }" />
+              <span>{{ loading ? '正在检索...' : '开始检索' }}</span>
+            </button>
           </div>
-        </div>
-
-        <!-- 3. 数据类型过滤与检索发起栏 -->
-        <div class="filter-row">
-          <div class="filter-group">
-            <span class="filter-label">限定数据类型</span>
-            <div class="filter-chips">
-              <button
-                v-for="kind in [
-                  'image',
-                  'video',
-                  'document',
-                  'stream',
-                ] as MediaKind[]"
-                :key="kind"
-                class="filter-chip"
-                :class="{ active: mediaKinds.includes(kind) }"
-                @click="toggleMediaKind(kind)"
-              >
-                <span class="chip-dot" />
-                {{
-                  kind === "image"
-                    ? "图片"
-                    : kind === "video"
-                      ? "视频"
-                      : kind === "document"
-                        ? "文档"
-                        : "视频流"
-                }}
-              </button>
-            </div>
-          </div>
-          <button
-            class="button primary search-submit"
-            :disabled="loading || !hasQuery"
-            @click="runSearch"
-          >
-            <SearchIcon :size="15" :class="{ spin: loading }" />
-            <span>{{ loading ? '正在检索...' : '开始检索' }}</span>
-          </button>
         </div>
       </div>
     </section>
@@ -656,60 +660,69 @@ useRefresh(runSearch);
 }
 .mode-tabs {
   display: flex;
-  gap: 4px;
-  padding: 8px 14px 0;
+  gap: 0;
+  padding: 0 16px;
   border-bottom: 1px solid var(--line, #e2e8e6);
-  background: #fafbfb;
+  background: #fff;
 }
 .mode-tab-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 16px;
-  border: 1px solid transparent;
-  border-bottom: 0;
-  border-radius: 6px 6px 0 0;
+  gap: 7px;
+  padding: 11px 16px;
+  border: 0;
+  border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--muted, #64716d);
   cursor: pointer;
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 500;
   position: relative;
   top: 1px;
-  transition: all 140ms ease;
+  transition: all 120ms ease;
 }
 .mode-tab-btn:hover:not(.active) {
   color: var(--color-text, #17211f);
-  background: rgba(0, 0, 0, 0.03);
 }
 .mode-tab-btn.active {
-  border-color: var(--line, #e2e8e6);
-  background: var(--color-surface, #fff);
-  color: var(--color-text, #17211f);
+  border-bottom-color: #10b981;
+  color: #047857;
   font-weight: 600;
-  border-top: 2px solid var(--primary, #0ea5e9);
+  background: transparent;
+}
+
+.search-form-section {
+  padding: 16px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 /* 1. 文搜图行 */
-.text-query-row {
+.text-search-box {
+  width: 100%;
+}
+.text-query-bar {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin: 14px;
   padding: 0 12px;
   border: 1px solid var(--line, #e2e8e6);
   border-radius: 6px;
-  min-height: 40px;
-  background: var(--color-surface, #fff);
-  transition: border-color 140ms ease, box-shadow 140ms ease;
+  min-height: 42px;
+  background: #fff;
+  transition: all 140ms ease;
 }
-.text-query-row:focus-within {
-  border-color: var(--primary, #0ea5e9);
-  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.12);
+.text-query-bar:focus-within {
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
 }
 .text-search-icon {
-  color: var(--muted, #64716d);
+  color: #64716d;
   flex-shrink: 0;
+}
+.text-query-bar:focus-within .text-search-icon {
+  color: #10b981;
 }
 .text-search-input {
   flex: 1;
@@ -744,7 +757,6 @@ useRefresh(runSearch);
   display: flex;
   align-items: stretch;
   gap: 16px;
-  margin: 14px;
   padding: 14px 16px;
   background: #f8faf9;
   border: 1px solid var(--line, #e2e8e6);
@@ -772,9 +784,9 @@ useRefresh(runSearch);
   transition: all 140ms ease;
 }
 .portrait-preview-box.has-preview {
-  border: 1.5px solid var(--primary, #0ea5e9);
+  border: 1.5px solid #10b981;
   background: #0f172a;
-  box-shadow: 0 2px 6px rgba(14, 165, 233, 0.18);
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.18);
 }
 .preview-img {
   width: 100%;
@@ -811,7 +823,7 @@ useRefresh(runSearch);
   color: var(--muted, #64716d);
 }
 .preview-scan-icon {
-  color: #0ea5e9;
+  color: #10b981;
   opacity: 0.85;
 }
 .preview-tip {
@@ -854,9 +866,9 @@ useRefresh(runSearch);
   transition: all 120ms ease;
 }
 .portrait-upload-btn:hover {
-  border-color: #0ea5e9;
-  color: #0284c7;
-  background: #f0f9ff;
+  border-color: #10b981;
+  color: #047857;
+  background: #ecfdf5;
 }
 .portrait-upload-btn input {
   position: absolute;
@@ -901,8 +913,8 @@ useRefresh(runSearch);
   border-color: #cbd5e1;
 }
 .portrait-asset-select:focus {
-  border-color: var(--primary, #0ea5e9);
-  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.12);
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
 }
 .portrait-clear-btn {
   height: 32px;
@@ -1014,8 +1026,8 @@ useRefresh(runSearch);
   border-color: #cbd5e1;
 }
 .threshold-field:focus {
-  border-color: var(--primary, #0ea5e9);
-  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.12);
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
 }
 
 /* 3. 数据类型过滤与检索发起栏 */
@@ -1025,9 +1037,8 @@ useRefresh(runSearch);
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  padding: 10px 14px 12px;
-  border-top: 1px solid #f1f5f4;
-  background: #fff;
+  padding: 2px 0 0;
+  background: transparent;
 }
 .filter-group {
   display: flex;
@@ -1037,7 +1048,7 @@ useRefresh(runSearch);
 }
 .filter-label {
   color: var(--muted, #64716d);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
 }
@@ -1049,8 +1060,8 @@ useRefresh(runSearch);
 .filter-chip {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
+  gap: 5px;
+  padding: 4px 11px;
   border: 1px solid var(--line, #e2e8e6);
   border-radius: 4px;
   background: #fff;
@@ -1081,10 +1092,10 @@ useRefresh(runSearch);
   background: #10b981;
 }
 .search-submit {
-  min-height: 32px;
-  height: 32px;
-  font-size: 12px;
-  padding: 0 16px;
+  min-height: 34px;
+  height: 34px;
+  font-size: 12.5px;
+  padding: 0 18px;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1119,7 +1130,7 @@ useRefresh(runSearch);
   outline: none;
 }
 .saved-create input:focus {
-  border-color: var(--primary, #0ea5e9);
+  border-color: #10b981;
 }
 .saved-create button {
   min-height: 32px;
