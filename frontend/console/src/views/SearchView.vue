@@ -727,11 +727,29 @@ useRefresh(runSearch);
 .text-search-input {
   flex: 1;
   min-width: 0;
-  border: 0;
-  outline: 0;
-  background: transparent;
-  font-size: 13px;
+  height: 38px;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  font-size: 13.5px;
   color: var(--color-text, #17211f);
+  -webkit-appearance: none;
+  appearance: none;
+}
+.text-search-input:focus,
+.text-search-input:focus-visible {
+  outline: none !important;
+  outline-offset: 0 !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.text-search-input::-webkit-search-cancel-button,
+.text-search-input::-webkit-search-decoration {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
 }
 .query-clear-icon-btn {
   display: flex;
