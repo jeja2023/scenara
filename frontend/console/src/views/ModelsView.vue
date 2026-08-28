@@ -28,6 +28,8 @@ const error = ref("");
 const loading = ref(false);
 const searchQuery = ref("");
 const selectedDomain = ref<string>("all");
+const pageSize = ref(10);
+
 
 const domainTabs = [
   { id: "all", label: "全部模型", icon: Layers },
@@ -199,8 +201,13 @@ useRefresh(refresh);
         :columns="columns"
         :items="filteredModels"
         :loading="loading"
+        :page-size="pageSize"
+        :page-size-options="[5, 10, 20, 50]"
+        :show-page-size-selector="true"
+        :show-jumper="true"
         empty-text="暂无匹配的模型数据"
       >
+
         <!-- 1. 模型名称与元信息 -->
         <template #model="{ row }">
           <div class="model-cell">
