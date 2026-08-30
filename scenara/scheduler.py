@@ -31,6 +31,9 @@ async def run_once() -> tuple[int, int, int, int]:
     await runtime.open()
     try:
         retained, expired_features = await _run_governance(runtime)
+        surveillance = getattr(runtime, "surveillance", None)
+        if surveillance is not None:
+            await surveillance.reconcile()
         delivered, failed = await runtime.webhooks.deliver_due()
         return retained, expired_features, delivered, failed
     finally:
@@ -47,6 +50,9 @@ async def run_forever(interval_seconds: int, webhook_interval_seconds: float = 1
             if now >= next_governance_at:
                 await _run_governance(runtime)
                 next_governance_at = now + interval_seconds
+            surveillance = getattr(runtime, "surveillance", None)
+            if surveillance is not None:
+                await surveillance.reconcile()
             await runtime.webhooks.deliver_due()
             await asyncio.sleep(webhook_interval_seconds)
     finally:

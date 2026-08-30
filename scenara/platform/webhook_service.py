@@ -24,6 +24,8 @@ SUPPORTED_WEBHOOK_EVENTS = frozenset(
     {
         "result.available",
         "result.delta",
+        "alert.triggered",
+        "alert.triaged",
         "model.deployment.changed",
         "run.cancelled",
         "run.cancelling",

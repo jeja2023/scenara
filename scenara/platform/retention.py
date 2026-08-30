@@ -11,6 +11,7 @@ class RetentionPolicy:
     preview_days: int = 30
     structured_result_days: int = 180
     biometric_days: int | None = None
+    alert_snapshot_days: int | None = 30
 
     def validate(self) -> None:
         for name, value in (
@@ -22,6 +23,8 @@ class RetentionPolicy:
                 raise ValueError(f"{name} must be between 1 and 3650")
         if self.biometric_days is not None and not 1 <= self.biometric_days <= 3650:
             raise ValueError("biometric_days must be null or between 1 and 3650")
+        if self.alert_snapshot_days is not None and not 1 <= self.alert_snapshot_days <= 3650:
+            raise ValueError("alert_snapshot_days must be null or between 1 and 3650")
 
     def expires_at(self, category: str, *, created_at: float | None = None) -> float | None:
         self.validate()
@@ -31,8 +34,9 @@ class RetentionPolicy:
             "preview": self.preview_days,
             "structured_result": self.structured_result_days,
             "biometric": self.biometric_days,
+            "alert_snapshot": self.alert_snapshot_days,
         }.get(category)
-        if category not in {"raw_media", "preview", "structured_result", "biometric"}:
+        if category not in {"raw_media", "preview", "structured_result", "biometric", "alert_snapshot"}:
             raise ValueError(f"unknown retention category: {category}")
         return None if days is None else base + days * 86_400
 

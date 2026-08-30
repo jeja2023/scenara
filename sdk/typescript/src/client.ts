@@ -49,6 +49,7 @@ import type {
   WebhookDelivery,
   WebhookSubscription,
 } from "./types.js";
+import type { OpenApi } from "./generated.js";
 
 export type ScenaraTransport = <T>(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
@@ -122,7 +123,11 @@ export interface ParseStreamInput {
 }
 
 export class ScenaraError extends Error {
-  constructor(readonly code: string, message: string, readonly details?: unknown) {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly details?: unknown,
+  ) {
     super(message);
     this.name = "ScenaraError";
   }
@@ -140,14 +145,23 @@ export class ScenaraClient {
     path: string,
     body?: ControlPlaneRecord,
   ): Promise<T> {
-    return this.transport<T>(method, path, body === undefined ? undefined : { body });
+    return this.transport<T>(
+      method,
+      path,
+      body === undefined ? undefined : { body },
+    );
   }
 
   getRun(runId: string): Promise<Run> {
-    return this.transport<Run>("GET", "/api/v1/runs/" + encodeURIComponent(runId));
+    return this.transport<Run>(
+      "GET",
+      "/api/v1/runs/" + encodeURIComponent(runId),
+    );
   }
 
-  listRuns(filters: { status?: RunStatus; domain?: Domain; limit?: number } = {}): Promise<RunPage> {
+  listRuns(
+    filters: { status?: RunStatus; domain?: Domain; limit?: number } = {},
+  ): Promise<RunPage> {
     const query = new URLSearchParams();
     if (filters.status) query.set("status", filters.status);
     if (filters.domain) query.set("domain", filters.domain);
@@ -160,7 +174,10 @@ export class ScenaraClient {
       idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
       body: {
         domain: input.domain,
-        pipeline: { pipeline_id: input.pipelineId, version: input.pipelineVersion },
+        pipeline: {
+          pipeline_id: input.pipelineId,
+          version: input.pipelineVersion,
+        },
         asset_id: input.assetId,
         source_id: input.sourceId,
         parameters: input.parameters ?? {},
@@ -171,7 +188,10 @@ export class ScenaraClient {
   }
 
   cancelRun(runId: string): Promise<Run> {
-    return this.transport<Run>("POST", "/api/v1/runs/" + encodeURIComponent(runId) + "/cancel");
+    return this.transport<Run>(
+      "POST",
+      "/api/v1/runs/" + encodeURIComponent(runId) + "/cancel",
+    );
   }
 
   async getResult(runId: string): Promise<ResultEnvelope> {
@@ -187,14 +207,21 @@ export class ScenaraClient {
     return { ...page.result, units };
   }
 
-  getResultPage(runId: string, unitOffset = 0, unitLimit = 100): Promise<ResultPage> {
+  getResultPage(
+    runId: string,
+    unitOffset = 0,
+    unitLimit = 100,
+  ): Promise<ResultPage> {
     const query = new URLSearchParams({
       unit_offset: String(unitOffset),
       unit_limit: String(unitLimit),
     });
     return this.transport<ResultPage>(
       "GET",
-      "/api/v1/runs/" + encodeURIComponent(runId) + "/result?" + query.toString(),
+      "/api/v1/runs/" +
+        encodeURIComponent(runId) +
+        "/result?" +
+        query.toString(),
     );
   }
 
@@ -206,22 +233,34 @@ export class ScenaraClient {
   getResultArtifact(runId: string, artifactId: string): Promise<Uint8Array> {
     return this.transport<Uint8Array>(
       "GET",
-      "/api/v1/runs/" + encodeURIComponent(runId) + "/artifacts/" + encodeURIComponent(artifactId),
+      "/api/v1/runs/" +
+        encodeURIComponent(runId) +
+        "/artifacts/" +
+        encodeURIComponent(artifactId),
     );
   }
 
   pauseRun(runId: string): Promise<Run> {
-    return this.transport<Run>("POST", "/api/v1/runs/" + encodeURIComponent(runId) + "/pause");
+    return this.transport<Run>(
+      "POST",
+      "/api/v1/runs/" + encodeURIComponent(runId) + "/pause",
+    );
   }
 
   resumeRun(runId: string): Promise<Run> {
-    return this.transport<Run>("POST", "/api/v1/runs/" + encodeURIComponent(runId) + "/resume");
+    return this.transport<Run>(
+      "POST",
+      "/api/v1/runs/" + encodeURIComponent(runId) + "/resume",
+    );
   }
 
   listAssets(offset = 0, limit = 50): Promise<MediaAssetPage> {
     return this.transport<MediaAssetPage>(
       "GET",
-      "/api/v1/media/assets?offset=" + String(offset) + "&limit=" + String(limit),
+      "/api/v1/media/assets?offset=" +
+        String(offset) +
+        "&limit=" +
+        String(limit),
     );
   }
 
@@ -233,7 +272,9 @@ export class ScenaraClient {
     const form = new FormData();
     form.append("file", input.file, input.filename);
     form.append("kind", input.kind ?? "image");
-    return this.transport<MediaAsset>("POST", "/api/v1/media/assets", { body: form });
+    return this.transport<MediaAsset>("POST", "/api/v1/media/assets", {
+      body: form,
+    });
   }
 
   async uploadAssetDirect(input: {
@@ -241,8 +282,13 @@ export class ScenaraClient {
     filename: string;
     kind?: "image" | "video" | "document";
   }): Promise<MediaAsset> {
-    const digest = await crypto.subtle.digest("SHA-256", await input.file.arrayBuffer());
-    const sha256 = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
+    const digest = await crypto.subtle.digest(
+      "SHA-256",
+      await input.file.arrayBuffer(),
+    );
+    const sha256 = Array.from(new Uint8Array(digest), (value) =>
+      value.toString(16).padStart(2, "0"),
+    ).join("");
     const request = {
       filename: input.filename,
       content_type: input.file.type || "application/octet-stream",
@@ -250,30 +296,49 @@ export class ScenaraClient {
       size_bytes: input.file.size,
       sha256,
     };
-    const upload = await this.transport<PresignedMediaUpload>("POST", "/api/v1/media/uploads/presign", {
-      body: request,
-    });
+    const upload = await this.transport<PresignedMediaUpload>(
+      "POST",
+      "/api/v1/media/uploads/presign",
+      {
+        body: request,
+      },
+    );
     const response = await fetch(upload.url, {
       method: upload.method,
       headers: upload.headers,
       body: input.file,
     });
-    if (!response.ok) throw new ScenaraError("OBJECT_UPLOAD_FAILED", `Object upload failed with ${response.status}`);
-    return this.transport<MediaAsset>("POST", "/api/v1/media/uploads/complete", {
-      body: {
-        ...request,
-        upload_id: upload.upload_id,
-        upload_token: upload.upload_token,
-        expires_at: upload.expires_at,
+    if (!response.ok)
+      throw new ScenaraError(
+        "OBJECT_UPLOAD_FAILED",
+        `Object upload failed with ${response.status}`,
+      );
+    return this.transport<MediaAsset>(
+      "POST",
+      "/api/v1/media/uploads/complete",
+      {
+        body: {
+          ...request,
+          upload_id: upload.upload_id,
+          upload_token: upload.upload_token,
+          expires_at: upload.expires_at,
+        },
       },
-    });
+    );
   }
 
-  getAssetDownloadUrl(assetId: string, expiresIn?: number): Promise<PresignedMediaDownload> {
-    const query = expiresIn === undefined ? "" : "?expires_in=" + String(expiresIn);
+  getAssetDownloadUrl(
+    assetId: string,
+    expiresIn?: number,
+  ): Promise<PresignedMediaDownload> {
+    const query =
+      expiresIn === undefined ? "" : "?expires_in=" + String(expiresIn);
     return this.transport<PresignedMediaDownload>(
       "GET",
-      "/api/v1/media/assets/" + encodeURIComponent(assetId) + "/download-url" + query,
+      "/api/v1/media/assets/" +
+        encodeURIComponent(assetId) +
+        "/download-url" +
+        query,
     );
   }
 
@@ -282,7 +347,8 @@ export class ScenaraClient {
     form.append("file", input.file, input.filename);
     form.append("domain", input.domain ?? "portrait");
     if (input.pipelineId) form.append("pipeline_id", input.pipelineId);
-    if (input.pipelineVersion) form.append("pipeline_version", input.pipelineVersion);
+    if (input.pipelineVersion)
+      form.append("pipeline_version", input.pipelineVersion);
     return this.transport<ParseImageResponse>("POST", "/api/v1/parse/image", {
       body: form,
       idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
@@ -294,13 +360,19 @@ export class ScenaraClient {
     form.append("file", input.file, input.filename);
     form.append("domain", input.domain ?? "portrait");
     if (input.pipelineId) form.append("pipeline_id", input.pipelineId);
-    if (input.pipelineVersion) form.append("pipeline_version", input.pipelineVersion);
+    if (input.pipelineVersion)
+      form.append("pipeline_version", input.pipelineVersion);
     form.append("sample_interval_ms", String(input.sampleIntervalMs ?? 1000));
     form.append("sample_strategy", input.sampleStrategy ?? "interval");
     form.append("sample_start_ms", String(input.sampleStartMs ?? 0));
-    if (input.sampleEndMs !== undefined) form.append("sample_end_ms", String(input.sampleEndMs));
-    form.append("scene_change_threshold", String(input.sceneChangeThreshold ?? 0.35));
-    if (input.frameMaxEdge !== undefined) form.append("frame_max_edge", String(input.frameMaxEdge));
+    if (input.sampleEndMs !== undefined)
+      form.append("sample_end_ms", String(input.sampleEndMs));
+    form.append(
+      "scene_change_threshold",
+      String(input.sceneChangeThreshold ?? 0.35),
+    );
+    if (input.frameMaxEdge !== undefined)
+      form.append("frame_max_edge", String(input.frameMaxEdge));
     form.append("page_scale", String(input.pageScale ?? 1.5));
     if (input.cameraId) form.append("camera_id", input.cameraId);
     if (input.recordingStartedAt !== undefined)
@@ -317,23 +389,30 @@ export class ScenaraClient {
     form.append("file", input.file, input.filename);
     form.append("domain", input.domain ?? "ocr");
     if (input.pipelineId) form.append("pipeline_id", input.pipelineId);
-    if (input.pipelineVersion) form.append("pipeline_version", input.pipelineVersion);
+    if (input.pipelineVersion)
+      form.append("pipeline_version", input.pipelineVersion);
     form.append("page_scale", String(input.pageScale ?? 1.5));
     form.append("wait_ms", String(input.waitMs ?? 0));
-    return this.transport<ParseDocumentResponse>("POST", "/api/v1/parse/document", {
-      body: form,
-      idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
-    });
+    return this.transport<ParseDocumentResponse>(
+      "POST",
+      "/api/v1/parse/document",
+      {
+        body: form,
+        idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
+      },
+    );
   }
 
   parseStream(input: ParseStreamInput): Promise<Run> {
     const domain = input.domain ?? "portrait";
-    const pipelineId = input.pipelineId ?? (
-      domain === "portrait" ? "portrait.person-detection" : "ocr.document"
-    );
+    const pipelineId =
+      input.pipelineId ??
+      (domain === "portrait" ? "portrait.person-detection" : "ocr.document");
     const pipeline = {
       pipeline_id: pipelineId,
-      ...(input.pipelineVersion === undefined ? {} : { version: input.pipelineVersion }),
+      ...(input.pipelineVersion === undefined
+        ? {}
+        : { version: input.pipelineVersion }),
     };
     return this.transport<Run>("POST", "/api/v1/parse/stream", {
       idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
@@ -345,9 +424,13 @@ export class ScenaraClient {
           sample_interval_ms: input.sampleIntervalMs ?? 1000,
           sample_strategy: input.sampleStrategy ?? "interval",
           sample_start_ms: input.sampleStartMs ?? 0,
-          ...(input.sampleEndMs === undefined ? {} : { sample_end_ms: input.sampleEndMs }),
+          ...(input.sampleEndMs === undefined
+            ? {}
+            : { sample_end_ms: input.sampleEndMs }),
           scene_change_threshold: input.sceneChangeThreshold ?? 0.35,
-          ...(input.frameMaxEdge === undefined ? {} : { frame_max_edge: input.frameMaxEdge }),
+          ...(input.frameMaxEdge === undefined
+            ? {}
+            : { frame_max_edge: input.frameMaxEdge }),
           max_reconnect_attempts: input.maxReconnectAttempts ?? 3,
           connect_timeout_ms: input.connectTimeoutMs ?? 10000,
           read_timeout_ms: input.readTimeoutMs ?? 10000,
@@ -362,17 +445,26 @@ export class ScenaraClient {
   }
 
   deleteAsset(assetId: string): Promise<void> {
-    return this.transport<void>("DELETE", "/api/v1/media/assets/" + encodeURIComponent(assetId));
+    return this.transport<void>(
+      "DELETE",
+      "/api/v1/media/assets/" + encodeURIComponent(assetId),
+    );
   }
 
   getAssetPreview(assetId: string): Promise<Uint8Array> {
-    return this.transport<Uint8Array>("GET", "/api/v1/media/assets/" + encodeURIComponent(assetId) + "/preview");
+    return this.transport<Uint8Array>(
+      "GET",
+      "/api/v1/media/assets/" + encodeURIComponent(assetId) + "/preview",
+    );
   }
 
   listSources(offset = 0, limit = 50): Promise<MediaSourcePage> {
     return this.transport<MediaSourcePage>(
       "GET",
-      "/api/v1/media/sources?offset=" + String(offset) + "&limit=" + String(limit),
+      "/api/v1/media/sources?offset=" +
+        String(offset) +
+        "&limit=" +
+        String(limit),
     );
   }
 
@@ -382,27 +474,43 @@ export class ScenaraClient {
     metadata?: Record<string, unknown>;
   }): Promise<MediaSource> {
     return this.transport<MediaSource>("POST", "/api/v1/media/sources", {
-      body: { name: input.name, url: input.url, metadata: input.metadata ?? {} },
+      body: {
+        name: input.name,
+        url: input.url,
+        metadata: input.metadata ?? {},
+      },
     });
   }
 
   getSource(sourceId: string): Promise<MediaSource> {
-    return this.transport<MediaSource>("GET", "/api/v1/media/sources/" + encodeURIComponent(sourceId));
+    return this.transport<MediaSource>(
+      "GET",
+      "/api/v1/media/sources/" + encodeURIComponent(sourceId),
+    );
   }
 
   probeSource(sourceId: string, timeoutMs = 10000): Promise<MediaSourceProbe> {
     return this.transport<MediaSourceProbe>(
       "POST",
-      "/api/v1/media/sources/" + encodeURIComponent(sourceId) + "/probe?timeout_ms=" + String(timeoutMs),
+      "/api/v1/media/sources/" +
+        encodeURIComponent(sourceId) +
+        "/probe?timeout_ms=" +
+        String(timeoutMs),
     );
   }
 
   deleteSource(sourceId: string): Promise<void> {
-    return this.transport<void>("DELETE", "/api/v1/media/sources/" + encodeURIComponent(sourceId));
+    return this.transport<void>(
+      "DELETE",
+      "/api/v1/media/sources/" + encodeURIComponent(sourceId),
+    );
   }
 
   listPipelines(): Promise<Record<string, unknown>[]> {
-    return this.transport<Record<string, unknown>[]>("GET", "/api/v1/pipelines");
+    return this.transport<Record<string, unknown>[]>(
+      "GET",
+      "/api/v1/pipelines",
+    );
   }
 
   listDomains(): Promise<Record<string, unknown>[]> {
@@ -410,19 +518,31 @@ export class ScenaraClient {
   }
 
   listProducts(): Promise<ProductCatalogItem[]> {
-    return this.transport<ProductCatalogItem[]>("GET", "/api/v1/platform/products");
+    return this.transport<ProductCatalogItem[]>(
+      "GET",
+      "/api/v1/platform/products",
+    );
   }
 
   getRepositoryTopology(): Promise<RepositoryTopology> {
-    return this.transport<RepositoryTopology>("GET", "/api/v1/platform/repositories");
+    return this.transport<RepositoryTopology>(
+      "GET",
+      "/api/v1/platform/repositories",
+    );
   }
 
   getRepositoryContracts(): Promise<RepositoryContractCatalog> {
-    return this.transport<RepositoryContractCatalog>("GET", "/api/v1/platform/contracts");
+    return this.transport<RepositoryContractCatalog>(
+      "GET",
+      "/api/v1/platform/contracts",
+    );
   }
 
   getAccessFoundation(): Promise<AccessFoundationStatus> {
-    return this.transport<AccessFoundationStatus>("GET", "/api/v1/platform/access-foundation");
+    return this.transport<AccessFoundationStatus>(
+      "GET",
+      "/api/v1/platform/access-foundation",
+    );
   }
 
   /**
@@ -431,7 +551,10 @@ export class ScenaraClient {
    * readiness state for the portrait domain.
    */
   getPortraitIntelligence(): Promise<PortraitIntelligenceStatus> {
-    return this.transport<PortraitIntelligenceStatus>("GET", "/api/v1/platform/portrait-intelligence");
+    return this.transport<PortraitIntelligenceStatus>(
+      "GET",
+      "/api/v1/platform/portrait-intelligence",
+    );
   }
 
   getIamSummary(): Promise<IamSummary> {
@@ -439,16 +562,26 @@ export class ScenaraClient {
   }
 
   createOrganization(displayName: string): Promise<Organization> {
-    return this.transport<Organization>("POST", "/api/v1/platform/organizations", {
-      body: { display_name: displayName },
-    });
+    return this.transport<Organization>(
+      "POST",
+      "/api/v1/platform/organizations",
+      {
+        body: { display_name: displayName },
+      },
+    );
   }
 
   listOrganizations(): Promise<Organization[]> {
-    return this.transport<Organization[]>("GET", "/api/v1/platform/organizations");
+    return this.transport<Organization[]>(
+      "GET",
+      "/api/v1/platform/organizations",
+    );
   }
 
-  createProject(input: { displayName: string; projectId?: string }): Promise<Project> {
+  createProject(input: {
+    displayName: string;
+    projectId?: string;
+  }): Promise<Project> {
     return this.transport<Project>("POST", "/api/v1/platform/projects", {
       body: { display_name: input.displayName, project_id: input.projectId },
     });
@@ -458,9 +591,17 @@ export class ScenaraClient {
     return this.transport<Project[]>("GET", "/api/v1/platform/projects");
   }
 
-  createUser(input: { displayName: string; userId?: string; email?: string }): Promise<UserAccount> {
+  createUser(input: {
+    displayName: string;
+    userId?: string;
+    email?: string;
+  }): Promise<UserAccount> {
     return this.transport<UserAccount>("POST", "/api/v1/platform/users", {
-      body: { display_name: input.displayName, user_id: input.userId, email: input.email },
+      body: {
+        display_name: input.displayName,
+        user_id: input.userId,
+        email: input.email,
+      },
     });
   }
 
@@ -514,18 +655,25 @@ export class ScenaraClient {
     productIds?: string[];
     serviceAccountId?: string;
   }): Promise<ServiceAccount> {
-    return this.transport<ServiceAccount>("POST", "/api/v1/platform/service-accounts", {
-      body: {
-        display_name: input.displayName,
-        service_account_id: input.serviceAccountId,
-        scopes: input.scopes,
-        product_ids: input.productIds ?? [],
+    return this.transport<ServiceAccount>(
+      "POST",
+      "/api/v1/platform/service-accounts",
+      {
+        body: {
+          display_name: input.displayName,
+          service_account_id: input.serviceAccountId,
+          scopes: input.scopes,
+          product_ids: input.productIds ?? [],
+        },
       },
-    });
+    );
   }
 
   listServiceAccounts(): Promise<ServiceAccount[]> {
-    return this.transport<ServiceAccount[]>("GET", "/api/v1/platform/service-accounts");
+    return this.transport<ServiceAccount[]>(
+      "GET",
+      "/api/v1/platform/service-accounts",
+    );
   }
 
   createApiKey(input: {
@@ -537,7 +685,9 @@ export class ScenaraClient {
   }): Promise<CreateApiKeyResponse> {
     return this.transport<CreateApiKeyResponse>(
       "POST",
-      "/api/v1/platform/service-accounts/" + encodeURIComponent(input.serviceAccountId) + "/api-keys",
+      "/api/v1/platform/service-accounts/" +
+        encodeURIComponent(input.serviceAccountId) +
+        "/api-keys",
       {
         body: {
           name: input.name,
@@ -566,18 +716,25 @@ export class ScenaraClient {
     source?: "manual" | "enterprise_license" | "system";
     projectId?: string;
   }): Promise<ProductEntitlement> {
-    return this.transport<ProductEntitlement>("POST", "/api/v1/platform/product-entitlements", {
-      body: {
-        product_id: input.productId,
-        status: input.status ?? "active",
-        source: input.source ?? "manual",
-        project_id: input.projectId,
+    return this.transport<ProductEntitlement>(
+      "POST",
+      "/api/v1/platform/product-entitlements",
+      {
+        body: {
+          product_id: input.productId,
+          status: input.status ?? "active",
+          source: input.source ?? "manual",
+          project_id: input.projectId,
+        },
       },
-    });
+    );
   }
 
   listProductEntitlements(): Promise<ProductEntitlement[]> {
-    return this.transport<ProductEntitlement[]>("GET", "/api/v1/platform/product-entitlements");
+    return this.transport<ProductEntitlement[]>(
+      "GET",
+      "/api/v1/platform/product-entitlements",
+    );
   }
 
   updateProductEntitlement(input: {
@@ -587,7 +744,8 @@ export class ScenaraClient {
   }): Promise<ProductEntitlement> {
     return this.transport<ProductEntitlement>(
       "PUT",
-      "/api/v1/platform/product-entitlements/" + encodeURIComponent(input.productId),
+      "/api/v1/platform/product-entitlements/" +
+        encodeURIComponent(input.productId),
       { body: { status: input.status, source: input.source ?? "manual" } },
     );
   }
@@ -602,13 +760,25 @@ export class ScenaraClient {
     secret: string;
     eventTypes: string[];
   }): Promise<WebhookSubscription> {
-    return this.transport<WebhookSubscription>("POST", "/api/v1/webhooks/subscriptions", {
-      body: { name: input.name, url: input.url, secret: input.secret, event_types: input.eventTypes },
-    });
+    return this.transport<WebhookSubscription>(
+      "POST",
+      "/api/v1/webhooks/subscriptions",
+      {
+        body: {
+          name: input.name,
+          url: input.url,
+          secret: input.secret,
+          event_types: input.eventTypes,
+        },
+      },
+    );
   }
 
   listWebhookSubscriptions(): Promise<WebhookSubscription[]> {
-    return this.transport<WebhookSubscription[]>("GET", "/api/v1/webhooks/subscriptions");
+    return this.transport<WebhookSubscription[]>(
+      "GET",
+      "/api/v1/webhooks/subscriptions",
+    );
   }
 
   deleteWebhookSubscription(endpointId: string): Promise<void> {
@@ -619,16 +789,23 @@ export class ScenaraClient {
   }
 
   listWebhookDeliveries(limit = 100): Promise<WebhookDelivery[]> {
-    return this.transport<WebhookDelivery[]>("GET", "/api/v1/webhooks/deliveries?limit=" + String(limit));
+    return this.transport<WebhookDelivery[]>(
+      "GET",
+      "/api/v1/webhooks/deliveries?limit=" + String(limit),
+    );
   }
 
   createPortraitIdentity(
     displayName: string,
     metadata: Record<string, unknown> = {},
   ): Promise<Record<string, unknown>> {
-    return this.transport<Record<string, unknown>>("POST", "/api/v1/portrait/identities", {
-      body: { display_name: displayName, metadata },
-    });
+    return this.transport<Record<string, unknown>>(
+      "POST",
+      "/api/v1/portrait/identities",
+      {
+        body: { display_name: displayName, metadata },
+      },
+    );
   }
 
   deletePortraitIdentity(identityId: string): Promise<void> {
@@ -644,19 +821,33 @@ export class ScenaraClient {
   ): Promise<Record<string, unknown>> {
     return this.transport<Record<string, unknown>>(
       "POST",
-      "/api/v1/portrait/identities/" + encodeURIComponent(identityId) + "/enrollments",
+      "/api/v1/portrait/identities/" +
+        encodeURIComponent(identityId) +
+        "/enrollments",
       { body: enrollment },
     );
   }
 
-  searchPortrait(query: Record<string, unknown>): Promise<Record<string, unknown>> {
-    return this.transport<Record<string, unknown>>("POST", "/api/v1/portrait/search", { body: query });
+  searchPortrait(
+    query: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    return this.transport<Record<string, unknown>>(
+      "POST",
+      "/api/v1/portrait/search",
+      { body: query },
+    );
   }
 
-  comparePortrait(comparison: Record<string, unknown>): Promise<Record<string, unknown>> {
-    return this.transport<Record<string, unknown>>("POST", "/api/v1/portrait/compare", {
-      body: comparison,
-    });
+  comparePortrait(
+    comparison: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    return this.transport<Record<string, unknown>>(
+      "POST",
+      "/api/v1/portrait/compare",
+      {
+        body: comparison,
+      },
+    );
   }
 
   getStreamSession(sessionId: string): Promise<Record<string, unknown>> {
@@ -673,29 +864,51 @@ export class ScenaraClient {
     );
   }
 
-  createIdentityProvider(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
-    return this.controlPlane("POST", "/api/v1/platform/identity-providers", input);
+  createIdentityProvider(
+    input: ControlPlaneRecord,
+  ): Promise<ControlPlaneRecord> {
+    return this.controlPlane(
+      "POST",
+      "/api/v1/platform/identity-providers",
+      input,
+    );
   }
 
   listIdentityProviders(): Promise<ControlPlaneRecord[]> {
-    return this.controlPlane<ControlPlaneRecord[]>("GET", "/api/v1/platform/identity-providers");
+    return this.controlPlane<ControlPlaneRecord[]>(
+      "GET",
+      "/api/v1/platform/identity-providers",
+    );
   }
 
   probeIdentityProvider(providerId: string): Promise<ControlPlaneRecord> {
     return this.controlPlane(
       "POST",
-      "/api/v1/platform/identity-providers/" + encodeURIComponent(providerId) + "/probe",
+      "/api/v1/platform/identity-providers/" +
+        encodeURIComponent(providerId) +
+        "/probe",
     );
   }
 
-  requestProjectLifecycle(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
-    return this.controlPlane("POST", "/api/v1/platform/projects/lifecycle-requests", input);
-  }
-
-  decideProjectLifecycle(requestId: string, input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
+  requestProjectLifecycle(
+    input: ControlPlaneRecord,
+  ): Promise<ControlPlaneRecord> {
     return this.controlPlane(
       "POST",
-      "/api/v1/platform/projects/lifecycle-requests/" + encodeURIComponent(requestId) + "/decide",
+      "/api/v1/platform/projects/lifecycle-requests",
+      input,
+    );
+  }
+
+  decideProjectLifecycle(
+    requestId: string,
+    input: ControlPlaneRecord,
+  ): Promise<ControlPlaneRecord> {
+    return this.controlPlane(
+      "POST",
+      "/api/v1/platform/projects/lifecycle-requests/" +
+        encodeURIComponent(requestId) +
+        "/decide",
       input,
     );
   }
@@ -708,7 +921,10 @@ export class ScenaraClient {
     return this.controlPlane("POST", "/api/v1/platform/audit/purge", input);
   }
 
-  createSession(input: { userId: string; ttlSeconds?: number }): Promise<ControlPlaneRecord> {
+  createSession(input: {
+    userId: string;
+    ttlSeconds?: number;
+  }): Promise<ControlPlaneRecord> {
     return this.controlPlane("POST", "/api/v1/platform/sessions", {
       user_id: input.userId,
       ttl_seconds: input.ttlSeconds ?? 3600,
@@ -717,7 +933,10 @@ export class ScenaraClient {
 
   setUserDisabled(userId: string, disabled: boolean): Promise<UserAccount> {
     const action = disabled ? "disable" : "restore";
-    return this.transport<UserAccount>("POST", "/api/v1/platform/users/" + encodeURIComponent(userId) + "/" + action);
+    return this.transport<UserAccount>(
+      "POST",
+      "/api/v1/platform/users/" + encodeURIComponent(userId) + "/" + action,
+    );
   }
 
   createQuotaPlan(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
@@ -725,41 +944,75 @@ export class ScenaraClient {
   }
 
   checkQuota(metric: string, amount = 1): Promise<ControlPlaneRecord> {
-    return this.controlPlane("POST", "/api/v1/platform/quotas/check", { metric, amount });
+    return this.controlPlane("POST", "/api/v1/platform/quotas/check", {
+      metric,
+      amount,
+    });
   }
 
   createAnnotationTask(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
     return this.controlPlane("POST", "/api/v1/data/annotation-tasks", input);
   }
 
-  registerAnnotationProvider(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
-    return this.controlPlane("POST", "/api/v1/data/annotation-providers", input);
+  registerAnnotationProvider(
+    input: ControlPlaneRecord,
+  ): Promise<ControlPlaneRecord> {
+    return this.controlPlane(
+      "POST",
+      "/api/v1/data/annotation-providers",
+      input,
+    );
   }
 
   probeAnnotationProvider(providerId: string): Promise<ControlPlaneRecord> {
     return this.controlPlane(
       "POST",
-      "/api/v1/data/annotation-providers/" + encodeURIComponent(providerId) + "/probe",
+      "/api/v1/data/annotation-providers/" +
+        encodeURIComponent(providerId) +
+        "/probe",
     );
   }
 
-  reviewAnnotationTask(taskId: string, input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
-    return this.controlPlane("POST", "/api/v1/data/annotation-tasks/" + encodeURIComponent(taskId) + "/review", input);
+  reviewAnnotationTask(
+    taskId: string,
+    input: ControlPlaneRecord,
+  ): Promise<ControlPlaneRecord> {
+    return this.controlPlane(
+      "POST",
+      "/api/v1/data/annotation-tasks/" + encodeURIComponent(taskId) + "/review",
+      input,
+    );
   }
 
   createFlow(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
     return this.controlPlane("POST", "/api/v1/flows", input);
   }
 
-  executeFlow(flowId: string, input: ControlPlaneRecord = {}): Promise<ControlPlaneRecord> {
-    return this.controlPlane("POST", "/api/v1/flows/" + encodeURIComponent(flowId) + "/execute", input);
+  executeFlow(
+    flowId: string,
+    input: ControlPlaneRecord = {},
+  ): Promise<ControlPlaneRecord> {
+    return this.controlPlane(
+      "POST",
+      "/api/v1/flows/" + encodeURIComponent(flowId) + "/execute",
+      input,
+    );
   }
 
-  decideFlowApproval(approvalId: string, input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
-    return this.controlPlane("POST", "/api/v1/flows/approvals/" + encodeURIComponent(approvalId) + "/decide", input);
+  decideFlowApproval(
+    approvalId: string,
+    input: ControlPlaneRecord,
+  ): Promise<ControlPlaneRecord> {
+    return this.controlPlane(
+      "POST",
+      "/api/v1/flows/approvals/" + encodeURIComponent(approvalId) + "/decide",
+      input,
+    );
   }
 
-  createSearchRankingProfile(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
+  createSearchRankingProfile(
+    input: ControlPlaneRecord,
+  ): Promise<ControlPlaneRecord> {
     return this.controlPlane("POST", "/api/v1/search/ranking-profiles", input);
   }
 
@@ -768,7 +1021,9 @@ export class ScenaraClient {
   }
 
   rebuildIndex(indexId: string): Promise<ControlPlaneRecord> {
-    return this.controlPlane("POST", "/api/v1/indexes/rebuild", { index_id: indexId });
+    return this.controlPlane("POST", "/api/v1/indexes/rebuild", {
+      index_id: indexId,
+    });
   }
 
   createIndex(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
@@ -782,11 +1037,15 @@ export class ScenaraClient {
   probeIndexBackend(backendId: string): Promise<ControlPlaneRecord> {
     return this.controlPlane(
       "POST",
-      "/api/v1/search/index-backends/" + encodeURIComponent(backendId) + "/probe",
+      "/api/v1/search/index-backends/" +
+        encodeURIComponent(backendId) +
+        "/probe",
     );
   }
 
-  registerSearchReranker(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
+  registerSearchReranker(
+    input: ControlPlaneRecord,
+  ): Promise<ControlPlaneRecord> {
     return this.controlPlane("POST", "/api/v1/search/rerankers", input);
   }
 
@@ -801,18 +1060,30 @@ export class ScenaraClient {
     return this.controlPlane("POST", "/api/v1/edge/devices", input);
   }
 
-  heartbeatEdgeDevice(deviceId: string, input: ControlPlaneRecord = {}): Promise<ControlPlaneRecord> {
-    return this.controlPlane("POST", "/api/v1/edge/devices/" + encodeURIComponent(deviceId) + "/heartbeat", input);
+  heartbeatEdgeDevice(
+    deviceId: string,
+    input: ControlPlaneRecord = {},
+  ): Promise<ControlPlaneRecord> {
+    return this.controlPlane(
+      "POST",
+      "/api/v1/edge/devices/" + encodeURIComponent(deviceId) + "/heartbeat",
+      input,
+    );
   }
 
   deployEdge(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
     return this.controlPlane("POST", "/api/v1/edge/deployments", input);
   }
 
-  acknowledgeEdgeDeployment(deploymentId: string, input: ControlPlaneRecord = {}): Promise<ControlPlaneRecord> {
+  acknowledgeEdgeDeployment(
+    deploymentId: string,
+    input: ControlPlaneRecord = {},
+  ): Promise<ControlPlaneRecord> {
     return this.controlPlane(
       "POST",
-      "/api/v1/edge/deployments/" + encodeURIComponent(deploymentId) + "/acknowledge",
+      "/api/v1/edge/deployments/" +
+        encodeURIComponent(deploymentId) +
+        "/acknowledge",
       input,
     );
   }
@@ -825,19 +1096,31 @@ export class ScenaraClient {
     return this.controlPlane("POST", "/api/v1/agents/actions", input);
   }
 
-  decideAgentAction(actionId: string, input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
-    return this.controlPlane("POST", "/api/v1/agents/actions/" + encodeURIComponent(actionId) + "/decide", input);
+  decideAgentAction(
+    actionId: string,
+    input: ControlPlaneRecord,
+  ): Promise<ControlPlaneRecord> {
+    return this.controlPlane(
+      "POST",
+      "/api/v1/agents/actions/" + encodeURIComponent(actionId) + "/decide",
+      input,
+    );
   }
 
   executeAgentAction(actionId: string): Promise<ControlPlaneRecord> {
-    return this.controlPlane("POST", "/api/v1/agents/actions/" + encodeURIComponent(actionId) + "/execute");
+    return this.controlPlane(
+      "POST",
+      "/api/v1/agents/actions/" + encodeURIComponent(actionId) + "/execute",
+    );
   }
 
   recordAgentTrace(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
     return this.controlPlane("POST", "/api/v1/agents/traces", input);
   }
 
-  recordAgentEvaluation(input: ControlPlaneRecord): Promise<ControlPlaneRecord> {
+  recordAgentEvaluation(
+    input: ControlPlaneRecord,
+  ): Promise<ControlPlaneRecord> {
     return this.controlPlane("POST", "/api/v1/agents/evaluations", input);
   }
 
@@ -845,10 +1128,16 @@ export class ScenaraClient {
     return this.controlPlane("PUT", "/api/v1/agents/memory", input);
   }
 
-  getAgentMemory(namespace: string, key: string): Promise<ControlPlaneRecord | null> {
+  getAgentMemory(
+    namespace: string,
+    key: string,
+  ): Promise<ControlPlaneRecord | null> {
     return this.controlPlane<ControlPlaneRecord | null>(
       "GET",
-      "/api/v1/agents/memory?namespace=" + encodeURIComponent(namespace) + "&key=" + encodeURIComponent(key),
+      "/api/v1/agents/memory?namespace=" +
+        encodeURIComponent(namespace) +
+        "&key=" +
+        encodeURIComponent(key),
     );
   }
 
@@ -856,52 +1145,136 @@ export class ScenaraClient {
     return this.controlPlane("GET", "/api/v1/platform/deployment/topology");
   }
 
-  listDatasets(offset = 0, limit = 50): Promise<{ items: DatasetRecord[]; offset: number; limit: number; total: number }> {
-    return this.transport<{ items: DatasetRecord[]; offset: number; limit: number; total: number }>(
+  listDatasets(
+    offset = 0,
+    limit = 50,
+  ): Promise<{
+    items: DatasetRecord[];
+    offset: number;
+    limit: number;
+    total: number;
+  }> {
+    return this.transport<{
+      items: DatasetRecord[];
+      offset: number;
+      limit: number;
+      total: number;
+    }>(
       "GET",
       "/api/v1/datasets?offset=" + String(offset) + "&limit=" + String(limit),
     );
   }
 
-  createDataset(input: { name: string; description?: string; metadata?: Record<string, unknown> }): Promise<DatasetRecord> {
+  createDataset(input: {
+    name: string;
+    description?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<DatasetRecord> {
     return this.transport<DatasetRecord>("POST", "/api/v1/datasets", {
-      body: { name: input.name, description: input.description ?? "", metadata: input.metadata ?? {} },
-    });
-  }
-
-  getDataset(datasetId: string): Promise<DatasetRecord> {
-    return this.transport<DatasetRecord>("GET", "/api/v1/datasets/" + encodeURIComponent(datasetId));
-  }
-
-  updateDataset(datasetId: string, input: Partial<Pick<DatasetRecord, "name" | "description" | "status" | "metadata">>): Promise<DatasetRecord> {
-    return this.transport<DatasetRecord>("PATCH", "/api/v1/datasets/" + encodeURIComponent(datasetId), { body: input });
-  }
-
-  createDatasetVersion(datasetId: string, input: { version: string; manifestSha256: string; assetIds?: string[]; qualityScore?: number | null; lineage?: Record<string, unknown>; annotationSummary?: Record<string, unknown> }): Promise<DatasetVersion> {
-    return this.transport<DatasetVersion>("POST", "/api/v1/datasets/" + encodeURIComponent(datasetId) + "/versions", {
       body: {
-        version: input.version,
-        manifest_sha256: input.manifestSha256,
-        asset_ids: input.assetIds ?? [],
-        quality_score: input.qualityScore ?? null,
-        lineage: input.lineage ?? {},
-        annotation_summary: input.annotationSummary ?? {},
+        name: input.name,
+        description: input.description ?? "",
+        metadata: input.metadata ?? {},
       },
     });
   }
 
-  listDatasetVersions(datasetId: string, offset = 0, limit = 50): Promise<{ items: DatasetVersion[]; offset: number; limit: number; total: number }> {
-    return this.transport<{ items: DatasetVersion[]; offset: number; limit: number; total: number }>(
+  getDataset(datasetId: string): Promise<DatasetRecord> {
+    return this.transport<DatasetRecord>(
       "GET",
-      "/api/v1/datasets/" + encodeURIComponent(datasetId) + "/versions?offset=" + String(offset) + "&limit=" + String(limit),
+      "/api/v1/datasets/" + encodeURIComponent(datasetId),
     );
   }
 
-  transitionDatasetVersion(versionId: string, status: "validated" | "published" | "retired"): Promise<DatasetVersion> {
-    return this.transport<DatasetVersion>("POST", "/api/v1/dataset-versions/" + encodeURIComponent(versionId) + "/transition", { body: { status } });
+  updateDataset(
+    datasetId: string,
+    input: Partial<
+      Pick<DatasetRecord, "name" | "description" | "status" | "metadata">
+    >,
+  ): Promise<DatasetRecord> {
+    return this.transport<DatasetRecord>(
+      "PATCH",
+      "/api/v1/datasets/" + encodeURIComponent(datasetId),
+      { body: input },
+    );
   }
 
-  listAuditEvents(filters: { action?: string; resourceType?: string; principalId?: string; outcome?: string; offset?: number; limit?: number } = {}): Promise<AuditEventPage> {
+  createDatasetVersion(
+    datasetId: string,
+    input: {
+      version: string;
+      manifestSha256: string;
+      assetIds?: string[];
+      qualityScore?: number | null;
+      lineage?: Record<string, unknown>;
+      annotationSummary?: Record<string, unknown>;
+    },
+  ): Promise<DatasetVersion> {
+    return this.transport<DatasetVersion>(
+      "POST",
+      "/api/v1/datasets/" + encodeURIComponent(datasetId) + "/versions",
+      {
+        body: {
+          version: input.version,
+          manifest_sha256: input.manifestSha256,
+          asset_ids: input.assetIds ?? [],
+          quality_score: input.qualityScore ?? null,
+          lineage: input.lineage ?? {},
+          annotation_summary: input.annotationSummary ?? {},
+        },
+      },
+    );
+  }
+
+  listDatasetVersions(
+    datasetId: string,
+    offset = 0,
+    limit = 50,
+  ): Promise<{
+    items: DatasetVersion[];
+    offset: number;
+    limit: number;
+    total: number;
+  }> {
+    return this.transport<{
+      items: DatasetVersion[];
+      offset: number;
+      limit: number;
+      total: number;
+    }>(
+      "GET",
+      "/api/v1/datasets/" +
+        encodeURIComponent(datasetId) +
+        "/versions?offset=" +
+        String(offset) +
+        "&limit=" +
+        String(limit),
+    );
+  }
+
+  transitionDatasetVersion(
+    versionId: string,
+    status: "validated" | "published" | "retired",
+  ): Promise<DatasetVersion> {
+    return this.transport<DatasetVersion>(
+      "POST",
+      "/api/v1/dataset-versions/" +
+        encodeURIComponent(versionId) +
+        "/transition",
+      { body: { status } },
+    );
+  }
+
+  listAuditEvents(
+    filters: {
+      action?: string;
+      resourceType?: string;
+      principalId?: string;
+      outcome?: string;
+      offset?: number;
+      limit?: number;
+    } = {},
+  ): Promise<AuditEventPage> {
     const query = new URLSearchParams();
     if (filters.action) query.set("action", filters.action);
     if (filters.resourceType) query.set("resource_type", filters.resourceType);
@@ -909,7 +1282,10 @@ export class ScenaraClient {
     if (filters.outcome) query.set("outcome", filters.outcome);
     query.set("offset", String(filters.offset ?? 0));
     query.set("limit", String(filters.limit ?? 50));
-    return this.transport<AuditEventPage>("GET", "/api/v1/audit/events?" + query.toString());
+    return this.transport<AuditEventPage>(
+      "GET",
+      "/api/v1/audit/events?" + query.toString(),
+    );
   }
 
   enrollPortraitIdentityImage(
@@ -920,11 +1296,15 @@ export class ScenaraClient {
   ): Promise<Record<string, unknown>> {
     const form = new FormData();
     form.append("file", file, filename);
-    if (options.featureSpaceId) form.append("feature_space_id", options.featureSpaceId);
-    if (options.quality !== undefined) form.append("quality", String(options.quality));
+    if (options.featureSpaceId)
+      form.append("feature_space_id", options.featureSpaceId);
+    if (options.quality !== undefined)
+      form.append("quality", String(options.quality));
     return this.transport<Record<string, unknown>>(
       "POST",
-      "/api/v1/portrait/identities/" + encodeURIComponent(identityId) + "/enrollments/image",
+      "/api/v1/portrait/identities/" +
+        encodeURIComponent(identityId) +
+        "/enrollments/image",
       { body: form },
     );
   }
@@ -932,27 +1312,49 @@ export class ScenaraClient {
   searchPortraitImage(
     file: Blob,
     filename = "portrait-query",
-    options: { featureSpaceId?: string; limit?: number; threshold?: number } = {},
+    options: {
+      featureSpaceId?: string;
+      limit?: number;
+      threshold?: number;
+    } = {},
   ): Promise<Record<string, unknown>> {
     const form = new FormData();
     form.append("file", file, filename);
-    if (options.featureSpaceId) form.append("feature_space_id", options.featureSpaceId);
-    if (options.limit !== undefined) form.append("limit", String(options.limit));
-    if (options.threshold !== undefined) form.append("threshold", String(options.threshold));
-    return this.transport<Record<string, unknown>>("POST", "/api/v1/portrait/search/image", { body: form });
+    if (options.featureSpaceId)
+      form.append("feature_space_id", options.featureSpaceId);
+    if (options.limit !== undefined)
+      form.append("limit", String(options.limit));
+    if (options.threshold !== undefined)
+      form.append("threshold", String(options.threshold));
+    return this.transport<Record<string, unknown>>(
+      "POST",
+      "/api/v1/portrait/search/image",
+      { body: form },
+    );
   }
 
   comparePortraitImages(
     left: Blob,
     right: Blob,
-    options: { leftFilename?: string; rightFilename?: string; featureSpaceId?: string; threshold?: number } = {},
+    options: {
+      leftFilename?: string;
+      rightFilename?: string;
+      featureSpaceId?: string;
+      threshold?: number;
+    } = {},
   ): Promise<PortraitCompareResponse> {
     const form = new FormData();
     form.append("left", left, options.leftFilename ?? "portrait-left");
     form.append("right", right, options.rightFilename ?? "portrait-right");
-    if (options.featureSpaceId) form.append("feature_space_id", options.featureSpaceId);
-    if (options.threshold !== undefined) form.append("threshold", String(options.threshold));
-    return this.transport<PortraitCompareResponse>("POST", "/api/v1/portrait/compare/images", { body: form });
+    if (options.featureSpaceId)
+      form.append("feature_space_id", options.featureSpaceId);
+    if (options.threshold !== undefined)
+      form.append("threshold", String(options.threshold));
+    return this.transport<PortraitCompareResponse>(
+      "POST",
+      "/api/v1/portrait/compare/images",
+      { body: form },
+    );
   }
 
   comparePortraitAssets(input: {
@@ -961,40 +1363,64 @@ export class ScenaraClient {
     featureSpaceId?: string;
     threshold?: number;
   }): Promise<PortraitCompareResponse> {
-    return this.transport<PortraitCompareResponse>("POST", "/api/v1/portrait/compare/assets", {
-      body: {
-        left_asset_id: input.leftAssetId,
-        right_asset_id: input.rightAssetId,
-        feature_space_id: input.featureSpaceId,
-        threshold: input.threshold,
+    return this.transport<PortraitCompareResponse>(
+      "POST",
+      "/api/v1/portrait/compare/assets",
+      {
+        body: {
+          left_asset_id: input.leftAssetId,
+          right_asset_id: input.rightAssetId,
+          feature_space_id: input.featureSpaceId,
+          threshold: input.threshold,
+        },
       },
-    });
+    );
   }
 
   comparePortraitAssetImage(
     assetId: string,
     image: Blob,
-    options: { filename?: string; featureSpaceId?: string; threshold?: number } = {},
+    options: {
+      filename?: string;
+      featureSpaceId?: string;
+      threshold?: number;
+    } = {},
   ): Promise<PortraitCompareResponse> {
     const form = new FormData();
     form.append("asset_id", assetId);
     form.append("file", image, options.filename ?? "portrait-image");
-    if (options.featureSpaceId) form.append("feature_space_id", options.featureSpaceId);
-    if (options.threshold !== undefined) form.append("threshold", String(options.threshold));
-    return this.transport<PortraitCompareResponse>("POST", "/api/v1/portrait/compare/asset-image", { body: form });
+    if (options.featureSpaceId)
+      form.append("feature_space_id", options.featureSpaceId);
+    if (options.threshold !== undefined)
+      form.append("threshold", String(options.threshold));
+    return this.transport<PortraitCompareResponse>(
+      "POST",
+      "/api/v1/portrait/compare/asset-image",
+      { body: form },
+    );
   }
 
   comparePortraitImageAsset(
     image: Blob,
     assetId: string,
-    options: { filename?: string; featureSpaceId?: string; threshold?: number } = {},
+    options: {
+      filename?: string;
+      featureSpaceId?: string;
+      threshold?: number;
+    } = {},
   ): Promise<PortraitCompareResponse> {
     const form = new FormData();
     form.append("file", image, options.filename ?? "portrait-image");
     form.append("asset_id", assetId);
-    if (options.featureSpaceId) form.append("feature_space_id", options.featureSpaceId);
-    if (options.threshold !== undefined) form.append("threshold", String(options.threshold));
-    return this.transport<PortraitCompareResponse>("POST", "/api/v1/portrait/compare/image-asset", { body: form });
+    if (options.featureSpaceId)
+      form.append("feature_space_id", options.featureSpaceId);
+    if (options.threshold !== undefined)
+      form.append("threshold", String(options.threshold));
+    return this.transport<PortraitCompareResponse>(
+      "POST",
+      "/api/v1/portrait/compare/image-asset",
+      { body: form },
+    );
   }
 
   listSearchIndexes(domain?: string): Promise<IndexDefinition[]> {
@@ -1002,16 +1428,20 @@ export class ScenaraClient {
     return this.transport<IndexDefinition[]>("GET", "/api/v1/indexes" + query);
   }
 
-  listSearchIndexRecords(indexId: string, filters: {
-    sourceType?: string;
-    sourceId?: string;
-    offset?: number;
-    limit?: number;
-  } = {}): Promise<IndexRecordView[]> {
+  listSearchIndexRecords(
+    indexId: string,
+    filters: {
+      sourceType?: string;
+      sourceId?: string;
+      offset?: number;
+      limit?: number;
+    } = {},
+  ): Promise<IndexRecordView[]> {
     const query = new URLSearchParams();
     if (filters.sourceType) query.set("source_type", filters.sourceType);
     if (filters.sourceId) query.set("source_id", filters.sourceId);
-    if (filters.offset !== undefined) query.set("offset", String(filters.offset));
+    if (filters.offset !== undefined)
+      query.set("offset", String(filters.offset));
     if (filters.limit !== undefined) query.set("limit", String(filters.limit));
     const suffix = query.toString() ? `?${query.toString()}` : "";
     return this.transport<IndexRecordView[]>(
@@ -1020,7 +1450,11 @@ export class ScenaraClient {
     );
   }
 
-  querySearchIndexText(indexId: string, query: string, limit = 20): Promise<Record<string, unknown>[]> {
+  querySearchIndexText(
+    indexId: string,
+    query: string,
+    limit = 20,
+  ): Promise<Record<string, unknown>[]> {
     return this.transport<Record<string, unknown>[]>(
       "POST",
       "/api/v1/indexes/" + encodeURIComponent(indexId) + "/query/text",
@@ -1036,7 +1470,13 @@ export class ScenaraClient {
     return this.transport<IndexHit[]>(
       "POST",
       "/api/v1/indexes/" + encodeURIComponent(indexId) + "/query/vector",
-      { body: { vector, limit: options.limit ?? 20, threshold: options.threshold } },
+      {
+        body: {
+          vector,
+          limit: options.limit ?? 20,
+          threshold: options.threshold,
+        },
+      },
     );
   }
 
@@ -1066,11 +1506,16 @@ export class ScenaraClient {
   }): Promise<SearchResponse> {
     const form = new FormData();
     form.append("file", input.file, input.filename ?? "query-image");
-    if (input.featureSpaceId) form.append("feature_space_id", input.featureSpaceId);
-    if (input.mediaKinds?.length) form.append("media_kinds", input.mediaKinds.join(","));
+    if (input.featureSpaceId)
+      form.append("feature_space_id", input.featureSpaceId);
+    if (input.mediaKinds?.length)
+      form.append("media_kinds", input.mediaKinds.join(","));
     if (input.limit !== undefined) form.append("limit", String(input.limit));
-    if (input.threshold !== undefined) form.append("threshold", String(input.threshold));
-    return this.transport<SearchResponse>("POST", "/api/v1/search/image", { body: form });
+    if (input.threshold !== undefined)
+      form.append("threshold", String(input.threshold));
+    return this.transport<SearchResponse>("POST", "/api/v1/search/image", {
+      body: form,
+    });
   }
 
   searchPortraitAsset(input: {
@@ -1091,46 +1536,226 @@ export class ScenaraClient {
     });
   }
 
-  createSavedSearch(input: { name: string; mode: "text" | "portrait"; definition: Record<string, unknown>; description?: string }): Promise<SavedSearch> {
+  createSavedSearch(input: {
+    name: string;
+    mode: "text" | "portrait";
+    definition: Record<string, unknown>;
+    description?: string;
+  }): Promise<SavedSearch> {
     return this.transport<SavedSearch>("POST", "/api/v1/search/saved", {
-      body: { name: input.name, description: input.description ?? "", mode: input.mode, definition: input.definition },
+      body: {
+        name: input.name,
+        description: input.description ?? "",
+        mode: input.mode,
+        definition: input.definition,
+      },
     });
   }
 
   listSavedSearches(offset = 0, limit = 50): Promise<SavedSearchPage> {
-    return this.transport<SavedSearchPage>("GET", "/api/v1/search/saved?offset=" + String(offset) + "&limit=" + String(limit));
+    return this.transport<SavedSearchPage>(
+      "GET",
+      "/api/v1/search/saved?offset=" +
+        String(offset) +
+        "&limit=" +
+        String(limit),
+    );
   }
 
   getSavedSearch(savedSearchId: string): Promise<SavedSearch> {
-    return this.transport<SavedSearch>("GET", "/api/v1/search/saved/" + encodeURIComponent(savedSearchId));
+    return this.transport<SavedSearch>(
+      "GET",
+      "/api/v1/search/saved/" + encodeURIComponent(savedSearchId),
+    );
   }
 
   updateSavedSearch(
     savedSearchId: string,
-    input: { name?: string; description?: string; definition?: Record<string, unknown> },
+    input: {
+      name?: string;
+      description?: string;
+      definition?: Record<string, unknown>;
+    },
   ): Promise<SavedSearch> {
-    return this.transport<SavedSearch>("PATCH", "/api/v1/search/saved/" + encodeURIComponent(savedSearchId), {
-      body: input,
-    });
+    return this.transport<SavedSearch>(
+      "PATCH",
+      "/api/v1/search/saved/" + encodeURIComponent(savedSearchId),
+      {
+        body: input,
+      },
+    );
   }
 
   runSavedSearch(savedSearchId: string): Promise<SearchResponse> {
-    return this.transport<SearchResponse>("POST", "/api/v1/search/saved/" + encodeURIComponent(savedSearchId) + "/run");
+    return this.transport<SearchResponse>(
+      "POST",
+      "/api/v1/search/saved/" + encodeURIComponent(savedSearchId) + "/run",
+    );
   }
 
   deleteSavedSearch(savedSearchId: string): Promise<void> {
-    return this.transport<void>("DELETE", "/api/v1/search/saved/" + encodeURIComponent(savedSearchId));
+    return this.transport<void>(
+      "DELETE",
+      "/api/v1/search/saved/" + encodeURIComponent(savedSearchId),
+    );
+  }
+
+  createWatchlist(input: {
+    name: string;
+    category?: "blacklist" | "whitelist" | "custom";
+    description?: string;
+  }): Promise<OpenApi.Watchlist> {
+    return this.transport<OpenApi.Watchlist>(
+      "POST",
+      "/api/v1/surveillance/watchlists",
+      { body: input },
+    );
+  }
+
+  listWatchlists(offset = 0, limit = 50): Promise<OpenApi.WatchlistPage> {
+    return this.transport<OpenApi.WatchlistPage>(
+      "GET",
+      "/api/v1/surveillance/watchlists?offset=" +
+        String(offset) +
+        "&limit=" +
+        String(limit),
+    );
+  }
+
+  addWatchlistMember(
+    watchlistId: string,
+    input: {
+      portraitIdentityId: string;
+      displayLabel?: string;
+      validFrom?: number;
+      validUntil?: number;
+    },
+  ): Promise<OpenApi.WatchlistMember> {
+    return this.transport<OpenApi.WatchlistMember>(
+      "POST",
+      "/api/v1/surveillance/watchlists/" +
+        encodeURIComponent(watchlistId) +
+        "/members",
+      {
+        body: {
+          portrait_identity_id: input.portraitIdentityId,
+          display_label: input.displayLabel ?? "",
+          valid_from: input.validFrom,
+          valid_until: input.validUntil,
+        },
+      },
+    );
+  }
+
+  createSurveillanceTask(
+    input: OpenApi.CreateSurveillanceTaskRequest,
+  ): Promise<OpenApi.SurveillanceTask> {
+    return this.transport<OpenApi.SurveillanceTask>(
+      "POST",
+      "/api/v1/surveillance/tasks",
+      { body: input },
+    );
+  }
+
+  listSurveillanceTasks(
+    offset = 0,
+    limit = 50,
+  ): Promise<OpenApi.SurveillanceTaskPage> {
+    return this.transport<OpenApi.SurveillanceTaskPage>(
+      "GET",
+      "/api/v1/surveillance/tasks?offset=" +
+        String(offset) +
+        "&limit=" +
+        String(limit),
+    );
+  }
+
+  startSurveillanceTask(taskId: string): Promise<OpenApi.SurveillanceTask> {
+    return this.transport<OpenApi.SurveillanceTask>(
+      "POST",
+      "/api/v1/surveillance/tasks/" + encodeURIComponent(taskId) + "/start",
+    );
+  }
+
+  pauseSurveillanceTask(taskId: string): Promise<OpenApi.SurveillanceTask> {
+    return this.transport<OpenApi.SurveillanceTask>(
+      "POST",
+      "/api/v1/surveillance/tasks/" + encodeURIComponent(taskId) + "/pause",
+    );
+  }
+
+  listSurveillanceAlerts(
+    input: {
+      status?: OpenApi.AlertStatus;
+      taskId?: string;
+      cameraId?: string;
+      offset?: number;
+      limit?: number;
+    } = {},
+  ): Promise<OpenApi.AlertPage> {
+    const query = new URLSearchParams();
+    if (input.status) query.set("status", input.status);
+    if (input.taskId) query.set("task_id", input.taskId);
+    if (input.cameraId) query.set("camera_id", input.cameraId);
+    query.set("offset", String(input.offset ?? 0));
+    query.set("limit", String(input.limit ?? 50));
+    return this.transport<OpenApi.AlertPage>(
+      "GET",
+      "/api/v1/surveillance/alerts?" + query.toString(),
+    );
+  }
+
+  triageSurveillanceAlert(
+    alertId: string,
+    input: {
+      expectedRevision: number;
+      status: "confirmed" | "false_positive" | "ignored";
+      reason: string;
+      notes?: string;
+    },
+  ): Promise<OpenApi.AlertRecord> {
+    return this.transport<OpenApi.AlertRecord>(
+      "PATCH",
+      "/api/v1/surveillance/alerts/" + encodeURIComponent(alertId) + "/status",
+      {
+        body: {
+          expected_revision: input.expectedRevision,
+          status: input.status,
+          reason: input.reason,
+          notes: input.notes ?? "",
+        },
+      },
+    );
+  }
+
+  createSurveillanceAlertFeedback(
+    alertId: string,
+    correction: Record<string, unknown> = {},
+  ): Promise<FeedbackRecord> {
+    return this.transport<FeedbackRecord>(
+      "POST",
+      "/api/v1/surveillance/alerts/" +
+        encodeURIComponent(alertId) +
+        "/feedback",
+      { body: { correction } },
+    );
   }
 
   createFeedback(feedback: Record<string, unknown>): Promise<FeedbackRecord> {
-    return this.transport<FeedbackRecord>("POST", "/api/v1/feedback", { body: feedback });
+    return this.transport<FeedbackRecord>("POST", "/api/v1/feedback", {
+      body: feedback,
+    });
   }
 
   listFeedback(): Promise<FeedbackRecord[]> {
     return this.transport<FeedbackRecord[]>("GET", "/api/v1/feedback");
   }
 
-  reviewFeedback(feedbackId: string, status: "approved" | "rejected", notes = ""): Promise<FeedbackRecord> {
+  reviewFeedback(
+    feedbackId: string,
+    status: "approved" | "rejected",
+    notes = "",
+  ): Promise<FeedbackRecord> {
     return this.transport<FeedbackRecord>(
       "POST",
       "/api/v1/feedback/" + encodeURIComponent(feedbackId) + "/review",
@@ -1145,23 +1770,33 @@ export class ScenaraClient {
     labelSchema?: string;
     split?: "train" | "validation" | "test";
   }): Promise<HardSampleManifest> {
-    return this.transport<HardSampleManifest>("POST", "/api/v1/hard-sample-manifests", {
-      body: {
-        dataset_id: input.datasetId,
-        version: input.version,
-        feedback_ids: input.feedbackIds,
-        label_schema: input.labelSchema ?? "scenara.feedback.correction.v1",
-        split: input.split ?? "train",
+    return this.transport<HardSampleManifest>(
+      "POST",
+      "/api/v1/hard-sample-manifests",
+      {
+        body: {
+          dataset_id: input.datasetId,
+          version: input.version,
+          feedback_ids: input.feedbackIds,
+          label_schema: input.labelSchema ?? "scenara.feedback.correction.v1",
+          split: input.split ?? "train",
+        },
       },
-    });
+    );
   }
 
   createModelRelease(release: Record<string, unknown>): Promise<ModelRelease> {
-    return this.transport<ModelRelease>("POST", "/api/v1/model-releases", { body: release });
+    return this.transport<ModelRelease>("POST", "/api/v1/model-releases", {
+      body: release,
+    });
   }
 
   admitModelPackage(modelPackage: ModelPackage): Promise<ModelPackage> {
-    return this.transport<ModelPackage>("POST", "/api/v1/model-packages/admissions", { body: modelPackage });
+    return this.transport<ModelPackage>(
+      "POST",
+      "/api/v1/model-packages/admissions",
+      { body: modelPackage },
+    );
   }
 
   listModelReleases(): Promise<ModelRelease[]> {
@@ -1176,12 +1811,20 @@ export class ScenaraClient {
   ): Promise<ModelRelease> {
     return this.transport<ModelRelease>(
       "POST",
-      "/api/v1/model-releases/" + encodeURIComponent(modelId) + "/versions/" + encodeURIComponent(version) + "/transition",
+      "/api/v1/model-releases/" +
+        encodeURIComponent(modelId) +
+        "/versions/" +
+        encodeURIComponent(version) +
+        "/transition",
       { body: { status, reason } },
     );
   }
 
-  rollbackModelRelease(modelId: string, targetVersion: string, reason: string): Promise<ModelRelease> {
+  rollbackModelRelease(
+    modelId: string,
+    targetVersion: string,
+    reason: string,
+  ): Promise<ModelRelease> {
     return this.transport<ModelRelease>(
       "POST",
       "/api/v1/model-releases/" + encodeURIComponent(modelId) + "/rollback",
@@ -1190,19 +1833,33 @@ export class ScenaraClient {
   }
 
   listModelDeploymentEvents(limit = 100): Promise<ModelDeploymentEvent[]> {
-    return this.transport<ModelDeploymentEvent[]>("GET", "/api/v1/model-deployment-events?limit=" + String(limit));
+    return this.transport<ModelDeploymentEvent[]>(
+      "GET",
+      "/api/v1/model-deployment-events?limit=" + String(limit),
+    );
   }
 
-  async waitResult(runId: string, options: { timeoutMs?: number; pollMs?: number } = {}): Promise<ResultEnvelope> {
+  async waitResult(
+    runId: string,
+    options: { timeoutMs?: number; pollMs?: number } = {},
+  ): Promise<ResultEnvelope> {
     const deadline = Date.now() + (options.timeoutMs ?? 300000);
     while (Date.now() < deadline) {
       const run = await this.getRun(runId);
       if (run.status === "completed") return await this.getResult(runId);
       if (["failed", "cancelled"].includes(run.status)) {
-        throw new ScenaraError(run.error_code ?? "RUN_TERMINATED", run.termination_reason ?? run.status);
+        throw new ScenaraError(
+          run.error_code ?? "RUN_TERMINATED",
+          run.termination_reason ?? run.status,
+        );
       }
-      await new Promise((resolve) => setTimeout(resolve, options.pollMs ?? 500));
+      await new Promise((resolve) =>
+        setTimeout(resolve, options.pollMs ?? 500),
+      );
     }
-    throw new ScenaraError("RUN_TIMEOUT", "Run did not complete before timeout");
+    throw new ScenaraError(
+      "RUN_TIMEOUT",
+      "Run did not complete before timeout",
+    );
   }
 }

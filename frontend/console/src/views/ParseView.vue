@@ -322,7 +322,7 @@ function syncRunToHistory(r: Run): void {
             ...item,
             status: r.status,
             progress: r.progress,
-            finished_at: r.finished_at ?? item.finished_at,
+            completed_at: r.completed_at ?? item.completed_at,
             termination_reason: r.termination_reason ?? item.termination_reason,
             error_code: r.error_code ?? item.error_code,
           }
@@ -1686,7 +1686,7 @@ watch(
 );
 watch(
   () => [run.value?.run_id, run.value?.status, run.value?.progress],
-  ([newId, newStatus]) => {
+  ([, newStatus]) => {
     if (run.value) {
       syncRunToHistory(run.value);
       if (

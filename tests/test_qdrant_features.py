@@ -13,8 +13,10 @@ class FakeQdrant:
         self.collections: set[str] = set()
         self.metadata: dict[str, dict[str, object]] = {}
         self.metadata_ids: dict[str, object] = {}
+        self.modern_scroll_response = False
 
     async def request(self, method: str, path: str, **kwargs: object) -> httpx.Response:
+        path = path.split("?", 1)[0]
         body = kwargs.get("json")
         assert body is None or isinstance(body, dict)
         self.requests.append((method, path, body))
@@ -44,24 +46,27 @@ class FakeQdrant:
                 },
             )
         if method == "POST" and path.endswith("/points/scroll"):
+            point = {
+                "id": "feat_a",
+                "vector": [1.0, 0.0],
+                "payload": {
+                    "tenant_id": "tenant_a",
+                    "project_id": "project_a",
+                    "feature_space_id": "person/body/reid",
+                    "subject_type": "person",
+                    "subject_id": "person_a",
+                    "created_at": 10.0,
+                    "expires_at": 20.0,
+                },
+            }
+            if self.modern_scroll_response:
+                return httpx.Response(200, json={"result": {"points": [point], "next_page_offset": None}})
             return httpx.Response(
                 200,
                 json={
                     "result": [
                         [
-                            {
-                                "id": "feat_a",
-                                "vector": [1.0, 0.0],
-                                "payload": {
-                                    "tenant_id": "tenant_a",
-                                    "project_id": "project_a",
-                                    "feature_space_id": "person/body/reid",
-                                    "subject_type": "person",
-                                    "subject_id": "person_a",
-                                    "created_at": 10.0,
-                                    "expires_at": 20.0,
-                                },
-                            }
+                            point
                         ],
                         None,
                     ]
@@ -196,3 +201,21 @@ async def test_qdrant_feature_store_deletes_expired_and_subject_records() -> Non
     deletes = [body for method, path, body in fake.requests if method == "POST" and path.endswith("/points/delete")]
     assert len(deletes) == 2
     assert all(body and len(body["points"]) == 1 for body in deletes)
+
+
+@pytest.mark.asyncio
+async def test_qdrant_feature_store_supports_modern_scroll_points_response() -> None:
+    fake = FakeQdrant()
+    fake.modern_scroll_response = True
+    store = QdrantFeatureStore("https://qdrant.example", client=fake)  # type: ignore[arg-type]
+    space = FeatureSpace(
+        feature_space_id="person/body/reid",
+        domain="portrait",
+        modality="body",
+        model_id="osnet",
+        model_version="1.0.0",
+        dimension=2,
+        distance_metric=DistanceMetric.COSINE,
+    )
+    await store.create_space(space)
+    assert await store.delete_subject("tenant_a", "project_a", "person", "person_a") == 1

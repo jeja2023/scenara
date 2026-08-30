@@ -7,7 +7,7 @@ from typing import Literal, Protocol
 
 SAFE_COMPONENT = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}")
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
-RetentionCategory = Literal["raw_media", "preview", "structured_result", "pending_upload", "secret"]
+RetentionCategory = Literal["raw_media", "preview", "structured_result", "alert_snapshot", "pending_upload", "secret"]
 
 
 class ObjectStoreError(RuntimeError):

@@ -117,5 +117,18 @@ class PostgresPortraitRepository:
             row = await cursor.fetchone()
         return PortraitEnrollment.model_validate(row[0]) if row else None
 
+    async def list_enrollments(
+        self, tenant_id: str, project_id: str, identity_id: str
+    ) -> list[PortraitEnrollment]:
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """SELECT document FROM scenara_portrait_enrollments
+                   WHERE tenant_id = %s AND project_id = %s AND identity_id = %s
+                   ORDER BY created_at ASC, enrollment_id ASC""",
+                (tenant_id, project_id, identity_id),
+            )
+            rows = await cursor.fetchall()
+        return [PortraitEnrollment.model_validate(row[0]) for row in rows]
+
 
 __all__ = ["PostgresPortraitRepository"]

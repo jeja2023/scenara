@@ -148,7 +148,9 @@ def test_keyframe_strategy_only_keeps_container_keyframes(fake_capture: type[_Fa
     )
     assert [unit.unit_id for unit in decoded.units] == ["frame_0", "frame_8", "frame_16", "frame_24", "frame_32"]
     assert decoded.metadata.keyframe_count == 5
-    assert decoded.metadata.timestamp_source == "position_msec"
+    # Modern OpenCV exposes CAP_PROP_PTS; prefer decoder timing over the
+    # less precise position_msec fallback when it is available.
+    assert decoded.metadata.timestamp_source == "decoder_pts"
 
 
 def test_keyframe_strategy_rejects_backends_without_decoded_frame_types(
@@ -375,6 +377,43 @@ def test_stream_allows_an_initial_connection_when_reconnects_are_disabled(
     assert len(decoded.units) == 1
     assert decoded.units[0].pts_ms == 0
     assert _SingleCapture.created == 1
+
+
+def test_stream_uses_pyav_fallback_when_opencv_returns_no_frames(monkeypatch: pytest.MonkeyPatch) -> None:
+    class _EmptyCapture:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            del args, kwargs
+
+        def isOpened(self) -> bool:
+            return True
+
+        def get(self, _field: int) -> float:
+            return 0.0
+
+        def read(self) -> tuple[bool, None]:
+            return False, None
+
+        def release(self) -> None:
+            return None
+
+    fallback_result = object()
+    received: dict[str, object] = {}
+
+    def fallback(media: MediaInput, **kwargs: object) -> object:
+        received["media"] = media
+        received["kwargs"] = kwargs
+        return fallback_result
+
+    monkeypatch.setattr("scenara.platform.media_batch.cv2.VideoCapture", _EmptyCapture)
+    monkeypatch.setattr("scenara.platform.media_batch._decode_stream_with_pyav", fallback)
+    decoded = decode_media(
+        MediaInput(kind=MediaKind.STREAM, content_type="video/rtsp", source_url="rtsp://example.test/live"),
+        sample_interval_ms=1_000,
+        max_reconnect_attempts=0,
+    )
+    assert decoded is fallback_result
+    assert isinstance(received["media"], MediaInput)
+    assert received["media"].source_url == "rtsp://example.test/live"
 
 
 @pytest.mark.asyncio

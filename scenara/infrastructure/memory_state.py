@@ -824,6 +824,30 @@ class MemoryStateStore:
                 raise StateConflict("object retention record already exists")
             self._object_retention[key] = record.model_copy(deep=True)
 
+    async def protect_object_for_alert(
+        self,
+        tenant_id: str,
+        project_id: str,
+        object_key: str,
+        alert_id: str,
+        expires_at: float,
+    ) -> bool:
+        async with self._lock:
+            key = self._key(tenant_id, project_id, object_key)
+            current = self._object_retention.get(key)
+            if current is None or current.deleted_at is not None:
+                return False
+            effective_expiry = max(current.expires_at or 0, expires_at)
+            self._object_retention[key] = current.model_copy(
+                update={
+                    "category": "alert_snapshot",
+                    "owner_type": "surveillance_alert",
+                    "owner_id": alert_id,
+                    "expires_at": effective_expiry,
+                }
+            )
+            return True
+
     async def expired_object_keys(self, before: float, limit: int) -> list[str]:
         async with self._lock:
             keys = [

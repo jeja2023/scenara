@@ -777,8 +777,8 @@ class ObjectRetentionRecord(StrictModel):
     tenant_id: str
     project_id: str
     object_key: str
-    category: Literal["raw_media", "preview", "structured_result", "biometric"]
-    owner_type: Literal["media_asset", "run_result", "portrait_enrollment"]
+    category: Literal["raw_media", "preview", "structured_result", "biometric", "alert_snapshot"]
+    owner_type: Literal["media_asset", "run_result", "portrait_enrollment", "surveillance_alert"]
     owner_id: str
     created_at: float
     expires_at: float | None = None

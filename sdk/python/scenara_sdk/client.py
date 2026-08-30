@@ -5,7 +5,7 @@ import hashlib
 import time
 import uuid
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 import httpx
 
@@ -45,10 +45,14 @@ from .models import (
     Run,
     SampleStrategy,
     SavedSearch,
+    SurveillanceAlert,
+    SurveillanceTask,
     ServiceAccount,
     UserAccount,
     WebhookDelivery,
     WebhookSubscription,
+    Watchlist,
+    WatchlistMember,
 )
 
 TERMINAL_STATUSES = {"completed", "failed", "cancelled"}
@@ -563,6 +567,104 @@ class ScenaraClient:
 
     def delete_saved_search(self, saved_search_id: str) -> None:
         self._request("DELETE", f"/api/v1/search/saved/{saved_search_id}")
+
+    def create_watchlist(
+        self,
+        name: str,
+        *,
+        category: Literal["blacklist", "whitelist", "custom"] = "custom",
+        description: str = "",
+    ) -> Watchlist:
+        return cast(
+            Watchlist,
+            self._request(
+                "POST",
+                "/api/v1/surveillance/watchlists",
+                json={"name": name, "category": category, "description": description},
+            ),
+        )
+
+    def list_watchlists(self, *, offset: int = 0, limit: int = 50) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self._request("GET", "/api/v1/surveillance/watchlists", params={"offset": offset, "limit": limit}),
+        )
+
+    def add_watchlist_member(
+        self,
+        watchlist_id: str,
+        portrait_identity_id: str,
+        *,
+        display_label: str = "",
+        valid_from: float | None = None,
+        valid_until: float | None = None,
+    ) -> WatchlistMember:
+        return cast(
+            WatchlistMember,
+            self._request(
+                "POST",
+                f"/api/v1/surveillance/watchlists/{watchlist_id}/members",
+                json={
+                    "portrait_identity_id": portrait_identity_id,
+                    "display_label": display_label,
+                    "valid_from": valid_from,
+                    "valid_until": valid_until,
+                },
+            ),
+        )
+
+    def create_surveillance_task(self, task: dict[str, Any]) -> SurveillanceTask:
+        return cast(SurveillanceTask, self._request("POST", "/api/v1/surveillance/tasks", json=task))
+
+    def list_surveillance_tasks(self, *, offset: int = 0, limit: int = 50) -> dict[str, Any]:
+        return cast(
+            dict[str, Any],
+            self._request("GET", "/api/v1/surveillance/tasks", params={"offset": offset, "limit": limit}),
+        )
+
+    def start_surveillance_task(self, task_id: str) -> SurveillanceTask:
+        return cast(SurveillanceTask, self._request("POST", f"/api/v1/surveillance/tasks/{task_id}/start"))
+
+    def pause_surveillance_task(self, task_id: str) -> SurveillanceTask:
+        return cast(SurveillanceTask, self._request("POST", f"/api/v1/surveillance/tasks/{task_id}/pause"))
+
+    def list_surveillance_alerts(self, **params: Any) -> dict[str, Any]:
+        return cast(dict[str, Any], self._request("GET", "/api/v1/surveillance/alerts", params=params))
+
+    def triage_surveillance_alert(
+        self,
+        alert_id: str,
+        *,
+        expected_revision: int,
+        status: Literal["confirmed", "false_positive", "ignored"],
+        reason: str,
+        notes: str = "",
+    ) -> SurveillanceAlert:
+        return cast(
+            SurveillanceAlert,
+            self._request(
+                "PATCH",
+                f"/api/v1/surveillance/alerts/{alert_id}/status",
+                json={
+                    "expected_revision": expected_revision,
+                    "status": status,
+                    "reason": reason,
+                    "notes": notes,
+                },
+            ),
+        )
+
+    def create_surveillance_alert_feedback(
+        self, alert_id: str, *, correction: dict[str, Any] | None = None
+    ) -> FeedbackRecord:
+        return cast(
+            FeedbackRecord,
+            self._request(
+                "POST",
+                f"/api/v1/surveillance/alerts/{alert_id}/feedback",
+                json={"correction": correction or {}},
+            ),
+        )
 
     def export_audit(self, *, format: str = "json", **filters: Any) -> bytes:
         response = self._client.get("/api/v1/audit/export", params={"format": format, **filters})

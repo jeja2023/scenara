@@ -130,6 +130,7 @@ class Settings:
     trajectory_min_frame_count: int
     trajectory_max_templates: int
     trajectory_default_transition_seconds: float
+    surveillance_alert_snapshot_retention_days: int
 
     @property
     def production(self) -> bool:
@@ -325,6 +326,10 @@ def load_settings() -> Settings:
         trajectory_max_templates=max(1, min(1_000, int(os.getenv("SCENARA_TRAJECTORY_MAX_TEMPLATES", "32")))),
         trajectory_default_transition_seconds=_ratio(
             "SCENARA_TRAJECTORY_DEFAULT_TRANSITION_SECONDS", 0.0, maximum=86_400.0
+        ),
+        surveillance_alert_snapshot_retention_days=max(
+            1,
+            min(3650, int(os.getenv("SCENARA_SURVEILLANCE_ALERT_SNAPSHOT_RETENTION_DAYS", "30"))),
         ),
     )
     settings.validate()

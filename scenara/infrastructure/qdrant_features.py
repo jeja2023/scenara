@@ -194,7 +194,7 @@ class QdrantFeatureStore:
         vector = normalize_embedding(feature.embedding, space.dimension)
         await self._request(
             "PUT",
-            f"/collections/{self._collection(space, self._prefix)}/points",
+            f"/collections/{self._collection(space, self._prefix)}/points?wait=true",
             body={
                 "points": [
                     {
@@ -362,7 +362,17 @@ class QdrantFeatureStore:
             f"/collections/{self._collection(space, self._prefix)}/points/scroll",
             body={"limit": limit, "with_payload": True, "with_vector": with_vector, "filter": {"must": must}},
         )
-        rows = result.get("result", [[], None])[0] if isinstance(result, dict) else []
+        payload = result.get("result") if isinstance(result, dict) else None
+        # Qdrant <= 1.17 returned ``[points, next_page_offset]`` while
+        # 1.18 returns ``{"points": [...], "next_page_offset": ...}``.
+        # Accept both forms so provider upgrades do not break deletion,
+        # retention sweeps, or subject cleanup.
+        if isinstance(payload, list):
+            rows = payload[0] if payload else []
+        elif isinstance(payload, dict):
+            rows = payload.get("points", [])
+        else:
+            rows = []
         return [row for row in rows if isinstance(row, dict)]
 
     async def _delete_ids(self, ids: list[str], *, space: FeatureSpace | None = None) -> None:
@@ -370,8 +380,8 @@ class QdrantFeatureStore:
         for item in spaces:
             await self._request(
                 "POST",
-                f"/collections/{self._collection(item, self._prefix)}/points/delete",
-                body={"points": ids, "wait": True},
+                f"/collections/{self._collection(item, self._prefix)}/points/delete?wait=true",
+                body={"points": ids},
             )
 
     @staticmethod

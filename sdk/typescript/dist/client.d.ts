@@ -1,4 +1,5 @@
 import type { AccessFoundationStatus, AuditEventPage, ApiKeyRecord, CreateApiKeyResponse, DatasetRecord, DatasetVersion, Domain, FeedbackRecord, HardSampleManifest, IamSummary, MediaAsset, MediaAssetPage, MediaSource, MediaSourcePage, MediaSourceProbe, Membership, ModelDeploymentEvent, ModelPackage, ModelRelease, Organization, ParseDocumentResponse, ParseImageResponse, ParseVideoResponse, PresignedMediaDownload, PortraitCompareResponse, IndexDefinition, IndexHit, IndexRecordView, SearchResponse, SavedSearch, SavedSearchPage, PortraitIntelligenceStatus, ProductCatalogItem, ProductEntitlement, Project, RepositoryContractCatalog, RepositoryTopology, ResultEnvelope, ResultPage, Run, RunPage, RunStatus, SampleStrategy, Role, ServiceAccount, UserAccount, WebhookDelivery, WebhookSubscription } from "./types.js";
+import type { OpenApi } from "./generated.js";
 export type ScenaraTransport = <T>(method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE", path: string, options?: {
     body?: unknown;
     idempotencyKey?: string;
@@ -357,6 +358,36 @@ export declare class ScenaraClient {
     }): Promise<SavedSearch>;
     runSavedSearch(savedSearchId: string): Promise<SearchResponse>;
     deleteSavedSearch(savedSearchId: string): Promise<void>;
+    createWatchlist(input: {
+        name: string;
+        category?: "blacklist" | "whitelist" | "custom";
+        description?: string;
+    }): Promise<OpenApi.Watchlist>;
+    listWatchlists(offset?: number, limit?: number): Promise<OpenApi.WatchlistPage>;
+    addWatchlistMember(watchlistId: string, input: {
+        portraitIdentityId: string;
+        displayLabel?: string;
+        validFrom?: number;
+        validUntil?: number;
+    }): Promise<OpenApi.WatchlistMember>;
+    createSurveillanceTask(input: OpenApi.CreateSurveillanceTaskRequest): Promise<OpenApi.SurveillanceTask>;
+    listSurveillanceTasks(offset?: number, limit?: number): Promise<OpenApi.SurveillanceTaskPage>;
+    startSurveillanceTask(taskId: string): Promise<OpenApi.SurveillanceTask>;
+    pauseSurveillanceTask(taskId: string): Promise<OpenApi.SurveillanceTask>;
+    listSurveillanceAlerts(input?: {
+        status?: OpenApi.AlertStatus;
+        taskId?: string;
+        cameraId?: string;
+        offset?: number;
+        limit?: number;
+    }): Promise<OpenApi.AlertPage>;
+    triageSurveillanceAlert(alertId: string, input: {
+        expectedRevision: number;
+        status: "confirmed" | "false_positive" | "ignored";
+        reason: string;
+        notes?: string;
+    }): Promise<OpenApi.AlertRecord>;
+    createSurveillanceAlertFeedback(alertId: string, correction?: Record<string, unknown>): Promise<FeedbackRecord>;
     createFeedback(feedback: Record<string, unknown>): Promise<FeedbackRecord>;
     listFeedback(): Promise<FeedbackRecord[]>;
     reviewFeedback(feedbackId: string, status: "approved" | "rejected", notes?: string): Promise<FeedbackRecord>;

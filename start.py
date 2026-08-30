@@ -188,6 +188,15 @@ def _minio_server_path(runtime_root: Path) -> Path | None:
     return Path(installed) if installed else None
 
 
+def _qdrant_server_path(runtime_root: Path) -> Path | None:
+    executable = "qdrant.exe" if os.name == "nt" else "qdrant"
+    bundled = sorted(runtime_root.glob(f"qdrant-*/**/{executable}"), reverse=True)
+    if bundled:
+        return bundled[0]
+    installed = shutil.which(executable)
+    return Path(installed) if installed else None
+
+
 def _start_local_minio(env_file: Path, runtime_root: Path) -> subprocess.Popen[bytes] | None:
     if (_dotenv_value(env_file, "SCENARA_OBJECT_BACKEND") or "local").lower() != "s3":
         return None
@@ -333,6 +342,71 @@ def _start_local_redis(env_file: Path, runtime_root: Path) -> subprocess.Popen[b
     raise RuntimeError(f"Redis 启动超时：{host}:{port}；日志：{logs_dir / f'redis-{port}.log'}")
 
 
+def _start_local_qdrant(env_file: Path, runtime_root: Path) -> subprocess.Popen[bytes] | None:
+    qdrant_url = _dotenv_value(env_file, "SCENARA_QDRANT_URL")
+    if not qdrant_url:
+        return None
+    parsed = urlsplit(qdrant_url)
+    host = parsed.hostname
+    if parsed.scheme not in {"http", "https"} or host is None:
+        raise RuntimeError(f"Qdrant 地址无效：{qdrant_url}")
+    try:
+        port = parsed.port or 6333
+    except ValueError as exc:
+        raise RuntimeError(f"Qdrant 地址端口无效：{qdrant_url}") from exc
+    if _tcp_open(host, port):
+        return None
+    if host.lower() not in {"127.0.0.1", "localhost", "::1"}:
+        return None
+    executable = _qdrant_server_path(runtime_root)
+    if executable is None:
+        raise RuntimeError(
+            f"Qdrant 未运行：{host}:{port}；未找到本地 qdrant，可清空 SCENARA_QDRANT_URL 或安装官方二进制"
+        )
+
+    data_dir = runtime_root / f"qdrant-data-{port}"
+    logs_dir = runtime_root / "logs"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    config_path = runtime_root / f"qdrant-{port}.yaml"
+    config_path.write_text(
+        "\n".join(
+            (
+                "storage:",
+                f"  storage_path: {data_dir.as_posix()}",
+                f"  snapshots_path: {(data_dir / 'snapshots').as_posix()}",
+                f"  temp_path: {(data_dir / 'temp').as_posix()}",
+                "service:",
+                f"  host: {host}",
+                f"  http_port: {port}",
+                f"  grpc_port: {port + 1}",
+                "telemetry_disabled: true",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    log_path = logs_dir / f"qdrant-{port}.log"
+    log_file = open(log_path, "a", encoding="utf-8")
+    process = subprocess.Popen(
+        [str(executable), "--config-path", str(config_path), "--disable-telemetry"],
+        cwd=executable.parent,
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+    )
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        if _tcp_open(host, port):
+            print(f"Qdrant 已自动启动：{host}:{port}（进程 {process.pid}）")
+            return process
+        exit_code = process.poll()
+        if exit_code is not None:
+            raise RuntimeError(f"Qdrant 启动失败，状态码：{exit_code}；日志：{log_path}")
+        time.sleep(0.1)
+    _stop(process)
+    raise RuntimeError(f"Qdrant 启动超时：{host}:{port}；日志：{log_path}")
+
+
 def _stop(process: subprocess.Popen[bytes]) -> None:
     if process.poll() is not None:
         return
@@ -384,6 +458,9 @@ def _run(args: argparse.Namespace) -> int:
             redis = _start_local_redis(env_file, runtime_root)
             if redis is not None:
                 processes.append(redis)
+            qdrant = _start_local_qdrant(env_file, runtime_root)
+            if qdrant is not None:
+                processes.append(qdrant)
 
         api = subprocess.Popen(_api_command(args, env_file), cwd=ROOT, env=child_env)
         processes.append(api)

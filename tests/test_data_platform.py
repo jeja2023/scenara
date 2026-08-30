@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from dataclasses import replace
 
@@ -126,6 +127,44 @@ async def test_http_data_client_maps_legacy_dataset_version_states() -> None:
     )
     assert received["body"] == {"status": "ready"}
     assert result.status == DatasetVersionStatus.VALIDATED
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_http_data_client_pages_through_data_service_limit_for_core_page() -> None:
+    requests: list[dict[str, str]] = []
+    rows = [
+        {
+            "dataset_id": f"dst_{index:03d}",
+            "tenant_id": "tenant-a",
+            "project_id": "project-a",
+            "name": f"dataset {index}",
+            "description": "",
+            "status": "draft",
+            "dataset_metadata": {},
+            "created_at": "2026-08-30T00:00:00Z",
+            "updated_at": "2026-08-30T00:00:00Z",
+        }
+        for index in range(150)
+    ]
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(dict(request.url.params))
+        cursor = request.url.params.get("cursor")
+        offset = 0 if cursor is None else int(base64.urlsafe_b64decode(cursor).decode("ascii"))
+        limit = int(request.url.params["limit"])
+        return httpx.Response(200, json={"items": rows[offset : offset + limit], "total": len(rows)})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="https://data.example")
+    gateway = HttpDataPlatformClient("https://ignored.example", client=client)
+    page = await gateway.list_datasets(
+        PrincipalContext(tenant_id="tenant-a", project_id="project-a", principal_id="user-a"), offset=0, limit=200
+    )
+    assert len(page.items) == 150
+    assert page.total == 150
+    assert [request["limit"] for request in requests] == ["100", "100"]
+    assert requests[0].get("cursor") is None
+    assert requests[1]["cursor"] == "MTAw"
     await client.aclose()
 
 

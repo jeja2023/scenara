@@ -167,6 +167,59 @@ class SavedSearch(TypedDict):
     last_run_at: float | None
 
 
+class Watchlist(TypedDict):
+    watchlist_id: str
+    tenant_id: str
+    project_id: str
+    name: str
+    category: Literal["blacklist", "whitelist", "custom"]
+    description: str
+    status: Literal["active", "paused", "archived"]
+    created_by: str
+    created_at: float
+    updated_at: float
+    revision: int
+
+
+class WatchlistMember(TypedDict):
+    member_id: str
+    watchlist_id: str
+    portrait_identity_id: str
+    status: Literal["active", "paused", "removed"]
+    display_label: str
+    valid_from: float | None
+    valid_until: float | None
+    revision: int
+
+
+class SurveillanceTask(TypedDict):
+    task_id: str
+    tenant_id: str
+    project_id: str
+    name: str
+    status: Literal["draft", "active", "paused", "expired", "failed"]
+    watchlist_ids: list[str]
+    bindings: list[dict[str, Any]]
+    threshold_policy: dict[str, Any]
+    cooldown_seconds: int
+    alert_level: Literal["critical", "warning", "info"]
+    revision: int
+
+
+class SurveillanceAlert(TypedDict):
+    alert_id: str
+    task_id: str
+    camera_id: str
+    portrait_identity_id: str
+    match_score: float
+    modality: Literal["face", "body", "fused"]
+    status: Literal["pending", "confirmed", "false_positive", "ignored"]
+    occurrence_count: int
+    run_id: str
+    snapshot_artifact_id: str | None
+    revision: int
+
+
 class ModelPackage(TypedDict):
     schema_version: Literal["1.0"]
     model_id: str

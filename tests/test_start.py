@@ -20,6 +20,10 @@ def _minio_env(path: Path, *, endpoint: str = "http://127.0.0.1:9000") -> None:
     )
 
 
+def _qdrant_env(path: Path, *, endpoint: str = "http://127.0.0.1:6333") -> None:
+    path.write_text(f"SCENARA_QDRANT_URL={endpoint}\n", encoding="utf-8")
+
+
 def test_existing_minio_is_reused(tmp_path: Path, monkeypatch: Any) -> None:
     env_file = tmp_path / ".env"
     _minio_env(env_file)
@@ -102,6 +106,32 @@ def test_bundled_redis_is_started_for_local_endpoint(tmp_path: Path, monkeypatch
         "6380",
     ]
     assert "--appendonly" in captured["command"]
+    assert captured["kwargs"]["cwd"] == executable.parent
+
+
+def test_bundled_qdrant_is_started_for_local_endpoint(tmp_path: Path, monkeypatch: Any) -> None:
+    env_file = tmp_path / ".env"
+    _qdrant_env(env_file)
+    binary_name = "qdrant.exe" if os.name == "nt" else "qdrant"
+    executable = tmp_path / "qdrant-1.18.2" / binary_name
+    executable.parent.mkdir(parents=True)
+    executable.touch()
+    monkeypatch.delenv("SCENARA_QDRANT_URL", raising=False)
+    connectivity = iter((False, True))
+    monkeypatch.setattr(start, "_tcp_open", lambda _host, _port: next(connectivity))
+    captured: dict[str, Any] = {}
+    process = SimpleNamespace(pid=44, poll=lambda: None)
+
+    def popen(command: list[str], **kwargs: Any) -> Any:
+        captured["command"] = command
+        captured["kwargs"] = kwargs
+        return process
+
+    monkeypatch.setattr(start.subprocess, "Popen", popen)
+
+    assert start._start_local_qdrant(env_file, tmp_path) is process
+    assert captured["command"][:2] == [str(executable), "--config-path"]
+    assert "--disable-telemetry" in captured["command"]
     assert captured["kwargs"]["cwd"] == executable.parent
 
 

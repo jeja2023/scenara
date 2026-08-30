@@ -42,10 +42,14 @@ from .models import (
     RunStatus,
     SampleStrategy,
     SavedSearch,
+    SurveillanceAlert,
+    SurveillanceTask,
     ServiceAccount,
     UserAccount,
     WebhookDelivery,
     WebhookSubscription,
+    Watchlist,
+    WatchlistMember,
 )
 
 __all__ = [
@@ -90,11 +94,15 @@ __all__ = [
     "RunStatus",
     "SampleStrategy",
     "SavedSearch",
+    "SurveillanceAlert",
+    "SurveillanceTask",
     "ScenaraClient",
     "ScenaraError",
     "ServiceAccount",
     "UserAccount",
     "WebhookDelivery",
     "WebhookSubscription",
+    "Watchlist",
+    "WatchlistMember",
     "__version__",
 ]

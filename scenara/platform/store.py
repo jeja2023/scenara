@@ -278,6 +278,15 @@ class StateStore(Protocol):
 
     async def track_object(self, record: ObjectRetentionRecord) -> None: ...
 
+    async def protect_object_for_alert(
+        self,
+        tenant_id: str,
+        project_id: str,
+        object_key: str,
+        alert_id: str,
+        expires_at: float,
+    ) -> bool: ...
+
     async def expired_object_keys(self, before: float, limit: int) -> list[str]: ...
 
     async def mark_objects_deleted(self, object_keys: list[str], deleted_at: float) -> None: ...

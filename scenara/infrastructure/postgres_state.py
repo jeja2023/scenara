@@ -1323,6 +1323,24 @@ class PostgresStateStore:
             if cursor.rowcount != 1:
                 raise StateConflict("object retention record already exists")
 
+    async def protect_object_for_alert(
+        self,
+        tenant_id: str,
+        project_id: str,
+        object_key: str,
+        alert_id: str,
+        expires_at: float,
+    ) -> bool:
+        async with self._pool.connection() as conn, conn.transaction():
+            cursor = await conn.execute(
+                """UPDATE scenara_object_retention
+                   SET category = 'alert_snapshot', owner_type = 'surveillance_alert', owner_id = %s,
+                       expires_at = GREATEST(COALESCE(expires_at, '-infinity'::timestamptz), to_timestamp(%s))
+                   WHERE tenant_id = %s AND project_id = %s AND object_key = %s AND deleted_at IS NULL""",
+                (alert_id, expires_at, tenant_id, project_id, object_key),
+            )
+        return int(cursor.rowcount) == 1
+
     async def expired_object_keys(self, before: float, limit: int) -> list[str]:
         async with self._pool.connection() as conn:
             cursor = await conn.execute(

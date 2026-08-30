@@ -33,7 +33,10 @@ export class ScenaraClient {
             idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
             body: {
                 domain: input.domain,
-                pipeline: { pipeline_id: input.pipelineId, version: input.pipelineVersion },
+                pipeline: {
+                    pipeline_id: input.pipelineId,
+                    version: input.pipelineVersion,
+                },
                 asset_id: input.assetId,
                 source_id: input.sourceId,
                 parameters: input.parameters ?? {},
@@ -63,7 +66,10 @@ export class ScenaraClient {
             unit_offset: String(unitOffset),
             unit_limit: String(unitLimit),
         });
-        return this.transport("GET", "/api/v1/runs/" + encodeURIComponent(runId) + "/result?" + query.toString());
+        return this.transport("GET", "/api/v1/runs/" +
+            encodeURIComponent(runId) +
+            "/result?" +
+            query.toString());
     }
     /**
      * Download one derived image declared by a run result: a feature crop
@@ -71,7 +77,10 @@ export class ScenaraClient {
      * (`frame_artifact_id` on a media unit).
      */
     getResultArtifact(runId, artifactId) {
-        return this.transport("GET", "/api/v1/runs/" + encodeURIComponent(runId) + "/artifacts/" + encodeURIComponent(artifactId));
+        return this.transport("GET", "/api/v1/runs/" +
+            encodeURIComponent(runId) +
+            "/artifacts/" +
+            encodeURIComponent(artifactId));
     }
     pauseRun(runId) {
         return this.transport("POST", "/api/v1/runs/" + encodeURIComponent(runId) + "/pause");
@@ -80,13 +89,18 @@ export class ScenaraClient {
         return this.transport("POST", "/api/v1/runs/" + encodeURIComponent(runId) + "/resume");
     }
     listAssets(offset = 0, limit = 50) {
-        return this.transport("GET", "/api/v1/media/assets?offset=" + String(offset) + "&limit=" + String(limit));
+        return this.transport("GET", "/api/v1/media/assets?offset=" +
+            String(offset) +
+            "&limit=" +
+            String(limit));
     }
     uploadAsset(input) {
         const form = new FormData();
         form.append("file", input.file, input.filename);
         form.append("kind", input.kind ?? "image");
-        return this.transport("POST", "/api/v1/media/assets", { body: form });
+        return this.transport("POST", "/api/v1/media/assets", {
+            body: form,
+        });
     }
     async uploadAssetDirect(input) {
         const digest = await crypto.subtle.digest("SHA-256", await input.file.arrayBuffer());
@@ -119,7 +133,10 @@ export class ScenaraClient {
     }
     getAssetDownloadUrl(assetId, expiresIn) {
         const query = expiresIn === undefined ? "" : "?expires_in=" + String(expiresIn);
-        return this.transport("GET", "/api/v1/media/assets/" + encodeURIComponent(assetId) + "/download-url" + query);
+        return this.transport("GET", "/api/v1/media/assets/" +
+            encodeURIComponent(assetId) +
+            "/download-url" +
+            query);
     }
     parseImage(input) {
         const form = new FormData();
@@ -178,10 +195,13 @@ export class ScenaraClient {
     }
     parseStream(input) {
         const domain = input.domain ?? "portrait";
-        const pipelineId = input.pipelineId ?? (domain === "portrait" ? "portrait.person-detection" : "ocr.document");
+        const pipelineId = input.pipelineId ??
+            (domain === "portrait" ? "portrait.person-detection" : "ocr.document");
         const pipeline = {
             pipeline_id: pipelineId,
-            ...(input.pipelineVersion === undefined ? {} : { version: input.pipelineVersion }),
+            ...(input.pipelineVersion === undefined
+                ? {}
+                : { version: input.pipelineVersion }),
         };
         return this.transport("POST", "/api/v1/parse/stream", {
             idempotencyKey: input.idempotencyKey ?? crypto.randomUUID(),
@@ -193,9 +213,13 @@ export class ScenaraClient {
                     sample_interval_ms: input.sampleIntervalMs ?? 1000,
                     sample_strategy: input.sampleStrategy ?? "interval",
                     sample_start_ms: input.sampleStartMs ?? 0,
-                    ...(input.sampleEndMs === undefined ? {} : { sample_end_ms: input.sampleEndMs }),
+                    ...(input.sampleEndMs === undefined
+                        ? {}
+                        : { sample_end_ms: input.sampleEndMs }),
                     scene_change_threshold: input.sceneChangeThreshold ?? 0.35,
-                    ...(input.frameMaxEdge === undefined ? {} : { frame_max_edge: input.frameMaxEdge }),
+                    ...(input.frameMaxEdge === undefined
+                        ? {}
+                        : { frame_max_edge: input.frameMaxEdge }),
                     max_reconnect_attempts: input.maxReconnectAttempts ?? 3,
                     connect_timeout_ms: input.connectTimeoutMs ?? 10000,
                     read_timeout_ms: input.readTimeoutMs ?? 10000,
@@ -215,18 +239,28 @@ export class ScenaraClient {
         return this.transport("GET", "/api/v1/media/assets/" + encodeURIComponent(assetId) + "/preview");
     }
     listSources(offset = 0, limit = 50) {
-        return this.transport("GET", "/api/v1/media/sources?offset=" + String(offset) + "&limit=" + String(limit));
+        return this.transport("GET", "/api/v1/media/sources?offset=" +
+            String(offset) +
+            "&limit=" +
+            String(limit));
     }
     createSource(input) {
         return this.transport("POST", "/api/v1/media/sources", {
-            body: { name: input.name, url: input.url, metadata: input.metadata ?? {} },
+            body: {
+                name: input.name,
+                url: input.url,
+                metadata: input.metadata ?? {},
+            },
         });
     }
     getSource(sourceId) {
         return this.transport("GET", "/api/v1/media/sources/" + encodeURIComponent(sourceId));
     }
     probeSource(sourceId, timeoutMs = 10000) {
-        return this.transport("POST", "/api/v1/media/sources/" + encodeURIComponent(sourceId) + "/probe?timeout_ms=" + String(timeoutMs));
+        return this.transport("POST", "/api/v1/media/sources/" +
+            encodeURIComponent(sourceId) +
+            "/probe?timeout_ms=" +
+            String(timeoutMs));
     }
     deleteSource(sourceId) {
         return this.transport("DELETE", "/api/v1/media/sources/" + encodeURIComponent(sourceId));
@@ -278,7 +312,11 @@ export class ScenaraClient {
     }
     createUser(input) {
         return this.transport("POST", "/api/v1/platform/users", {
-            body: { display_name: input.displayName, user_id: input.userId, email: input.email },
+            body: {
+                display_name: input.displayName,
+                user_id: input.userId,
+                email: input.email,
+            },
         });
     }
     listUsers() {
@@ -324,7 +362,9 @@ export class ScenaraClient {
         return this.transport("GET", "/api/v1/platform/service-accounts");
     }
     createApiKey(input) {
-        return this.transport("POST", "/api/v1/platform/service-accounts/" + encodeURIComponent(input.serviceAccountId) + "/api-keys", {
+        return this.transport("POST", "/api/v1/platform/service-accounts/" +
+            encodeURIComponent(input.serviceAccountId) +
+            "/api-keys", {
             body: {
                 name: input.name,
                 scopes: input.scopes,
@@ -353,14 +393,20 @@ export class ScenaraClient {
         return this.transport("GET", "/api/v1/platform/product-entitlements");
     }
     updateProductEntitlement(input) {
-        return this.transport("PUT", "/api/v1/platform/product-entitlements/" + encodeURIComponent(input.productId), { body: { status: input.status, source: input.source ?? "manual" } });
+        return this.transport("PUT", "/api/v1/platform/product-entitlements/" +
+            encodeURIComponent(input.productId), { body: { status: input.status, source: input.source ?? "manual" } });
     }
     listModels() {
         return this.transport("GET", "/api/v1/models");
     }
     createWebhookSubscription(input) {
         return this.transport("POST", "/api/v1/webhooks/subscriptions", {
-            body: { name: input.name, url: input.url, secret: input.secret, event_types: input.eventTypes },
+            body: {
+                name: input.name,
+                url: input.url,
+                secret: input.secret,
+                event_types: input.eventTypes,
+            },
         });
     }
     listWebhookSubscriptions() {
@@ -381,7 +427,9 @@ export class ScenaraClient {
         return this.transport("DELETE", "/api/v1/portrait/identities/" + encodeURIComponent(identityId));
     }
     enrollPortraitIdentity(identityId, enrollment) {
-        return this.transport("POST", "/api/v1/portrait/identities/" + encodeURIComponent(identityId) + "/enrollments", { body: enrollment });
+        return this.transport("POST", "/api/v1/portrait/identities/" +
+            encodeURIComponent(identityId) +
+            "/enrollments", { body: enrollment });
     }
     searchPortrait(query) {
         return this.transport("POST", "/api/v1/portrait/search", { body: query });
@@ -404,13 +452,17 @@ export class ScenaraClient {
         return this.controlPlane("GET", "/api/v1/platform/identity-providers");
     }
     probeIdentityProvider(providerId) {
-        return this.controlPlane("POST", "/api/v1/platform/identity-providers/" + encodeURIComponent(providerId) + "/probe");
+        return this.controlPlane("POST", "/api/v1/platform/identity-providers/" +
+            encodeURIComponent(providerId) +
+            "/probe");
     }
     requestProjectLifecycle(input) {
         return this.controlPlane("POST", "/api/v1/platform/projects/lifecycle-requests", input);
     }
     decideProjectLifecycle(requestId, input) {
-        return this.controlPlane("POST", "/api/v1/platform/projects/lifecycle-requests/" + encodeURIComponent(requestId) + "/decide", input);
+        return this.controlPlane("POST", "/api/v1/platform/projects/lifecycle-requests/" +
+            encodeURIComponent(requestId) +
+            "/decide", input);
     }
     setAuditRetention(input) {
         return this.controlPlane("PUT", "/api/v1/platform/audit/retention", input);
@@ -432,7 +484,10 @@ export class ScenaraClient {
         return this.controlPlane("POST", "/api/v1/platform/quotas/plans", input);
     }
     checkQuota(metric, amount = 1) {
-        return this.controlPlane("POST", "/api/v1/platform/quotas/check", { metric, amount });
+        return this.controlPlane("POST", "/api/v1/platform/quotas/check", {
+            metric,
+            amount,
+        });
     }
     createAnnotationTask(input) {
         return this.controlPlane("POST", "/api/v1/data/annotation-tasks", input);
@@ -441,7 +496,9 @@ export class ScenaraClient {
         return this.controlPlane("POST", "/api/v1/data/annotation-providers", input);
     }
     probeAnnotationProvider(providerId) {
-        return this.controlPlane("POST", "/api/v1/data/annotation-providers/" + encodeURIComponent(providerId) + "/probe");
+        return this.controlPlane("POST", "/api/v1/data/annotation-providers/" +
+            encodeURIComponent(providerId) +
+            "/probe");
     }
     reviewAnnotationTask(taskId, input) {
         return this.controlPlane("POST", "/api/v1/data/annotation-tasks/" + encodeURIComponent(taskId) + "/review", input);
@@ -462,7 +519,9 @@ export class ScenaraClient {
         return this.controlPlane("POST", "/api/v1/search/evaluations", input);
     }
     rebuildIndex(indexId) {
-        return this.controlPlane("POST", "/api/v1/indexes/rebuild", { index_id: indexId });
+        return this.controlPlane("POST", "/api/v1/indexes/rebuild", {
+            index_id: indexId,
+        });
     }
     createIndex(input) {
         return this.controlPlane("POST", "/api/v1/indexes", input);
@@ -471,7 +530,9 @@ export class ScenaraClient {
         return this.controlPlane("POST", "/api/v1/search/index-backends", input);
     }
     probeIndexBackend(backendId) {
-        return this.controlPlane("POST", "/api/v1/search/index-backends/" + encodeURIComponent(backendId) + "/probe");
+        return this.controlPlane("POST", "/api/v1/search/index-backends/" +
+            encodeURIComponent(backendId) +
+            "/probe");
     }
     registerSearchReranker(input) {
         return this.controlPlane("POST", "/api/v1/search/rerankers", input);
@@ -489,7 +550,9 @@ export class ScenaraClient {
         return this.controlPlane("POST", "/api/v1/edge/deployments", input);
     }
     acknowledgeEdgeDeployment(deploymentId, input = {}) {
-        return this.controlPlane("POST", "/api/v1/edge/deployments/" + encodeURIComponent(deploymentId) + "/acknowledge", input);
+        return this.controlPlane("POST", "/api/v1/edge/deployments/" +
+            encodeURIComponent(deploymentId) +
+            "/acknowledge", input);
     }
     registerAgentTool(input) {
         return this.controlPlane("POST", "/api/v1/agents/tools", input);
@@ -513,7 +576,10 @@ export class ScenaraClient {
         return this.controlPlane("PUT", "/api/v1/agents/memory", input);
     }
     getAgentMemory(namespace, key) {
-        return this.controlPlane("GET", "/api/v1/agents/memory?namespace=" + encodeURIComponent(namespace) + "&key=" + encodeURIComponent(key));
+        return this.controlPlane("GET", "/api/v1/agents/memory?namespace=" +
+            encodeURIComponent(namespace) +
+            "&key=" +
+            encodeURIComponent(key));
     }
     getDeploymentTopology() {
         return this.controlPlane("GET", "/api/v1/platform/deployment/topology");
@@ -523,7 +589,11 @@ export class ScenaraClient {
     }
     createDataset(input) {
         return this.transport("POST", "/api/v1/datasets", {
-            body: { name: input.name, description: input.description ?? "", metadata: input.metadata ?? {} },
+            body: {
+                name: input.name,
+                description: input.description ?? "",
+                metadata: input.metadata ?? {},
+            },
         });
     }
     getDataset(datasetId) {
@@ -545,10 +615,17 @@ export class ScenaraClient {
         });
     }
     listDatasetVersions(datasetId, offset = 0, limit = 50) {
-        return this.transport("GET", "/api/v1/datasets/" + encodeURIComponent(datasetId) + "/versions?offset=" + String(offset) + "&limit=" + String(limit));
+        return this.transport("GET", "/api/v1/datasets/" +
+            encodeURIComponent(datasetId) +
+            "/versions?offset=" +
+            String(offset) +
+            "&limit=" +
+            String(limit));
     }
     transitionDatasetVersion(versionId, status) {
-        return this.transport("POST", "/api/v1/dataset-versions/" + encodeURIComponent(versionId) + "/transition", { body: { status } });
+        return this.transport("POST", "/api/v1/dataset-versions/" +
+            encodeURIComponent(versionId) +
+            "/transition", { body: { status } });
     }
     listAuditEvents(filters = {}) {
         const query = new URLSearchParams();
@@ -571,7 +648,9 @@ export class ScenaraClient {
             form.append("feature_space_id", options.featureSpaceId);
         if (options.quality !== undefined)
             form.append("quality", String(options.quality));
-        return this.transport("POST", "/api/v1/portrait/identities/" + encodeURIComponent(identityId) + "/enrollments/image", { body: form });
+        return this.transport("POST", "/api/v1/portrait/identities/" +
+            encodeURIComponent(identityId) +
+            "/enrollments/image", { body: form });
     }
     searchPortraitImage(file, filename = "portrait-query", options = {}) {
         const form = new FormData();
@@ -645,7 +724,13 @@ export class ScenaraClient {
         return this.transport("POST", "/api/v1/indexes/" + encodeURIComponent(indexId) + "/query/text", { body: { query, limit } });
     }
     querySearchIndexVector(indexId, vector, options = {}) {
-        return this.transport("POST", "/api/v1/indexes/" + encodeURIComponent(indexId) + "/query/vector", { body: { vector, limit: options.limit ?? 20, threshold: options.threshold } });
+        return this.transport("POST", "/api/v1/indexes/" + encodeURIComponent(indexId) + "/query/vector", {
+            body: {
+                vector,
+                limit: options.limit ?? 20,
+                threshold: options.threshold,
+            },
+        });
     }
     searchText(input) {
         return this.transport("POST", "/api/v1/search/text", {
@@ -668,7 +753,9 @@ export class ScenaraClient {
             form.append("limit", String(input.limit));
         if (input.threshold !== undefined)
             form.append("threshold", String(input.threshold));
-        return this.transport("POST", "/api/v1/search/image", { body: form });
+        return this.transport("POST", "/api/v1/search/image", {
+            body: form,
+        });
     }
     searchPortraitAsset(input) {
         return this.transport("POST", "/api/v1/search/asset", {
@@ -683,11 +770,19 @@ export class ScenaraClient {
     }
     createSavedSearch(input) {
         return this.transport("POST", "/api/v1/search/saved", {
-            body: { name: input.name, description: input.description ?? "", mode: input.mode, definition: input.definition },
+            body: {
+                name: input.name,
+                description: input.description ?? "",
+                mode: input.mode,
+                definition: input.definition,
+            },
         });
     }
     listSavedSearches(offset = 0, limit = 50) {
-        return this.transport("GET", "/api/v1/search/saved?offset=" + String(offset) + "&limit=" + String(limit));
+        return this.transport("GET", "/api/v1/search/saved?offset=" +
+            String(offset) +
+            "&limit=" +
+            String(limit));
     }
     getSavedSearch(savedSearchId) {
         return this.transport("GET", "/api/v1/search/saved/" + encodeURIComponent(savedSearchId));
@@ -703,8 +798,73 @@ export class ScenaraClient {
     deleteSavedSearch(savedSearchId) {
         return this.transport("DELETE", "/api/v1/search/saved/" + encodeURIComponent(savedSearchId));
     }
+    createWatchlist(input) {
+        return this.transport("POST", "/api/v1/surveillance/watchlists", { body: input });
+    }
+    listWatchlists(offset = 0, limit = 50) {
+        return this.transport("GET", "/api/v1/surveillance/watchlists?offset=" +
+            String(offset) +
+            "&limit=" +
+            String(limit));
+    }
+    addWatchlistMember(watchlistId, input) {
+        return this.transport("POST", "/api/v1/surveillance/watchlists/" +
+            encodeURIComponent(watchlistId) +
+            "/members", {
+            body: {
+                portrait_identity_id: input.portraitIdentityId,
+                display_label: input.displayLabel ?? "",
+                valid_from: input.validFrom,
+                valid_until: input.validUntil,
+            },
+        });
+    }
+    createSurveillanceTask(input) {
+        return this.transport("POST", "/api/v1/surveillance/tasks", { body: input });
+    }
+    listSurveillanceTasks(offset = 0, limit = 50) {
+        return this.transport("GET", "/api/v1/surveillance/tasks?offset=" +
+            String(offset) +
+            "&limit=" +
+            String(limit));
+    }
+    startSurveillanceTask(taskId) {
+        return this.transport("POST", "/api/v1/surveillance/tasks/" + encodeURIComponent(taskId) + "/start");
+    }
+    pauseSurveillanceTask(taskId) {
+        return this.transport("POST", "/api/v1/surveillance/tasks/" + encodeURIComponent(taskId) + "/pause");
+    }
+    listSurveillanceAlerts(input = {}) {
+        const query = new URLSearchParams();
+        if (input.status)
+            query.set("status", input.status);
+        if (input.taskId)
+            query.set("task_id", input.taskId);
+        if (input.cameraId)
+            query.set("camera_id", input.cameraId);
+        query.set("offset", String(input.offset ?? 0));
+        query.set("limit", String(input.limit ?? 50));
+        return this.transport("GET", "/api/v1/surveillance/alerts?" + query.toString());
+    }
+    triageSurveillanceAlert(alertId, input) {
+        return this.transport("PATCH", "/api/v1/surveillance/alerts/" + encodeURIComponent(alertId) + "/status", {
+            body: {
+                expected_revision: input.expectedRevision,
+                status: input.status,
+                reason: input.reason,
+                notes: input.notes ?? "",
+            },
+        });
+    }
+    createSurveillanceAlertFeedback(alertId, correction = {}) {
+        return this.transport("POST", "/api/v1/surveillance/alerts/" +
+            encodeURIComponent(alertId) +
+            "/feedback", { body: { correction } });
+    }
     createFeedback(feedback) {
-        return this.transport("POST", "/api/v1/feedback", { body: feedback });
+        return this.transport("POST", "/api/v1/feedback", {
+            body: feedback,
+        });
     }
     listFeedback() {
         return this.transport("GET", "/api/v1/feedback");
@@ -724,7 +884,9 @@ export class ScenaraClient {
         });
     }
     createModelRelease(release) {
-        return this.transport("POST", "/api/v1/model-releases", { body: release });
+        return this.transport("POST", "/api/v1/model-releases", {
+            body: release,
+        });
     }
     admitModelPackage(modelPackage) {
         return this.transport("POST", "/api/v1/model-packages/admissions", { body: modelPackage });
@@ -733,7 +895,11 @@ export class ScenaraClient {
         return this.transport("GET", "/api/v1/model-releases");
     }
     transitionModelRelease(modelId, version, status, reason) {
-        return this.transport("POST", "/api/v1/model-releases/" + encodeURIComponent(modelId) + "/versions/" + encodeURIComponent(version) + "/transition", { body: { status, reason } });
+        return this.transport("POST", "/api/v1/model-releases/" +
+            encodeURIComponent(modelId) +
+            "/versions/" +
+            encodeURIComponent(version) +
+            "/transition", { body: { status, reason } });
     }
     rollbackModelRelease(modelId, targetVersion, reason) {
         return this.transport("POST", "/api/v1/model-releases/" + encodeURIComponent(modelId) + "/rollback", { body: { target_version: targetVersion, reason } });

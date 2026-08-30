@@ -261,11 +261,12 @@ class HttpDataPlatformClient:
                 if idempotency_suffix is not None and "Idempotency-Key" in headers:
                     suffix = hashlib.sha256(idempotency_suffix.encode("utf-8")).hexdigest()[:16]
                     headers["Idempotency-Key"] = f"{headers['Idempotency-Key']}:{suffix}"
+                query = {key: value for key, value in (params or {}).items() if value is not None}
                 response = await self._client.request(
                     method,
                     path,
                     headers=headers,
-                    params=params,
+                    params=query,
                     json=body,
                 )
             except httpx.RequestError as exc:
@@ -306,13 +307,7 @@ class HttpDataPlatformClient:
         return _core_dataset(payload)
 
     async def list_datasets(self, context: PrincipalContext, *, offset: int, limit: int) -> DatasetPage:
-        payload = await self._request(
-            context,
-            "GET",
-            "/internal/v1/datasets",
-            params={"cursor": _data_cursor(offset), "limit": limit},
-        )
-        return _core_dataset_page(payload, offset=offset, limit=limit)
+        return await self._paged_datasets(context, offset=offset, limit=limit)
 
     async def update_dataset(
         self, context: PrincipalContext, dataset_id: str, request: UpdateDatasetRequest
@@ -343,13 +338,53 @@ class HttpDataPlatformClient:
     async def list_dataset_versions(
         self, context: PrincipalContext, dataset_id: str, *, offset: int, limit: int
     ) -> DatasetVersionPage:
-        payload = await self._request(
-            context,
-            "GET",
-            f"/internal/v1/datasets/{dataset_id}/versions",
-            params={"cursor": _data_cursor(offset), "limit": limit},
-        )
-        return _core_dataset_version_page(payload, context=context, offset=offset, limit=limit)
+        return await self._paged_dataset_versions(context, dataset_id, offset=offset, limit=limit)
+
+    async def _paged_datasets(self, context: PrincipalContext, *, offset: int, limit: int) -> DatasetPage:
+        """Bridge Core's 200-item page contract to Data's 100-item limit."""
+
+        items: list[DatasetRecord] = []
+        total = 0
+        page_offset = offset
+        while len(items) < limit:
+            page_limit = min(100, limit - len(items))
+            payload = await self._request(
+                context,
+                "GET",
+                "/internal/v1/datasets",
+                params={"cursor": _data_cursor(page_offset), "limit": page_limit},
+            )
+            page = _core_dataset_page(payload, offset=page_offset, limit=page_limit)
+            items.extend(page.items)
+            total = page.total
+            if len(page.items) < page_limit or page_offset + len(page.items) >= total:
+                break
+            page_offset += len(page.items)
+        return DatasetPage(items=items, offset=offset, limit=limit, total=total)
+
+    async def _paged_dataset_versions(
+        self, context: PrincipalContext, dataset_id: str, *, offset: int, limit: int
+    ) -> DatasetVersionPage:
+        """Bridge Core's 200-item page contract to Data's 100-item limit."""
+
+        items: list[DatasetVersion] = []
+        total = 0
+        page_offset = offset
+        while len(items) < limit:
+            page_limit = min(100, limit - len(items))
+            payload = await self._request(
+                context,
+                "GET",
+                f"/internal/v1/datasets/{dataset_id}/versions",
+                params={"cursor": _data_cursor(page_offset), "limit": page_limit},
+            )
+            page = _core_dataset_version_page(payload, context=context, offset=page_offset, limit=page_limit)
+            items.extend(page.items)
+            total = page.total
+            if len(page.items) < page_limit or page_offset + len(page.items) >= total:
+                break
+            page_offset += len(page.items)
+        return DatasetVersionPage(items=items, offset=offset, limit=limit, total=total)
 
     async def transition_dataset_version(
         self, context: PrincipalContext, version_id: str, request: TransitionDatasetVersionRequest

@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "d69098ebdb6c370558372b4fc947d648a06ae3742c286cc9878e6dadbb0ca41d" /** gitleaks:allow - public contract digest */;
+export declare const OPENAPI_SHA256 = "9009fb9691aacb1c4f5e66c15620c509a29dbd1f91d5abe585d50c254385278a" /** gitleaks:allow - public contract digest */;
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
@@ -103,6 +103,56 @@ export declare namespace OpenApi {
         tenant_id: string;
         trace_type: string;
     };
+    type AlertLevel = "critical" | "warning" | "info";
+    type AlertModality = "face" | "body" | "fused";
+    type AlertPage = {
+        items: Array<AlertRecord>;
+        limit: number;
+        offset: number;
+        total: number;
+    };
+    type AlertRecord = {
+        alert_id: string;
+        binding_id: string;
+        camera_id: string;
+        created_at?: number;
+        first_seen_at: number;
+        idempotency_key: string;
+        last_seen_at: number;
+        match_score: number;
+        max_score: number;
+        member_id: string;
+        modality: AlertModality;
+        model_bindings?: {
+            [key: string]: {
+                [key: string]: string;
+            };
+        };
+        occurrence_count?: number;
+        portrait_identity_id: string;
+        project_id: string;
+        revision?: number;
+        run_id: string;
+        snapshot_artifact_id?: (string) | (null);
+        snapshot_retention_expires_at?: (number) | (null);
+        source_id: string;
+        status?: AlertStatus;
+        task_id: string;
+        tenant_id: string;
+        threshold_policy_version: string;
+        track_id?: string;
+        trajectory_identity_id?: (string) | (null);
+        trajectory_segment_id?: (string) | (null);
+        triage_notes?: string;
+        triage_reason?: string;
+        triaged_at?: (number) | (null);
+        triaged_by?: (string) | (null);
+        triggered_at: number;
+        unit_id?: string;
+        updated_at?: number;
+        watchlist_id: string;
+    };
+    type AlertStatus = "pending" | "confirmed" | "false_positive" | "ignored";
     type AnnotationProvider = {
         created_at: number;
         enabled?: boolean;
@@ -160,6 +210,16 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_AgentTrace_ = {
         data: AgentTrace;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_AlertPage_ = {
+        data: AlertPage;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_AlertRecord_ = {
+        data: AlertRecord;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -548,6 +608,16 @@ export declare namespace OpenApi {
         request_id: string;
         schema_version?: "1.0";
     };
+    type ApiEnvelope_SurveillanceTaskPage_ = {
+        data: SurveillanceTaskPage;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_SurveillanceTask_ = {
+        data: SurveillanceTask;
+        request_id: string;
+        schema_version?: "1.0";
+    };
     type ApiEnvelope_SystemStatus_ = {
         data: SystemStatus;
         request_id: string;
@@ -560,6 +630,26 @@ export declare namespace OpenApi {
     };
     type ApiEnvelope_UserAccount_ = {
         data: UserAccount;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_WatchlistMemberPage_ = {
+        data: WatchlistMemberPage;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_WatchlistMember_ = {
+        data: WatchlistMember;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_WatchlistPage_ = {
+        data: WatchlistPage;
+        request_id: string;
+        schema_version?: "1.0";
+    };
+    type ApiEnvelope_Watchlist_ = {
+        data: Watchlist;
         request_id: string;
         schema_version?: "1.0";
     };
@@ -888,6 +978,7 @@ export declare namespace OpenApi {
         threshold?: (number) | (null);
     };
     type Body_create_media_asset_api_v1_media_assets_post = {
+        domain?: (string) | (null);
         file: string;
         kind?: MediaKind;
     };
@@ -984,6 +1075,7 @@ export declare namespace OpenApi {
     };
     type CompleteMediaUploadRequest = {
         content_type: string;
+        domain?: (string) | (null);
         expires_at: number;
         filename?: (string) | (null);
         kind: MediaKind;
@@ -1016,6 +1108,11 @@ export declare namespace OpenApi {
             [key: string]: unknown;
         };
         trace_type: string;
+    };
+    type CreateAlertFeedbackRequest = {
+        correction?: {
+            [key: string]: unknown;
+        };
     };
     type CreateAnnotationProviderRequest = {
         endpoint: string;
@@ -1238,11 +1335,32 @@ export declare namespace OpenApi {
         ttl_seconds?: number;
         user_id: string;
     };
+    type CreateSurveillanceTaskRequest = {
+        alert_level?: AlertLevel;
+        bindings: Array<TaskBinding>;
+        cooldown_seconds?: number;
+        match_policy?: MatchPolicy;
+        name: string;
+        schedule?: SurveillanceSchedule;
+        threshold_policy: ThresholdPolicy;
+        watchlist_ids: Array<string>;
+    };
     type CreateUserRequest = {
         display_name: string;
         email?: (string) | (null);
         password?: (string) | (null);
         user_id?: (AccessId) | (null);
+    };
+    type CreateWatchlistMemberRequest = {
+        display_label?: string;
+        portrait_identity_id: string;
+        valid_from?: (number) | (null);
+        valid_until?: (number) | (null);
+    };
+    type CreateWatchlistRequest = {
+        category?: WatchlistCategory;
+        description?: string;
+        name: string;
     };
     type CreateWebhookSubscriptionRequest = {
         event_types: Array<string>;
@@ -1681,11 +1799,13 @@ export declare namespace OpenApi {
         tenant_id: string;
         updated_at?: number;
     };
+    type MatchPolicy = "alert_on_match" | "suppress_on_match" | "observe_only";
     type MediaAsset = {
         asset_id: string;
         content_type: string;
         created_at: number;
         deleted_at?: (number) | (null);
+        domain?: (string) | (null);
         expires_at?: (number) | (null);
         filename?: (string) | (null);
         kind: MediaKind;
@@ -1881,9 +2001,16 @@ export declare namespace OpenApi {
     type ModelReleaseStatus = "candidate" | "validated" | "approved" | "active" | "retired";
     type OcrDomainPayload = {
         blocks?: Array<OcrTextBlock>;
+        compliance_report?: ({
+            [key: string]: unknown;
+        }) | (null);
         domain?: "ocr";
+        html_layout?: (string) | (null);
         language?: (string) | (null);
         schema_version?: "1.0";
+        slides?: Array<{
+            [key: string]: unknown;
+        }>;
         text?: string;
         [key: string]: unknown;
     };
@@ -2112,6 +2239,7 @@ export declare namespace OpenApi {
     };
     type PresignMediaUploadRequest = {
         content_type: string;
+        domain?: (string) | (null);
         filename?: (string) | (null);
         kind: MediaKind;
         sha256: string;
@@ -2481,6 +2609,15 @@ export declare namespace OpenApi {
         offset: number;
         total: number;
     };
+    type ScheduleException = {
+        date: string;
+        enabled: boolean;
+    };
+    type ScheduleWindow = {
+        end: string;
+        start: string;
+        weekday: number;
+    };
     type SearchAssetRequest = {
         asset_id: string;
         feature_space_id?: (string) | (null);
@@ -2624,6 +2761,36 @@ export declare namespace OpenApi {
         status: "active" | "completed" | "failed" | "cancelled";
         updated_at: number;
     };
+    type SurveillanceSchedule = {
+        exceptions?: Array<ScheduleException>;
+        timezone?: string;
+        weekly?: Array<ScheduleWindow>;
+    };
+    type SurveillanceTask = {
+        alert_level?: AlertLevel;
+        bindings: Array<TaskBinding>;
+        cooldown_seconds?: number;
+        created_at?: number;
+        created_by: string;
+        match_policy?: MatchPolicy;
+        name: string;
+        project_id: string;
+        revision?: number;
+        schedule?: SurveillanceSchedule;
+        status?: SurveillanceTaskStatus;
+        task_id: string;
+        tenant_id: string;
+        threshold_policy: ThresholdPolicy;
+        updated_at?: number;
+        watchlist_ids: Array<string>;
+    };
+    type SurveillanceTaskPage = {
+        items: Array<SurveillanceTask>;
+        limit: number;
+        offset: number;
+        total: number;
+    };
+    type SurveillanceTaskStatus = "draft" | "active" | "paused" | "expired" | "failed";
     type SystemStatus = {
         auth_required: boolean;
         object_backend: string;
@@ -2634,6 +2801,14 @@ export declare namespace OpenApi {
         state_backend: string;
         version: string;
     };
+    type TaskBinding = {
+        active_run_id?: (string) | (null);
+        binding_id: string;
+        camera_id: string;
+        last_error?: (string) | (null);
+        source_id: string;
+        stream_session_id?: (string) | (null);
+    };
     type TemporalSegment = {
         confidence?: (number) | (null);
         description?: string;
@@ -2642,6 +2817,15 @@ export declare namespace OpenApi {
         segment_type: string;
         start_ms: number;
         [key: string]: unknown;
+    };
+    type ThresholdPolicy = {
+        body_threshold?: (number) | (null);
+        body_weight?: number;
+        face_threshold?: (number) | (null);
+        face_weight?: number;
+        min_body_quality?: number;
+        min_face_quality?: number;
+        policy_version: string;
     };
     type TimelineEntry = {
         camera_id: string;
@@ -2691,6 +2875,12 @@ export declare namespace OpenApi {
         reason: string;
         status: ModelReleaseStatus;
     };
+    type TriageAlertRequest = {
+        expected_revision: number;
+        notes?: string;
+        reason: string;
+        status: "confirmed" | "false_positive" | "ignored";
+    };
     type UpdateCameraRequest = {
         display_name?: (string) | (null);
         location?: (string) | (null);
@@ -2724,6 +2914,31 @@ export declare namespace OpenApi {
         description?: (string) | (null);
         name?: (string) | (null);
     };
+    type UpdateSurveillanceTaskRequest = {
+        alert_level?: (AlertLevel) | (null);
+        bindings?: (Array<TaskBinding>) | (null);
+        cooldown_seconds?: (number) | (null);
+        expected_revision: number;
+        match_policy?: (MatchPolicy) | (null);
+        name?: (string) | (null);
+        schedule?: (SurveillanceSchedule) | (null);
+        threshold_policy?: (ThresholdPolicy) | (null);
+        watchlist_ids?: (Array<string>) | (null);
+    };
+    type UpdateWatchlistMemberRequest = {
+        display_label?: (string) | (null);
+        expected_revision: number;
+        status?: (WatchlistMemberStatus) | (null);
+        valid_from?: (number) | (null);
+        valid_until?: (number) | (null);
+    };
+    type UpdateWatchlistRequest = {
+        category?: (WatchlistCategory) | (null);
+        description?: (string) | (null);
+        expected_revision: number;
+        name?: (string) | (null);
+        status?: (WatchlistStatus) | (null);
+    };
     type UserAccount = {
         created_at: number;
         disabled?: boolean;
@@ -2754,6 +2969,49 @@ export declare namespace OpenApi {
         track_id?: (string) | (null);
         [key: string]: unknown;
     };
+    type Watchlist = {
+        category?: WatchlistCategory;
+        created_at?: number;
+        created_by: string;
+        description?: string;
+        name: string;
+        project_id: string;
+        revision?: number;
+        status?: WatchlistStatus;
+        tenant_id: string;
+        updated_at?: number;
+        watchlist_id: string;
+    };
+    type WatchlistCategory = "blacklist" | "whitelist" | "custom";
+    type WatchlistMember = {
+        created_at?: number;
+        created_by: string;
+        display_label?: string;
+        member_id: string;
+        portrait_identity_id: string;
+        project_id: string;
+        revision?: number;
+        status?: WatchlistMemberStatus;
+        tenant_id: string;
+        updated_at?: number;
+        valid_from?: (number) | (null);
+        valid_until?: (number) | (null);
+        watchlist_id: string;
+    };
+    type WatchlistMemberPage = {
+        items: Array<WatchlistMember>;
+        limit: number;
+        offset: number;
+        total: number;
+    };
+    type WatchlistMemberStatus = "active" | "paused" | "removed";
+    type WatchlistPage = {
+        items: Array<Watchlist>;
+        limit: number;
+        offset: number;
+        total: number;
+    };
+    type WatchlistStatus = "active" | "paused" | "archived";
     type WebhookDeliveryRecord = {
         attempts?: number;
         created_at: number;

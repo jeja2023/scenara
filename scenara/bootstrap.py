@@ -18,6 +18,7 @@ from scenara.domains.portrait import PortraitPlugin
 from scenara.domains.portrait.analysis import PortraitAnalysisBackend
 from scenara.domains.portrait.encoder import RuntimePortraitImageEncoder
 from scenara.domains.portrait.service import MemoryPortraitRepository, PortraitRepository, PortraitService
+from scenara.domains.portrait.surveillance import SurveillanceService
 from scenara.domains.portrait.trajectory import (
     MemoryTrajectoryRepository,
     TrajectoryRegistrar,
@@ -41,7 +42,9 @@ from scenara.infrastructure.postgres_feedback import PostgresFeedbackRepository
 from scenara.infrastructure.postgres_index import PostgresIndexStore
 from scenara.infrastructure.postgres_portrait import PostgresPortraitRepository
 from scenara.infrastructure.postgres_state import PostgresStateStore
+from scenara.infrastructure.postgres_surveillance import PostgresSurveillanceRepository
 from scenara.infrastructure.postgres_trajectory import PostgresTrajectoryRepository
+from scenara.infrastructure.memory_surveillance import MemorySurveillanceRepository
 from scenara.infrastructure.queue import InlineRunQueue, RedisRunQueue
 from scenara.platform.access import AccessRepository, AccessService, MemoryAccessRepository
 from scenara.platform.audit import AuditLogger
@@ -55,6 +58,7 @@ from scenara.platform.index import IndexStore, MemoryIndexStore
 from scenara.platform.media import DecodeImageOperator
 from scenara.platform.media_batch import DecodeMediaOperator
 from scenara.platform.model_runtime import ModelRegistry
+from scenara.platform.observability import SurveillanceMetrics
 from scenara.platform.objects import ObjectStore
 from scenara.platform.pipeline import PipelineRegistry
 from scenara.platform.plugins import DomainPluginRegistry
@@ -64,6 +68,7 @@ from scenara.platform.search import SearchService
 from scenara.platform.secrets import EncryptedObjectSecretStore, MemorySecretStore, SecretStore
 from scenara.platform.services import RunService
 from scenara.platform.store import StateStore
+from scenara.platform.surveillance import SurveillanceRepository
 from scenara.platform.webhook_service import WebhookService
 from scenara.settings import Settings, load_settings
 
@@ -88,6 +93,8 @@ class Runtime:
     feedback: FeedbackService
     portrait: PortraitService
     trajectory: TrajectoryService
+    surveillance: SurveillanceService
+    surveillance_metrics: SurveillanceMetrics
     search: SearchService
     data: DataPlatformClient
     control_plane: ControlPlaneService
@@ -178,6 +185,7 @@ def build_runtime(
         feedback_repository: FeedbackRepository = PostgresFeedbackRepository(postgres_state.pool)
         control_plane_store = PostgresControlPlaneStore(postgres_state.pool)
         trajectory_repository: TrajectoryRepository = PostgresTrajectoryRepository(postgres_state.pool)
+        surveillance_repository: SurveillanceRepository = PostgresSurveillanceRepository(postgres_state.pool)
     elif settings.state_backend == "memory":
         state = MemoryStateStore()
         access_repository = MemoryAccessRepository()
@@ -188,6 +196,7 @@ def build_runtime(
         feedback_repository = MemoryFeedbackRepository()
         control_plane_store = MemoryControlPlaneStore()
         trajectory_repository = MemoryTrajectoryRepository()
+        surveillance_repository = MemorySurveillanceRepository()
     else:
         raise RuntimeError(f"unsupported state backend: {settings.state_backend}")
 
@@ -274,6 +283,18 @@ def build_runtime(
         max_templates=settings.trajectory_max_templates,
         default_transition_seconds=settings.trajectory_default_transition_seconds,
     )
+    surveillance_metrics = SurveillanceMetrics()
+    surveillance = SurveillanceService(
+        repository=surveillance_repository,
+        features=features,
+        portraits=portrait_repository,
+        trajectory=trajectory,
+        state=state,
+        policy=policy,
+        audit=audit,
+        alert_snapshot_retention_days=settings.surveillance_alert_snapshot_retention_days,
+        metrics=surveillance_metrics,
+    )
     search = SearchService(
         indexes=indexes,
         state=state,
@@ -323,7 +344,9 @@ def build_runtime(
         run_artifact_frame_max_edge=settings.run_artifact_frame_max_edge,
         indexes=indexes,
         registrars=([TrajectoryRegistrar(trajectory)] if settings.trajectory_enabled else []),
+        observation_evaluators=(surveillance,),
     )
+    surveillance.bind_run_service(runs)
     access = AccessService(access_repository, audit, policy)
     control_plane = ControlPlaneService(
         control_plane_store, policy, audit, indexes=indexes, access=access, audit_store=state
@@ -361,6 +384,8 @@ def build_runtime(
         policy=policy,
         portrait=portrait,
         trajectory=trajectory,
+        surveillance=surveillance,
+        surveillance_metrics=surveillance_metrics,
         search=search,
         data=data,
         control_plane=control_plane,

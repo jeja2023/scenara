@@ -192,6 +192,171 @@ export interface TimelineEntry {
   transition_seconds: number | null;
 }
 
+export type WatchlistCategory = "blacklist" | "whitelist" | "custom";
+export type WatchlistStatus = "active" | "paused" | "archived";
+export type WatchlistMemberStatus = "active" | "paused" | "removed";
+export type SurveillanceTaskStatus =
+  "draft" | "active" | "paused" | "expired" | "failed";
+export type SurveillanceAlertStatus =
+  "pending" | "confirmed" | "false_positive" | "ignored";
+export type SurveillanceModality = "face" | "body" | "fused";
+
+export interface Watchlist {
+  watchlist_id: string;
+  tenant_id: string;
+  project_id: string;
+  name: string;
+  category: WatchlistCategory;
+  description: string;
+  status: WatchlistStatus;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+  revision: number;
+}
+export interface WatchlistMember {
+  member_id: string;
+  tenant_id: string;
+  project_id: string;
+  watchlist_id: string;
+  portrait_identity_id: string;
+  status: WatchlistMemberStatus;
+  display_label: string;
+  valid_from: number | null;
+  valid_until: number | null;
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+  revision: number;
+}
+export interface SurveillanceTaskBinding {
+  binding_id: string;
+  source_id: string;
+  camera_id: string;
+  active_run_id: string | null;
+  stream_session_id: string | null;
+  last_error: string | null;
+}
+export interface SurveillanceScheduleWindow {
+  weekday: number;
+  start: string;
+  end: string;
+}
+export interface SurveillanceSchedule {
+  timezone: string;
+  weekly: SurveillanceScheduleWindow[];
+  exceptions: Array<{ date: string; enabled: boolean }>;
+}
+export interface ThresholdPolicy {
+  policy_version: string;
+  face_threshold: number | null;
+  body_threshold: number | null;
+  min_face_quality: number;
+  min_body_quality: number;
+  face_weight: number;
+  body_weight: number;
+}
+export interface SurveillanceTask {
+  task_id: string;
+  tenant_id: string;
+  project_id: string;
+  name: string;
+  status: SurveillanceTaskStatus;
+  watchlist_ids: string[];
+  bindings: SurveillanceTaskBinding[];
+  schedule: SurveillanceSchedule;
+  match_policy: "alert_on_match" | "suppress_on_match" | "observe_only";
+  threshold_policy: ThresholdPolicy;
+  cooldown_seconds: number;
+  alert_level: "critical" | "warning" | "info";
+  created_by: string;
+  created_at: number;
+  updated_at: number;
+  revision: number;
+}
+export interface SurveillanceAlert {
+  alert_id: string;
+  tenant_id: string;
+  project_id: string;
+  task_id: string;
+  binding_id: string;
+  watchlist_id: string;
+  member_id: string;
+  portrait_identity_id: string;
+  source_id: string;
+  camera_id: string;
+  run_id: string;
+  unit_id: string;
+  track_id: string;
+  trajectory_identity_id: string | null;
+  trajectory_segment_id: string | null;
+  match_score: number;
+  max_score: number;
+  modality: SurveillanceModality;
+  threshold_policy_version: string;
+  model_bindings: Record<string, Record<string, string>>;
+  snapshot_artifact_id: string | null;
+  snapshot_retention_expires_at: number | null;
+  status: SurveillanceAlertStatus;
+  first_seen_at: number;
+  last_seen_at: number;
+  triggered_at: number;
+  occurrence_count: number;
+  idempotency_key: string;
+  created_at: number;
+  updated_at: number;
+  revision: number;
+  triaged_by: string | null;
+  triaged_at: number | null;
+  triage_reason: string;
+  triage_notes: string;
+}
+export interface SurveillanceAlertEvent {
+  event_id: string;
+  event_cursor: number;
+  event_type: "alert.triggered" | "alert.triaged";
+  event_version: "1.0";
+  occurred_at: string;
+  producer: "scenara";
+  tenant_id: string;
+  project_id: string;
+  trace_id: string | null;
+  alert_id: string;
+  task_id: string;
+  camera_id: string;
+  portrait_identity_id: string;
+  match_score: number;
+  modality: SurveillanceModality;
+  snapshot_artifact_id: string | null;
+  deduplication_key: string;
+  status: SurveillanceAlertStatus;
+  created_at: number;
+}
+export interface WatchlistPage {
+  items: Watchlist[];
+  offset: number;
+  limit: number;
+  total: number;
+}
+export interface WatchlistMemberPage {
+  items: WatchlistMember[];
+  offset: number;
+  limit: number;
+  total: number;
+}
+export interface SurveillanceTaskPage {
+  items: SurveillanceTask[];
+  offset: number;
+  limit: number;
+  total: number;
+}
+export interface SurveillanceAlertPage {
+  items: SurveillanceAlert[];
+  offset: number;
+  limit: number;
+  total: number;
+}
+
 export interface AuditEvent {
   event_id: string;
   tenant_id: string;
@@ -418,6 +583,7 @@ export interface Pipeline {
 }
 export interface PipelineParameterDefinition {
   label: string;
+  description?: string;
   control: "boolean" | "integer" | "number" | "select" | "text";
   default?: unknown;
   minimum?: number | null;
@@ -785,5 +951,3 @@ export interface OcrDomainPayload {
   html_layout?: string | null;
   [key: string]: unknown;
 }
-
-

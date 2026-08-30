@@ -182,6 +182,10 @@ class PortraitRepository(Protocol):
         feature_id: str,
     ) -> PortraitEnrollment | None: ...
 
+    async def list_enrollments(
+        self, tenant_id: str, project_id: str, identity_id: str
+    ) -> list[PortraitEnrollment]: ...
+
 
 class MemoryPortraitRepository:
     def __init__(self) -> None:
@@ -240,6 +244,17 @@ class MemoryPortraitRepository:
     ) -> PortraitEnrollment | None:
         enrollment = self._enrollments.get((tenant_id, project_id, feature_id))
         return enrollment.model_copy(deep=True) if enrollment else None
+
+    async def list_enrollments(
+        self, tenant_id: str, project_id: str, identity_id: str
+    ) -> list[PortraitEnrollment]:
+        rows = [
+            enrollment.model_copy(deep=True)
+            for enrollment in self._enrollments.values()
+            if (enrollment.tenant_id, enrollment.project_id, enrollment.identity_id)
+            == (tenant_id, project_id, identity_id)
+        ]
+        return sorted(rows, key=lambda item: (item.created_at, item.enrollment_id))
 
 
 class PortraitService:
@@ -531,6 +546,17 @@ class PortraitService:
             },
         )
         return stored
+
+    async def list_enrollments(self, context: PrincipalContext, identity_id: str) -> list[PortraitEnrollment]:
+        await require_allowed(
+            self.policy,
+            context,
+            "read",
+            "portrait_identity",
+            {"identity_id": identity_id},
+        )
+        await self.get_identity(context, identity_id)
+        return await self.repository.list_enrollments(context.tenant_id, context.project_id, identity_id)
 
     async def search_image(
         self,

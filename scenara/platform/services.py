@@ -94,6 +94,12 @@ class RunResultRegistrar(Protocol):
     async def register_run_result(self, run: RunRecord, result: ResultEnvelope) -> None: ...
 
 
+class RunObservationEvaluator(Protocol):
+    """Evaluate an in-memory result snapshot without exposing private vectors publicly."""
+
+    async def evaluate_run_result(self, run: RunRecord, result: ResultEnvelope) -> None: ...
+
+
 @dataclass(frozen=True, slots=True)
 class CreateRunOutcome:
     run: RunRecord
@@ -127,6 +133,7 @@ class RunService:
         run_artifact_frame_max_edge: int = 1920,
         indexes: IndexStore | None = None,
         registrars: Sequence[RunResultRegistrar] = (),
+        observation_evaluators: Sequence[RunObservationEvaluator] = (),
     ) -> None:
         self.state = state
         self.objects = objects
@@ -151,6 +158,7 @@ class RunService:
         self.run_artifact_frame_max_edge = run_artifact_frame_max_edge
         self.indexes = indexes
         self.registrars = tuple(registrars)
+        self.observation_evaluators = tuple(observation_evaluators)
         self.queue.set_handler(self.execute_run)
 
     async def create_asset(
@@ -1286,6 +1294,13 @@ class RunService:
                     )
                 try:
                     await self._store_result(execution_run, partial, sink, partial=True)
+                    for evaluator in self.observation_evaluators:
+                        try:
+                            await evaluator.evaluate_run_result(execution_run, partial)
+                        except Exception:
+                            # Surveillance and similar observers enrich a run but must not
+                            # turn an otherwise valid parse result into a failed run.
+                            logger.exception("run observation evaluator failed for run %s", execution_run.run_id)
                     latest = await self.state.get_run(
                         execution_run.tenant_id,
                         execution_run.project_id,
@@ -1388,6 +1403,11 @@ class RunService:
                     # 登记是结果的增益信息，失败不应让整个 run 失败。
                     logger.exception("run result registrar failed for run %s", run.run_id)
             await self._store_result(run, result, sink)
+            for evaluator in self.observation_evaluators:
+                try:
+                    await evaluator.evaluate_run_result(run, result)
+                except Exception:
+                    logger.exception("run observation evaluator failed for run %s", run.run_id)
             latest = await self.state.get_run(run.tenant_id, run.project_id, run.run_id)
             if latest is None:
                 raise ResourceNotFound("run disappeared during execution")
@@ -2015,5 +2035,6 @@ __all__ = [
     "InvalidTransition",
     "ResourceNotFound",
     "RunService",
+    "RunObservationEvaluator",
     "sse_payload",
 ]
