@@ -379,43 +379,6 @@ def test_stream_allows_an_initial_connection_when_reconnects_are_disabled(
     assert _SingleCapture.created == 1
 
 
-def test_stream_uses_pyav_fallback_when_opencv_returns_no_frames(monkeypatch: pytest.MonkeyPatch) -> None:
-    class _EmptyCapture:
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            del args, kwargs
-
-        def isOpened(self) -> bool:
-            return True
-
-        def get(self, _field: int) -> float:
-            return 0.0
-
-        def read(self) -> tuple[bool, None]:
-            return False, None
-
-        def release(self) -> None:
-            return None
-
-    fallback_result = object()
-    received: dict[str, object] = {}
-
-    def fallback(media: MediaInput, **kwargs: object) -> object:
-        received["media"] = media
-        received["kwargs"] = kwargs
-        return fallback_result
-
-    monkeypatch.setattr("scenara.platform.media_batch.cv2.VideoCapture", _EmptyCapture)
-    monkeypatch.setattr("scenara.platform.media_batch._decode_stream_with_pyav", fallback)
-    decoded = decode_media(
-        MediaInput(kind=MediaKind.STREAM, content_type="video/rtsp", source_url="rtsp://example.test/live"),
-        sample_interval_ms=1_000,
-        max_reconnect_attempts=0,
-    )
-    assert decoded is fallback_result
-    assert isinstance(received["media"], MediaInput)
-    assert received["media"].source_url == "rtsp://example.test/live"
-
-
 @pytest.mark.asyncio
 async def test_decode_control_pauses_and_cancels_stream_reads(monkeypatch: pytest.MonkeyPatch) -> None:
     frame = _solid_frame(90)

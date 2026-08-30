@@ -377,168 +377,6 @@ def _effective_frame_max_edge(
     return effective_edge if effective_edge < natural_edge or plan.frame_max_edge is not None else None
 
 
-def _decode_stream_with_pyav(
-    media: MediaInput,
-    *,
-    plan: SamplePlan,
-    connect_timeout_ms: int,
-    read_timeout_ms: int,
-    control: ExecutionControl | None,
-    unit_callback: Callable[[DecodedMediaUnit, int | None], None] | None,
-    retain_units: bool,
-) -> DecodedMedia:
-    """Fallback for live streams when the bundled OpenCV FFmpeg cannot decode them.
-
-    OpenCV packages may bundle a reduced or older FFmpeg.  PyAV is already a
-    production dependency and gives the live ingest path a second decoder with
-    the same frame, sampling, and cancellation contracts.
-    """
-
-    if not media.source_url:
-        raise PipelineError("PyAV stream fallback requires a source URL")
-    try:
-        import av
-    except ImportError as exc:  # pragma: no cover - production lock requires PyAV
-        raise PipelineError("live stream could not be decoded and PyAV is unavailable") from exc
-    options: dict[str, str] = {}
-    if media.source_url.startswith(("rtsp://", "rtsps://")):
-        options["rtsp_transport"] = "tcp"
-    try:
-        container = av.open(
-            media.source_url,
-            mode="r",
-            options=options,
-            timeout=(connect_timeout_ms / 1_000, read_timeout_ms / 1_000),
-        )
-    except Exception as exc:
-        raise PipelineError("video or stream could not be opened") from exc
-    try:
-        stream = next((item for item in container.streams if item.type == "video"), None)
-        if stream is None:
-            raise PipelineError("video or stream has no video track")
-        codec_context = stream.codec_context
-        width, height = int(codec_context.width or 0), int(codec_context.height or 0)
-        fps = float(stream.average_rate) if stream.average_rate else 25.0
-        effective_frame_max_edge = _effective_frame_max_edge(
-            plan,
-            width=width,
-            height=height,
-            estimated_units=None,
-        )
-        started = time.monotonic()
-        segment_started_at: float | None = None
-        units: list[DecodedMediaUnit] = []
-        frame_index = 0
-        sampled_units = 0
-        keyframe_count = 0
-        scene_change_count = 0
-        previous_signature: Any | None = None
-        next_interval_ms = plan.start_ms
-        uniform_step = max(1, round(plan.sample_interval_ms / 1_000 * fps))
-        termination_reason = "source_ended"
-        for frame in container.decode(stream):
-            _check_control(control)
-            frame_index += 1
-            now = time.monotonic()
-            if segment_started_at is None:
-                segment_started_at = now
-            elapsed_ms = int((now - segment_started_at) * 1_000)
-            if plan.stream_segment_duration_ms is not None and elapsed_ms >= plan.stream_segment_duration_ms:
-                termination_reason = "segment_window_completed"
-                break
-            if elapsed_ms < plan.start_ms:
-                continue
-            selected = False
-            bgr: Any | None = None
-            if plan.strategy == SampleStrategy.KEYFRAME:
-                selected = bool(frame.key_frame)
-                if selected:
-                    keyframe_count += 1
-            elif plan.strategy == SampleStrategy.SCENE_CHANGE:
-                array = frame.to_ndarray(format="bgr24")
-                signature = _frame_signature(array)
-                if previous_signature is None:
-                    selected = True
-                else:
-                    selected = _signature_distance(previous_signature, signature) >= plan.scene_change_threshold
-                    if selected:
-                        scene_change_count += 1
-                if selected:
-                    previous_signature = signature
-                if not selected:
-                    continue
-                bgr = array
-            elif plan.strategy == SampleStrategy.UNIFORM:
-                selected = (frame_index - 1) % uniform_step == 0
-            else:
-                selected = elapsed_ms >= next_interval_ms
-                if selected:
-                    while next_interval_ms <= elapsed_ms:
-                        next_interval_ms += plan.sample_interval_ms
-            if not selected:
-                continue
-            bgr = bgr if bgr is not None else frame.to_ndarray(format="bgr24")
-            frame_height, frame_width = bgr.shape[:2]
-            if frame_width <= 0 or frame_height <= 0 or frame_width * frame_height > MAX_PIXELS:
-                raise PipelineError("video frame dimensions exceed the safety limit")
-            image = _downscale(
-                Image.fromarray(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)),
-                effective_frame_max_edge,
-            )
-            unit = DecodedMediaUnit(
-                unit_id=f"frame_{frame_index - 1}",
-                unit_type="frame",
-                index=sampled_units,
-                pts_ms=max(0, elapsed_ms),
-                image=image,
-            )
-            sampled_units += 1
-            if retain_units:
-                units.append(unit)
-            if unit_callback is not None:
-                unit_callback(unit, None)
-        if sampled_units == 0:
-            raise PipelineError("video or stream did not yield a decodable frame")
-        metadata: dict[str, Any] = {
-            "format": container.format.name if container.format is not None else None,
-            "container": container.format.name if container.format is not None else None,
-            "codec": codec_context.name,
-            "width": width or None,
-            "height": height or None,
-            "fps": fps,
-            "sampled_units": sampled_units,
-            "frames_read": frame_index,
-            "sample_interval_ms": plan.sample_interval_ms,
-            "sample_strategy": plan.strategy.value,
-            "sample_start_ms": plan.start_ms,
-            "sample_end_ms": plan.end_ms,
-            "stream_segment_duration_ms": plan.stream_segment_duration_ms,
-            "stream_segment_index": plan.stream_segment_index,
-            "decode_seek_used": False,
-            "reconnect_count": 0,
-            "elapsed_ms": int((time.monotonic() - started) * 1_000),
-            "timestamp_source": "monotonic_clock",
-        }
-        if effective_frame_max_edge is not None:
-            metadata["frame_max_edge"] = effective_frame_max_edge
-        if plan.strategy == SampleStrategy.KEYFRAME:
-            metadata["keyframe_count"] = keyframe_count
-        if plan.strategy == SampleStrategy.SCENE_CHANGE:
-            metadata["scene_change_count"] = scene_change_count
-        return DecodedMedia(
-            kind=media.kind,
-            units=units,
-            metadata=MediaTechnicalMetadata.model_validate({key: value for key, value in metadata.items() if value is not None}),
-            termination_reason=termination_reason,
-        )
-    except PipelineError:
-        raise
-    except Exception as exc:
-        raise PipelineError("video or stream could not be decoded with PyAV") from exc
-    finally:
-        container.close()
-
-
 def _decode_video(
     media: MediaInput,
     *,
@@ -595,16 +433,6 @@ def _decode_video(
 
     capture = open_capture(max(1, max_reconnect_attempts) if is_stream else 1)
     if capture is None:
-        if is_stream:
-            return _decode_stream_with_pyav(
-                media,
-                plan=plan,
-                connect_timeout_ms=connect_timeout_ms,
-                read_timeout_ms=read_timeout_ms,
-                control=control,
-                unit_callback=unit_callback,
-                retain_units=retain_units,
-            )
         raise PipelineError("video or stream could not be opened")
     try:
         metadata = _capture_metadata(capture)
@@ -756,17 +584,6 @@ def _decode_video(
                 termination_reason = "preview_completed"
                 break
         if sampled_units == 0:
-            if is_stream:
-                capture.release()
-                return _decode_stream_with_pyav(
-                    media,
-                    plan=plan,
-                    connect_timeout_ms=connect_timeout_ms,
-                    read_timeout_ms=read_timeout_ms,
-                    control=control,
-                    unit_callback=unit_callback,
-                    retain_units=retain_units,
-                )
             raise PipelineError("video or stream did not yield a decodable frame")
         metadata.update(
             {
