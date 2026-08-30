@@ -158,34 +158,23 @@ def contract_definitions() -> list[dict[str, Any]]:
             "consumer_repository_id": "scenara-data",
             "transport": "immutable_manifest",
             "example": DomainAnnotationSchema(
-                schema_id="scenara.behavior.action.v1",
+                schema_id="scenara.portrait.surveillance-review.v1",
                 version="1.0.0",
-                domain="behavior",
-                task_type="action_recognition",
-                supported_media_kinds=("video", "stream"),
+                domain="portrait",
+                task_type="surveillance_match_review",
+                supported_media_kinds=("image", "video", "stream"),
                 payload_schema={
                     "$schema": "https://json-schema.org/draft/2020-12/schema",
                     "type": "object",
-                    "required": ["actions"],
+                    "required": ["alert_id", "triage_reason", "review_outcome"],
                     "properties": {
-                        "actions": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "required": ["action_type", "start_ms", "end_ms"],
-                                "properties": {
-                                    "action_type": {"type": "string", "minLength": 1},
-                                    "start_ms": {"type": "integer", "minimum": 0},
-                                    "end_ms": {"type": "integer", "minimum": 0},
-                                    "track_id": {"type": ["string", "null"]},
-                                },
-                                "additionalProperties": True,
-                            },
-                        }
+                        "alert_id": {"type": "string", "pattern": "^alt_[A-Za-z0-9]+$"},
+                        "triage_reason": {"type": "string", "minLength": 1, "maxLength": 256},
+                        "review_outcome": {"const": "false_positive"},
                     },
-                    "additionalProperties": False,
+                    "additionalProperties": True,
                 },
-                quality_rules=("non_empty_actions", "valid_temporal_range"),
+                quality_rules=("false_positive_review", "non_empty_triage_reason"),
             ),
         },
         {

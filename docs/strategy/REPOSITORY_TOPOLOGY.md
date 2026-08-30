@@ -33,11 +33,11 @@ flowchart LR
 
 | 契约 | 版本 | 生产方 | 消费方 | 传输方式 | 核心约束 |
 | --- | --- | --- | --- | --- | --- |
-| `model-package-admission` | `1.1.0` | `scenara-model` | `scenara` | 不可变清单 | SHA-256、模型卡、许可元数据、评估证据、领域和多制品清单齐全 |
-| `deployment-feedback` | `1.1.0` | `scenara` | `scenara-model` | 事件 / 签名 Webhook | 版本化结构、租户/项目/领域作用域、运行时版本和审计轨迹齐全 |
-| `hard-sample-handoff` | `1.1.0` | `scenara` | `scenara-data` | 不可变清单 | 仅包含已批准反馈，并通过领域标注模式、授权、脱敏和内容摘要检查 |
-| `dataset-version-input` | `1.1.0` | `scenara-data` | `scenara-model` | 版本化接口 | 数据集版本不可变，领域、标注模式、血缘和访问授权齐全 |
-| `domain-annotation-schema` | `1.1.0` | `scenara-contracts` | `scenara-data` | 不可变清单 | OCR、Behavior、Fashion 等标注模式按版本和摘要锁定 |
+| `model-package-admission` | `1.2.0` | `scenara-model` | `scenara` | 不可变清单 | SHA-256、模型卡、许可元数据、评估证据、领域和多制品清单齐全 |
+| `deployment-feedback` | `1.2.0` | `scenara` | `scenara-model` | 事件 / 签名 Webhook | 版本化结构、租户/项目/领域作用域、运行时版本和审计轨迹齐全 |
+| `hard-sample-handoff` | `1.2.0` | `scenara` | `scenara-data` | 不可变清单 | 仅包含已批准反馈，并通过领域标注模式、授权、脱敏和内容摘要检查 |
+| `dataset-version-input` | `1.2.0` | `scenara-data` | `scenara-model` | 版本化接口 | 数据集版本不可变，领域、标注模式、血缘和访问授权齐全 |
+| `domain-annotation-schema` | `1.2.0` | `scenara-contracts` | `scenara-data` | 不可变清单 | OCR、Behavior、Fashion 与布控误报复核标注模式按版本和摘要锁定 |
 
 当前平台通过 `POST /api/v1/model-packages/admissions` 接收正式 `ModelPackageManifest`。清单必须把模型制品、模型卡和评估证据绑定到 SHA-256，并声明平台已安装配置中的 `runtime_model_id`。发布经过 `candidate -> validated -> approved -> active -> retired`；激活与回滚按租户、项目和能力维护唯一绑定。Run 开始时冻结绑定，避免在途执行被后续切换改变，并把模型标识、版本和摘要写入 Result 来源。
 
@@ -66,7 +66,7 @@ flowchart LR
 
 仓库拓扑通过 `GET /api/v1/platform/repositories` 暴露，当前结构版本为 `1.0`。Python SDK 使用 `get_repository_topology()`，TypeScript SDK 使用 `getRepositoryTopology()`。Console 总览从该接口读取拓扑，但所有面向用户的职责和状态均通过中文标签层展示。
 
-五条正式契约当前发布在 `contracts/repository/v1.1.0/`，采用 JSON Schema Draft 2020-12；`v1.0.0`、`v1.0.1` 作为不可变历史目录保留。每条契约包含 Schema、有效示例与 SHA-256；`manifest.json` 描述生产方、消费方、传输方式和兼容策略，`release-index.json` 锁定已发布清单摘要。`GET /api/v1/platform/contracts` 返回契约目录，`GET /api/v1/platform/contracts/{contract_id}/schema` 返回具体 Schema。Python/TypeScript SDK 分别使用 `get_repository_contracts()` 与 `getRepositoryContracts()` 查询。
+五条正式契约当前发布在 `contracts/repository/v1.2.0/`，采用 JSON Schema Draft 2020-12；`v1.0.0`、`v1.0.1`、`v1.1.0` 作为不可变历史目录保留。每条契约包含 Schema、有效示例与 SHA-256；`manifest.json` 描述生产方、消费方、传输方式和兼容策略，`release-index.json` 锁定已发布清单摘要。`GET /api/v1/platform/contracts` 返回契约目录，`GET /api/v1/platform/contracts/{contract_id}/schema` 返回具体 Schema。Python/TypeScript SDK 分别使用 `get_repository_contracts()` 与 `getRepositoryContracts()` 查询。
 
 CI 执行 `python scripts/repository_contracts.py --check`，验证 Pydantic 模型、Schema、示例、摘要和发布索引零漂移，并生成确定性的 `repository-contracts-1.1.0.zip` 制品。候选版本通过 `--against` 对上一发布版本运行消费方兼容检查；新增必填字段、删除字段、收窄枚举/联合类型、收窄类型或强化字符串、数值和数组约束都会失败。具体命令见 [`contracts/repository/README.md`](../../contracts/repository/README.md)。
 

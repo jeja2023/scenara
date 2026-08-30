@@ -89,6 +89,7 @@ class CreateFeedbackRequest(FeedbackModel):
     model_id: str = Field(min_length=1, max_length=128)
     model_version: str = Field(min_length=1, max_length=64)
     correction: dict[str, Any]
+    annotation_schema_id: str | None = Field(default=None, min_length=1, max_length=256)
     authorized_for_training: bool = False
     deidentified: bool = False
 
@@ -119,6 +120,7 @@ class FeedbackRecord(FeedbackModel):
     model_id: str
     model_version: str
     correction: dict[str, Any]
+    annotation_schema_id: str | None = Field(default=None, min_length=1, max_length=256)
     authorized_for_training: bool
     deidentified: bool
     status: FeedbackStatus = FeedbackStatus.PENDING
@@ -575,6 +577,9 @@ class FeedbackService:
         if allowed_domains is not None and trace["domain"] not in allowed_domains:
             raise FeedbackConflict(f"{body.kind.value} feedback is not valid for domain {trace['domain']}")
         now = time.time()
+        request_data = body.model_dump()
+        if request_data["annotation_schema_id"] is None:
+            request_data["annotation_schema_id"] = ANNOTATION_SCHEMA_BY_DOMAIN.get(trace["domain"])
         record = FeedbackRecord(
             feedback_id=f"fbk_{uuid4().hex}",
             tenant_id=context.tenant_id,
@@ -583,7 +588,7 @@ class FeedbackService:
             created_at=now,
             updated_at=now,
             **trace,
-            **body.model_dump(),
+            **request_data,
         )
         audit = await self._audit.record(
             context,
@@ -658,7 +663,7 @@ class FeedbackService:
                     pipeline_version=record.pipeline_version,
                     correction=record.correction,
                     domain=record.domain,
-                    annotation_schema_id=ANNOTATION_SCHEMA_BY_DOMAIN.get(record.domain or ""),
+                    annotation_schema_id=record.annotation_schema_id,
                 )
             )
         domains = {item.domain for item in items if item.domain is not None}

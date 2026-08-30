@@ -6213,6 +6213,19 @@
       "CreateFeedbackRequest": {
         "additionalProperties": false,
         "properties": {
+          "annotation_schema_id": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation Schema Id"
+          },
           "authorized_for_training": {
             "default": false,
             "title": "Authorized For Training",
@@ -8170,6 +8183,19 @@
       "FeedbackRecord": {
         "additionalProperties": false,
         "properties": {
+          "annotation_schema_id": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Annotation Schema Id"
+          },
           "authorized_for_training": {
             "title": "Authorized For Training",
             "type": "boolean"

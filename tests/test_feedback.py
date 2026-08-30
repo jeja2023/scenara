@@ -234,6 +234,38 @@ async def test_feedback_review_and_hard_sample_manifest_are_fail_closed(feedback
     assert other_tenant.json()["data"] == []
 
 
+@pytest.mark.asyncio
+async def test_surveillance_review_feedback_keeps_its_annotation_schema_in_hard_sample_export(feedback_client) -> None:
+    api, _ = feedback_client
+    body = feedback_body()
+    body.update(
+        {
+            "kind": "false_positive",
+            "annotation_schema_id": "scenara.portrait.surveillance-review.v1",
+            "correction": {
+                "source": "surveillance_alert",
+                "alert_id": "alt_feedbackexport",
+                "triage_reason": "人工排除误报",
+                "review_outcome": "false_positive",
+            },
+        }
+    )
+    created = await api.post("/api/v1/feedback", json=body)
+    assert created.status_code == 201, created.text
+    feedback_id = created.json()["data"]["feedback_id"]
+    reviewed = await api.post(
+        f"/api/v1/feedback/{feedback_id}/review",
+        json={"status": "approved", "notes": "授权和脱敏复核完成"},
+    )
+    assert reviewed.status_code == 200, reviewed.text
+    manifest = await api.post(
+        "/api/v1/hard-sample-manifests",
+        json={"dataset_id": "portrait.surveillance-review", "version": "1.0.0", "feedback_ids": [feedback_id]},
+    )
+    assert manifest.status_code == 201, manifest.text
+    assert manifest.json()["data"]["items"][0]["annotation_schema_id"] == "scenara.portrait.surveillance-review.v1"
+
+
 async def qualification_refs(
     runtime,
     version: str,

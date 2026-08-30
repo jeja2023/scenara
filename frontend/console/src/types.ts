@@ -837,6 +837,7 @@ export interface FeedbackRecord {
   model_id: string;
   model_version: string;
   correction: Record<string, unknown>;
+  annotation_schema_id?: string | null;
   authorized_for_training: boolean;
   deidentified: boolean;
   status: "pending" | "approved" | "rejected";

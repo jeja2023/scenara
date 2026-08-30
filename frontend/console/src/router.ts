@@ -1,6 +1,5 @@
 import {
   Boxes,
-  BellRing,
   Cpu,
   Database,
   FileCheck,
@@ -12,6 +11,7 @@ import {
   LayoutDashboard,
   MessageSquarePlus,
   Route,
+  Radar,
   ScanFace,
   Search,
   Server,
@@ -151,48 +151,58 @@ const routes = [
     },
   },
   {
-    path: "/surveillance/watchlists",
-    name: "surveillance-watchlists",
-    component: () => import("./views/surveillance/WatchlistManagement.vue"),
+    path: "/surveillance",
+    name: "surveillance",
+    component: () => import("./views/surveillance/SurveillanceLayout.vue"),
     meta: {
-      title: "布控名单",
-      description: "管理引用既有人像身份的布控名单与成员有效期。",
-      icon: BellRing,
+      title: "布控预警",
+      description: "统一管理布控名单、任务、实时告警与人工研判。",
+      icon: Radar,
       section: "智能检索",
     },
-  },
-  {
-    path: "/surveillance/tasks",
-    name: "surveillance-tasks",
-    component: () => import("./views/surveillance/TaskManagement.vue"),
-    meta: {
-      title: "布控任务",
-      description: "配置名单、视频源、摄像头、阈值与告警冷却策略。",
-      icon: BellRing,
-      section: "智能检索",
-    },
-  },
-  {
-    path: "/surveillance/live",
-    name: "surveillance-live",
-    component: () => import("./views/surveillance/LiveAlertCenter.vue"),
-    meta: {
-      title: "实时预警",
-      description: "订阅已持久化的实时匹配告警并支持断线恢复。",
-      icon: BellRing,
-      section: "智能检索",
-    },
-  },
-  {
-    path: "/surveillance/alerts",
-    name: "surveillance-alerts",
-    component: () => import("./views/surveillance/AlertHistory.vue"),
-    meta: {
-      title: "告警研判",
-      description: "筛选历史告警、核验抓拍并完成确认、误报或忽略处置。",
-      icon: BellRing,
-      section: "智能检索",
-    },
+    children: [
+      { path: "", redirect: { name: "surveillance-live" } },
+      {
+        path: "watchlists",
+        name: "surveillance-watchlists",
+        component: () => import("./views/surveillance/WatchlistManagement.vue"),
+        meta: {
+          title: "布控名单",
+          description: "管理引用既有人像身份的布控名单与成员有效期。",
+          hideFromNavigation: true,
+        },
+      },
+      {
+        path: "tasks",
+        name: "surveillance-tasks",
+        component: () => import("./views/surveillance/TaskManagement.vue"),
+        meta: {
+          title: "布控任务",
+          description: "配置名单、视频源、摄像头、阈值与告警冷却策略。",
+          hideFromNavigation: true,
+        },
+      },
+      {
+        path: "live",
+        name: "surveillance-live",
+        component: () => import("./views/surveillance/LiveAlertCenter.vue"),
+        meta: {
+          title: "实时预警",
+          description: "订阅已持久化的实时匹配告警并支持断线恢复。",
+          hideFromNavigation: true,
+        },
+      },
+      {
+        path: "alerts",
+        name: "surveillance-alerts",
+        component: () => import("./views/surveillance/AlertHistory.vue"),
+        meta: {
+          title: "告警研判",
+          description: "筛选历史告警、核验抓拍并完成确认、误报或忽略处置。",
+          hideFromNavigation: true,
+        },
+      },
+    ],
   },
   {
     path: "/results",

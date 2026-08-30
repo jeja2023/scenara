@@ -7,7 +7,7 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-CONTRACT_RELEASE_VERSION = "1.1.0"
+CONTRACT_RELEASE_VERSION = "1.2.0"
 CONTRACT_ROOT = Path(__file__).resolve().parents[2] / "contracts" / "repository" / f"v{CONTRACT_RELEASE_VERSION}"
 SHA256 = r"^[0-9a-f]{64}$"
 IMMUTABLE_URI = r"^.+(?:@sha256:|#sha256=)[0-9a-f]{64}$"

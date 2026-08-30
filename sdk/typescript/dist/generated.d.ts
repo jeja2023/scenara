@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "9009fb9691aacb1c4f5e66c15620c509a29dbd1f91d5abe585d50c254385278a" /** gitleaks:allow - public contract digest */;
+export declare const OPENAPI_SHA256 = "9e5823abde49e1491cd4a540065c4cf256e3c5199a4565fc8530be9d7b3650f0" /** gitleaks:allow - public contract digest */;
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
@@ -1165,6 +1165,7 @@ export declare namespace OpenApi {
         pipeline_version: string;
     };
     type CreateFeedbackRequest = {
+        annotation_schema_id?: (string) | (null);
         authorized_for_training?: boolean;
         correction: {
             [key: string]: unknown;
@@ -1516,6 +1517,7 @@ export declare namespace OpenApi {
     };
     type FeedbackKind = "false_positive" | "false_negative" | "wrong_attribute" | "wrong_identity" | "ocr_correction" | "action_correction" | "temporal_correction" | "style_correction" | "character_correction" | "accessory_correction";
     type FeedbackRecord = {
+        annotation_schema_id?: (string) | (null);
         authorized_for_training: boolean;
         correction: {
             [key: string]: unknown;

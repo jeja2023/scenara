@@ -47,7 +47,7 @@ def test_python_sdk_context_lifecycle_and_domain_methods() -> None:
                 content=envelope(
                     {
                         "schema_version": "1.0",
-                        "release_version": "1.1.0",
+                        "release_version": "1.2.0",
                         "package_name": "@scenara/repository-contracts",
                         "contracts": [],
                     }
@@ -136,7 +136,7 @@ def test_python_sdk_context_lifecycle_and_domain_methods() -> None:
         assert client.get_asset_preview("asset-1") == b"jpeg-preview"
         assert client.list_products()[0]["product_id"] == "parse"
         assert client.get_repository_topology()["current_repository_id"] == "scenara"
-        assert client.get_repository_contracts()["release_version"] == "1.1.0"
+        assert client.get_repository_contracts()["release_version"] == "1.2.0"
         assert client.get_access_foundation()["auth_mode"] == "single_bearer_token"
         portrait_intelligence = client.get_portrait_intelligence()
         assert portrait_intelligence["positioning"] == "portrait_intelligence_foundation_platform"

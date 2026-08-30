@@ -516,6 +516,8 @@ tests/
 - `python scripts/run_local_data_cutover_simulation.py`：Core 本地 Adapter 与真实本机 Data HTTP 边界的影子记录对比、幂等重放、读取、更新和归档清理。Core 的 200 条分页契约已桥接为 Data 的最多 100 条分页请求。
 - `python scripts/run_local_evidence_pipeline_simulation.py`：自编写的合成向量和合成模型文件验证“固定阈值早于两次独立运行”、摘要绑定和模型权利候选报告的失败关闭流程；绝不代表真实模型或真实评估集的权利状态。
 
+跨仓库适配已随本功能同步：`scenara-contracts` 发布兼容的 `@scenara/repository-contracts` `1.2.0` 与 `scenara.portrait.surveillance-review.v1`；`scenara-data` 对该模式执行摘要锁定和 JSON Schema 校验，并接收由 Core 审核、授权、脱敏后的布控误报难例；`scenara-model` 将该模式纳入 ReID Dataset Version 和人像 ReID bundle 的准入校验。三端只通过版本化契约、不可变对象引用和 Data Dataset Version 传递，不共享数据库或源码。
+
 仍保持未完成状态的项目是目标环境资格，而不是代码待办：物理摄像头与外部网络的 RTSP/RTMP 实测、目标生产规模 Qdrant、目标 GPU 上 50+ **实际视频解码**压力、真实固定评估集和模型权利批准、外部网络 Webhook/SSE、整库备份恢复和 Data 服务正式切流，必须在实际部署环境取得可复现证据后才可关闭。
 
 | 里程碑 | 核心交付 | 退出条件 |

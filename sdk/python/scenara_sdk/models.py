@@ -505,6 +505,7 @@ class FeedbackRecord(TypedDict):
     model_id: str
     model_version: str
     correction: dict[str, Any]
+    annotation_schema_id: NotRequired[str | None]
     authorized_for_training: bool
     deidentified: bool
     status: FeedbackStatus

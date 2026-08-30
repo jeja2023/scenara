@@ -323,10 +323,7 @@ describe("console information architecture", () => {
         "search",
         "trajectories",
         "portrait-compare",
-        "surveillance-watchlists",
-        "surveillance-tasks",
-        "surveillance-live",
-        "surveillance-alerts",
+        "surveillance",
         "runs",
         "capabilities",
         "pipelines",
@@ -339,6 +336,14 @@ describe("console information architecture", () => {
         "fallback",
       ]),
     );
+    const surveillance = routes.find((route) => route.name === "surveillance");
+    expect(surveillance?.children?.map((route) => route.name)).toEqual([
+      undefined,
+      "surveillance-watchlists",
+      "surveillance-tasks",
+      "surveillance-live",
+      "surveillance-alerts",
+    ]);
   });
 
   it("keeps general-purpose interface labels in Chinese", () => {

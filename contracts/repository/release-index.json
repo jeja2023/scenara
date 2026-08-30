@@ -19,6 +19,12 @@
       "status": "published",
       "manifest_path": "contracts/repository/v1.1.0/manifest.json",
       "manifest_sha256": "74ed21916f89da6b22658376b2df0169847d5cc070f47f75c5ea8437dd4ae3a2"
+    },
+    {
+      "release_version": "1.2.0",
+      "status": "published",
+      "manifest_path": "contracts/repository/v1.2.0/manifest.json",
+      "manifest_sha256": "2889523368f6a4d2297b66fc714dfe38d882add7484605c12dcfa3e2e451d111"
     }
   ]
 }

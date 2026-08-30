@@ -5,7 +5,7 @@
 ## 发布身份
 
 - 应用镜像使用 `repository@sha256:<digest>`，并与源码提交、OpenAPI 摘要、离线包摘要和模型集合摘要绑定。
-- Contracts 固定为 `1.1.0`，Core、Data、Model 消费摘要必须一致。
+- Contracts 固定为 `1.2.0`，Core、Data、Model 消费摘要必须一致。
 - 运行 `python scripts/release_gate.py --implementation-only`；正式发布还必须运行严格门禁且无 pending 证据。
 
 ## 配置与凭据
