@@ -394,8 +394,8 @@ useRefresh(refresh);
 }
 
 .domain-tab-btn.active {
-  color: var(--primary, #0ea5e9);
-  background: #ffffff;
+  color: var(--color-accent-hover, #065e67);
+  background: var(--color-accent-soft, #e4f1f1);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   font-weight: 600;
 }

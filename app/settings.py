@@ -89,7 +89,7 @@ def parse_csv_env(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in os.getenv(name, default).split(",") if item.strip()]
 
 
-APP_VERSION = "0.3.0.dev36"
+APP_VERSION = "0.3.0.dev37"
 PORTRAIT_RUNTIME_PROFILE = (
     os.getenv("PORTRAIT_RUNTIME_PROFILE", os.getenv("APP_ENV", "development")).strip().lower() or "development"
 )

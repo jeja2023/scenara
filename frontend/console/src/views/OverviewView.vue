@@ -1123,8 +1123,8 @@ useRefresh(refresh);
 }
 
 .matrix-tab-btn.active {
-  background: #fff;
-  color: var(--teal, #087682);
+  background: var(--color-accent-soft, #e4f1f1);
+  color: var(--color-accent-hover, #065e67);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 

@@ -420,8 +420,8 @@ textarea:focus-visible {
   background: var(--coral);
 }
 .page {
-  width: min(1420px, 100%);
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
 }
 .page-header {
   display: flex;
@@ -726,6 +726,8 @@ table .icon-button,
   align-items: center;
   gap: 6px;
   margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .pagination-btn {
   height: 26px;
@@ -765,6 +767,31 @@ table .icon-button,
   color: var(--color-text, #17211f);
   background: #fff;
   border: 1px solid var(--line, #e2e8e6);
+}
+.pagination-jumper-input {
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  max-height: 24px !important;
+  padding: 0 4px !important;
+  line-height: 22px;
+  box-sizing: border-box !important;
+  text-align: center;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 4px;
+  background: #fff;
+  color: var(--color-text, #17211f);
+  font-size: 11.5px;
+  outline: none;
+  flex: 0 0 40px !important;
+  -moz-appearance: textfield;
+}
+.pagination-jumper-input::-webkit-outer-spin-button,
+.pagination-jumper-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 .badge {
   display: inline-flex;
@@ -893,8 +920,8 @@ textarea {
   background: rgba(255, 255, 255, 0.55);
 }
 .segmented button.active {
-  background: #fff;
-  color: var(--graphite);
+  background: var(--color-accent-soft, #e4f1f1);
+  color: var(--color-accent-hover, #065e67);
   box-shadow: 0 1px 3px #17211f1a;
   font-weight: 700;
 }

@@ -8,6 +8,7 @@ import {
   listAlerts,
   triageAlert,
 } from "../../api/surveillance";
+import { labelModality, labelSurveillanceAlertStatus } from "../../labels";
 import type { SurveillanceAlert } from "../../types";
 
 const alerts = ref<SurveillanceAlert[]>([]);
@@ -75,16 +76,6 @@ onMounted(() => void refresh());
 
 <template>
   <main class="page alert-page">
-    <header class="page-header">
-      <div>
-        <p class="eyebrow">Surveillance</p>
-        <h1>告警历史与研判</h1>
-        <p>匹配证据不可修改；处置使用版本号控制并留下完整审计记录。</p>
-      </div>
-      <button class="button secondary" @click="refresh">
-        <RefreshCw :size="16" />刷新
-      </button>
-    </header>
     <p v-if="error" class="error-message">{{ error }}</p>
     <section class="panel filters">
       <label
@@ -98,9 +89,12 @@ onMounted(() => void refresh());
       ><label
         >摄像头<input
           v-model.trim="filters.camera_id"
-          placeholder="camera-id"
+          placeholder="输入摄像头编号"
           @change="refresh" /></label
       ><strong>共 {{ total }} 条</strong>
+      <button class="button secondary refresh-btn" @click="refresh">
+        <RefreshCw :size="15" />刷新
+      </button>
     </section>
     <section class="cards">
       <article
@@ -118,11 +112,11 @@ onMounted(() => void refresh());
             <div>
               <h2>{{ alert.camera_id }}</h2>
               <small
-                >{{ format(alert.triggered_at) }} · {{ alert.modality }} ·
+                >{{ format(alert.triggered_at) }} · {{ labelModality(alert.modality) }} ·
                 {{ (alert.match_score * 100).toFixed(1) }}%</small
               >
             </div>
-            <span class="badge" :class="alert.status">{{ alert.status }}</span>
+            <span class="badge" :class="alert.status">{{ labelSurveillanceAlertStatus(alert.status) }}</span>
           </div>
           <dl>
             <div>
@@ -182,27 +176,6 @@ onMounted(() => void refresh());
   display: grid;
   gap: 1rem;
 }
-.page-header {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 1rem;
-}
-.eyebrow {
-  margin: 0;
-  color: var(--accent, #2563eb);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-h1,
-h2,
-p {
-  margin-top: 0;
-}
-h2 {
-  font-size: 1rem;
-  margin-bottom: 0.2rem;
-}
 .panel {
   border: 1px solid var(--border-color, #d9e0ea);
   border-radius: 0.8rem;
@@ -234,6 +207,9 @@ h2 {
   display: flex;
   gap: 0.75rem;
   align-items: end;
+}
+.refresh-btn {
+  margin-left: auto;
 }
 .filters label {
   display: grid;

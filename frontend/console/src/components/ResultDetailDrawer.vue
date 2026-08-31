@@ -1401,9 +1401,9 @@ watch(
 }
 
 .ocr-tab-btn.active {
-  background: var(--surface, #fff);
-  color: var(--brand, #3b82f6);
-  border-color: var(--line, #e2e8f0);
+  background: var(--color-accent-soft, #e4f1f1);
+  color: var(--color-accent-hover, #065e67);
+  border-color: var(--color-accent-soft, #e4f1f1);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
 

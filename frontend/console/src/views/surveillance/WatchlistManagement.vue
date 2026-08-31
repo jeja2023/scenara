@@ -9,6 +9,7 @@ import {
   listMembers,
   listWatchlists,
 } from "../../api/surveillance";
+import { labelWatchlistCategory, labelWatchlistStatus } from "../../labels";
 import type { Watchlist, WatchlistMember } from "../../types";
 
 const watchlists = ref<Watchlist[]>([]);
@@ -81,16 +82,6 @@ onMounted(() => void refresh());
 
 <template>
   <main class="page surveillance-page">
-    <header class="page-header">
-      <div>
-        <p class="eyebrow">Surveillance</p>
-        <h1>布控名单</h1>
-        <p>名单成员引用已注册人像身份；照片和特征始终由人像身份服务管理。</p>
-      </div>
-      <button class="button secondary" :disabled="loading" @click="refresh">
-        <RefreshCw :size="16" />刷新
-      </button>
-    </header>
     <p v-if="error" class="error-message">{{ error }}</p>
 
     <section class="panel form-grid">
@@ -118,7 +109,12 @@ onMounted(() => void refresh());
 
     <section class="split-grid">
       <article class="panel">
-        <h2>名单库</h2>
+        <div class="panel-header-row">
+          <h2>名单库</h2>
+          <button class="button secondary refresh-btn" :disabled="loading" @click="refresh">
+            <RefreshCw :size="14" />刷新
+          </button>
+        </div>
         <button
           v-for="item in watchlists"
           :key="item.watchlist_id"
@@ -131,7 +127,7 @@ onMounted(() => void refresh());
         >
           <span
             ><strong>{{ item.name }}</strong
-            ><small>{{ item.category }} · {{ item.status }}</small></span
+            ><small>{{ labelWatchlistCategory(item.category) }} · {{ labelWatchlistStatus(item.status) }}</small></span
           >
           <small>{{ date(item.updated_at) }}</small>
         </button>
@@ -167,7 +163,7 @@ onMounted(() => void refresh());
             }}</strong
             ><small>{{ member.portrait_identity_id }}</small></span
           >
-          <span class="badge">{{ member.status }}</span>
+          <span class="badge">{{ labelWatchlistStatus(member.status) }}</span>
         </div>
         <p v-if="selectedId && !members.length" class="muted">尚未添加成员。</p>
       </article>
@@ -180,29 +176,19 @@ onMounted(() => void refresh());
   display: grid;
   gap: 1rem;
 }
-.page-header,
 .split-grid {
   display: grid;
   gap: 1rem;
 }
-.page-header {
-  grid-template-columns: 1fr auto;
-  align-items: start;
-}
-.eyebrow {
-  color: var(--accent, #3b82f6);
-  font-weight: 700;
-  margin: 0;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-h1,
-h2,
-p {
-  margin-top: 0;
+.panel-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.8rem;
 }
 h2 {
   font-size: 1rem;
+  margin: 0;
 }
 .panel {
   border: 1px solid var(--border-color, #d9e0ea);

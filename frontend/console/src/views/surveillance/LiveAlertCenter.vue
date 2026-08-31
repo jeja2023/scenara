@@ -4,6 +4,7 @@ import { onBeforeUnmount, onMounted, ref } from "vue";
 
 import { api, apiStream, streamJsonEvents, userFacingError } from "../../api";
 import { listAlerts } from "../../api/surveillance";
+import { labelModality } from "../../labels";
 import type { SurveillanceAlert, SurveillanceAlertEvent } from "../../types";
 
 const alerts = ref<SurveillanceAlert[]>([]);
@@ -82,22 +83,15 @@ onBeforeUnmount(() => controller?.abort());
 
 <template>
   <main class="page live-page">
-    <header class="page-header">
-      <div>
-        <p class="eyebrow">Live Surveillance</p>
-        <h1>实时预警中心</h1>
-        <p>只显示已持久化告警。断线后可按事件游标恢复历史。</p>
-      </div>
-      <div class="toolbar">
-        <span class="connection" :class="{ online: connected }"
-          ><Radio :size="15" />{{ connected ? "已连接" : "重连中" }}</span
-        ><button class="button secondary" @click="muted = !muted">
-          <VolumeX v-if="muted" :size="16" /><Volume2 v-else :size="16" />{{
-            muted ? "开启提示音" : "静音"
-          }}
-        </button>
-      </div>
-    </header>
+    <div class="toolbar live-toolbar">
+      <span class="connection" :class="{ online: connected }"
+        ><Radio :size="15" />{{ connected ? "已连接" : "重连中" }}</span
+      ><button class="button secondary" @click="muted = !muted">
+        <VolumeX v-if="muted" :size="16" /><Volume2 v-else :size="16" />{{
+          muted ? "开启提示音" : "静音"
+        }}
+      </button>
+    </div>
     <p v-if="error" class="error-message">{{ error }}</p>
     <section class="alert-wall">
       <article v-for="alert in alerts" :key="alert.alert_id" class="alert-card">
@@ -108,7 +102,7 @@ onBeforeUnmount(() => controller?.abort());
             ><time>{{ format(alert.triggered_at) }}</time>
           </div>
           <p class="score">{{ (alert.match_score * 100).toFixed(1) }}%</p>
-          <p>{{ alert.modality }} · {{ alert.portrait_identity_id }}</p>
+          <p>{{ labelModality(alert.modality) }} · {{ alert.portrait_identity_id }}</p>
           <small>告警事件 · 已出现 {{ alert.occurrence_count }} 次</small>
         </div>
       </article>
@@ -122,25 +116,9 @@ onBeforeUnmount(() => controller?.abort());
   display: grid;
   gap: 1rem;
 }
-.page-header {
+.live-toolbar {
   display: flex;
-  justify-content: space-between;
-  gap: 1rem;
-  align-items: start;
-}
-.eyebrow {
-  margin: 0;
-  color: var(--accent, #2563eb);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-h1,
-p {
-  margin-top: 0;
-}
-.toolbar {
-  display: flex;
+  justify-content: flex-end;
   gap: 0.6rem;
   align-items: center;
 }

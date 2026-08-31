@@ -325,8 +325,6 @@ const pageDescription = computed(() => {
         <img :src="brandMark" alt="" /><strong>Scenara</strong>
       </div>
       <div class="topbar-context">
-        <span class="context-product">视觉 AI 中枢平台</span>
-        <span class="context-separator"></span>
         <h1 class="context-title">{{ pageTitle }}</h1>
         <span
           v-if="pageDescription"

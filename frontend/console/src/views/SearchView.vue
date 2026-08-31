@@ -997,7 +997,7 @@ useRefresh(runSearch);
 
 <style scoped>
 .search-page {
-  max-width: 1320px;
+  width: 100%;
 }
 .eyebrow {
   display: block;
@@ -1055,10 +1055,11 @@ useRefresh(runSearch);
   color: var(--color-text, #17211f);
 }
 .mode-tab-btn.active {
-  border-bottom-color: #10b981;
-  color: #047857;
+  border-bottom-color: var(--color-accent, #087682);
+  color: var(--color-accent-hover, #065e67);
   font-weight: 600;
-  background: transparent;
+  background: var(--color-accent-soft, #e4f1f1);
+  border-radius: var(--radius-sm, 4px) var(--radius-sm, 4px) 0 0;
 }
 
 .search-form-section {

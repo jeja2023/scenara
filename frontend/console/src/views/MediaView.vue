@@ -4,8 +4,11 @@ import {
   ChevronDown,
   ChevronRight,
   Eye,
+  FileText,
+  Filter,
   Play,
   Plus,
+  RotateCcw,
   Trash2,
   Upload,
   Video,
@@ -21,6 +24,7 @@ import type { MediaAsset, MediaSource, MediaSourceProbe, TableColumn } from "../
 
 type AssetKindFilter = "" | "image" | "video" | "document";
 type AssetDomainFilter = "" | "fashion" | "portrait" | "behavior" | "ocr";
+type MediaTab = "files" | "streams";
 
 const PAGE_SIZE = 20;
 
@@ -43,6 +47,7 @@ const sourceColumns: TableColumn<MediaSource>[] = [
   { key: "actions", label: "操作" },
 ];
 
+const activeTab = ref<MediaTab>("files");
 const loading = ref(false);
 const uploading = ref(false);
 const error = ref("");
@@ -81,6 +86,12 @@ function onPageChange(newOffset: number): void {
 watch([kindFilter, domainFilter], () => {
   offset.value = 0;
 });
+
+function resetFilters(): void {
+  domainFilter.value = "";
+  kindFilter.value = "";
+  offset.value = 0;
+}
 
 const totalSizeBytes = computed(() =>
   filteredAssets.value.reduce((sum, item) => sum + item.size_bytes, 0),
@@ -347,69 +358,60 @@ useRefresh(refresh);
     <p v-if="error" class="callout error">{{ error }}</p>
     <p v-if="message" class="callout success">{{ message }}</p>
 
-    <section class="panel asset-panel">
+    <div class="tabs-header-bar">
+      <div class="domain-tabs" role="tablist" aria-label="数据资产类型切换">
+        <button
+          type="button"
+          class="domain-tab-btn"
+          :class="{ active: activeTab === 'files' }"
+          role="tab"
+          :aria-selected="activeTab === 'files'"
+          @click="activeTab = 'files'"
+        >
+          <FileText :size="13" />
+          <span>文件资产</span>
+          <span class="tab-badge">{{ assets.length }}</span>
+        </button>
+        <button
+          type="button"
+          class="domain-tab-btn"
+          :class="{ active: activeTab === 'streams' }"
+          role="tab"
+          :aria-selected="activeTab === 'streams'"
+          @click="activeTab = 'streams'"
+        >
+          <Video :size="13" />
+          <span>视频流源</span>
+          <span class="tab-badge">{{ sources.length }}</span>
+        </button>
+      </div>
+    </div>
+
+    <section v-if="activeTab === 'files'" class="panel asset-panel">
       <div class="panel-header">
         <div class="header-left">
           <h2>文件资产</h2>
-          <div class="filter-row">
-            <div class="segmented" role="group" aria-label="所属领域筛选">
-              <button
-                :class="{ active: domainFilter === '' }"
-                @click="domainFilter = ''"
-              >
-                全部领域
-              </button>
-              <button
-                :class="{ active: domainFilter === 'fashion' }"
-                @click="domainFilter = 'fashion'"
-              >
-                服饰风格
-              </button>
-              <button
-                :class="{ active: domainFilter === 'portrait' }"
-                @click="domainFilter = 'portrait'"
-              >
-                人像解析
-              </button>
-              <button
-                :class="{ active: domainFilter === 'behavior' }"
-                @click="domainFilter = 'behavior'"
-              >
-                行为分析
-              </button>
-              <button
-                :class="{ active: domainFilter === 'ocr' }"
-                @click="domainFilter = 'ocr'"
-              >
-                文字识别
-              </button>
+          <div class="filter-controls">
+            <div class="filter-heading">
+              <Filter :size="14" />
+              <span>筛选记录</span>
             </div>
-            <div class="segmented" role="group" aria-label="类型筛选">
-              <button
-                :class="{ active: kindFilter === '' }"
-                @click="kindFilter = ''"
-              >
-                全部类型
-              </button>
-              <button
-                :class="{ active: kindFilter === 'image' }"
-                @click="kindFilter = 'image'"
-              >
-                图片
-              </button>
-              <button
-                :class="{ active: kindFilter === 'video' }"
-                @click="kindFilter = 'video'"
-              >
-                视频
-              </button>
-              <button
-                :class="{ active: kindFilter === 'document' }"
-                @click="kindFilter = 'document'"
-              >
-                文档
-              </button>
-            </div>
+            <select v-model="domainFilter" aria-label="所属领域筛选">
+              <option value="">全部领域</option>
+              <option value="fashion">服饰风格</option>
+              <option value="portrait">人像解析</option>
+              <option value="behavior">行为分析</option>
+              <option value="ocr">文字识别</option>
+            </select>
+            <select v-model="kindFilter" aria-label="类型筛选">
+              <option value="">全部类型</option>
+              <option value="image">图片</option>
+              <option value="video">视频</option>
+              <option value="document">文档</option>
+            </select>
+            <button class="button secondary reset-btn" @click="resetFilters">
+              <RotateCcw :size="13" />重置
+            </button>
             <span class="badge">{{ filteredAssets.length }}</span>
             <span class="size-total">{{ formatBytes(totalSizeBytes) }}</span>
           </div>
@@ -547,7 +549,7 @@ useRefresh(refresh);
       </DataTable>
     </section>
 
-    <section class="panel source-panel">
+    <section v-else-if="activeTab === 'streams'" class="panel source-panel">
       <div class="panel-header">
         <div class="header-left">
           <h2>视频流源</h2>
@@ -653,17 +655,108 @@ useRefresh(refresh);
 </template>
 
 <style scoped>
+.tabs-header-bar {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.domain-tabs {
+  display: inline-flex;
+  align-items: center;
+  background: #eef2f1;
+  padding: 3px;
+  border-radius: 6px;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.domain-tab-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--muted, #64716d);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.domain-tab-btn:hover {
+  color: var(--graphite, #17211f);
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.domain-tab-btn.active {
+  color: var(--color-accent-hover, #065e67);
+  background: var(--color-accent-soft, #e4f1f1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  font-weight: 600;
+}
+
+.tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 16px;
+  min-width: 16px;
+  padding: 0 5px;
+  border-radius: 10px;
+  font-size: 10.5px;
+  background: rgba(0, 0, 0, 0.06);
+  color: inherit;
+}
+
 .header-left {
   display: flex;
   align-items: center;
   gap: 14px;
   flex-wrap: wrap;
 }
-.filter-row {
+.filter-controls {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
+}
+.filter-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--color-text);
+  margin-right: 2px;
+  white-space: nowrap;
+}
+.filter-heading svg {
+  color: var(--teal);
+}
+.filter-controls select {
+  width: 140px;
+  min-width: 110px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+  border: 1px solid var(--line, #cbd3d0);
+  border-radius: 4px;
+  background-color: var(--color-surface, #fff);
+  color: var(--color-text, #17211f);
+}
+.filter-controls .reset-btn {
+  height: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 .size-total {
   color: var(--muted);

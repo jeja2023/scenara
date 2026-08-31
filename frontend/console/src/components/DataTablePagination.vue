@@ -281,6 +281,14 @@ const pageNumbers = computed<(number | string)[]>(() => {
   font-size: 11px;
 }
 
+.pagination-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .pagination-jumper {
   display: inline-flex;
   align-items: center;
@@ -288,11 +296,25 @@ const pageNumbers = computed<(number | string)[]>(() => {
   margin-left: 6px;
   font-size: 11.5px;
   color: var(--muted, #64716d);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.jumper-label {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .pagination-jumper-input {
-  width: 38px;
-  height: 24px;
+  width: 40px !important;
+  min-width: 40px !important;
+  max-width: 40px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  max-height: 24px !important;
+  padding: 0 4px !important;
+  line-height: 22px;
+  box-sizing: border-box !important;
   text-align: center;
   border: 1px solid var(--line, #e2e8e6);
   border-radius: 4px;
@@ -300,6 +322,14 @@ const pageNumbers = computed<(number | string)[]>(() => {
   color: var(--color-text, #17211f);
   font-size: 11.5px;
   outline: none;
+  flex: 0 0 40px !important;
+  -moz-appearance: textfield;
+}
+
+.pagination-jumper-input::-webkit-outer-spin-button,
+.pagination-jumper-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .pagination-jumper-input:focus {

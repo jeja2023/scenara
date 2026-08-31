@@ -410,7 +410,7 @@ useRefresh(refresh);
 
 <style scoped>
 .results-page {
-  max-width: 1500px;
+  width: 100%;
 }
 
 .result-stats {

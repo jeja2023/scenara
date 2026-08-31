@@ -9,6 +9,7 @@ import {
   listWatchlists,
   taskAction,
 } from "../../api/surveillance";
+import { labelSurveillanceTaskStatus } from "../../labels";
 import type {
   CameraRecord,
   MediaSource,
@@ -116,18 +117,6 @@ onMounted(() => void refresh());
 
 <template>
   <main class="page task-page">
-    <header class="page-header">
-      <div>
-        <p class="eyebrow">Surveillance</p>
-        <h1>布控任务</h1>
-        <p>
-          任务将名单与已注册视频源、摄像头绑定，并由调度器按生效策略启动流式解析。
-        </p>
-      </div>
-      <button class="button secondary" @click="refresh">
-        <RefreshCw :size="16" />刷新
-      </button>
-    </header>
     <p v-if="error" class="error-message">{{ error }}</p>
     <section class="panel form-grid">
       <label
@@ -206,7 +195,12 @@ onMounted(() => void refresh());
       </button>
     </section>
     <section class="panel">
-      <h2>任务列表</h2>
+      <div class="panel-header-row">
+        <h2>任务列表</h2>
+        <button class="button secondary refresh-btn" @click="refresh">
+          <RefreshCw :size="14" />刷新
+        </button>
+      </div>
       <div v-for="task in tasks" :key="task.task_id" class="task-row">
         <div>
           <strong>{{ task.name }}</strong
@@ -217,7 +211,7 @@ onMounted(() => void refresh());
           >
         </div>
         <div class="actions">
-          <span class="badge" :class="task.status">{{ task.status }}</span
+          <span class="badge" :class="task.status">{{ labelSurveillanceTaskStatus(task.status) }}</span
           ><button
             v-if="task.status !== 'active'"
             class="icon-button"
@@ -245,25 +239,15 @@ onMounted(() => void refresh());
   display: grid;
   gap: 1rem;
 }
-.page-header {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 1rem;
-}
-.eyebrow {
-  margin: 0;
-  color: var(--accent, #2563eb);
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-h1,
-h2,
-p {
-  margin-top: 0;
+.panel-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.8rem;
 }
 h2 {
   font-size: 1rem;
+  margin: 0;
 }
 .panel {
   border: 1px solid var(--border-color, #d9e0ea);

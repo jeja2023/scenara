@@ -959,3 +959,60 @@ export function labelFieldKey(value: string): string {
   return value.replace(/[_.-]+/g, " ");
 }
 
+const surveillanceAlertStatusLabels: Record<string, string> = {
+  pending: "待处置",
+  confirmed: "已确认",
+  false_positive: "误报",
+  ignored: "已忽略",
+};
+
+export function labelSurveillanceAlertStatus(status: string): string {
+  return surveillanceAlertStatusLabels[status] ?? status;
+}
+
+const surveillanceTaskStatusLabels: Record<string, string> = {
+  draft: "草稿",
+  active: "运行中",
+  paused: "已暂停",
+  stopped: "已停止",
+  archived: "已归档",
+};
+
+export function labelSurveillanceTaskStatus(status: string): string {
+  return surveillanceTaskStatusLabels[status] ?? status;
+}
+
+const watchlistCategoryLabels: Record<string, string> = {
+  blacklist: "黑名单",
+  whitelist: "白名单",
+  custom: "自定义",
+};
+
+export function labelWatchlistCategory(category: string): string {
+  return watchlistCategoryLabels[category] ?? category;
+}
+
+const watchlistStatusLabels: Record<string, string> = {
+  active: "已启用",
+  archived: "已归档",
+  disabled: "已禁用",
+};
+
+export function labelWatchlistStatus(status: string): string {
+  return watchlistStatusLabels[status] ?? status;
+}
+
+const modalityLabels: Record<string, string> = {
+  portrait: "人像",
+  face: "人脸",
+  body: "人体",
+  behavior: "行为",
+  ocr: "OCR",
+  fashion: "服饰",
+};
+
+export function labelModality(modality: string): string {
+  return modalityLabels[modality] ?? modality;
+}
+
+
