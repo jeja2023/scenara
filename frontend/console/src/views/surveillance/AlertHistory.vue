@@ -8,8 +8,6 @@ import {
   RefreshCw,
   Search,
   ShieldAlert,
-  Sliders,
-  User,
   X,
 } from "@lucide/vue";
 import { onMounted, reactive, ref } from "vue";

@@ -10,7 +10,6 @@ import {
   RefreshCw,
   Search,
   Sliders,
-  Video,
 } from "@lucide/vue";
 import { computed, onMounted, reactive, ref } from "vue";
 
@@ -278,9 +277,9 @@ onMounted(() => void refresh());
               </td>
               <td>
                 <div class="thresholds-cell">
-                  <span class="thresh-item">人脸: <strong>{{ (task.threshold_policy.face_threshold * 100).toFixed(0) }}%</strong></span>
+                  <span class="thresh-item">人脸: <strong>{{ task.threshold_policy.face_threshold != null ? (task.threshold_policy.face_threshold * 100).toFixed(0) + '%' : '-' }}</strong></span>
                   <span class="divider">|</span>
-                  <span class="thresh-item">人体: <strong>{{ (task.threshold_policy.body_threshold * 100).toFixed(0) }}%</strong></span>
+                  <span class="thresh-item">人体: <strong>{{ task.threshold_policy.body_threshold != null ? (task.threshold_policy.body_threshold * 100).toFixed(0) + '%' : '-' }}</strong></span>
                 </div>
               </td>
               <td style="text-align: center;" class="mono">

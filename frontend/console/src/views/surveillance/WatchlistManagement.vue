@@ -6,7 +6,6 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Trash2,
   UserCheck,
   UserPlus,
   Users,
