@@ -301,17 +301,20 @@ const entitlementLabels: Record<string, string> = {
 };
 
 const productLabels: Record<string, string> = {
-  parse: "Scenara Parse",
-  model: "Scenara Model",
-  data: "Scenara Data",
-  console: "Scenara 控制台",
-  api: "Scenara API",
-  sdk: "Scenara SDK",
-  index: "Scenara Index",
-  search: "Scenara Search",
-  flow: "Scenara Flow",
-  edge: "Scenara Edge",
-  agent: "Scenara Agent",
+  parse: "智能视觉与文档解析",
+  search: "综合与多模态检索",
+  model: "AI 模型管理与准入",
+  data: "数据资产与数据集治理",
+  flow: "智能分析流水线编排",
+  index: "特征与向量索引底座",
+  api: "开放应用接口",
+  sdk: "多语言开发工具包",
+  console: "平台共享控制台",
+  edge: "边缘推理与设备管理",
+  agent: "智能协同代理",
+  train: "模型训练与实验",
+  surveillance: "比对预警与布控",
+  media: "媒体资产处理",
 };
 
 const productSummaryLabels: Record<string, string> = {
@@ -326,6 +329,9 @@ const productSummaryLabels: Record<string, string> = {
   flow: "面向运行、事件回调和人工审核的流程编排产品。",
   edge: "面向离线和设备侧部署的边缘推理产品。",
   agent: "协调解析、检索、流程和审核动作的智能执行层。",
+  train: "模型训练实验、算力调度与不可变模型制品生成。",
+  surveillance: "多路视频流人像比对、黑白名单预警与布控任务调度。",
+  media: "多模态媒体素材接入、转码解码与特征提取。",
 };
 
 const productGateLabels: Record<string, string> = {

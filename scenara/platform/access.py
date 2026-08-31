@@ -514,6 +514,7 @@ class AccessService:
             user_id=body.user_id or _new_id("usr"),
             display_name=body.display_name,
             email=body.email,
+            phone=body.phone or body.email,
             created_at=now,
             updated_at=now,
         )

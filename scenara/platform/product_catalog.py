@@ -12,7 +12,7 @@ def build_product_catalog(
 ) -> list[ProductCatalogItem]:
     domains = frozenset(installed_domains)
     parse_maturity = ProductMaturity.AVAILABLE if domains else ProductMaturity.SEED
-    parse_scope = ["媒体接入", "运行生命周期", "版本化流水线", "类型化视觉结果", "OCR document parsing"]
+    parse_scope = ["媒体接入", "运行生命周期", "版本化流水线", "类型化视觉结果"]
     for domain_id in sorted(domains):
         parse_scope.extend(domain_scopes.get(domain_id, ()) if domain_scopes is not None else ())
 
@@ -45,7 +45,7 @@ def build_product_catalog(
             maturity=ProductMaturity.SEED,
             summary="模型准入、发布治理、回滚和部署证据管理。",
             current_scope=["模型制品目录", "发布生命周期", "部署事件", "反馈溯源"],
-            not_in_scope_yet=["数据集标注", "实验跟踪", "training jobs", "算力调度"],
+            not_in_scope_yet=["数据集标注", "实验跟踪", "训练作业编排", "算力调度"],
             console_route="/models",
             api_paths=[
                 "/api/v1/model-packages/admissions",
@@ -116,7 +116,7 @@ def build_product_catalog(
             layer=ProductLayer.DEVELOPER_SURFACE,
             maturity=ProductMaturity.AVAILABLE,
             summary="面向平台集成的版本化公开契约。",
-            current_scope=["OpenAPI 契约", "v1 接口", "Webhook", "系统探针"],
+            current_scope=["OpenAPI 标准契约", "v1 接口路由", "Webhook 事件推送", "系统运行探针"],
             not_in_scope_yet=["开发者门户", "OAuth 应用", "弃用策略"],
             api_paths=["/openapi.json", "/api/v1/platform/products", "/api/v1/webhooks/subscriptions"],
             next_gate="在将 API 作为独立平台开放前，引入应用凭据和权限作用域。",
@@ -127,7 +127,7 @@ def build_product_catalog(
             layer=ProductLayer.DEVELOPER_SURFACE,
             maturity=ProductMaturity.AVAILABLE,
             summary="面向 v1 API 的 Python 与 TypeScript 开发客户端。",
-            current_scope=["Python SDK", "TypeScript SDK", "OpenAPI 生成的模式类型"],
+            current_scope=["Python SDK 客户端", "TypeScript SDK 客户端", "OpenAPI 类型定义契约"],
             not_in_scope_yet=[
                 "多产品命名空间",
                 "公开发布自动化",
@@ -152,7 +152,7 @@ def build_product_catalog(
                 "软删除与保留策略",
                 "保存的检索",
                 "可重建的来源引用",
-                "Qdrant FeatureStore provider adapter with tenant/project filters",
+                "Qdrant 向量特征库多租户适配",
             ],
             not_in_scope_yet=[
                 "分布式索引分片",

@@ -751,6 +751,7 @@ export interface UserAccount {
   user_id: string;
   display_name: string;
   email?: string | null;
+  phone?: string | null;
   disabled: boolean;
   created_at: number;
   updated_at: number;
