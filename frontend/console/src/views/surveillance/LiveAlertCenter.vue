@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { BellRing, Radio, Volume2, VolumeX } from "@lucide/vue";
+import {
+  BellRing,
+  Camera,
+  Radio,
+  Trash2,
+  Volume2,
+  VolumeX,
+} from "@lucide/vue";
 import { onBeforeUnmount, onMounted, ref } from "vue";
 
 import { api, apiStream, streamJsonEvents, userFacingError } from "../../api";
@@ -15,27 +22,41 @@ let controller: AbortController | null = null;
 let cursor = 0;
 
 function format(value: number): string {
-  return new Date(value * 1000).toLocaleTimeString("zh-CN", { hour12: false });
+  if (!value) return "-";
+  return new Date(value * 1000).toLocaleTimeString("zh-CN", {
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
+
 function snapshot(alert: SurveillanceAlert): string | null {
   return alert.snapshot_artifact_id
     ? `/api/v1/runs/${encodeURIComponent(alert.run_id)}/artifacts/${encodeURIComponent(alert.snapshot_artifact_id)}`
     : null;
 }
+
 function beep(): void {
   if (muted.value || typeof AudioContext === "undefined") return;
-  const context = new AudioContext();
-  const oscillator = context.createOscillator();
-  oscillator.frequency.value = 880;
-  oscillator.connect(context.destination);
-  oscillator.start();
-  oscillator.stop(context.currentTime + 0.12);
-  oscillator.addEventListener("ended", () => void context.close());
+  try {
+    const context = new AudioContext();
+    const oscillator = context.createOscillator();
+    oscillator.frequency.value = 880;
+    oscillator.connect(context.destination);
+    oscillator.start();
+    oscillator.stop(context.currentTime + 0.12);
+    oscillator.addEventListener("ended", () => void context.close());
+  } catch {
+    // Ignore audio context autoplay restriction errors
+  }
 }
+
 async function initial(): Promise<void> {
   const page = await listAlerts("limit=30");
   alerts.value = page.items;
 }
+
 async function connect(): Promise<void> {
   controller?.abort();
   controller = new AbortController();
@@ -64,12 +85,14 @@ async function connect(): Promise<void> {
       }
     }
   } catch (caught) {
-    if (!controller?.signal.aborted)
+    if (!controller?.signal.aborted) {
       error.value = userFacingError(caught, "实时告警连接已断开");
+    }
   } finally {
     connected.value = false;
   }
 }
+
 onMounted(async () => {
   try {
     await initial();
@@ -78,130 +101,417 @@ onMounted(async () => {
   }
   void connect();
 });
+
 onBeforeUnmount(() => controller?.abort());
 </script>
 
 <template>
   <main class="page live-page">
-    <div class="toolbar live-toolbar">
-      <span class="connection" :class="{ online: connected }"
-        ><Radio :size="15" />{{ connected ? "已连接" : "重连中" }}</span
-      ><button class="button secondary" @click="muted = !muted">
-        <VolumeX v-if="muted" :size="16" /><Volume2 v-else :size="16" />{{
-          muted ? "开启提示音" : "静音"
-        }}
-      </button>
+    <p v-if="error" class="error-banner">{{ error }}</p>
+
+    <!-- 顶部操作与流连接状态工具栏 -->
+    <div class="filter-controls">
+      <div class="filter-left">
+        <span class="live-status-pill" :class="{ online: connected }">
+          <span class="pulse-dot"></span>
+          <Radio :size="13" />
+          <span>{{ connected ? "实时事件流已连接 (Active)" : "事件流重连中 (Connecting...)" }}</span>
+        </span>
+
+        <span class="badge count-badge">实时捕获: {{ alerts.length }} 条</span>
+      </div>
+
+      <div class="filter-right">
+        <button
+          class="button secondary tiny-btn audio-btn"
+          :class="{ active: !muted }"
+          @click="muted = !muted"
+        >
+          <Volume2 v-if="!muted" :size="13" class="audio-on-icon" />
+          <VolumeX v-else :size="13" />
+          <span>{{ muted ? "开启提示音效" : "静音模式" }}</span>
+        </button>
+
+        <button
+          class="button secondary tiny-btn"
+          :disabled="!alerts.length"
+          @click="alerts = []"
+        >
+          <Trash2 :size="12" />
+          <span>清空实时流</span>
+        </button>
+      </div>
     </div>
-    <p v-if="error" class="error-message">{{ error }}</p>
-    <section class="alert-wall">
-      <article v-for="alert in alerts" :key="alert.alert_id" class="alert-card">
-        <img v-if="snapshot(alert)" :src="snapshot(alert)!" alt="实时抓拍" />
-        <div class="alert-content">
-          <div class="card-top">
-            <BellRing :size="18" /><strong>{{ alert.camera_id }}</strong
-            ><time>{{ format(alert.triggered_at) }}</time>
+
+    <!-- 实时告警墙网格 -->
+    <section class="live-alert-grid">
+      <article
+        v-for="alert in alerts"
+        :key="alert.alert_id"
+        class="panel live-card-item"
+      >
+        <!-- 顶部实时抓拍图 -->
+        <div class="snapshot-wrapper">
+          <img
+            v-if="snapshot(alert)"
+            :src="snapshot(alert)!"
+            alt="实时抓拍"
+            class="live-img"
+          />
+          <div v-else class="placeholder-box">
+            <Camera :size="28" class="placeholder-icon" />
+            <span>无抓拍图</span>
           </div>
-          <p class="score">{{ (alert.match_score * 100).toFixed(1) }}%</p>
-          <p>{{ labelModality(alert.modality) }} · {{ alert.portrait_identity_id }}</p>
-          <small>告警事件 · 已出现 {{ alert.occurrence_count }} 次</small>
+
+          <!-- 抓拍时间角标 -->
+          <div class="time-overlay-tag">
+            {{ format(alert.triggered_at) }}
+          </div>
+
+          <!-- 相似度得分角标 -->
+          <div class="score-overlay-tag">
+            <span>相似度</span>
+            <strong>{{ (alert.match_score * 100).toFixed(1) }}%</strong>
+          </div>
+        </div>
+
+        <!-- 告警内容摘要 -->
+        <div class="live-content">
+          <div class="camera-row">
+            <div class="camera-info">
+              <Camera :size="13" class="cam-icon" />
+              <strong>{{ alert.camera_id }}</strong>
+            </div>
+            <span class="badge modality-badge">{{ labelModality(alert.modality) }}</span>
+          </div>
+
+          <div class="identity-info-row">
+            <span class="identity-label">目标身份:</span>
+            <span class="mono identity-val">{{ alert.portrait_identity_id }}</span>
+          </div>
+
+          <div class="footer-stats-row">
+            <span class="occurrence-text">
+              已累计出现 <strong>{{ alert.occurrence_count }}</strong> 次
+            </span>
+            <span class="max-score-text">最高 {{ (alert.max_score * 100).toFixed(1) }}%</span>
+          </div>
         </div>
       </article>
-      <p v-if="!alerts.length" class="empty">等待新的已持久化告警。</p>
     </section>
+
+    <div v-if="!alerts.length" class="panel empty-live-state">
+      <div class="radar-pulse-box">
+        <BellRing :size="36" class="radar-icon" />
+      </div>
+      <p class="empty-title">正在监听实时布控告警事件流</p>
+      <p class="empty-sub">当摄像头检测到符合布控名单的目标时，将在此处实时推送告警抓拍与研判卡片</p>
+    </div>
   </main>
 </template>
 
 <style scoped>
 .live-page {
-  display: grid;
-  gap: 1rem;
-}
-.live-toolbar {
   display: flex;
-  justify-content: flex-end;
-  gap: 0.6rem;
-  align-items: center;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
 }
-.connection {
+
+.error-banner {
+  padding: 8px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  border-radius: 4px;
+  font-size: 12px;
+  margin: 0;
+}
+
+/* 顶部控制栏 */
+.filter-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 6px;
+  padding: 6px 12px;
+  flex-wrap: wrap;
+}
+
+.filter-left,
+.filter-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-status-pill {
   display: inline-flex;
-  gap: 0.3rem;
   align-items: center;
-  color: #b45309;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 500;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde68a;
+  transition: all 0.2s ease;
 }
-.connection.online {
-  color: #15803d;
+
+.live-status-pill.online {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
 }
-.button {
-  border: 0;
-  border-radius: 0.5rem;
-  padding: 0.45rem 0.75rem;
-  cursor: pointer;
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d97706;
 }
-.button.secondary {
-  background: var(--soft-color, #e2e8f0);
-  color: inherit;
+
+.live-status-pill.online .pulse-dot {
+  background: #16a34a;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.25);
+  animation: pulse 1.8s infinite;
 }
-.alert-wall {
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+.count-badge {
+  background: #edf2f0;
+  color: #45534f;
+  font-size: 11px;
+  padding: 3px 7px;
+  border-radius: 4px;
+}
+
+.audio-btn.active {
+  background: var(--color-accent-soft, #e4f1f1);
+  color: var(--color-accent-hover, #065e67);
+  border-color: var(--color-accent, #087682);
+}
+
+.audio-on-icon {
+  color: var(--color-accent, #087682);
+}
+
+/* 实时卡片网格 */
+.live-alert-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1rem;
+  gap: 12px;
 }
-.alert-card {
+
+.live-card-item {
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 6px;
   overflow: hidden;
-  border: 1px solid var(--border-color, #d9e0ea);
-  border-radius: 0.8rem;
-  background: var(--panel-color, #fff);
-  box-shadow: 0 0.3rem 1rem rgba(15, 23, 42, 0.07);
+  display: flex;
+  flex-direction: column;
+  transition: all 0.15s ease;
 }
-.alert-card img {
+
+.live-card-item:hover {
+  border-color: var(--line-strong, #b7c2bd);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  transform: translateY(-1px);
+}
+
+.snapshot-wrapper {
+  position: relative;
   width: 100%;
-  height: 170px;
-  object-fit: cover;
-  background: #e2e8f0;
-}
-.alert-content {
-  padding: 0.85rem;
-}
-.card-top {
+  height: 150px;
+  background: #f1f4f3;
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  justify-content: center;
 }
-.card-top time {
-  margin-left: auto;
-  color: var(--muted-text, #64748b);
-  font-size: 0.8rem;
+
+.live-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
-.score {
-  font-size: 2rem;
-  font-weight: 750;
-  margin: 0.65rem 0 0.15rem;
-  color: #dc2626;
+
+.placeholder-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted, #64716d);
+  font-size: 11px;
 }
-.alert-content p:not(.score) {
-  font-size: 0.85rem;
-  overflow-wrap: anywhere;
+
+.placeholder-icon {
+  color: #b7c2bd;
 }
-.alert-content small {
-  color: var(--muted-text, #64748b);
+
+.time-overlay-tag {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: rgba(17, 26, 24, 0.75);
+  backdrop-filter: blur(4px);
+  color: #ffffff;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10.5px;
+  font-family: var(--font-mono, monospace);
 }
-.empty {
-  grid-column: 1/-1;
+
+.score-overlay-tag {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: rgba(17, 26, 24, 0.82);
+  backdrop-filter: blur(4px);
+  color: #ffffff;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.score-overlay-tag strong {
+  color: #34d399;
+  font-size: 11.5px;
+}
+
+/* 卡片内容 */
+.live-content {
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.camera-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.camera-info {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.camera-info strong {
+  font-size: 12.5px;
+  color: var(--graphite, #17211f);
+}
+
+.cam-icon {
+  color: var(--color-accent, #087682);
+}
+
+.modality-badge {
+  font-size: 10px;
+  background: #eef2f1;
+  color: #2c3e38;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+.identity-info-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+}
+
+.identity-label {
+  color: var(--muted, #64716d);
+  flex-shrink: 0;
+}
+
+.identity-val {
+  color: var(--graphite, #17211f);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footer-stats-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--muted, #64716d);
+  padding-top: 4px;
+  border-top: 1px dashed var(--line, #e2e8e6);
+}
+
+.occurrence-text strong {
+  color: var(--color-accent, #087682);
+}
+
+/* 空状态 */
+.empty-live-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 56px 16px;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 6px;
   text-align: center;
-  padding: 3rem;
-  color: var(--muted-text, #64748b);
-  border: 1px dashed var(--border-color, #cbd5e1);
-  border-radius: 0.8rem;
 }
-.error-message {
-  color: #dc2626;
+
+.radar-pulse-box {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: #edf2f0;
+  display: grid;
+  place-items: center;
+  margin-bottom: 6px;
 }
-@media (max-width: 700px) {
-  .page-header {
-    display: grid;
-  }
-  .toolbar {
-    justify-content: space-between;
-  }
+
+.radar-icon {
+  color: var(--color-accent, #087682);
+}
+
+.empty-title {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--graphite, #17211f);
+}
+
+.empty-sub {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--muted, #64716d);
+  max-width: 480px;
+}
+
+.mono {
+  font-family: var(--font-mono, monospace);
+  font-size: 11.5px;
 }
 </style>

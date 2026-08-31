@@ -1,6 +1,17 @@
 <script setup lang="ts">
-import { Plus, RefreshCw, UserPlus } from "@lucide/vue";
-import { onMounted, reactive, ref } from "vue";
+import {
+  Clock,
+  Filter,
+  ListChecks,
+  Plus,
+  RefreshCw,
+  Search,
+  Trash2,
+  UserCheck,
+  UserPlus,
+  Users,
+} from "@lucide/vue";
+import { computed, onMounted, reactive, ref } from "vue";
 
 import { userFacingError } from "../../api";
 import {
@@ -16,17 +27,55 @@ const watchlists = ref<Watchlist[]>([]);
 const members = ref<WatchlistMember[]>([]);
 const selectedId = ref("");
 const loading = ref(false);
+const mutating = ref(false);
 const error = ref("");
+const searchQuery = ref("");
+const categoryFilter = ref<string>("all");
+const showCreateModal = ref(false);
+
 const watchlistForm = reactive({
   name: "",
-  category: "custom",
+  category: "custom" as "blacklist" | "whitelist" | "custom",
   description: "",
 });
-const memberForm = reactive({ portrait_identity_id: "", display_label: "" });
+
+const memberForm = reactive({
+  portrait_identity_id: "",
+  display_label: "",
+});
 
 function date(value: number): string {
-  return new Date(value * 1000).toLocaleString("zh-CN", { hour12: false });
+  if (!value) return "-";
+  return new Date(value * 1000).toLocaleString("zh-CN", {
+    hour12: false,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
+
+const selectedWatchlist = computed(() =>
+  watchlists.value.find((w) => w.watchlist_id === selectedId.value),
+);
+
+const filteredWatchlists = computed(() => {
+  return watchlists.value.filter((item) => {
+    if (categoryFilter.value !== "all" && item.category !== categoryFilter.value) {
+      return false;
+    }
+    if (searchQuery.value.trim()) {
+      const q = searchQuery.value.trim().toLowerCase();
+      return (
+        item.name.toLowerCase().includes(q) ||
+        item.watchlist_id.toLowerCase().includes(q) ||
+        (item.description && item.description.toLowerCase().includes(q))
+      );
+    }
+    return true;
+  });
+});
 
 async function refresh(): Promise<void> {
   loading.value = true;
@@ -34,8 +83,14 @@ async function refresh(): Promise<void> {
   try {
     const page = await listWatchlists();
     watchlists.value = page.items;
-    if (!selectedId.value && page.items[0])
+    if (!selectedId.value && page.items[0]) {
       selectedId.value = page.items[0].watchlist_id;
+    } else if (
+      selectedId.value &&
+      !page.items.some((w) => w.watchlist_id === selectedId.value)
+    ) {
+      selectedId.value = page.items[0]?.watchlist_id || "";
+    }
     await loadMembers();
   } catch (caught) {
     error.value = userFacingError(caught);
@@ -49,31 +104,58 @@ async function loadMembers(): Promise<void> {
     members.value = [];
     return;
   }
-  const page = await listMembers(selectedId.value);
-  members.value = page.items;
-}
-
-async function create(): Promise<void> {
   try {
-    const created = await createWatchlist(watchlistForm);
-    watchlistForm.name = "";
-    watchlistForm.description = "";
-    selectedId.value = created.watchlist_id;
-    await refresh();
+    const page = await listMembers(selectedId.value);
+    members.value = page.items;
   } catch (caught) {
     error.value = userFacingError(caught);
   }
 }
 
-async function addMember(): Promise<void> {
-  if (!selectedId.value) return;
+async function selectWatchlist(id: string): Promise<void> {
+  selectedId.value = id;
+  await loadMembers();
+}
+
+async function handleCreateWatchlist(): Promise<void> {
+  if (!watchlistForm.name.trim()) return;
+  mutating.value = true;
+  error.value = "";
   try {
-    await createMember(selectedId.value, memberForm);
+    const created = await createWatchlist({
+      name: watchlistForm.name.trim(),
+      category: watchlistForm.category,
+      description: watchlistForm.description.trim(),
+    });
+    watchlistForm.name = "";
+    watchlistForm.description = "";
+    watchlistForm.category = "custom";
+    showCreateModal.value = false;
+    selectedId.value = created.watchlist_id;
+    await refresh();
+  } catch (caught) {
+    error.value = userFacingError(caught);
+  } finally {
+    mutating.value = false;
+  }
+}
+
+async function handleAddMember(): Promise<void> {
+  if (!selectedId.value || !memberForm.portrait_identity_id.trim()) return;
+  mutating.value = true;
+  error.value = "";
+  try {
+    await createMember(selectedId.value, {
+      portrait_identity_id: memberForm.portrait_identity_id.trim(),
+      display_label: memberForm.display_label.trim(),
+    });
     memberForm.portrait_identity_id = "";
     memberForm.display_label = "";
     await loadMembers();
   } catch (caught) {
     error.value = userFacingError(caught);
+  } finally {
+    mutating.value = false;
   }
 }
 
@@ -82,223 +164,802 @@ onMounted(() => void refresh());
 
 <template>
   <main class="page surveillance-page">
-    <p v-if="error" class="error-message">{{ error }}</p>
+    <p v-if="error" class="error-banner">{{ error }}</p>
 
-    <section class="panel form-grid">
-      <label
-        >名单名称<input
-          v-model.trim="watchlistForm.name"
-          placeholder="例如：重点关注人员"
-      /></label>
-      <label
-        >类别<select v-model="watchlistForm.category">
-          <option value="blacklist">黑名单</option>
-          <option value="whitelist">白名单</option>
-          <option value="custom">自定义</option>
-        </select></label
-      >
-      <label class="wide"
-        >说明<input
-          v-model.trim="watchlistForm.description"
-          placeholder="业务说明（可选）"
-      /></label>
-      <button class="button" :disabled="!watchlistForm.name" @click="create">
-        <Plus :size="16" />创建名单
-      </button>
-    </section>
+    <!-- 顶部操作与筛选工具栏 -->
+    <div class="filter-controls">
+      <div class="filter-left">
+        <label class="filter-item">
+          <Filter :size="12" class="filter-icon" />
+          <span class="filter-label">类别筛选:</span>
+          <select v-model="categoryFilter" class="filter-select">
+            <option value="all">全部类别 (All)</option>
+            <option value="blacklist">黑名单 (Blacklist)</option>
+            <option value="whitelist">白名单 (Whitelist)</option>
+            <option value="custom">自定义 (Custom)</option>
+          </select>
+        </label>
 
-    <section class="split-grid">
-      <article class="panel">
-        <div class="panel-header-row">
-          <h2>名单库</h2>
-          <button class="button secondary refresh-btn" :disabled="loading" @click="refresh">
-            <RefreshCw :size="14" />刷新
-          </button>
+        <div class="search-box">
+          <Search :size="13" class="search-icon" />
+          <input
+            v-model="searchQuery"
+            placeholder="搜索名单名称或 ID..."
+            class="search-input"
+          />
         </div>
+
+        <span class="badge count-badge">共 {{ watchlists.length }} 个名单库</span>
+      </div>
+
+      <div class="filter-right">
         <button
-          v-for="item in watchlists"
-          :key="item.watchlist_id"
-          class="list-row"
-          :class="{ selected: selectedId === item.watchlist_id }"
-          @click="
-            selectedId = item.watchlist_id;
-            loadMembers();
-          "
+          class="button secondary tiny-btn"
+          :disabled="loading"
+          @click="refresh"
         >
-          <span
-            ><strong>{{ item.name }}</strong
-            ><small>{{ labelWatchlistCategory(item.category) }} · {{ labelWatchlistStatus(item.status) }}</small></span
-          >
-          <small>{{ date(item.updated_at) }}</small>
+          <RefreshCw :size="12" :class="{ spinning: loading }" />
+          <span>刷新</span>
         </button>
-        <p v-if="!watchlists.length" class="muted">暂无名单库。</p>
-      </article>
-      <article class="panel">
-        <h2>名单成员</h2>
-        <div v-if="selectedId" class="inline-form">
-          <input
-            v-model.trim="memberForm.portrait_identity_id"
-            placeholder="人像身份 ID（idn_...）"
-          />
-          <input
-            v-model.trim="memberForm.display_label"
-            placeholder="名单显示名（可选）"
-          />
-          <button
-            class="button"
-            :disabled="!memberForm.portrait_identity_id"
-            @click="addMember"
-          >
-            <UserPlus :size="16" />加入
-          </button>
-        </div>
-        <div
-          v-for="member in members"
-          :key="member.member_id"
-          class="member-row"
+        <button
+          class="button primary tiny-btn"
+          @click="showCreateModal = true"
         >
-          <span
-            ><strong>{{
-              member.display_label || member.portrait_identity_id
-            }}</strong
-            ><small>{{ member.portrait_identity_id }}</small></span
-          >
-          <span class="badge">{{ labelWatchlistStatus(member.status) }}</span>
+          <Plus :size="13" />
+          <span>新建布控名单</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 主工作区：左右分栏 -->
+    <div class="watchlist-split-view">
+      <!-- 左栏：名单库列表 -->
+      <section class="panel watchlist-master-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <ListChecks :size="14" class="title-icon" />
+            <h3>名单库</h3>
+            <span class="count-pill">{{ filteredWatchlists.length }}</span>
+          </div>
         </div>
-        <p v-if="selectedId && !members.length" class="muted">尚未添加成员。</p>
-      </article>
-    </section>
+
+        <div class="watchlist-cards-list">
+          <div
+            v-for="item in filteredWatchlists"
+            :key="item.watchlist_id"
+            class="watchlist-card-item"
+            :class="{ selected: selectedId === item.watchlist_id }"
+            @click="selectWatchlist(item.watchlist_id)"
+          >
+            <div class="card-top-row">
+              <strong class="watchlist-name">{{ item.name }}</strong>
+              <div class="badges-row">
+                <span
+                  class="badge category-badge"
+                  :class="item.category"
+                >
+                  {{ labelWatchlistCategory(item.category) }}
+                </span>
+                <span class="badge status-badge" :class="item.status">
+                  {{ labelWatchlistStatus(item.status) }}
+                </span>
+              </div>
+            </div>
+
+            <p class="watchlist-desc">
+              {{ item.description || "暂无业务说明" }}
+            </p>
+
+            <div class="card-footer-row">
+              <span class="watchlist-id-text mono">{{ item.watchlist_id }}</span>
+              <span class="time-text">
+                <Clock :size="11" />
+                {{ date(item.updated_at) }}
+              </span>
+            </div>
+          </div>
+
+          <div v-if="!filteredWatchlists.length" class="empty-state">
+            <ListChecks :size="32" class="empty-icon" />
+            <p>暂无符合条件的布控名单库</p>
+            <button
+              class="button primary tiny-btn"
+              @click="showCreateModal = true"
+            >
+              <Plus :size="12" />立即创建名单
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右栏：选定名单的成员清单 -->
+      <section class="panel watchlist-detail-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <Users :size="14" class="title-icon" />
+            <h3>
+              {{ selectedWatchlist ? selectedWatchlist.name : "名单成员" }}
+            </h3>
+            <span v-if="selectedWatchlist" class="count-pill">
+              {{ members.length }} 人
+            </span>
+          </div>
+          <div v-if="selectedWatchlist" class="header-meta">
+            <span class="watchlist-id-badge mono">ID: {{ selectedWatchlist.watchlist_id }}</span>
+          </div>
+        </div>
+
+        <div v-if="selectedWatchlist" class="detail-body">
+          <!-- 快速录入成员栏 -->
+          <form class="inline-add-member-bar" @submit.prevent="handleAddMember">
+            <div class="add-member-inputs">
+              <input
+                v-model="memberForm.portrait_identity_id"
+                placeholder="人像身份 ID (如: idn_face_001)... *"
+                class="field-input mono"
+                required
+              />
+              <input
+                v-model="memberForm.display_label"
+                placeholder="成员姓名/备注 (可选，如: 重点嫌疑对象)"
+                class="field-input"
+              />
+            </div>
+            <button
+              type="submit"
+              class="button primary tiny-btn"
+              :disabled="mutating || !memberForm.portrait_identity_id.trim()"
+            >
+              <UserPlus :size="13" />加入名单
+            </button>
+          </form>
+
+          <!-- 成员数据表格 -->
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width: 50px; text-align: center;">序号</th>
+                  <th style="width: 140px;">成员姓名 / 备注</th>
+                  <th style="width: 180px;">人像身份 ID (Identity ID)</th>
+                  <th style="width: 90px; text-align: center;">成员状态</th>
+                  <th style="width: 140px;">加入时间</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="(member, idx) in members" :key="member.member_id">
+                  <td style="text-align: center;" class="muted mono">{{ idx + 1 }}</td>
+                  <td>
+                    <strong>{{ member.display_label || "未命名成员" }}</strong>
+                  </td>
+                  <td class="mono">{{ member.portrait_identity_id }}</td>
+                  <td style="text-align: center;">
+                    <span class="badge status-badge" :class="member.status">
+                      {{ labelWatchlistStatus(member.status) }}
+                    </span>
+                  </td>
+                  <td class="muted">{{ date(member.created_at) }}</td>
+                </tr>
+                <tr v-if="!members.length">
+                  <td colspan="5" class="empty-cell">
+                    <div class="empty-table-state">
+                      <UserCheck :size="24" class="empty-table-icon" />
+                      <p>当前名单库尚未录入任何成员，请在上方输入人像身份 ID 进行添加</p>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div v-else class="empty-state select-prompt">
+          <ListChecks :size="36" class="empty-icon" />
+          <p>请从左侧选择一个布控名单库以查看或管理其成员</p>
+        </div>
+      </section>
+    </div>
+
+    <!-- ==================== 新建模态弹窗 ==================== -->
+    <div
+      v-if="showCreateModal"
+      class="modal-overlay"
+      @click.self="showCreateModal = false"
+    >
+      <div class="modal-dialog modal-dialog-md" role="dialog" aria-modal="true">
+        <div class="modal-header">
+          <div class="modal-title-box">
+            <ListChecks :size="17" class="modal-title-icon" />
+            <div>
+              <h3>创建新布控名单</h3>
+              <p>录入新的人像布控库，用于关联布控任务与实时预警研判</p>
+            </div>
+          </div>
+        </div>
+        <form @submit.prevent="handleCreateWatchlist">
+          <div class="modal-body">
+            <div class="form-grid-2col">
+              <label class="form-field">
+                <span class="field-label">名单名称 <em class="required">*</em></span>
+                <input
+                  v-model="watchlistForm.name"
+                  placeholder="例如: 园区重点关注人员 / VIP访客库"
+                  class="field-input"
+                  required
+                  autofocus
+                />
+              </label>
+              <label class="form-field">
+                <span class="field-label">名单类别 <em class="required">*</em></span>
+                <select v-model="watchlistForm.category" class="field-input">
+                  <option value="blacklist">黑名单 (高风险预警)</option>
+                  <option value="whitelist">白名单 (免检放行)</option>
+                  <option value="custom">自定义 (常规业务组)</option>
+                </select>
+              </label>
+            </div>
+            <label class="form-field" style="margin-top: 10px;">
+              <span class="field-label">业务说明 <small class="muted">(可选)</small></span>
+              <textarea
+                v-model="watchlistForm.description"
+                placeholder="输入该名单库的应用场景与业务背景说明..."
+                class="field-input field-textarea"
+                rows="3"
+              ></textarea>
+            </label>
+          </div>
+          <div class="modal-actions">
+            <button
+              type="button"
+              class="button secondary tiny-btn"
+              @click="showCreateModal = false"
+            >
+              取消
+            </button>
+            <button
+              type="submit"
+              class="button primary tiny-btn"
+              :disabled="mutating || !watchlistForm.name.trim()"
+            >
+              <Plus :size="13" />确认创建名单
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </main>
 </template>
 
 <style scoped>
 .surveillance-page {
-  display: grid;
-  gap: 1rem;
-}
-.split-grid {
-  display: grid;
-  gap: 1rem;
-}
-.panel-header-row {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.8rem;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
 }
-h2 {
-  font-size: 1rem;
+
+.error-banner {
+  padding: 8px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  border-radius: 4px;
+  font-size: 12px;
   margin: 0;
 }
+
+/* 顶部过滤控制栏 */
+.filter-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 6px;
+  padding: 6px 12px;
+  flex-wrap: wrap;
+}
+
+.filter-left,
+.filter-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--muted, #64716d);
+}
+
+.filter-icon {
+  color: var(--muted, #64716d);
+}
+
+.filter-label {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.filter-select {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 11.5px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 4px;
+  background: #fafbfb;
+  color: var(--graphite, #17211f);
+  cursor: pointer;
+}
+.filter-select:focus {
+  border-color: var(--color-accent, #087682);
+  outline: none;
+}
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-icon {
+  position: absolute;
+  left: 8px;
+  color: var(--muted, #64716d);
+  pointer-events: none;
+}
+
+.search-input {
+  height: 28px;
+  padding: 0 8px 0 26px;
+  font-size: 11.5px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 4px;
+  background: #fafbfb;
+  color: var(--graphite, #17211f);
+  width: 200px;
+}
+.search-input:focus {
+  border-color: var(--color-accent, #087682);
+  background: #ffffff;
+  outline: none;
+}
+
+.count-badge {
+  background: #edf2f0;
+  color: #45534f;
+  font-size: 11px;
+  padding: 3px 7px;
+  border-radius: 4px;
+}
+
+/* 主分栏工作区 */
+.watchlist-split-view {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .watchlist-split-view {
+    grid-template-columns: 1fr;
+  }
+}
+
 .panel {
-  border: 1px solid var(--border-color, #d9e0ea);
-  border-radius: 0.8rem;
-  background: var(--panel-color, #fff);
-  padding: 1rem;
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
-.form-grid {
-  display: grid;
-  grid-template-columns: 1fr 180px;
-  gap: 0.8rem;
-  align-items: end;
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line, #e2e8e6);
+  background: #fafbfb;
+  min-height: 38px;
+  box-sizing: border-box;
 }
-.wide {
-  grid-column: span 2;
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-label {
-  display: grid;
-  gap: 0.35rem;
-  font-size: 0.86rem;
-  color: var(--muted-text, #64748b);
+
+.title-icon {
+  color: var(--color-accent, #087682);
 }
-input,
-select {
-  min-width: 0;
-  padding: 0.6rem 0.7rem;
-  border: 1px solid var(--border-color, #cbd5e1);
-  border-radius: 0.45rem;
-  background: transparent;
-  color: inherit;
+
+.panel-title h3 {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--graphite, #17211f);
 }
-.button {
+
+.count-pill {
+  font-size: 10.5px;
+  color: #45534f;
+  background: #edf2f0;
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.watchlist-id-badge {
+  font-size: 10.5px;
+  color: var(--muted, #64716d);
+  background: #f1f4f3;
+  padding: 2px 6px;
+  border-radius: 3px;
+}
+
+/* 左侧名单卡片列表 */
+.watchlist-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  max-height: calc(100vh - 210px);
+  overflow-y: auto;
+}
+
+.watchlist-card-item {
+  padding: 10px 12px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 6px;
+  background: #ffffff;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  transition: all 0.15s ease;
+}
+
+.watchlist-card-item:hover {
+  border-color: var(--line-strong, #b7c2bd);
+  background: #fafbfb;
+}
+
+.watchlist-card-item.selected {
+  background: var(--color-accent-soft, #eef7f7);
+  border-color: var(--color-accent, #087682);
+  box-shadow: 0 0 0 1px var(--color-accent, #087682);
+}
+
+.card-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.watchlist-name {
+  font-size: 12.5px;
+  color: var(--graphite, #17211f);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.badges-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.category-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.category-badge.blacklist {
+  background: #fee2e2;
+  color: #991b1b;
+}
+.category-badge.whitelist {
+  background: #dcfce7;
+  color: #166534;
+}
+.category-badge.custom {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.status-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+.status-badge.active {
+  background: #dcfce7;
+  color: #166534;
+}
+.status-badge.disabled,
+.status-badge.archived {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.watchlist-desc {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted, #64716d);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--muted, #64716d);
+  margin-top: 2px;
+}
+
+.time-text {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  min-height: 2.35rem;
-  border: 0;
-  border-radius: 0.5rem;
-  padding: 0.45rem 0.8rem;
-  cursor: pointer;
-  background: var(--accent, #2563eb);
-  color: #fff;
+  gap: 3px;
 }
-.button.secondary {
-  background: var(--soft-color, #e2e8f0);
-  color: inherit;
-}
-.button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-.split-grid {
-  grid-template-columns: minmax(220px, 0.85fr) minmax(360px, 1.4fr);
-}
-.list-row,
-.member-row {
-  width: 100%;
+
+/* 右侧详情面板 */
+.detail-body {
+  padding: 10px;
   display: flex;
-  justify-content: space-between;
-  gap: 0.7rem;
-  padding: 0.75rem 0;
-  text-align: left;
-  border: 0;
-  border-bottom: 1px solid var(--border-color, #e2e8f0);
-  background: transparent;
-  color: inherit;
+  flex-direction: column;
+  gap: 10px;
 }
-.list-row {
-  cursor: pointer;
+
+.inline-add-member-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fafbfb;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 6px;
+  padding: 8px 10px;
+  flex-wrap: wrap;
 }
-.list-row.selected {
-  color: var(--accent, #2563eb);
+
+.add-member-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 260px;
 }
-strong,
-small {
-  display: block;
+
+.field-input {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 11.5px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 4px;
+  background: #ffffff;
+  color: var(--graphite, #17211f);
+  box-sizing: border-box;
+  width: 100%;
 }
-small,
+.field-input:focus {
+  border-color: var(--color-accent, #087682);
+  outline: none;
+}
+
+.field-textarea {
+  height: auto;
+  padding: 6px 8px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+/* 空状态 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 36px 16px;
+  gap: 8px;
+  color: var(--muted, #64716d);
+  text-align: center;
+}
+
+.empty-icon {
+  color: #b7c2bd;
+}
+
+.empty-state p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.empty-table-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  gap: 6px;
+  color: var(--muted, #64716d);
+}
+
+.empty-table-icon {
+  color: #b7c2bd;
+}
+
+.empty-table-state p {
+  margin: 0;
+  font-size: 11.5px;
+}
+
+/* 表格全局 */
+.table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 4px;
+  background: #ffffff;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11.5px;
+}
+
+.data-table th {
+  height: 28px;
+  padding: 2px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  background: #fafbfb;
+  color: var(--muted, #64716d);
+  border: 1px solid var(--line, #e2e8e6);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.data-table td {
+  height: 28px;
+  padding: 2px 8px;
+  border: 1px solid var(--line, #e2e8e6);
+  vertical-align: middle;
+}
+
+.empty-cell {
+  background: #fafbfb;
+  text-align: center;
+}
+
+.mono {
+  font-family: var(--font-mono, monospace);
+  font-size: 11.5px;
+}
+
 .muted {
-  color: var(--muted-text, #64748b);
-  font-size: 0.8rem;
+  color: var(--muted, #64716d);
 }
-.inline-form {
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* 模态弹窗 */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 26, 24, 0.45);
   display: grid;
-  grid-template-columns: 1.3fr 1fr auto;
-  gap: 0.6rem;
-  margin-bottom: 0.8rem;
+  place-items: center;
+  z-index: 1000;
+  padding: 16px;
 }
-.badge {
-  align-self: center;
-  padding: 0.2rem 0.45rem;
-  border-radius: 999px;
-  background: var(--soft-color, #e2e8f0);
-  font-size: 0.78rem;
+
+.modal-dialog {
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 8px;
+  box-shadow: 0 20px 50px rgba(15, 23, 21, 0.22);
+  width: min(640px, 95vw);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
-.error-message {
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line, #e2e8e6);
+  background: #fafbfb;
+}
+
+.modal-title-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-title-icon {
+  color: var(--color-accent, #087682);
+}
+
+.modal-title-box h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--graphite, #17211f);
+}
+
+.modal-title-box p {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--muted, #64716d);
+}
+
+.modal-body {
+  padding: 16px 18px;
+}
+
+.form-grid-2col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--graphite, #17211f);
+}
+
+.required {
   color: #dc2626;
+  font-style: normal;
 }
-@media (max-width: 800px) {
-  .page-header,
-  .split-grid,
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
-  .wide {
-    grid-column: auto;
-  }
-  .inline-form {
-    grid-template-columns: 1fr;
-  }
+
+.modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line, #e2e8e6);
+  background: #fafbfb;
 }
 </style>
