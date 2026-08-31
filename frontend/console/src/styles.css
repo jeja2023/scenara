@@ -817,7 +817,7 @@ table .icon-button,
 
 .search-box .search-input,
 input.search-input {
-  width: 200px;
+  width: 220px;
   height: 28px !important;
   min-height: 28px !important;
   line-height: 28px !important;
@@ -830,6 +830,26 @@ input.search-input {
   box-sizing: border-box !important;
   outline: none !important;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, width 0.2s ease !important;
+}
+
+.search-box.search-sm .search-input,
+.search-box.search-sm input.search-input {
+  width: 180px !important;
+}
+
+.search-box.search-md .search-input,
+.search-box.search-md input.search-input {
+  width: 220px !important;
+}
+
+.search-box.search-lg .search-input,
+.search-box.search-lg input.search-input {
+  width: 250px !important;
+}
+
+.search-box.search-xl .search-input,
+.search-box.search-xl input.search-input {
+  width: 300px !important;
 }
 
 .search-box .search-input:focus,

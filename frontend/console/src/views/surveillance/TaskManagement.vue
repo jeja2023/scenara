@@ -193,7 +193,7 @@ onMounted(() => void refresh());
           </select>
         </label>
 
-        <div class="search-box">
+        <div class="search-box search-lg">
           <Search :size="13" class="search-icon" />
           <input
             v-model="searchQuery"
