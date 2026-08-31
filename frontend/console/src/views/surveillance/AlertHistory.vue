@@ -343,47 +343,6 @@ onMounted(() => void refresh());
   outline: none;
 }
 
-.search-box {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.search-icon {
-  position: absolute;
-  left: 9px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--muted, #64716d);
-  pointer-events: none;
-  z-index: 1;
-}
-
-.search-input {
-  height: 28px;
-  line-height: 28px;
-  padding: 0 10px 0 30px !important;
-  font-size: 11.5px;
-  border: 1px solid var(--line, #e2e8e6);
-  border-radius: 4px;
-  background: #ffffff;
-  color: var(--graphite, #17211f);
-  width: 180px;
-  box-sizing: border-box !important;
-  outline: none;
-}
-.search-input:focus {
-  border-color: var(--color-accent, #087682);
-  background: #ffffff;
-  outline: none;
-  box-shadow: 0 0 0 2px var(--color-accent-soft, #e4f1f1);
-}
-.search-input::placeholder {
-  color: var(--muted, #64716d);
-  opacity: 0.75;
-}
-
 .count-badge {
   background: #edf2f0;
   color: #45534f;

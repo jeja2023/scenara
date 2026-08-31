@@ -793,6 +793,84 @@ table .icon-button,
   -webkit-appearance: none;
   margin: 0;
 }
+
+/* ==========================================================================
+   全局统一搜索框组件规范 (Global Standard Search Box)
+   ========================================================================== */
+.search-box {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.search-box .search-icon {
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted, #64716d);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.search-box .search-input,
+input.search-input {
+  width: 200px;
+  height: 28px !important;
+  min-height: 28px !important;
+  line-height: 28px !important;
+  padding: 0 10px 0 30px !important;
+  font-size: 11.5px !important;
+  border: 1px solid var(--line, #e2e8e6) !important;
+  border-radius: 4px !important;
+  background: #ffffff !important;
+  color: var(--graphite, #17211f) !important;
+  box-sizing: border-box !important;
+  outline: none !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, width 0.2s ease !important;
+}
+
+.search-box .search-input:focus,
+input.search-input:focus {
+  border-color: var(--color-accent, #087682) !important;
+  background: #ffffff !important;
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--color-accent-soft, #e4f1f1) !important;
+}
+
+.search-box .search-input::placeholder,
+input.search-input::placeholder {
+  color: var(--muted, #64716d) !important;
+  opacity: 0.75 !important;
+}
+
+.search-box .search-clear-btn,
+.search-box .clear-search-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--muted, #64716d);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: color 0.15s ease, background 0.15s ease;
+  z-index: 1;
+}
+
+.search-box .search-clear-btn:hover,
+.search-box .clear-search-btn:hover {
+  color: var(--graphite, #17211f);
+  background: rgba(0, 0, 0, 0.06);
+}
+
 .badge {
   display: inline-flex;
   align-items: center;
