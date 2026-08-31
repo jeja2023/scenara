@@ -324,11 +324,13 @@ const pageNumbers = computed<(number | string)[]>(() => {
   outline: none;
   flex: 0 0 40px !important;
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 .pagination-jumper-input::-webkit-outer-spin-button,
 .pagination-jumper-input::-webkit-inner-spin-button {
   -webkit-appearance: none;
+  appearance: none;
   margin: 0;
 }
 
