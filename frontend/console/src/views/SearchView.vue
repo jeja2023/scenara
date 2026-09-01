@@ -404,6 +404,54 @@ useRefresh(runSearch);
   <section class="page search-page">
     <p v-if="error" class="callout error">{{ error }}</p>
 
+    <!-- 顶部数据统计卡片 -->
+    <section class="stats">
+      <article class="stat teal">
+        <div class="stat-top-row">
+          <span class="stat-title">检索命中结果</span>
+          <div class="stat-icon-badge">
+            <SearchIcon :size="15" />
+          </div>
+        </div>
+        <strong class="stat-value">{{ response ? `${response.total} 条` : '就绪' }}</strong>
+        <small class="stat-desc">{{ response ? `跨 ${response.searched_indexes.length} 个特征索引库检索` : '输入条件后即可发起检索' }}</small>
+      </article>
+
+      <article class="stat green">
+        <div class="stat-top-row">
+          <span class="stat-title">当前检索模式</span>
+          <div class="stat-icon-badge">
+            <ScanFace v-if="mode === 'portrait'" :size="15" />
+            <SearchIcon v-else :size="15" />
+          </div>
+        </div>
+        <strong class="stat-value">{{ mode === 'text' ? '文搜图 / 视频' : '人像特征图搜' }}</strong>
+        <small class="stat-desc">{{ mode === 'text' ? '多模态语义文本嵌入向量' : '512 维人脸特征高维匹配' }}</small>
+      </article>
+
+      <article class="stat amber">
+        <div class="stat-top-row">
+          <span class="stat-title">相似度匹配阈值</span>
+          <div class="stat-icon-badge">
+            <Layers :size="15" />
+          </div>
+        </div>
+        <strong class="stat-value">{{ (Number(threshold) * 100).toFixed(0) }}% 截断</strong>
+        <small class="stat-desc">余弦相似度下限 {{ threshold }}</small>
+      </article>
+
+      <article class="stat teal">
+        <div class="stat-top-row">
+          <span class="stat-title">已保存策略</span>
+          <div class="stat-icon-badge">
+            <Bookmark :size="15" />
+          </div>
+        </div>
+        <strong class="stat-value">{{ savedSearches.length }} 项</strong>
+        <small class="stat-desc">支持一键重放与快捷检索</small>
+      </article>
+    </section>
+
     <section class="panel search-controls">
       <div class="panel-header">
         <div>
@@ -1020,6 +1068,94 @@ useRefresh(runSearch);
   background: #fef2f2;
   border-color: #fecaca;
 }
+/* 顶部统计卡片 */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 2px;
+}
+
+@media (max-width: 900px) {
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.stat {
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: all 0.15s ease;
+}
+
+.stat:hover {
+  transform: translateY(-1px);
+  border-color: var(--line-strong, #b7c2bd);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.04);
+}
+
+.stat-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.stat-title {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted, #64716d);
+}
+
+.stat-icon-badge {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat.teal .stat-icon-badge {
+  background: #f0fdfa;
+  color: var(--color-accent, #087682);
+  border: 1px solid #ccfbf1;
+}
+
+.stat.green .stat-icon-badge {
+  background: #f0fdf4;
+  color: #16a34a;
+  border: 1px solid #dcfce7;
+}
+
+.stat.amber .stat-icon-badge {
+  background: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fef3c7;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--graphite, #17211f);
+  line-height: 1.2;
+  margin: 2px 0 1px;
+}
+
+.stat-desc {
+  font-size: 10.5px;
+  color: #8c9b97;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .search-controls {
   padding: 0;
   overflow: hidden;
