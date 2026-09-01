@@ -47,7 +47,8 @@ function format(value: number): string {
 function query(): string {
   const params = new URLSearchParams({ limit: "100" });
   if (filters.status) params.set("status", filters.status);
-  if (filters.camera_id.trim()) params.set("camera_id", filters.camera_id.trim());
+  if (filters.camera_id.trim())
+    params.set("camera_id", filters.camera_id.trim());
   return params.toString();
 }
 
@@ -117,7 +118,11 @@ onMounted(() => void refresh());
         <label class="filter-item">
           <Filter :size="12" class="filter-icon" />
           <span class="filter-label">研判状态:</span>
-          <select v-model="filters.status" class="filter-select" @change="refresh">
+          <select
+            v-model="filters.status"
+            class="filter-select"
+            @change="refresh"
+          >
             <option value="">全部状态 (All)</option>
             <option value="pending">待处置 (Pending)</option>
             <option value="confirmed">已确认命中 (Confirmed)</option>
@@ -185,7 +190,9 @@ onMounted(() => void refresh());
                 <Camera :size="13" class="title-icon" />
                 <strong>{{ alert.camera_id }}</strong>
               </div>
-              <span class="badge modality-badge">{{ labelModality(alert.modality) }}</span>
+              <span class="badge modality-badge">{{
+                labelModality(alert.modality)
+              }}</span>
               <span class="time-text">
                 <Clock :size="11" />
                 {{ format(alert.triggered_at) }}
@@ -201,7 +208,9 @@ onMounted(() => void refresh());
           <div class="meta-grid">
             <div class="meta-item">
               <span class="meta-label">目标身份 (ID)</span>
-              <span class="meta-value mono">{{ alert.portrait_identity_id }}</span>
+              <span class="meta-value mono">{{
+                alert.portrait_identity_id
+              }}</span>
             </div>
             <div class="meta-item">
               <span class="meta-label">所属任务</span>
@@ -210,7 +219,8 @@ onMounted(() => void refresh());
             <div class="meta-item">
               <span class="meta-label">累计频次</span>
               <span class="meta-value">
-                已出现 <strong>{{ alert.occurrence_count }}</strong> 次 (最高 {{ (alert.max_score * 100).toFixed(1) }}%)
+                已出现 <strong>{{ alert.occurrence_count }}</strong> 次 (最高
+                {{ (alert.max_score * 100).toFixed(1) }}%)
               </span>
             </div>
             <div class="meta-item">
@@ -250,7 +260,9 @@ onMounted(() => void refresh());
             <div v-else class="triaged-info-row">
               <span class="triage-reason-badge">
                 研判结论: <strong>{{ alert.triage_reason }}</strong>
-                <small v-if="alert.triaged_by"> · 处置人: {{ alert.triaged_by }}</small>
+                <small v-if="alert.triaged_by">
+                  · 处置人: {{ alert.triaged_by }}</small
+                >
               </span>
 
               <button

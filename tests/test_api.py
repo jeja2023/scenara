@@ -336,8 +336,7 @@ async def test_pipeline_and_model_catalog_endpoints_use_state_store(client) -> N
     assert ocr_pipeline["parameter_schema"]["layout_required"]["control"] == "boolean"
     models = await api.get("/api/v1/models")
     assert models.status_code == 200
-    assert len(models.json()["data"]) >= 6
-    assert any(m["model_id"] == "scenara.portrait.yolov8n" for m in models.json()["data"])
+    assert models.json()["data"] == []
 
 
 
@@ -363,7 +362,7 @@ async def test_platform_product_catalog_exposes_matrix_boundaries(client) -> Non
     }
     assert by_id["parse"]["maturity"] == "available"
     assert by_id["parse"]["console_route"] == "/parse"
-    assert "OCR document parsing" in by_id["parse"]["current_scope"]
+    assert "OCR 文档解析" in by_id["parse"]["current_scope"]
     assert set(by_id["parse"]["api_paths"]) >= {
         "/api/v1/parse/image",
         "/api/v1/parse/video",
@@ -371,7 +370,7 @@ async def test_platform_product_catalog_exposes_matrix_boundaries(client) -> Non
         "/api/v1/parse/stream",
     }
     assert by_id["model"]["maturity"] == "seed"
-    assert "training jobs" in by_id["model"]["not_in_scope_yet"]
+    assert "训练作业编排" in by_id["model"]["not_in_scope_yet"]
     assert by_id["console"]["layer"] == "control_plane"
     assert by_id["api"]["layer"] == "developer_surface"
     assert by_id["agent"]["maturity"] == "gated"

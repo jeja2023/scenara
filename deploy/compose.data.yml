@@ -2,12 +2,12 @@ name: scenara-data
 
 services:
   data:
-    image: scenara-data:${SCENARA_DATA_IMAGE_TAG:-0.3.0-dev.34}
+    image: scenara-data:${SCENARA_DATA_IMAGE_TAG:-0.3.0-dev.39}
     build:
       context: ..
       dockerfile: Dockerfile.data
     environment:
-      SCENARA_DATA_SERVICE_TOKEN: ${SCENARA_DATA_SERVICE_TOKEN:?set SCENARA_DATA_SERVICE_TOKEN}
+      SCENARA_DATA_PLATFORM_SERVICE_TOKEN: ${SCENARA_DATA_PLATFORM_SERVICE_TOKEN:?set SCENARA_DATA_PLATFORM_SERVICE_TOKEN}
       SCENARA_DATA_STATE_PATH: /var/lib/scenara-data/data.db
     ports:
       - "127.0.0.1:${SCENARA_DATA_PORT:-8010}:8010"

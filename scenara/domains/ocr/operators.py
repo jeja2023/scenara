@@ -442,6 +442,7 @@ class OcrDocumentOperator:
         if not isinstance(decoded, DecodedMedia):
             raise TypeError("OCR requires a decoded media batch")
         if self._engine is None:
+            loaded_engine: OcrEngine
             try:
                 loaded_engine = await asyncio.to_thread(lambda: PaddleOcrEngine())
             except Exception:

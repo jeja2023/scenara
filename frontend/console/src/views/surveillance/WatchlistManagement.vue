@@ -61,7 +61,10 @@ const selectedWatchlist = computed(() =>
 
 const filteredWatchlists = computed(() => {
   return watchlists.value.filter((item) => {
-    if (categoryFilter.value !== "all" && item.category !== categoryFilter.value) {
+    if (
+      categoryFilter.value !== "all" &&
+      item.category !== categoryFilter.value
+    ) {
       return false;
     }
     if (searchQuery.value.trim()) {
@@ -188,7 +191,9 @@ onMounted(() => void refresh());
           />
         </div>
 
-        <span class="badge count-badge">共 {{ watchlists.length }} 个名单库</span>
+        <span class="badge count-badge"
+          >共 {{ watchlists.length }} 个名单库</span
+        >
       </div>
 
       <div class="filter-right">
@@ -200,10 +205,7 @@ onMounted(() => void refresh());
           <RefreshCw :size="12" :class="{ spinning: loading }" />
           <span>刷新</span>
         </button>
-        <button
-          class="button primary tiny-btn"
-          @click="showCreateModal = true"
-        >
+        <button class="button primary tiny-btn" @click="showCreateModal = true">
           <Plus :size="13" />
           <span>新建布控名单</span>
         </button>
@@ -233,10 +235,7 @@ onMounted(() => void refresh());
             <div class="card-top-row">
               <strong class="watchlist-name">{{ item.name }}</strong>
               <div class="badges-row">
-                <span
-                  class="badge category-badge"
-                  :class="item.category"
-                >
+                <span class="badge category-badge" :class="item.category">
                   {{ labelWatchlistCategory(item.category) }}
                 </span>
                 <span class="badge status-badge" :class="item.status">
@@ -250,7 +249,9 @@ onMounted(() => void refresh());
             </p>
 
             <div class="card-footer-row">
-              <span class="watchlist-id-text mono">{{ item.watchlist_id }}</span>
+              <span class="watchlist-id-text mono">{{
+                item.watchlist_id
+              }}</span>
               <span class="time-text">
                 <Clock :size="11" />
                 {{ date(item.updated_at) }}
@@ -284,7 +285,9 @@ onMounted(() => void refresh());
             </span>
           </div>
           <div v-if="selectedWatchlist" class="header-meta">
-            <span class="watchlist-id-badge mono">ID: {{ selectedWatchlist.watchlist_id }}</span>
+            <span class="watchlist-id-badge mono"
+              >ID: {{ selectedWatchlist.watchlist_id }}</span
+            >
           </div>
         </div>
 
@@ -318,21 +321,23 @@ onMounted(() => void refresh());
             <table class="data-table">
               <thead>
                 <tr>
-                  <th style="width: 50px; text-align: center;">序号</th>
-                  <th style="width: 140px;">成员姓名 / 备注</th>
-                  <th style="width: 180px;">人像身份 ID (Identity ID)</th>
-                  <th style="width: 90px; text-align: center;">成员状态</th>
-                  <th style="width: 140px;">加入时间</th>
+                  <th style="width: 50px; text-align: center">序号</th>
+                  <th style="width: 140px">成员姓名 / 备注</th>
+                  <th style="width: 180px">人像身份 ID (Identity ID)</th>
+                  <th style="width: 90px; text-align: center">成员状态</th>
+                  <th style="width: 140px">加入时间</th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-for="(member, idx) in members" :key="member.member_id">
-                  <td style="text-align: center;" class="muted mono">{{ idx + 1 }}</td>
+                  <td style="text-align: center" class="muted mono">
+                    {{ idx + 1 }}
+                  </td>
                   <td>
                     <strong>{{ member.display_label || "未命名成员" }}</strong>
                   </td>
                   <td class="mono">{{ member.portrait_identity_id }}</td>
-                  <td style="text-align: center;">
+                  <td style="text-align: center">
                     <span class="badge status-badge" :class="member.status">
                       {{ labelWatchlistStatus(member.status) }}
                     </span>
@@ -343,7 +348,10 @@ onMounted(() => void refresh());
                   <td colspan="5" class="empty-cell">
                     <div class="empty-table-state">
                       <UserCheck :size="24" class="empty-table-icon" />
-                      <p>当前名单库尚未录入任何成员，请在上方输入人像身份 ID 进行添加</p>
+                      <p>
+                        当前名单库尚未录入任何成员，请在上方输入人像身份 ID
+                        进行添加
+                      </p>
                     </div>
                   </td>
                 </tr>
@@ -379,7 +387,9 @@ onMounted(() => void refresh());
           <div class="modal-body">
             <div class="form-grid-2col">
               <label class="form-field">
-                <span class="field-label">名单名称 <em class="required">*</em></span>
+                <span class="field-label"
+                  >名单名称 <em class="required">*</em></span
+                >
                 <input
                   v-model="watchlistForm.name"
                   placeholder="例如: 园区重点关注人员 / VIP访客库"
@@ -389,7 +399,9 @@ onMounted(() => void refresh());
                 />
               </label>
               <label class="form-field">
-                <span class="field-label">名单类别 <em class="required">*</em></span>
+                <span class="field-label"
+                  >名单类别 <em class="required">*</em></span
+                >
                 <select v-model="watchlistForm.category" class="field-input">
                   <option value="blacklist">黑名单 (高风险预警)</option>
                   <option value="whitelist">白名单 (免检放行)</option>
@@ -397,8 +409,10 @@ onMounted(() => void refresh());
                 </select>
               </label>
             </div>
-            <label class="form-field" style="margin-top: 10px;">
-              <span class="field-label">业务说明 <small class="muted">(可选)</small></span>
+            <label class="form-field" style="margin-top: 10px">
+              <span class="field-label"
+                >业务说明 <small class="muted">(可选)</small></span
+              >
               <textarea
                 v-model="watchlistForm.description"
                 placeholder="输入该名单库的应用场景与业务背景说明..."

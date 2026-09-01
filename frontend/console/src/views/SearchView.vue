@@ -95,7 +95,6 @@ const previewLightboxOpen = ref(false);
 const drawerOpen = ref(false);
 const drawerRunId = ref<string | null>(null);
 
-
 const imageAssets = computed(() =>
   assets.value.filter((asset) => asset.kind === "image"),
 );
@@ -413,8 +412,14 @@ useRefresh(runSearch);
             <SearchIcon :size="15" />
           </div>
         </div>
-        <strong class="stat-value">{{ response ? `${response.total} 条` : '就绪' }}</strong>
-        <small class="stat-desc">{{ response ? `跨 ${response.searched_indexes.length} 个特征索引库检索` : '输入条件后即可发起检索' }}</small>
+        <strong class="stat-value">{{
+          response ? `${response.total} 条` : "就绪"
+        }}</strong>
+        <small class="stat-desc">{{
+          response
+            ? `跨 ${response.searched_indexes.length} 个特征索引库检索`
+            : "输入条件后即可发起检索"
+        }}</small>
       </article>
 
       <article class="stat green">
@@ -425,8 +430,12 @@ useRefresh(runSearch);
             <SearchIcon v-else :size="15" />
           </div>
         </div>
-        <strong class="stat-value">{{ mode === 'text' ? '文搜图 / 视频' : '人像特征图搜' }}</strong>
-        <small class="stat-desc">{{ mode === 'text' ? '多模态语义文本嵌入向量' : '512 维人脸特征高维匹配' }}</small>
+        <strong class="stat-value">{{
+          mode === "text" ? "文搜图 / 视频" : "人像特征图搜"
+        }}</strong>
+        <small class="stat-desc">{{
+          mode === "text" ? "多模态语义文本嵌入向量" : "512 维人脸特征高维匹配"
+        }}</small>
       </article>
 
       <article class="stat amber">
@@ -436,7 +445,9 @@ useRefresh(runSearch);
             <Layers :size="15" />
           </div>
         </div>
-        <strong class="stat-value">{{ (Number(threshold) * 100).toFixed(0) }}% 截断</strong>
+        <strong class="stat-value"
+          >{{ (Number(threshold) * 100).toFixed(0) }}% 截断</strong
+        >
         <small class="stat-desc">余弦相似度下限 {{ threshold }}</small>
       </article>
 
@@ -740,8 +751,10 @@ useRefresh(runSearch);
       <div v-if="response?.query_summary" class="query-summary">
         <UserRound :size="17" />
         <span>
-          人像生物特征比对：在查询图中定位到 {{ response.query_summary.face_count }} 张人脸，已提取
-          <strong>{{ response.query_summary.model_id }}</strong> 512 维特征向量进行全库比对。
+          人像生物特征比对：在查询图中定位到
+          {{ response.query_summary.face_count }} 张人脸，已提取
+          <strong>{{ response.query_summary.model_id }}</strong> 512
+          维特征向量进行全库比对。
         </span>
       </div>
 
@@ -757,9 +770,7 @@ useRefresh(runSearch);
           <div
             class="hit-thumbnail-box"
             :title="
-              hitThumbnails[hit.record_id]
-                ? '点击查看原图大图'
-                : '无预览图像'
+              hitThumbnails[hit.record_id] ? '点击查看原图大图' : '无预览图像'
             "
             @click.stop="
               hitThumbnails[hit.record_id]
@@ -816,9 +827,7 @@ useRefresh(runSearch);
                   title="视频时间戳"
                 >
                   <Clock :size="11" />
-                  {{ formatPts(hit.source.pts_ms) }} ({{
-                    hit.source.pts_ms
-                  }}ms)
+                  {{ formatPts(hit.source.pts_ms) }} ({{ hit.source.pts_ms }}ms)
                 </span>
                 <span
                   v-if="hit.source.page_number != null"
@@ -890,24 +899,33 @@ useRefresh(runSearch);
         <strong v-if="response && !response.searched_indexes.length">
           当前库中暂无可用的人像特征索引（已提取查询图特征，但底库无数据）
         </strong>
-        <strong v-else>{{ response ? "未检索到符合条件的匹配结果" : "等待检索" }}</strong>
+        <strong v-else>{{
+          response ? "未检索到符合条件的匹配结果" : "等待检索"
+        }}</strong>
         <template v-if="response">
           <div class="search-empty-tips">
             <p><strong>排查与说明：</strong></p>
             <ul>
               <li v-if="!response.searched_indexes.length">
-                <strong style="color: #b91c1c;">底库暂无已解析数据</strong>：查询图中已成功提取到 512 维人脸特征，但系统中目前<strong>尚未对目标视频/图片运行过【人像解析】任务</strong>，因此底库中暂无可供比对的特征索引。请先前往左侧<strong>【解析工作台】</strong>对目标视频执行一次【人像解析】。
+                <strong style="color: #b91c1c">底库暂无已解析数据</strong
+                >：查询图中已成功提取到 512
+                维人脸特征，但系统中目前<strong>尚未对目标视频/图片运行过【人像解析】任务</strong>，因此底库中暂无可供比对的特征索引。请先前往左侧<strong>【解析工作台】</strong>对目标视频执行一次【人像解析】。
               </li>
               <li v-else>
-                <strong>调低相似度阈值</strong>：当前阈值为 <code>{{ threshold }}</code>，对于跨角度/低清监控人脸，建议调整至 <code>0.60 ~ 0.70</code> 后重试；
+                <strong>调低相似度阈值</strong>：当前阈值为
+                <code>{{ threshold }}</code
+                >，对于跨角度/低清监控人脸，建议调整至
+                <code>0.60 ~ 0.70</code> 后重试；
               </li>
-              <li><strong>人体外貌/衣着检索</strong>：若需根据衣着颜色或人体特征查找，可切换至上方【文搜图/文搜视频】直接输入关键词（如：“深色上衣”、“白衬衫”）。</li>
+              <li>
+                <strong>人体外貌/衣着检索</strong
+                >：若需根据衣着颜色或人体特征查找，可切换至上方【文搜图/文搜视频】直接输入关键词（如：“深色上衣”、“白衬衫”）。
+              </li>
             </ul>
           </div>
         </template>
         <span v-else>检索结果会按向量相似度或文本匹配度排序。</span>
       </div>
-
     </section>
 
     <!-- 1. 结构化结果抽屉 -->
@@ -1008,7 +1026,14 @@ useRefresh(runSearch);
         <div class="lightbox-header">
           <div>
             <h3>查询原图大图预览</h3>
-            <p>{{ file?.name || imageAssets.find(a => a.asset_id === assetId)?.filename || assetId || '已选图片' }}</p>
+            <p>
+              {{
+                file?.name ||
+                imageAssets.find((a) => a.asset_id === assetId)?.filename ||
+                assetId ||
+                "已选图片"
+              }}
+            </p>
           </div>
           <button
             class="icon-button"
@@ -1020,17 +1045,19 @@ useRefresh(runSearch);
           </button>
         </div>
         <div class="lightbox-body">
-          <img
-            :src="preview"
-            alt="查询原图"
-            class="lightbox-img"
-          />
+          <img :src="preview" alt="查询原图" class="lightbox-img" />
         </div>
         <div class="lightbox-footer">
           <div class="lightbox-meta">
-            <span v-if="file" class="hit-badge local">本地文件: {{ file.name }}</span>
-            <span v-else-if="assetId" class="hit-badge asset">资产库图片: {{ assetId }}</span>
-            <span v-if="threshold" class="hit-badge score">设定相似度阈值: {{ threshold }}</span>
+            <span v-if="file" class="hit-badge local"
+              >本地文件: {{ file.name }}</span
+            >
+            <span v-else-if="assetId" class="hit-badge asset"
+              >资产库图片: {{ assetId }}</span
+            >
+            <span v-if="threshold" class="hit-badge score"
+              >设定相似度阈值: {{ threshold }}</span
+            >
           </div>
           <div class="lightbox-actions">
             <button class="button primary" @click="previewLightboxOpen = false">
@@ -1336,7 +1363,9 @@ useRefresh(runSearch);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: transform 120ms ease, background 120ms ease;
+  transition:
+    transform 120ms ease,
+    background 120ms ease;
 }
 .preview-clear-btn:hover {
   background: #ef4444;
@@ -2029,7 +2058,6 @@ useRefresh(runSearch);
   font-weight: 600;
 }
 
-
 @media (max-width: 768px) {
   .portrait-query-card {
     flex-direction: column;
@@ -2058,4 +2086,3 @@ useRefresh(runSearch);
   }
 }
 </style>
-

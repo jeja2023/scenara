@@ -1,4 +1,4 @@
-export declare const OPENAPI_SHA256 = "9e5823abde49e1491cd4a540065c4cf256e3c5199a4565fc8530be9d7b3650f0" /** gitleaks:allow - public contract digest */;
+export declare const OPENAPI_SHA256 = "f862789deb155ab325165ff03aa8c8614a8e773d722bbef5ab21ddfe366b45ec" /** gitleaks:allow - public contract digest */;
 export declare namespace OpenApi {
     type AccessCapabilityItem = {
         capability_id: string;
@@ -1350,6 +1350,7 @@ export declare namespace OpenApi {
         display_name: string;
         email?: (string) | (null);
         password?: (string) | (null);
+        phone?: (string) | (null);
         user_id?: (AccessId) | (null);
     };
     type CreateWatchlistMemberRequest = {
@@ -2946,6 +2947,7 @@ export declare namespace OpenApi {
         disabled?: boolean;
         display_name: string;
         email?: (string) | (null);
+        phone?: (string) | (null);
         tenant_id: AccessId;
         updated_at: number;
         user_id: AccessId;

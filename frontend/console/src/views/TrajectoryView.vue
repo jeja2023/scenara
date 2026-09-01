@@ -2,10 +2,7 @@
 import {
   Camera,
   Check,
-  CheckCircle2,
   Clock,
-  ExternalLink,
-  Eye,
   Filter,
   GitMerge,
   Layers,
@@ -14,14 +11,11 @@ import {
   RotateCcw,
   Route,
   Scissors,
-  ShieldCheck,
   Trash2,
   UserCheck,
   UserRound,
   Users,
-  Video,
   X,
-  XCircle,
 } from "@lucide/vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
@@ -41,10 +35,34 @@ const segmentColumns: TableColumn<TrajectorySegment>[] = [
   { key: "segment_id", label: "片段标识", class: "mono", width: "160px" },
   { key: "camera_id", label: "抓拍机位", width: "160px" },
   { key: "time_range", label: "时序区间", width: "200px" },
-  { key: "track_quality", label: "跟踪质量", width: "100px", align: "center", headerAlign: "center" },
-  { key: "match_method", label: "匹配方式", width: "120px", align: "center", headerAlign: "center" },
-  { key: "match_score", label: "相似度", width: "100px", align: "center", headerAlign: "center" },
-  { key: "actions", label: "拆分操作", width: "100px", align: "right", headerAlign: "right" },
+  {
+    key: "track_quality",
+    label: "跟踪质量",
+    width: "100px",
+    align: "center",
+    headerAlign: "center",
+  },
+  {
+    key: "match_method",
+    label: "匹配方式",
+    width: "120px",
+    align: "center",
+    headerAlign: "center",
+  },
+  {
+    key: "match_score",
+    label: "相似度",
+    width: "100px",
+    align: "center",
+    headerAlign: "center",
+  },
+  {
+    key: "actions",
+    label: "拆分操作",
+    width: "100px",
+    align: "right",
+    headerAlign: "right",
+  },
 ];
 
 const identities = ref<LongTermIdentity[]>([]);
@@ -113,12 +131,6 @@ function statusLabel(status: TrajectoryStatus): string {
     default:
       return status || "-";
   }
-}
-
-function statusClass(status: TrajectoryStatus): string {
-  if (status === "confirmed") return "active";
-  if (status === "rejected") return "error-badge";
-  return "warn-badge";
 }
 
 function methodLabel(method: string): string {
@@ -241,7 +253,8 @@ async function patchIdentity(
 
 async function removeIdentity(): Promise<void> {
   if (!selectedId.value) return;
-  if (!window.confirm("确定要删除该长期轨迹身份及其所有特征关联记录吗？")) return;
+  if (!window.confirm("确定要删除该长期轨迹身份及其所有特征关联记录吗？"))
+    return;
   saving.value = true;
   clearFeedback();
   try {
@@ -305,7 +318,9 @@ async function splitOut(segmentId?: string): Promise<void> {
     );
     splitSelection.value = [];
     selectedId.value = created.identity_id;
-    notifySuccess(`已成功拆分为新身份「${created.display_name || created.identity_id}」`);
+    notifySuccess(
+      `已成功拆分为新身份「${created.display_name || created.identity_id}」`,
+    );
     await refresh();
   } catch (caught) {
     error.value = userFacingError(caught, "片段拆分失败");
@@ -375,7 +390,11 @@ useRefresh(refresh);
           </div>
         </div>
         <strong class="stat-value">{{ segments.length }} 段</strong>
-        <small class="stat-desc">{{ selected ? `当前选定: ${selected.display_name || selected.identity_id}` : '未选择身份' }}</small>
+        <small class="stat-desc">{{
+          selected
+            ? `当前选定: ${selected.display_name || selected.identity_id}`
+            : "未选择身份"
+        }}</small>
       </article>
     </section>
 
@@ -385,7 +404,11 @@ useRefresh(refresh);
         <label class="filter-item">
           <Filter :size="12" class="filter-icon" />
           <span class="filter-label">研判状态:</span>
-          <select v-model="filters.status" class="filter-select" @change="refresh">
+          <select
+            v-model="filters.status"
+            class="filter-select"
+            @change="refresh"
+          >
             <option value="">全部状态 (All)</option>
             <option value="auto">待研判 (Auto)</option>
             <option value="confirmed">已确认 (Confirmed)</option>
@@ -395,7 +418,11 @@ useRefresh(refresh);
 
         <label class="filter-item">
           <span class="filter-label">抓拍机位:</span>
-          <select v-model="filters.camera_id" class="filter-select" @change="refresh">
+          <select
+            v-model="filters.camera_id"
+            class="filter-select"
+            @change="refresh"
+          >
             <option value="">全部机位 (All Cameras)</option>
             <option
               v-for="camera in cameras"
@@ -477,27 +504,55 @@ useRefresh(refresh);
               @click="select(identity.identity_id)"
             >
               <div class="identity-top-row">
-                <strong class="identity-title" :title="identity.display_name || identity.identity_id">
+                <strong
+                  class="identity-title"
+                  :title="identity.display_name || identity.identity_id"
+                >
                   {{ identity.display_name || identity.identity_id }}
                 </strong>
                 <span
                   class="badge status-badge"
-                  :class="identity.status === 'confirmed' ? 'active' : identity.status === 'rejected' ? 'error-badge' : 'warn-badge'"
+                  :class="
+                    identity.status === 'confirmed'
+                      ? 'active'
+                      : identity.status === 'rejected'
+                        ? 'error-badge'
+                        : 'warn-badge'
+                  "
                 >
                   <span
                     class="status-dot"
-                    :class="identity.status === 'confirmed' ? 'dot-active' : identity.status === 'rejected' ? 'dot-error' : 'dot-warn'"
+                    :class="
+                      identity.status === 'confirmed'
+                        ? 'dot-active'
+                        : identity.status === 'rejected'
+                          ? 'dot-error'
+                          : 'dot-warn'
+                    "
                   />
-                  {{ identity.status === 'confirmed' ? '已确认' : identity.status === 'rejected' ? '已否决' : '待研判' }}
+                  {{
+                    identity.status === "confirmed"
+                      ? "已确认"
+                      : identity.status === "rejected"
+                        ? "已否决"
+                        : "待研判"
+                  }}
                 </span>
               </div>
 
               <div class="identity-meta-row">
                 <span>{{ identity.segment_count }} 段轨迹</span>
                 <span class="dot-sep">·</span>
-                <span>{{ identity.camera_ids ? identity.camera_ids.length : 0 }} 个机位</span>
+                <span
+                  >{{
+                    identity.camera_ids ? identity.camera_ids.length : 0
+                  }}
+                  个机位</span
+                >
                 <span class="dot-sep">·</span>
-                <span class="mono">{{ identity.modalities ? identity.modalities.join("+") : "人脸" }}</span>
+                <span class="mono">{{
+                  identity.modalities ? identity.modalities.join("+") : "人脸"
+                }}</span>
               </div>
 
               <div class="identity-time-row">
@@ -537,18 +592,33 @@ useRefresh(refresh);
                   <h2>{{ selected.display_name || selected.identity_id }}</h2>
                   <span
                     class="badge status-badge"
-                    :class="selected.status === 'confirmed' ? 'active' : selected.status === 'rejected' ? 'error-badge' : 'warn-badge'"
+                    :class="
+                      selected.status === 'confirmed'
+                        ? 'active'
+                        : selected.status === 'rejected'
+                          ? 'error-badge'
+                          : 'warn-badge'
+                    "
                   >
                     <span
                       class="status-dot"
-                      :class="selected.status === 'confirmed' ? 'dot-active' : selected.status === 'rejected' ? 'dot-error' : 'dot-warn'"
+                      :class="
+                        selected.status === 'confirmed'
+                          ? 'dot-active'
+                          : selected.status === 'rejected'
+                            ? 'dot-error'
+                            : 'dot-warn'
+                      "
                     />
                     {{ statusLabel(selected.status) }}
                   </span>
-                  <span class="mono id-badge">ID: {{ selected.identity_id }}</span>
+                  <span class="mono id-badge"
+                    >ID: {{ selected.identity_id }}</span
+                  >
                 </div>
                 <small class="time-range-text">
-                  首次出现 {{ formatTime(selected.first_seen_at) }} · 最近出现 {{ formatTime(selected.last_seen_at) }}
+                  首次出现 {{ formatTime(selected.first_seen_at) }} · 最近出现
+                  {{ formatTime(selected.last_seen_at) }}
                 </small>
               </div>
 
@@ -558,7 +628,9 @@ useRefresh(refresh);
                   class="button primary tiny-btn confirm-btn"
                   :disabled="saving || selected.status === 'confirmed'"
                   title="确认该身份聚类准确"
-                  @click="patchIdentity({ status: 'confirmed' }, '身份已研判确认')"
+                  @click="
+                    patchIdentity({ status: 'confirmed' }, '身份已研判确认')
+                  "
                 >
                   <Check :size="12" />确认身份
                 </button>
@@ -589,12 +661,16 @@ useRefresh(refresh);
                 class="field-input rename-input"
                 maxlength="256"
                 placeholder="例如：张三 / 访客001"
-                @keyup.enter="patchIdentity({ display_name: renameDraft }, '身份名称已更新')"
+                @keyup.enter="
+                  patchIdentity({ display_name: renameDraft }, '身份名称已更新')
+                "
               />
               <button
                 class="button secondary tiny-btn"
                 :disabled="saving || renameDraft === selected.display_name"
-                @click="patchIdentity({ display_name: renameDraft }, '身份名称已更新')"
+                @click="
+                  patchIdentity({ display_name: renameDraft }, '身份名称已更新')
+                "
               >
                 保存名称
               </button>
@@ -607,7 +683,9 @@ useRefresh(refresh);
               <div class="header-left">
                 <Route :size="14" class="header-icon" />
                 <h3>跨摄像头时序轨迹迁移时序图</h3>
-                <span class="badge count-badge">{{ timeline.length }} 次出现记录</span>
+                <span class="badge count-badge"
+                  >{{ timeline.length }} 次出现记录</span
+                >
               </div>
             </div>
 
@@ -620,29 +698,49 @@ useRefresh(refresh);
                 >
                   <div class="timeline-marker">
                     <div class="timeline-dot" />
-                    <div v-if="index < timeline.length - 1" class="timeline-line" />
+                    <div
+                      v-if="index < timeline.length - 1"
+                      class="timeline-line"
+                    />
                   </div>
 
                   <div class="timeline-card">
                     <div class="timeline-card-header">
                       <div class="timeline-cam-name">
                         <MapPin :size="12" class="cam-icon" />
-                        <strong>{{ entry.camera_name || cameraName(entry.camera_id) }}</strong>
+                        <strong>{{
+                          entry.camera_name || cameraName(entry.camera_id)
+                        }}</strong>
                       </div>
-                      <span class="badge method-badge">{{ methodLabel(entry.match_method) }}</span>
+                      <span class="badge method-badge">{{
+                        methodLabel(entry.match_method)
+                      }}</span>
                     </div>
 
                     <div class="timeline-card-body">
-                      <span class="time-point">{{ formatTime(entry.first_seen_at) }}</span>
+                      <span class="time-point">{{
+                        formatTime(entry.first_seen_at)
+                      }}</span>
                       <span class="dot-sep">·</span>
-                      <span>停留 {{ formatDuration(entry.duration_seconds) }}</span>
+                      <span
+                        >停留 {{ formatDuration(entry.duration_seconds) }}</span
+                      >
                       <span v-if="entry.match_score" class="dot-sep">·</span>
-                      <span v-if="entry.match_score" class="score-text mono">相似度 {{ (entry.match_score * 100).toFixed(1) }}%</span>
+                      <span v-if="entry.match_score" class="score-text mono"
+                        >相似度
+                        {{ (entry.match_score * 100).toFixed(1) }}%</span
+                      >
                     </div>
 
-                    <div v-if="entry.transition_seconds !== null" class="timeline-gap-badge">
+                    <div
+                      v-if="entry.transition_seconds !== null"
+                      class="timeline-gap-badge"
+                    >
                       <Clock :size="10" />
-                      <span>距上次出现迁移耗时 {{ formatDuration(entry.transition_seconds) }}</span>
+                      <span
+                        >距上次出现迁移耗时
+                        {{ formatDuration(entry.transition_seconds) }}</span
+                      >
                     </div>
                   </div>
                 </li>
@@ -670,7 +768,8 @@ useRefresh(refresh);
                   :disabled="saving"
                   @click="splitOut()"
                 >
-                  <Scissors :size="11" />拆分所选 {{ splitSelection.length }} 段为新身份
+                  <Scissors :size="11" />拆分所选
+                  {{ splitSelection.length }} 段为新身份
                 </button>
               </div>
             </div>
@@ -694,13 +793,18 @@ useRefresh(refresh);
                     :title="'勾选以拆分该片段'"
                     @change="toggle(splitSelection, row.segment_id)"
                   />
-                  <span class="mono" :title="row.segment_id">{{ row.segment_id.slice(0, 16) }}…</span>
+                  <span class="mono" :title="row.segment_id"
+                    >{{ row.segment_id.slice(0, 16) }}…</span
+                  >
                 </div>
               </template>
 
               <!-- 2. 抓拍机位 -->
               <template #camera_id="{ row }">
-                <span class="single-line-text bold" :title="cameraName(row.camera_id)">
+                <span
+                  class="single-line-text bold"
+                  :title="cameraName(row.camera_id)"
+                >
                   {{ cameraName(row.camera_id) }}
                 </span>
               </template>
@@ -715,7 +819,11 @@ useRefresh(refresh);
               <!-- 4. 跟踪质量 -->
               <template #track_quality="{ row }">
                 <span class="quality-badge">
-                  {{ typeof row.track_quality === 'number' ? row.track_quality.toFixed(2) : '-' }}
+                  {{
+                    typeof row.track_quality === "number"
+                      ? row.track_quality.toFixed(2)
+                      : "-"
+                  }}
                 </span>
               </template>
 
@@ -729,7 +837,11 @@ useRefresh(refresh);
               <!-- 6. 相似度 -->
               <template #match_score="{ row }">
                 <span class="mono bold score-cell">
-                  {{ typeof row.match_score === 'number' ? (row.match_score * 100).toFixed(1) + '%' : '-' }}
+                  {{
+                    typeof row.match_score === "number"
+                      ? (row.match_score * 100).toFixed(1) + "%"
+                      : "-"
+                  }}
                 </span>
               </template>
 

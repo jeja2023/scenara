@@ -258,7 +258,12 @@ class ModelRegistry:
 
 
 def builtin_model_packages() -> list[ModelPackageManifest]:
-    """返回系统预置已装配的内置模型包清单（涵盖人像视觉、OCR智能文档、行为识别、服饰风格4大领域）。"""
+    """Return the legacy reference package list for development tooling.
+
+    These records are not installed artifacts or release approvals. Public API
+    clients must use the state-backed model registry, which contains only
+    packages verified during installation.
+    """
     return [
         # --- 1. 人像视觉领域 (Portrait Domain) ---
         ModelPackageManifest(

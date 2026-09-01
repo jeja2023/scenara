@@ -831,7 +831,10 @@ input.search-input {
   color: var(--graphite, #17211f) !important;
   box-sizing: border-box !important;
   outline: none !important;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease, width 0.2s ease !important;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    width 0.2s ease !important;
 }
 
 .search-box.search-sm .search-input,
@@ -883,7 +886,9 @@ input.search-input::placeholder {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
   z-index: 1;
 }
 

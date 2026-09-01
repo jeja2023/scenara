@@ -14,7 +14,14 @@ import { useRoute, useRouter } from "vue-router";
 import { api, userFacingError } from "../api";
 import { labelDomain, labelPipeline, labelRunStatus } from "../labels";
 import DataTable from "../components/DataTable.vue";
-import type { Domain, DomainManifest, Run, RunPage, RunStatus, TableColumn } from "../types";
+import type {
+  Domain,
+  DomainManifest,
+  Run,
+  RunPage,
+  RunStatus,
+  TableColumn,
+} from "../types";
 
 const pageSize = ref(20);
 const runs = ref<Run[]>([]);
@@ -248,7 +255,11 @@ onBeforeUnmount(() => {
             <Filter :size="15" />
             <span>筛选记录</span>
           </div>
-          <select v-model="domain" aria-label="领域筛选" @change="onFilterChange">
+          <select
+            v-model="domain"
+            aria-label="领域筛选"
+            @change="onFilterChange"
+          >
             <option value="">全部领域</option>
             <option
               v-for="item in domains"
@@ -258,7 +269,11 @@ onBeforeUnmount(() => {
               {{ item.display_name }}
             </option>
           </select>
-          <select v-model="status" aria-label="状态筛选" @change="onFilterChange">
+          <select
+            v-model="status"
+            aria-label="状态筛选"
+            @change="onFilterChange"
+          >
             <option value="">全部状态</option>
             <option value="queued">排队中</option>
             <option value="running">运行中</option>

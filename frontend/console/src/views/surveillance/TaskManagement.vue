@@ -52,10 +52,7 @@ const form = reactive({
 
 const isReadyToSubmit = computed(() =>
   Boolean(
-    form.name.trim() &&
-      form.watchlist_id &&
-      form.source_id &&
-      form.camera_id,
+    form.name.trim() && form.watchlist_id && form.source_id && form.camera_id,
   ),
 );
 
@@ -214,10 +211,7 @@ onMounted(() => void refresh());
           <RefreshCw :size="12" :class="{ spinning: loading }" />
           <span>刷新</span>
         </button>
-        <button
-          class="button primary tiny-btn"
-          @click="showCreateModal = true"
-        >
+        <button class="button primary tiny-btn" @click="showCreateModal = true">
           <Plus :size="13" />
           <span>新建布控任务</span>
         </button>
@@ -230,20 +224,22 @@ onMounted(() => void refresh());
         <table class="data-table">
           <thead>
             <tr>
-              <th style="width: 50px; text-align: center;">序号</th>
-              <th style="width: 200px;">任务名称 / ID</th>
-              <th style="width: 160px;">关联布控名单</th>
-              <th style="width: 180px;">监控视频源与摄像头</th>
-              <th style="width: 170px;">多模态比对阈值</th>
-              <th style="width: 90px; text-align: center;">频控冷却</th>
-              <th style="width: 80px; text-align: center;">告警等级</th>
-              <th style="width: 90px; text-align: center;">任务状态</th>
-              <th style="width: 100px; text-align: center;">操作</th>
+              <th style="width: 50px; text-align: center">序号</th>
+              <th style="width: 200px">任务名称 / ID</th>
+              <th style="width: 160px">关联布控名单</th>
+              <th style="width: 180px">监控视频源与摄像头</th>
+              <th style="width: 170px">多模态比对阈值</th>
+              <th style="width: 90px; text-align: center">频控冷却</th>
+              <th style="width: 80px; text-align: center">告警等级</th>
+              <th style="width: 90px; text-align: center">任务状态</th>
+              <th style="width: 100px; text-align: center">操作</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="(task, idx) in filteredTasks" :key="task.task_id">
-              <td style="text-align: center;" class="muted mono">{{ idx + 1 }}</td>
+              <td style="text-align: center" class="muted mono">
+                {{ idx + 1 }}
+              </td>
               <td>
                 <div class="task-title-cell">
                   <strong>{{ task.name }}</strong>
@@ -271,37 +267,68 @@ onMounted(() => void refresh());
                   >
                     <Camera :size="12" class="binding-icon" />
                     <span>{{ getCameraName(b.camera_id) }}</span>
-                    <small class="muted mono">({{ getSourceName(b.source_id) }})</small>
+                    <small class="muted mono"
+                      >({{ getSourceName(b.source_id) }})</small
+                    >
                   </div>
                 </div>
               </td>
               <td>
                 <div class="thresholds-cell">
-                  <span class="thresh-item">人脸: <strong>{{ task.threshold_policy.face_threshold != null ? (task.threshold_policy.face_threshold * 100).toFixed(0) + '%' : '-' }}</strong></span>
+                  <span class="thresh-item"
+                    >人脸:
+                    <strong>{{
+                      task.threshold_policy.face_threshold != null
+                        ? (task.threshold_policy.face_threshold * 100).toFixed(
+                            0,
+                          ) + "%"
+                        : "-"
+                    }}</strong></span
+                  >
                   <span class="divider">|</span>
-                  <span class="thresh-item">人体: <strong>{{ task.threshold_policy.body_threshold != null ? (task.threshold_policy.body_threshold * 100).toFixed(0) + '%' : '-' }}</strong></span>
+                  <span class="thresh-item"
+                    >人体:
+                    <strong>{{
+                      task.threshold_policy.body_threshold != null
+                        ? (task.threshold_policy.body_threshold * 100).toFixed(
+                            0,
+                          ) + "%"
+                        : "-"
+                    }}</strong></span
+                  >
                 </div>
               </td>
-              <td style="text-align: center;" class="mono">
+              <td style="text-align: center" class="mono">
                 {{ task.cooldown_seconds }}s
               </td>
-              <td style="text-align: center;">
+              <td style="text-align: center">
                 <span class="badge alert-level-badge" :class="task.alert_level">
-                  {{ task.alert_level === 'critical' ? '严重' : task.alert_level === 'warning' ? '警告' : '提示' }}
+                  {{
+                    task.alert_level === "critical"
+                      ? "严重"
+                      : task.alert_level === "warning"
+                        ? "警告"
+                        : "提示"
+                  }}
                 </span>
               </td>
-              <td style="text-align: center;">
+              <td style="text-align: center">
                 <span class="badge status-badge" :class="task.status">
                   {{ labelSurveillanceTaskStatus(task.status) }}
                 </span>
               </td>
-              <td style="text-align: center;">
+              <td style="text-align: center">
                 <div class="table-actions">
                   <button
                     v-if="task.status !== 'active'"
                     class="button primary tiny-btn action-btn start-btn"
                     title="启动布控任务"
-                    @click="handleTaskAction(task, task.status === 'paused' ? 'resume' : 'start')"
+                    @click="
+                      handleTaskAction(
+                        task,
+                        task.status === 'paused' ? 'resume' : 'start',
+                      )
+                    "
                   >
                     <Play :size="11" />启动
                   </button>
@@ -347,7 +374,9 @@ onMounted(() => void refresh());
             <ClipboardList :size="17" class="modal-title-icon" />
             <div>
               <h3>创建新布控任务</h3>
-              <p>绑定人像布控名单与视频流/摄像头，配置多模态比对策略及频控冷却规则</p>
+              <p>
+                绑定人像布控名单与视频流/摄像头，配置多模态比对策略及频控冷却规则
+              </p>
             </div>
           </div>
         </div>
@@ -356,7 +385,9 @@ onMounted(() => void refresh());
             <!-- 基础信息 -->
             <div class="form-grid-2col">
               <label class="form-field">
-                <span class="field-label">任务名称 <em class="required">*</em></span>
+                <span class="field-label"
+                  >任务名称 <em class="required">*</em></span
+                >
                 <input
                   v-model="form.name"
                   placeholder="例如: 1号园区主出入口实时布控"
@@ -366,7 +397,9 @@ onMounted(() => void refresh());
                 />
               </label>
               <label class="form-field">
-                <span class="field-label">告警等级 <em class="required">*</em></span>
+                <span class="field-label"
+                  >告警等级 <em class="required">*</em></span
+                >
                 <select v-model="form.alert_level" class="field-input">
                   <option value="critical">严重 (Critical - 重点预警)</option>
                   <option value="warning">警告 (Warning - 标准关注)</option>
@@ -376,23 +409,37 @@ onMounted(() => void refresh());
             </div>
 
             <!-- 绑定源配置 -->
-            <div class="form-grid-3col" style="margin-top: 12px;">
+            <div class="form-grid-3col" style="margin-top: 12px">
               <label class="form-field">
-                <span class="field-label">关联布控名单 <em class="required">*</em></span>
-                <select v-model="form.watchlist_id" class="field-input" required>
+                <span class="field-label"
+                  >关联布控名单 <em class="required">*</em></span
+                >
+                <select
+                  v-model="form.watchlist_id"
+                  class="field-input"
+                  required
+                >
                   <option value="" disabled>请选择布控名单库</option>
                   <option
                     v-for="wl in watchlists"
                     :key="wl.watchlist_id"
                     :value="wl.watchlist_id"
                   >
-                    {{ wl.name }} ({{ wl.category === 'blacklist' ? '黑名单' : wl.category === 'whitelist' ? '白名单' : '自定义' }})
+                    {{ wl.name }} ({{
+                      wl.category === "blacklist"
+                        ? "黑名单"
+                        : wl.category === "whitelist"
+                          ? "白名单"
+                          : "自定义"
+                    }})
                   </option>
                 </select>
               </label>
 
               <label class="form-field">
-                <span class="field-label">监控视频源 <em class="required">*</em></span>
+                <span class="field-label"
+                  >监控视频源 <em class="required">*</em></span
+                >
                 <select v-model="form.source_id" class="field-input" required>
                   <option value="" disabled>请选择媒体源</option>
                   <option
@@ -406,7 +453,9 @@ onMounted(() => void refresh());
               </label>
 
               <label class="form-field">
-                <span class="field-label">摄像头通道 <em class="required">*</em></span>
+                <span class="field-label"
+                  >摄像头通道 <em class="required">*</em></span
+                >
                 <select v-model="form.camera_id" class="field-input" required>
                   <option value="" disabled>请选择摄像头</option>
                   <option
@@ -421,12 +470,12 @@ onMounted(() => void refresh());
             </div>
 
             <!-- 比对与频控阈值 -->
-            <div class="form-section-title" style="margin-top: 14px;">
+            <div class="form-section-title" style="margin-top: 14px">
               <Sliders :size="13" />
               <span>多模态比对阈值与频控策略</span>
             </div>
 
-            <div class="form-grid-3col" style="margin-top: 8px;">
+            <div class="form-grid-3col" style="margin-top: 8px">
               <label class="form-field">
                 <span class="field-label">人脸比对相似度阈值</span>
                 <input

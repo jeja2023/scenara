@@ -100,7 +100,10 @@ const navigation = computed(() => {
       typeof entry.meta?.section === "string",
   )) {
     const section = String(item.meta?.section);
-    unorderedGroups.set(section, [...(unorderedGroups.get(section) ?? []), item]);
+    unorderedGroups.set(section, [
+      ...(unorderedGroups.get(section) ?? []),
+      item,
+    ]);
   }
 
   const groups = new Map<string, NavigationItem[]>();

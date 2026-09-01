@@ -168,7 +168,7 @@ class ProductionBehaviorEngine:
     )
 
     def __init__(self) -> None:
-        self._prev_frame_gray: np.ndarray | None = None
+        self._prev_frame_gray: np.ndarray[Any, Any] | None = None
 
     async def detect_frame_persons(
         self,

@@ -129,7 +129,6 @@ describe("results view feature images", () => {
     await router.push("/?run=run-result");
     await router.isReady();
     const wrapper = mount(ResultsView, {
-
       attachTo: document.body,
       global: { plugins: [router] },
     });
@@ -174,4 +173,3 @@ describe("results view feature images", () => {
     wrapper.unmount();
   });
 });
-

@@ -896,7 +896,7 @@ export interface ModelDeploymentEvent {
   created_at: number;
 }
 
-export interface TableColumn<T = any> {
+export interface TableColumn<T = unknown> {
   key: string;
   label?: string;
   width?: string;
@@ -906,7 +906,7 @@ export interface TableColumn<T = any> {
   class?: string;
   headerClass?: string;
   style?: Record<string, string | number> | string;
-  formatter?: (value: any, row: T, index: number) => any;
+  formatter?: (value: unknown, row: T, index: number) => unknown;
 }
 
 export interface OcrComplianceHit {

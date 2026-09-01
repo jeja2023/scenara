@@ -16,7 +16,7 @@ explicit release gates.
 Run locally with:
 
 ```text
-SCENARA_DATA_SERVICE_TOKEN=dev-secret \
+SCENARA_DATA_PLATFORM_SERVICE_TOKEN=dev-secret \
 SCENARA_DATA_STATE_PATH=runtime-state/scenara-data.db \
 python -m scenara_data
 ```

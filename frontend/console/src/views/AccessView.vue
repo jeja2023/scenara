@@ -30,7 +30,7 @@ import {
   Users,
   X,
 } from "@lucide/vue";
-import { computed, onMounted, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, type Component, watch } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import {
   api,
@@ -93,10 +93,19 @@ const defaultProductsList: DisplayProduct[] = [
     id: "parse",
     name: "智能视觉与文档解析",
     domain: "视觉解析与OCR",
-    summary: "面向图片、文档、视频与实时流的多模态解析，含人像、OCR、行为与服饰等核心 AI 能力",
+    summary:
+      "面向图片、文档、视频与实时流的多模态解析，含人像、OCR、行为与服饰等核心 AI 能力",
     layer: "product_module",
     maturity: "available",
-    scopes: ["媒体接入", "运行生命周期", "版本化流水线", "OCR 文档解析", "人像分析", "行为动作", "服饰风格"],
+    scopes: [
+      "媒体接入",
+      "运行生命周期",
+      "版本化流水线",
+      "OCR 文档解析",
+      "人像分析",
+      "行为动作",
+      "服饰风格",
+    ],
   },
   {
     id: "search",
@@ -105,7 +114,13 @@ const defaultProductsList: DisplayProduct[] = [
     summary: "面向视觉资产、结果索引与布控名单的多模态图文与人像检索",
     layer: "product_module",
     maturity: "available",
-    scopes: ["人像特征检索", "文档全文检索", "多模态过滤", "布控预警联动", "保存的检索定义"],
+    scopes: [
+      "人像特征检索",
+      "文档全文检索",
+      "多模态过滤",
+      "布控预警联动",
+      "保存的检索定义",
+    ],
   },
   {
     id: "model",
@@ -123,7 +138,13 @@ const defaultProductsList: DisplayProduct[] = [
     summary: "为视觉 AI 提供媒体素材、特征存储、标注数据集与难例数据闭环",
     layer: "product_module",
     maturity: "available",
-    scopes: ["媒体素材资产", "特征向量存储", "数据集版本管理", "难例清单闭环", "质量评分血缘"],
+    scopes: [
+      "媒体素材资产",
+      "特征向量存储",
+      "数据集版本管理",
+      "难例清单闭环",
+      "质量评分血缘",
+    ],
   },
   {
     id: "flow",
@@ -141,7 +162,12 @@ const defaultProductsList: DisplayProduct[] = [
     summary: "面向解析结果和特征向量的租户级多模态索引基础设施",
     layer: "foundation",
     maturity: "available",
-    scopes: ["特征向量索引", "多模态检索底座", "生命周期软删除", "Qdrant/向量存储适配"],
+    scopes: [
+      "特征向量索引",
+      "多模态检索底座",
+      "生命周期软删除",
+      "Qdrant/向量存储适配",
+    ],
   },
   {
     id: "api",
@@ -150,7 +176,12 @@ const defaultProductsList: DisplayProduct[] = [
     summary: "面向平台集成的版本化 OpenAPI、REST 接口与 Webhook 实时回调",
     layer: "developer_surface",
     maturity: "available",
-    scopes: ["OpenAPI v1 契约", "Webhook 回调推送", "接口访问令牌鉴权", "系统运行探针"],
+    scopes: [
+      "OpenAPI v1 契约",
+      "Webhook 回调推送",
+      "接口访问令牌鉴权",
+      "系统运行探针",
+    ],
   },
   {
     id: "sdk",
@@ -159,7 +190,11 @@ const defaultProductsList: DisplayProduct[] = [
     summary: "面向 Python 与 TypeScript 开发者的标准客户端库",
     layer: "developer_surface",
     maturity: "available",
-    scopes: ["Python SDK 客户端", "TypeScript SDK 客户端", "OpenAPI 类型化定义"],
+    scopes: [
+      "Python SDK 客户端",
+      "TypeScript SDK 客户端",
+      "OpenAPI 类型化定义",
+    ],
   },
   {
     id: "console",
@@ -168,17 +203,42 @@ const defaultProductsList: DisplayProduct[] = [
     summary: "租户运维、用户身份权限、审计治理与多模块共用管理控制台",
     layer: "control_plane",
     maturity: "available",
-    scopes: ["多租户工作区隔离", "IAM 身份权限管理", "系统运维监控", "全局合规审计"],
+    scopes: [
+      "多租户工作区隔离",
+      "IAM 身份权限管理",
+      "系统运维监控",
+      "全局合规审计",
+    ],
   },
 ];
 
 const scopePresets = [
   { id: "*", label: "全部操作权限", summary: "完全控制平台所有资源与服务" },
-  { id: "iam:*", label: "管理身份与权限", summary: "管理组织、用户、角色与成员" },
-  { id: "iam:read", label: "只读查看身份", summary: "仅允许读取身份与授权配置" },
-  { id: "platform:*", label: "平台全局管理", summary: "租户架构与基础设施管理" },
-  { id: "media_asset:create", label: "创建与上传媒体", summary: "上传媒体素材并触发解析" },
-  { id: "enterprise_incident:*", label: "安全告警与事件", summary: "企业安全告警与事件处置" },
+  {
+    id: "iam:*",
+    label: "管理身份与权限",
+    summary: "管理组织、用户、角色与成员",
+  },
+  {
+    id: "iam:read",
+    label: "只读查看身份",
+    summary: "仅允许读取身份与授权配置",
+  },
+  {
+    id: "platform:*",
+    label: "平台全局管理",
+    summary: "租户架构与基础设施管理",
+  },
+  {
+    id: "media_asset:create",
+    label: "创建与上传媒体",
+    summary: "上传媒体素材并触发解析",
+  },
+  {
+    id: "enterprise_incident:*",
+    label: "安全告警与事件",
+    summary: "企业安全告警与事件处置",
+  },
 ];
 
 const eventOptions = [
@@ -187,7 +247,7 @@ const eventOptions = [
   "run.failed",
   "run.cancelled",
 ];
-const tabs: Array<{ id: AccessTab; label: string; icon: any }> = [
+const tabs: Array<{ id: AccessTab; label: string; icon: Component }> = [
   { id: "foundation", label: "访问底座", icon: Shield },
   { id: "identity", label: "成员与角色", icon: Users },
   { id: "credentials", label: "服务凭据", icon: KeyRound },
@@ -221,7 +281,12 @@ const copied = ref(false);
 const availableProducts = computed<DisplayProduct[]>(() => {
   if (!products.value.length) return defaultProductsList;
   return products.value
-    .filter((p) => p.maturity !== "gated" && p.product_id !== "agent" && p.product_id !== "edge")
+    .filter(
+      (p) =>
+        p.maturity !== "gated" &&
+        p.product_id !== "agent" &&
+        p.product_id !== "edge",
+    )
     .map((p) => {
       const fallback = defaultProductsList.find((df) => df.id === p.product_id);
       return {
@@ -231,7 +296,9 @@ const availableProducts = computed<DisplayProduct[]>(() => {
         summary: p.summary || labelProductSummary(p.product_id),
         layer: p.layer,
         maturity: p.maturity,
-        scopes: p.current_scope?.length ? p.current_scope : (fallback?.scopes ?? []),
+        scopes: p.current_scope?.length
+          ? p.current_scope
+          : (fallback?.scopes ?? []),
       };
     });
 });
@@ -247,18 +314,20 @@ function labelScopeTag(scope: string): string {
     "OCR document parsing": "OCR 文档解析与识别",
     "OpenAPI 契约": "OpenAPI 标准契约",
     "v1 接口": "v1 接口路由",
-    "Webhook": "Webhook 事件推送",
-    "系统探针": "系统运行探针",
+    Webhook: "Webhook 事件推送",
+    系统探针: "系统运行探针",
     "Python SDK": "Python SDK 客户端",
     "TypeScript SDK": "TypeScript SDK 客户端",
     "OpenAPI 生成的模式类型": "OpenAPI 类型定义契约",
-    "Qdrant FeatureStore provider adapter with tenant/project filters": "Qdrant 向量特征库适配",
+    "Qdrant FeatureStore provider adapter with tenant/project filters":
+      "Qdrant 向量特征库适配",
     "Cosplay 识别与服饰风格分析": "服饰风格与二次元识别",
   };
   return map[scope] || scope;
 }
 
-type IdentitySubTab = "organizations" | "projects" | "users" | "memberships" | "roles";
+type IdentitySubTab =
+  "organizations" | "projects" | "users" | "memberships" | "roles";
 const identitySubTab = ref<IdentitySubTab>("organizations");
 
 type CredentialSubTab = "service_accounts" | "api_keys";
@@ -278,7 +347,9 @@ const serviceAccountSearch = ref("");
 const apiKeySearch = ref("");
 const entitlementSearch = ref("");
 const subscriptionSearch = ref("");
-const deliveryStatusFilter = ref<"all" | "delivered" | "dead_letter" | "queued">("all");
+const deliveryStatusFilter = ref<
+  "all" | "delivered" | "dead_letter" | "queued"
+>("all");
 
 // 10 组独立表格客户端分页配置（默认每页 10 条）
 const orgsPagination = reactive({ offset: 0, pageSize: 10 });
@@ -393,7 +464,9 @@ const userRolesMap = computed(() => {
   const map = new Map<string, Role[]>();
   for (const m of memberships.value) {
     if (m.principal_type === "user") {
-      const assigned = roles.value.filter((r) => m.role_ids.includes(r.role_id));
+      const assigned = roles.value.filter((r) =>
+        m.role_ids.includes(r.role_id),
+      );
       map.set(m.principal_id, assigned);
     }
   }
@@ -479,77 +552,97 @@ const filteredDeliveries = computed(() => {
 });
 
 // 搜索或筛选变化时自动重置第一页
-watch(orgSearch, () => { orgsPagination.offset = 0; });
-watch(projectSearch, () => { projectsPagination.offset = 0; });
-watch([userSearch, userStatusFilter], () => { usersPagination.offset = 0; });
-watch(memberSearch, () => { membershipsPagination.offset = 0; });
-watch(roleSearch, () => { rolesPagination.offset = 0; });
-watch(serviceAccountSearch, () => { serviceAccountsPagination.offset = 0; });
-watch(apiKeySearch, () => { apiKeysPagination.offset = 0; });
-watch(entitlementSearch, () => { entitlementsPagination.offset = 0; });
-watch(subscriptionSearch, () => { subscriptionsPagination.offset = 0; });
-watch(deliveryStatusFilter, () => { deliveriesPagination.offset = 0; });
+watch(orgSearch, () => {
+  orgsPagination.offset = 0;
+});
+watch(projectSearch, () => {
+  projectsPagination.offset = 0;
+});
+watch([userSearch, userStatusFilter], () => {
+  usersPagination.offset = 0;
+});
+watch(memberSearch, () => {
+  membershipsPagination.offset = 0;
+});
+watch(roleSearch, () => {
+  rolesPagination.offset = 0;
+});
+watch(serviceAccountSearch, () => {
+  serviceAccountsPagination.offset = 0;
+});
+watch(apiKeySearch, () => {
+  apiKeysPagination.offset = 0;
+});
+watch(entitlementSearch, () => {
+  entitlementsPagination.offset = 0;
+});
+watch(subscriptionSearch, () => {
+  subscriptionsPagination.offset = 0;
+});
+watch(deliveryStatusFilter, () => {
+  deliveriesPagination.offset = 0;
+});
 
 // 10 组列表的分页切片计算属性
 const paginatedOrganizations = computed(() =>
   filteredOrganizations.value.slice(
     orgsPagination.offset,
     orgsPagination.offset + orgsPagination.pageSize,
-  )
+  ),
 );
 const paginatedProjects = computed(() =>
   filteredProjects.value.slice(
     projectsPagination.offset,
     projectsPagination.offset + projectsPagination.pageSize,
-  )
+  ),
 );
 const paginatedUsers = computed(() =>
   filteredUsers.value.slice(
     usersPagination.offset,
     usersPagination.offset + usersPagination.pageSize,
-  )
+  ),
 );
 const paginatedMemberships = computed(() =>
   filteredMemberships.value.slice(
     membershipsPagination.offset,
     membershipsPagination.offset + membershipsPagination.pageSize,
-  )
+  ),
 );
 const paginatedRoles = computed(() =>
   filteredRoles.value.slice(
     rolesPagination.offset,
     rolesPagination.offset + rolesPagination.pageSize,
-  )
+  ),
 );
 const paginatedServiceAccounts = computed(() =>
   filteredServiceAccounts.value.slice(
     serviceAccountsPagination.offset,
     serviceAccountsPagination.offset + serviceAccountsPagination.pageSize,
-  )
+  ),
 );
 const paginatedApiKeys = computed(() =>
   filteredApiKeys.value.slice(
     apiKeysPagination.offset,
     apiKeysPagination.offset + apiKeysPagination.pageSize,
-  )
+  ),
 );
 const paginatedEntitlements = computed(() =>
   filteredEntitlements.value.slice(
     entitlementsPagination.offset,
     entitlementsPagination.offset + entitlementsPagination.pageSize,
-  )
+  ),
 );
 const paginatedSubscriptions = computed(() =>
   filteredSubscriptions.value.slice(
     subscriptionsPagination.offset,
     subscriptionsPagination.offset + subscriptionsPagination.pageSize,
-  )
+  ),
 );
 const paginatedDeliveries = computed(() =>
   filteredDeliveries.value.slice(
     deliveriesPagination.offset,
     deliveriesPagination.offset + deliveriesPagination.pageSize,
-  )
+  ),
 );
 
 const principalCandidateOptions = computed(() => {
@@ -580,13 +673,19 @@ function getPrincipalDisplayName(
     const user = users.value.find((u) => u.user_id === principalId);
     return user ? user.display_name : principalId;
   } else {
-    const sa = serviceAccounts.value.find((s) => s.service_account_id === principalId);
+    const sa = serviceAccounts.value.find(
+      (s) => s.service_account_id === principalId,
+    );
     return sa ? sa.display_name : principalId;
   }
 }
 
-const activeUsersCount = computed(() => users.value.filter((u) => !u.disabled).length);
-const disabledUsersCount = computed(() => users.value.filter((u) => u.disabled).length);
+const activeUsersCount = computed(
+  () => users.value.filter((u) => !u.disabled).length,
+);
+const disabledUsersCount = computed(
+  () => users.value.filter((u) => u.disabled).length,
+);
 
 const copiedKey = ref<string | null>(null);
 async function copyToClipboard(text: string, key: string) {
@@ -604,7 +703,9 @@ async function copyToClipboard(text: string, key: string) {
 function openAssignRole(userId: string) {
   membershipForm.principal_type = "user";
   membershipForm.principal_id = userId;
-  membershipForm.role_ids = (userRolesMap.value.get(userId) || []).map((r) => r.role_id);
+  membershipForm.role_ids = (userRolesMap.value.get(userId) || []).map(
+    (r) => r.role_id,
+  );
   identitySubTab.value = "memberships";
   showCreateMembership.value = true;
 }
@@ -1028,7 +1129,6 @@ useRefresh(refresh);
       </div>
     </div>
 
-
     <template v-if="activeTab === 'foundation'">
       <!-- 4 组核心能力统计卡片 -->
       <div class="inventory-grid">
@@ -1037,9 +1137,14 @@ useRefresh(refresh);
             <span class="stat-title">底座就绪状态</span>
             <div class="stat-icon-badge"><ShieldCheck :size="15" /></div>
           </div>
-          <div class="stat-value">{{ readiness.available }}/{{ (foundation?.capabilities ?? []).length }}</div>
+          <div class="stat-value">
+            {{ readiness.available }}/{{
+              (foundation?.capabilities ?? []).length
+            }}
+          </div>
           <div class="stat-desc">
-            {{ readiness.available }} 项已就绪 · {{ readiness.planned }} 项规划中 · {{ readiness.gated }} 项受限
+            {{ readiness.available }} 项已就绪 ·
+            {{ readiness.planned }} 项规划中 · {{ readiness.gated }} 项受限
           </div>
         </div>
 
@@ -1048,9 +1153,16 @@ useRefresh(refresh);
             <span class="stat-title">策略提供方</span>
             <div class="stat-icon-badge"><Lock :size="15" /></div>
           </div>
-          <div class="stat-value">{{ foundation ? labelPolicyProvider(foundation.policy_provider) : "未连接" }}</div>
+          <div class="stat-value">
+            {{
+              foundation
+                ? labelPolicyProvider(foundation.policy_provider)
+                : "未连接"
+            }}
+          </div>
           <div class="stat-desc">
-            认证模式: {{ foundation ? authModeLabels[foundation.auth_mode] : "未知" }}
+            认证模式:
+            {{ foundation ? authModeLabels[foundation.auth_mode] : "未知" }}
           </div>
         </div>
 
@@ -1059,9 +1171,18 @@ useRefresh(refresh);
             <span class="stat-title">鉴权主体模型</span>
             <div class="stat-icon-badge"><Users :size="15" /></div>
           </div>
-          <div class="stat-value">{{ foundation ? principalSourceLabels[foundation.principal_source] : "未知" }}</div>
+          <div class="stat-value">
+            {{
+              foundation
+                ? principalSourceLabels[foundation.principal_source]
+                : "未知"
+            }}
+          </div>
           <div class="stat-desc">
-            租户: {{ foundation ? labelContext(foundation.tenant_id, "租户") : "-" }} · 项目: {{ foundation ? labelContext(foundation.project_id, "项目") : "-" }}
+            租户:
+            {{ foundation ? labelContext(foundation.tenant_id, "租户") : "-" }}
+            · 项目:
+            {{ foundation ? labelContext(foundation.project_id, "项目") : "-" }}
           </div>
         </div>
 
@@ -1070,9 +1191,15 @@ useRefresh(refresh);
             <span class="stat-title">接入资源总览</span>
             <div class="stat-icon-badge"><Boxes :size="15" /></div>
           </div>
-          <div class="stat-value">{{ (iam?.inventory.service_accounts ?? 0) + (iam?.inventory.api_keys ?? 0) }}</div>
+          <div class="stat-value">
+            {{
+              (iam?.inventory.service_accounts ?? 0) +
+              (iam?.inventory.api_keys ?? 0)
+            }}
+          </div>
           <div class="stat-desc">
-            {{ iam?.inventory.service_accounts ?? 0 }} 个服务账号 · {{ iam?.inventory.api_keys ?? 0 }} 个密钥
+            {{ iam?.inventory.service_accounts ?? 0 }} 个服务账号 ·
+            {{ iam?.inventory.api_keys ?? 0 }} 个密钥
           </div>
         </div>
       </div>
@@ -1083,7 +1210,11 @@ useRefresh(refresh);
             <Server :size="16" class="header-icon" />
             <h2>访问底座</h2>
             <span class="badge" :class="foundation ? 'available' : 'gated'">
-              {{ foundation ? labelPolicyProvider(foundation.policy_provider) : "未读取" }}
+              {{
+                foundation
+                  ? labelPolicyProvider(foundation.policy_provider)
+                  : "未读取"
+              }}
             </span>
           </div>
         </div>
@@ -1092,27 +1223,41 @@ useRefresh(refresh);
         <div class="foundation-meta">
           <div>
             <span>认证模式</span>
-            <strong>{{ foundation ? authModeLabels[foundation.auth_mode] : "?" }}</strong>
+            <strong>{{
+              foundation ? authModeLabels[foundation.auth_mode] : "?"
+            }}</strong>
           </div>
           <div>
             <span>身份来源</span>
-            <strong>{{ foundation ? principalSourceLabels[foundation.principal_source] : "?" }}</strong>
+            <strong>{{
+              foundation
+                ? principalSourceLabels[foundation.principal_source]
+                : "?"
+            }}</strong>
           </div>
           <div>
             <span>作用域</span>
             <strong>
-              {{ foundation ? labelContext(foundation.tenant_id, "租户") : "?" }} /
-              {{ foundation ? labelContext(foundation.project_id, "项目") : "?" }}
+              {{
+                foundation ? labelContext(foundation.tenant_id, "租户") : "?"
+              }}
+              /
+              {{
+                foundation ? labelContext(foundation.project_id, "项目") : "?"
+              }}
             </strong>
           </div>
           <div>
             <span>能力分布</span>
-            <strong>{{ readiness.available }} 可用 · {{ readiness.planned }} 规划 · {{ readiness.gated }} 门禁</strong>
+            <strong
+              >{{ readiness.available }} 可用 · {{ readiness.planned }} 规划 ·
+              {{ readiness.gated }} 门禁</strong
+            >
           </div>
         </div>
 
         <!-- 访问底座核心能力分列表格 -->
-        <div class="table-scroll" style="margin-top: 8px;">
+        <div class="table-scroll" style="margin-top: 8px">
           <table class="data-table iam-table">
             <thead>
               <tr>
@@ -1132,12 +1277,20 @@ useRefresh(refresh);
                 <td>
                   <div class="capability-cell">
                     <component
-                      :is="item.status === 'available' ? CheckCircle2 : item.status === 'planned' ? Clock : ShieldAlert"
+                      :is="
+                        item.status === 'available'
+                          ? CheckCircle2
+                          : item.status === 'planned'
+                            ? Clock
+                            : ShieldAlert
+                      "
                       :size="14"
                       class="capability-status-icon"
                       :class="item.status"
                     />
-                    <strong>{{ labelAccessCapability(item.capability_id).name }}</strong>
+                    <strong>{{
+                      labelAccessCapability(item.capability_id).name
+                    }}</strong>
                   </div>
                 </td>
                 <td :title="labelAccessCapability(item.capability_id).summary">
@@ -1146,19 +1299,30 @@ useRefresh(refresh);
                 <td class="text-center">
                   <span
                     class="badge status-pill"
-                    :class="item.status === 'available' ? 'active' : item.status === 'planned' ? 'ghost-badge' : 'failed'"
+                    :class="
+                      item.status === 'available'
+                        ? 'active'
+                        : item.status === 'planned'
+                          ? 'ghost-badge'
+                          : 'failed'
+                    "
                   >
                     <span class="status-dot"></span>
                     {{ statusLabels[item.status] }}
                   </span>
                 </td>
-                <td class="muted" :title="labelAccessCapability(item.capability_id).nextGate">
+                <td
+                  class="muted"
+                  :title="labelAccessCapability(item.capability_id).nextGate"
+                >
                   {{ labelAccessCapability(item.capability_id).nextGate }}
                 </td>
               </tr>
               <tr v-if="!foundation?.capabilities?.length">
                 <td colspan="5" class="empty">
-                  {{ loading ? "正在加载访问底座状态..." : "未读取到访问底座状态" }}
+                  {{
+                    loading ? "正在加载访问底座状态..." : "未读取到访问底座状态"
+                  }}
                 </td>
               </tr>
             </tbody>
@@ -1240,7 +1404,11 @@ useRefresh(refresh);
                 placeholder="搜索组织名称 / 租户标识..."
                 class="search-input"
               />
-              <button v-if="orgSearch" class="clear-search-btn" @click="orgSearch = ''">
+              <button
+                v-if="orgSearch"
+                class="clear-search-btn"
+                @click="orgSearch = ''"
+              >
                 <X :size="12" />
               </button>
             </div>
@@ -1265,22 +1433,40 @@ useRefresh(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(item, index) in paginatedOrganizations" :key="item.tenant_id">
-                <td class="muted text-center">{{ index + 1 + orgsPagination.offset }}</td>
+              <tr
+                v-for="(item, index) in paginatedOrganizations"
+                :key="item.tenant_id"
+              >
+                <td class="muted text-center">
+                  {{ index + 1 + orgsPagination.offset }}
+                </td>
                 <td>
                   <strong>{{ item.display_name }}</strong>
                 </td>
                 <td class="mono muted-id">{{ item.tenant_id }}</td>
                 <td class="text-center">
-                  <span class="badge" :class="item.tenant_id === 'default' ? 'primary-soft' : 'ghost-badge'">
-                    {{ item.tenant_id === "default" ? "默认租户" : "自定义租户" }}
+                  <span
+                    class="badge"
+                    :class="
+                      item.tenant_id === 'default'
+                        ? 'primary-soft'
+                        : 'ghost-badge'
+                    "
+                  >
+                    {{
+                      item.tenant_id === "default" ? "默认租户" : "自定义租户"
+                    }}
                   </span>
                 </td>
                 <td class="muted">{{ formatTime(item.created_at) }}</td>
               </tr>
               <tr v-if="!filteredOrganizations.length">
                 <td colspan="5" class="empty">
-                  {{ organizations.length ? "未找到符合条件的组织" : "暂无组织信息" }}
+                  {{
+                    organizations.length
+                      ? "未找到符合条件的组织"
+                      : "暂无组织信息"
+                  }}
                 </td>
               </tr>
             </tbody>
@@ -1313,7 +1499,11 @@ useRefresh(refresh);
                 placeholder="搜索项目名称 / 项目标识..."
                 class="search-input"
               />
-              <button v-if="projectSearch" class="clear-search-btn" @click="projectSearch = ''">
+              <button
+                v-if="projectSearch"
+                class="clear-search-btn"
+                @click="projectSearch = ''"
+              >
                 <X :size="12" />
               </button>
             </div>
@@ -1338,11 +1528,21 @@ useRefresh(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(item, index) in paginatedProjects" :key="item.project_id">
-                <td class="muted text-center">{{ index + 1 + projectsPagination.offset }}</td>
+              <tr
+                v-for="(item, index) in paginatedProjects"
+                :key="item.project_id"
+              >
+                <td class="muted text-center">
+                  {{ index + 1 + projectsPagination.offset }}
+                </td>
                 <td>
                   <strong>{{ item.display_name }}</strong>
-                  <span v-if="item.project_id === 'default'" class="badge primary-soft" style="margin-left: 6px">默认项目</span>
+                  <span
+                    v-if="item.project_id === 'default'"
+                    class="badge primary-soft"
+                    style="margin-left: 6px"
+                    >默认项目</span
+                  >
                 </td>
                 <td class="mono muted-id">{{ item.project_id }}</td>
                 <td class="mono muted">{{ item.tenant_id }}</td>
@@ -1377,8 +1577,13 @@ useRefresh(refresh);
             <div class="header-sub-stats">
               <span class="sub-stat-dot active"></span>
               <span class="sub-stat-text">{{ activeUsersCount }} 启用</span>
-              <span v-if="disabledUsersCount" class="sub-stat-dot disabled"></span>
-              <span v-if="disabledUsersCount" class="sub-stat-text muted">{{ disabledUsersCount }} 停用</span>
+              <span
+                v-if="disabledUsersCount"
+                class="sub-stat-dot disabled"
+              ></span>
+              <span v-if="disabledUsersCount" class="sub-stat-text muted"
+                >{{ disabledUsersCount }} 停用</span
+              >
             </div>
           </div>
           <div class="header-actions">
@@ -1390,14 +1595,20 @@ useRefresh(refresh);
                 placeholder="搜索用户名 / 显示名称 / 手机号码..."
                 class="search-input"
               />
-              <button v-if="userSearch" class="clear-search-btn" @click="userSearch = ''">
+              <button
+                v-if="userSearch"
+                class="clear-search-btn"
+                @click="userSearch = ''"
+              >
                 <X :size="12" />
               </button>
             </div>
             <select v-model="userStatusFilter" class="filter-select-sm">
               <option value="all">全部状态 ({{ users.length }})</option>
               <option value="active">仅启用 ({{ activeUsersCount }})</option>
-              <option value="disabled">仅停用 ({{ disabledUsersCount }})</option>
+              <option value="disabled">
+                仅停用 ({{ disabledUsersCount }})
+              </option>
             </select>
             <button
               class="button primary tiny-btn"
@@ -1425,17 +1636,25 @@ useRefresh(refresh);
             </thead>
             <tbody>
               <tr v-for="(item, index) in paginatedUsers" :key="item.user_id">
-                <td class="muted text-center">{{ index + 1 + usersPagination.offset }}</td>
+                <td class="muted text-center">
+                  {{ index + 1 + usersPagination.offset }}
+                </td>
                 <td>
                   <div class="user-id-chip-row">
                     <strong class="mono">{{ item.user_id }}</strong>
                     <button
                       type="button"
                       class="copy-mini-btn"
-                      :title="copiedKey === item.user_id ? '已复制' : '复制用户名'"
+                      :title="
+                        copiedKey === item.user_id ? '已复制' : '复制用户名'
+                      "
                       @click="copyToClipboard(item.user_id, item.user_id)"
                     >
-                      <Check v-if="copiedKey === item.user_id" :size="10" class="copied-check" />
+                      <Check
+                        v-if="copiedKey === item.user_id"
+                        :size="10"
+                        class="copied-check"
+                      />
                       <Clipboard v-else :size="10" />
                     </button>
                   </div>
@@ -1453,7 +1672,7 @@ useRefresh(refresh);
                 <td>
                   <div class="role-tags-cell">
                     <span
-                      v-for="role in (userRolesMap.get(item.user_id) || [])"
+                      v-for="role in userRolesMap.get(item.user_id) || []"
                       :key="role.role_id"
                       class="badge role-pill"
                       :title="role.scopes.map(labelScope).join('、')"
@@ -1462,7 +1681,7 @@ useRefresh(refresh);
                       {{ role.display_name }}
                     </span>
                     <button
-                      v-if="!(userRolesMap.get(item.user_id)?.length)"
+                      v-if="!userRolesMap.get(item.user_id)?.length"
                       type="button"
                       class="assign-role-btn-link"
                       title="为该用户分配项目角色"
@@ -1529,7 +1748,11 @@ useRefresh(refresh);
                 placeholder="搜索成员主体标识 / 角色..."
                 class="search-input"
               />
-              <button v-if="memberSearch" class="clear-search-btn" @click="memberSearch = ''">
+              <button
+                v-if="memberSearch"
+                class="clear-search-btn"
+                @click="memberSearch = ''"
+              >
                 <X :size="12" />
               </button>
             </div>
@@ -1561,10 +1784,20 @@ useRefresh(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(item, index) in paginatedMemberships" :key="item.principal_id">
-                <td class="muted text-center">{{ index + 1 + membershipsPagination.offset }}</td>
+              <tr
+                v-for="(item, index) in paginatedMemberships"
+                :key="item.principal_id"
+              >
+                <td class="muted text-center">
+                  {{ index + 1 + membershipsPagination.offset }}
+                </td>
                 <td>
-                  <strong>{{ getPrincipalDisplayName(item.principal_id, item.principal_type) }}</strong>
+                  <strong>{{
+                    getPrincipalDisplayName(
+                      item.principal_id,
+                      item.principal_type,
+                    )
+                  }}</strong>
                 </td>
                 <td class="text-center">
                   <span class="badge type-badge" :class="item.principal_type">
@@ -1580,7 +1813,10 @@ useRefresh(refresh);
                       class="badge role-pill"
                     >
                       <Shield :size="10" />
-                      {{ roles.find(r => r.role_id === roleId)?.display_name || roleId }}
+                      {{
+                        roles.find((r) => r.role_id === roleId)?.display_name ||
+                        roleId
+                      }}
                     </span>
                   </div>
                 </td>
@@ -1602,7 +1838,11 @@ useRefresh(refresh);
               </tr>
               <tr v-if="!filteredMemberships.length">
                 <td colspan="6" class="empty">
-                  {{ memberships.length ? "未找到符合条件的项目成员" : "当前项目暂无成员关联" }}
+                  {{
+                    memberships.length
+                      ? "未找到符合条件的项目成员"
+                      : "当前项目暂无成员关联"
+                  }}
                 </td>
               </tr>
             </tbody>
@@ -1636,7 +1876,11 @@ useRefresh(refresh);
                 placeholder="搜索角色名 / 标识 / 权限..."
                 class="search-input"
               />
-              <button v-if="roleSearch" class="clear-search-btn" @click="roleSearch = ''">
+              <button
+                v-if="roleSearch"
+                class="clear-search-btn"
+                @click="roleSearch = ''"
+              >
                 <X :size="12" />
               </button>
             </div>
@@ -1664,7 +1908,9 @@ useRefresh(refresh);
             </thead>
             <tbody>
               <tr v-for="(item, index) in paginatedRoles" :key="item.role_id">
-                <td class="muted text-center">{{ index + 1 + rolesPagination.offset }}</td>
+                <td class="muted text-center">
+                  {{ index + 1 + rolesPagination.offset }}
+                </td>
                 <td>
                   <strong>{{ item.display_name }}</strong>
                 </td>
@@ -1762,7 +2008,11 @@ useRefresh(refresh);
                 placeholder="搜索服务账号 / 标识 / 权限..."
                 class="search-input"
               />
-              <button v-if="serviceAccountSearch" class="clear-search-btn" @click="serviceAccountSearch = ''">
+              <button
+                v-if="serviceAccountSearch"
+                class="clear-search-btn"
+                @click="serviceAccountSearch = ''"
+              >
                 <X :size="12" />
               </button>
             </div>
@@ -1793,7 +2043,9 @@ useRefresh(refresh);
                 v-for="(item, index) in paginatedServiceAccounts"
                 :key="item.service_account_id"
               >
-                <td class="muted text-center">{{ index + 1 + serviceAccountsPagination.offset }}</td>
+                <td class="muted text-center">
+                  {{ index + 1 + serviceAccountsPagination.offset }}
+                </td>
                 <td>
                   <strong>{{ item.display_name }}</strong>
                 </td>
@@ -1834,7 +2086,11 @@ useRefresh(refresh);
               </tr>
               <tr v-if="!filteredServiceAccounts.length">
                 <td colspan="6" class="empty">
-                  {{ serviceAccounts.length ? "未找到符合条件的服务账号" : "暂无服务账号" }}
+                  {{
+                    serviceAccounts.length
+                      ? "未找到符合条件的服务账号"
+                      : "暂无服务账号"
+                  }}
                 </td>
               </tr>
             </tbody>
@@ -1867,7 +2123,11 @@ useRefresh(refresh);
                 placeholder="搜索密钥名称 / 服务账号 / 前缀..."
                 class="search-input"
               />
-              <button v-if="apiKeySearch" class="clear-search-btn" @click="apiKeySearch = ''">
+              <button
+                v-if="apiKeySearch"
+                class="clear-search-btn"
+                @click="apiKeySearch = ''"
+              >
                 <X :size="12" />
               </button>
             </div>
@@ -1897,7 +2157,9 @@ useRefresh(refresh);
             </thead>
             <tbody>
               <tr v-for="(item, index) in paginatedApiKeys" :key="item.key_id">
-                <td class="muted text-center">{{ index + 1 + apiKeysPagination.offset }}</td>
+                <td class="muted text-center">
+                  {{ index + 1 + apiKeysPagination.offset }}
+                </td>
                 <td>
                   <strong>{{ item.name }}</strong>
                 </td>
@@ -1939,7 +2201,11 @@ useRefresh(refresh);
               </tr>
               <tr v-if="!filteredApiKeys.length">
                 <td colspan="8" class="empty">
-                  {{ apiKeys.length ? "未找到符合条件的 API 密钥" : "暂无 API 密钥" }}
+                  {{
+                    apiKeys.length
+                      ? "未找到符合条件的 API 密钥"
+                      : "暂无 API 密钥"
+                  }}
                 </td>
               </tr>
             </tbody>
@@ -1973,7 +2239,11 @@ useRefresh(refresh);
                 placeholder="搜索产品授权 / 项目..."
                 class="search-input"
               />
-              <button v-if="entitlementSearch" class="clear-search-btn" @click="entitlementSearch = ''">
+              <button
+                v-if="entitlementSearch"
+                class="clear-search-btn"
+                @click="entitlementSearch = ''"
+              >
                 <X :size="12" />
               </button>
             </div>
@@ -2002,8 +2272,13 @@ useRefresh(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(item, index) in paginatedEntitlements" :key="item.product_id">
-                <td class="muted text-center">{{ index + 1 + entitlementsPagination.offset }}</td>
+              <tr
+                v-for="(item, index) in paginatedEntitlements"
+                :key="item.product_id"
+              >
+                <td class="muted text-center">
+                  {{ index + 1 + entitlementsPagination.offset }}
+                </td>
                 <td>
                   <strong>{{ labelProduct(item.product_id) }}</strong>
                 </td>
@@ -2013,7 +2288,9 @@ useRefresh(refresh);
                 </td>
                 <td class="mono muted">{{ item.project_id }}</td>
                 <td class="text-center">
-                  <span class="badge ghost-badge">{{ labelEntitlementSource(item.source) }}</span>
+                  <span class="badge ghost-badge">{{
+                    labelEntitlementSource(item.source)
+                  }}</span>
                 </td>
                 <td class="text-center">
                   <span
@@ -2028,7 +2305,11 @@ useRefresh(refresh);
               </tr>
               <tr v-if="!filteredEntitlements.length">
                 <td colspan="8" class="empty">
-                  {{ entitlements.length ? "未找到符合条件的产品授权" : "当前项目没有产品授权" }}
+                  {{
+                    entitlements.length
+                      ? "未找到符合条件的产品授权"
+                      : "当前项目没有产品授权"
+                  }}
                 </td>
               </tr>
             </tbody>
@@ -2089,7 +2370,11 @@ useRefresh(refresh);
                 placeholder="搜索订阅名称 / 端点 / URL..."
                 class="search-input"
               />
-              <button v-if="subscriptionSearch" class="clear-search-btn" @click="subscriptionSearch = ''">
+              <button
+                v-if="subscriptionSearch"
+                class="clear-search-btn"
+                @click="subscriptionSearch = ''"
+              >
                 <X :size="12" />
               </button>
             </div>
@@ -2121,7 +2406,9 @@ useRefresh(refresh);
                 v-for="(item, index) in paginatedSubscriptions"
                 :key="item.endpoint_id"
               >
-                <td class="muted text-center">{{ index + 1 + subscriptionsPagination.offset }}</td>
+                <td class="muted text-center">
+                  {{ index + 1 + subscriptionsPagination.offset }}
+                </td>
                 <td>
                   <strong>{{ item.name }}</strong>
                 </td>
@@ -2159,7 +2446,11 @@ useRefresh(refresh);
               </tr>
               <tr v-if="!filteredSubscriptions.length">
                 <td colspan="7" class="empty">
-                  {{ subscriptions.length ? "未找到符合条件的回调订阅" : "暂无事件回调订阅" }}
+                  {{
+                    subscriptions.length
+                      ? "未找到符合条件的回调订阅"
+                      : "暂无事件回调订阅"
+                  }}
                 </td>
               </tr>
             </tbody>
@@ -2186,7 +2477,9 @@ useRefresh(refresh);
           </div>
           <div class="header-actions">
             <select v-model="deliveryStatusFilter" class="filter-select-sm">
-              <option value="all">全部投递状态 ({{ deliveries.length }})</option>
+              <option value="all">
+                全部投递状态 ({{ deliveries.length }})
+              </option>
               <option value="delivered">仅已成功投递</option>
               <option value="dead_letter">仅死信失败</option>
               <option value="queued">仅排队重试中</option>
@@ -2209,8 +2502,13 @@ useRefresh(refresh);
               </tr>
             </thead>
             <tbody>
-              <tr v-for="(item, index) in paginatedDeliveries" :key="item.delivery_id">
-                <td class="muted text-center">{{ index + 1 + deliveriesPagination.offset }}</td>
+              <tr
+                v-for="(item, index) in paginatedDeliveries"
+                :key="item.delivery_id"
+              >
+                <td class="muted text-center">
+                  {{ index + 1 + deliveriesPagination.offset }}
+                </td>
                 <td>
                   <strong>{{ labelEventType(item.event_type) }}</strong>
                 </td>
@@ -2238,7 +2536,11 @@ useRefresh(refresh);
                   <span
                     v-if="item.status_code"
                     class="badge http-status-badge"
-                    :class="item.status_code >= 200 && item.status_code < 300 ? 'status-2xx' : 'status-err'"
+                    :class="
+                      item.status_code >= 200 && item.status_code < 300
+                        ? 'status-2xx'
+                        : 'status-err'
+                    "
                   >
                     {{ item.status_code }}
                   </span>
@@ -2273,7 +2575,7 @@ useRefresh(refresh);
         <div class="header-actions">
           <span class="badge" :class="form.apiBase ? 'primary-soft' : 'active'">
             <span class="status-dot"></span>
-            {{ form.apiBase ? '自定义代理后端' : '同源默认' }}
+            {{ form.apiBase ? "自定义代理后端" : "同源默认" }}
           </span>
         </div>
       </div>
@@ -2287,7 +2589,9 @@ useRefresh(refresh);
               placeholder="例如: http://127.0.0.1:8000 (留空为同源)"
               class="field-input mono"
             />
-            <small class="muted field-help">若前后端分离部署，请指定 Scenara 后端服务根地址</small>
+            <small class="muted field-help"
+              >若前后端分离部署，请指定 Scenara 后端服务根地址</small
+            >
           </label>
 
           <label class="form-field">
@@ -2303,14 +2607,16 @@ useRefresh(refresh);
               <button
                 type="button"
                 class="icon-toggle-btn"
-                @click="showConnectionToken = !showConnectionToken"
                 :title="showConnectionToken ? '隐藏令牌' : '显示令牌'"
+                @click="showConnectionToken = !showConnectionToken"
               >
                 <EyeOff v-if="showConnectionToken" :size="14" />
                 <Eye v-else :size="14" />
               </button>
             </div>
-            <small class="muted field-help">用于浏览器向平台发起请求时的 Authorization 头部</small>
+            <small class="muted field-help"
+              >用于浏览器向平台发起请求时的 Authorization 头部</small
+            >
           </label>
 
           <label class="form-field">
@@ -2352,7 +2658,11 @@ useRefresh(refresh);
     </section>
 
     <!-- ==================== 模态弹窗 1：新建组织 ==================== -->
-    <div v-if="showCreateOrg" class="modal-overlay" @click.self="showCreateOrg = false">
+    <div
+      v-if="showCreateOrg"
+      class="modal-overlay"
+      @click.self="showCreateOrg = false"
+    >
       <div class="modal-dialog modal-dialog-md" role="dialog" aria-modal="true">
         <div class="modal-header">
           <div class="modal-title-box">
@@ -2366,7 +2676,9 @@ useRefresh(refresh);
         <form @submit.prevent="createOrganization">
           <div class="modal-body">
             <label class="form-field">
-              <span class="field-label">组织显示名称 <em class="required">*</em></span>
+              <span class="field-label"
+                >组织显示名称 <em class="required">*</em></span
+              >
               <input
                 v-model="organizationForm.display_name"
                 placeholder="例如: Scenara 华东研发中心"
@@ -2376,7 +2688,13 @@ useRefresh(refresh);
             </label>
           </div>
           <div class="modal-actions">
-            <button type="button" class="button secondary tiny-btn" @click="showCreateOrg = false">取消</button>
+            <button
+              type="button"
+              class="button secondary tiny-btn"
+              @click="showCreateOrg = false"
+            >
+              取消
+            </button>
             <button
               type="submit"
               class="button primary tiny-btn"
@@ -2390,7 +2708,11 @@ useRefresh(refresh);
     </div>
 
     <!-- ==================== 模态弹窗 2：新建项目 ==================== -->
-    <div v-if="showCreateProject" class="modal-overlay" @click.self="showCreateProject = false">
+    <div
+      v-if="showCreateProject"
+      class="modal-overlay"
+      @click.self="showCreateProject = false"
+    >
       <div class="modal-dialog modal-dialog-md" role="dialog" aria-modal="true">
         <div class="modal-header">
           <div class="modal-title-box">
@@ -2405,7 +2727,9 @@ useRefresh(refresh);
           <div class="modal-body">
             <div class="form-grid-2col">
               <label class="form-field">
-                <span class="field-label">项目标识 (英文) <em class="required">*</em></span>
+                <span class="field-label"
+                  >项目标识 (英文) <em class="required">*</em></span
+                >
                 <input
                   v-model="projectForm.project_id"
                   placeholder="例如: smart-campus"
@@ -2413,7 +2737,9 @@ useRefresh(refresh);
                 />
               </label>
               <label class="form-field">
-                <span class="field-label">显示名称 <em class="required">*</em></span>
+                <span class="field-label"
+                  >显示名称 <em class="required">*</em></span
+                >
                 <input
                   v-model="projectForm.display_name"
                   placeholder="例如: 智慧园区视觉系统"
@@ -2423,11 +2749,21 @@ useRefresh(refresh);
             </div>
           </div>
           <div class="modal-actions">
-            <button type="button" class="button secondary tiny-btn" @click="showCreateProject = false">取消</button>
+            <button
+              type="button"
+              class="button secondary tiny-btn"
+              @click="showCreateProject = false"
+            >
+              取消
+            </button>
             <button
               type="submit"
               class="button primary tiny-btn"
-              :disabled="mutating || !projectForm.project_id.trim() || !projectForm.display_name.trim()"
+              :disabled="
+                mutating ||
+                !projectForm.project_id.trim() ||
+                !projectForm.display_name.trim()
+              "
             >
               <Plus :size="13" />确认创建项目
             </button>
@@ -2437,7 +2773,11 @@ useRefresh(refresh);
     </div>
 
     <!-- ==================== 模态弹窗 3：新建用户 ==================== -->
-    <div v-if="showCreateUser" class="modal-overlay" @click.self="showCreateUser = false">
+    <div
+      v-if="showCreateUser"
+      class="modal-overlay"
+      @click.self="showCreateUser = false"
+    >
       <div class="modal-dialog modal-dialog-md" role="dialog" aria-modal="true">
         <div class="modal-header">
           <div class="modal-title-box">
@@ -2452,7 +2792,10 @@ useRefresh(refresh);
           <div class="modal-body">
             <div class="form-grid-2col">
               <label class="form-field">
-                <span class="field-label">用户名 <small class="muted">(登录账号，留空自动生成)</small></span>
+                <span class="field-label"
+                  >用户名
+                  <small class="muted">(登录账号，留空自动生成)</small></span
+                >
                 <input
                   v-model="userForm.user_id"
                   placeholder="如 operator-01"
@@ -2460,7 +2803,9 @@ useRefresh(refresh);
                 />
               </label>
               <label class="form-field">
-                <span class="field-label">显示名称 <em class="required">* (姓名或昵称)</em></span>
+                <span class="field-label"
+                  >显示名称 <em class="required">* (姓名或昵称)</em></span
+                >
                 <input
                   v-model="userForm.display_name"
                   placeholder="如 张三 / 运维工程师"
@@ -2479,7 +2824,9 @@ useRefresh(refresh);
                 />
               </label>
               <label class="form-field">
-                <span class="field-label">初始密码 <em class="required">* (至少8位)</em></span>
+                <span class="field-label"
+                  >初始密码 <em class="required">* (至少8位)</em></span
+                >
                 <input
                   v-model="userForm.password"
                   type="password"
@@ -2491,7 +2838,13 @@ useRefresh(refresh);
             </div>
           </div>
           <div class="modal-actions">
-            <button type="button" class="button secondary tiny-btn" @click="showCreateUser = false">取消</button>
+            <button
+              type="button"
+              class="button secondary tiny-btn"
+              @click="showCreateUser = false"
+            >
+              取消
+            </button>
             <button
               type="submit"
               class="button primary tiny-btn"
@@ -2509,7 +2862,11 @@ useRefresh(refresh);
     </div>
 
     <!-- ==================== 模态弹窗 4：项目成员与角色配置 ==================== -->
-    <div v-if="showCreateMembership" class="modal-overlay" @click.self="showCreateMembership = false">
+    <div
+      v-if="showCreateMembership"
+      class="modal-overlay"
+      @click.self="showCreateMembership = false"
+    >
       <div class="modal-dialog modal-dialog-md" role="dialog" aria-modal="true">
         <div class="modal-header">
           <div class="modal-title-box">
@@ -2529,7 +2886,9 @@ useRefresh(refresh);
                   <button
                     type="button"
                     class="seg-btn"
-                    :class="{ active: membershipForm.principal_type === 'user' }"
+                    :class="{
+                      active: membershipForm.principal_type === 'user',
+                    }"
                     @click="membershipForm.principal_type = 'user'"
                   >
                     <Users :size="13" /> 用户
@@ -2537,7 +2896,10 @@ useRefresh(refresh);
                   <button
                     type="button"
                     class="seg-btn"
-                    :class="{ active: membershipForm.principal_type === 'service_account' }"
+                    :class="{
+                      active:
+                        membershipForm.principal_type === 'service_account',
+                    }"
                     @click="membershipForm.principal_type = 'service_account'"
                   >
                     <KeyRound :size="13" /> 服务账号
@@ -2546,12 +2908,20 @@ useRefresh(refresh);
               </div>
 
               <label class="form-field">
-                <span class="field-label">选择主体标识 <em class="required">*</em></span>
+                <span class="field-label"
+                  >选择主体标识 <em class="required">*</em></span
+                >
                 <select
                   v-model="membershipForm.principal_id"
                   class="field-input"
                 >
-                  <option value="" disabled>请选择{{ membershipForm.principal_type === 'user' ? '用户' : '服务账号' }}</option>
+                  <option value="" disabled>
+                    请选择{{
+                      membershipForm.principal_type === "user"
+                        ? "用户"
+                        : "服务账号"
+                    }}
+                  </option>
                   <option
                     v-for="opt in principalCandidateOptions"
                     :key="opt.id"
@@ -2565,17 +2935,24 @@ useRefresh(refresh);
 
             <!-- 分配角色多选药丸 -->
             <div class="form-field">
-              <span class="field-label">分配角色 (可多选) <em class="required">*</em></span>
+              <span class="field-label"
+                >分配角色 (可多选) <em class="required">*</em></span
+              >
               <div class="role-selection-pills">
                 <button
                   v-for="role in roles"
                   :key="role.role_id"
                   type="button"
                   class="role-select-pill"
-                  :class="{ active: membershipForm.role_ids.includes(role.role_id) }"
+                  :class="{
+                    active: membershipForm.role_ids.includes(role.role_id),
+                  }"
                   @click="toggleMembershipRole(role.role_id)"
                 >
-                  <Check v-if="membershipForm.role_ids.includes(role.role_id)" :size="12" />
+                  <Check
+                    v-if="membershipForm.role_ids.includes(role.role_id)"
+                    :size="12"
+                  />
                   <Shield v-else :size="12" />
                   <span>{{ role.display_name }}</span>
                 </button>
@@ -2583,7 +2960,13 @@ useRefresh(refresh);
             </div>
           </div>
           <div class="modal-actions">
-            <button type="button" class="button secondary tiny-btn" @click="showCreateMembership = false">取消</button>
+            <button
+              type="button"
+              class="button secondary tiny-btn"
+              @click="showCreateMembership = false"
+            >
+              取消
+            </button>
             <button
               type="submit"
               class="button primary tiny-btn"
@@ -2601,7 +2984,11 @@ useRefresh(refresh);
     </div>
 
     <!-- ==================== 模态弹窗 5：新建角色与权限 ==================== -->
-    <div v-if="showCreateRole" class="modal-overlay" @click.self="showCreateRole = false">
+    <div
+      v-if="showCreateRole"
+      class="modal-overlay"
+      @click.self="showCreateRole = false"
+    >
       <div class="modal-dialog modal-dialog-lg" role="dialog" aria-modal="true">
         <div class="modal-header">
           <div class="modal-title-box">
@@ -2616,7 +3003,10 @@ useRefresh(refresh);
           <div class="modal-body">
             <div class="form-grid-2col">
               <label class="form-field">
-                <span class="field-label">角色标识 <small class="muted">(英文标识，留空自动生成)</small></span>
+                <span class="field-label"
+                  >角色标识
+                  <small class="muted">(英文标识，留空自动生成)</small></span
+                >
                 <input
                   v-model="roleForm.role_id"
                   placeholder="例如: role:operator"
@@ -2624,7 +3014,9 @@ useRefresh(refresh);
                 />
               </label>
               <label class="form-field">
-                <span class="field-label">角色显示名称 <em class="required">* (中文名称)</em></span>
+                <span class="field-label"
+                  >角色显示名称 <em class="required">* (中文名称)</em></span
+                >
                 <input
                   v-model="roleForm.display_name"
                   placeholder="例如: 运维操作员 / 视觉审计员"
@@ -2635,18 +3027,26 @@ useRefresh(refresh);
 
             <!-- 权限范围选择 -->
             <div class="form-field">
-              <span class="field-label">权限范围 <em class="required">* (可点击上方快捷预设或手动输入)</em></span>
+              <span class="field-label"
+                >权限范围
+                <em class="required">* (可点击上方快捷预设或手动输入)</em></span
+              >
               <div class="scope-presets-row">
                 <button
                   v-for="preset in scopePresets"
                   :key="preset.id"
                   type="button"
                   class="preset-chip"
-                  :class="{ active: parseList(roleForm.scopes).includes(preset.id) }"
-                  @click="toggleScopePreset(preset.id)"
+                  :class="{
+                    active: parseList(roleForm.scopes).includes(preset.id),
+                  }"
                   :title="preset.summary"
+                  @click="toggleScopePreset(preset.id)"
                 >
-                  <Check v-if="parseList(roleForm.scopes).includes(preset.id)" :size="11" />
+                  <Check
+                    v-if="parseList(roleForm.scopes).includes(preset.id)"
+                    :size="11"
+                  />
                   <span>{{ preset.label }}</span>
                 </button>
               </div>
@@ -2660,11 +3060,28 @@ useRefresh(refresh);
             <!-- 适用产品标签多选选择器 -->
             <div class="form-field">
               <div class="field-label-row">
-                <span class="field-label">适用产品范围 <small class="muted">(可多选，留空默认全部产品可用)</small></span>
+                <span class="field-label"
+                  >适用产品范围
+                  <small class="muted"
+                    >(可多选，留空默认全部产品可用)</small
+                  ></span
+                >
                 <div class="chips-quick-actions">
-                  <button type="button" class="link-btn" @click="selectAllRoleProducts">全选</button>
+                  <button
+                    type="button"
+                    class="link-btn"
+                    @click="selectAllRoleProducts"
+                  >
+                    全选
+                  </button>
                   <span class="divider">|</span>
-                  <button type="button" class="link-btn" @click="clearRoleProducts">清空</button>
+                  <button
+                    type="button"
+                    class="link-btn"
+                    @click="clearRoleProducts"
+                  >
+                    清空
+                  </button>
                 </div>
               </div>
               <div class="product-chips-grid">
@@ -2677,7 +3094,10 @@ useRefresh(refresh);
                   @click="toggleRoleProduct(prod.id)"
                 >
                   <div class="chip-check">
-                    <Check v-if="roleForm.product_ids.includes(prod.id)" :size="12" />
+                    <Check
+                      v-if="roleForm.product_ids.includes(prod.id)"
+                      :size="12"
+                    />
                   </div>
                   <div class="chip-text">
                     <strong>{{ prod.name }}</strong>
@@ -2688,7 +3108,13 @@ useRefresh(refresh);
             </div>
           </div>
           <div class="modal-actions">
-            <button type="button" class="button secondary tiny-btn" @click="showCreateRole = false">取消</button>
+            <button
+              type="button"
+              class="button secondary tiny-btn"
+              @click="showCreateRole = false"
+            >
+              取消
+            </button>
             <button
               type="submit"
               class="button primary tiny-btn"
@@ -2706,7 +3132,11 @@ useRefresh(refresh);
     </div>
 
     <!-- ==================== 模态弹窗 6：新建服务账号 ==================== -->
-    <div v-if="showCreateServiceAccount" class="modal-overlay" @click.self="showCreateServiceAccount = false">
+    <div
+      v-if="showCreateServiceAccount"
+      class="modal-overlay"
+      @click.self="showCreateServiceAccount = false"
+    >
       <div class="modal-dialog modal-dialog-lg" role="dialog" aria-modal="true">
         <div class="modal-header">
           <div class="modal-title-box">
@@ -2721,7 +3151,10 @@ useRefresh(refresh);
           <div class="modal-body">
             <div class="form-grid-2col">
               <label class="form-field">
-                <span class="field-label">服务账号标识 <small class="muted">(英文标识，留空自动生成)</small></span>
+                <span class="field-label"
+                  >服务账号标识
+                  <small class="muted">(英文标识，留空自动生成)</small></span
+                >
                 <input
                   v-model="serviceAccountForm.service_account_id"
                   placeholder="例如: sa-pipeline-runner"
@@ -2729,7 +3162,9 @@ useRefresh(refresh);
                 />
               </label>
               <label class="form-field">
-                <span class="field-label">显示名称 <em class="required">*</em></span>
+                <span class="field-label"
+                  >显示名称 <em class="required">*</em></span
+                >
                 <input
                   v-model="serviceAccountForm.display_name"
                   placeholder="例如: 自动化流水线执行主体"
@@ -2740,7 +3175,9 @@ useRefresh(refresh);
 
             <!-- 权限范围选择 -->
             <div class="form-field">
-              <span class="field-label">权限范围 <em class="required">* (逗号分隔)</em></span>
+              <span class="field-label"
+                >权限范围 <em class="required">* (逗号分隔)</em></span
+              >
               <input
                 v-model="serviceAccountForm.scopes"
                 class="field-input mono"
@@ -2751,11 +3188,26 @@ useRefresh(refresh);
             <!-- 适用产品选择 -->
             <div class="form-field">
               <div class="field-label-row">
-                <span class="field-label">适用产品范围 <small class="muted">(留空默认全部产品可用)</small></span>
+                <span class="field-label"
+                  >适用产品范围
+                  <small class="muted">(留空默认全部产品可用)</small></span
+                >
                 <div class="chips-quick-actions">
-                  <button type="button" class="link-btn" @click="selectAllServiceAccountProducts">全选</button>
+                  <button
+                    type="button"
+                    class="link-btn"
+                    @click="selectAllServiceAccountProducts"
+                  >
+                    全选
+                  </button>
                   <span class="divider">|</span>
-                  <button type="button" class="link-btn" @click="clearServiceAccountProducts">清空</button>
+                  <button
+                    type="button"
+                    class="link-btn"
+                    @click="clearServiceAccountProducts"
+                  >
+                    清空
+                  </button>
                 </div>
               </div>
               <div class="product-chips-grid">
@@ -2764,11 +3216,16 @@ useRefresh(refresh);
                   :key="prod.id"
                   type="button"
                   class="product-chip"
-                  :class="{ active: serviceAccountForm.product_ids.includes(prod.id) }"
+                  :class="{
+                    active: serviceAccountForm.product_ids.includes(prod.id),
+                  }"
                   @click="toggleServiceAccountProduct(prod.id)"
                 >
                   <div class="chip-check">
-                    <Check v-if="serviceAccountForm.product_ids.includes(prod.id)" :size="12" />
+                    <Check
+                      v-if="serviceAccountForm.product_ids.includes(prod.id)"
+                      :size="12"
+                    />
                   </div>
                   <div class="chip-text">
                     <strong>{{ prod.name }}</strong>
@@ -2779,7 +3236,13 @@ useRefresh(refresh);
             </div>
           </div>
           <div class="modal-actions">
-            <button type="button" class="button secondary tiny-btn" @click="showCreateServiceAccount = false">取消</button>
+            <button
+              type="button"
+              class="button secondary tiny-btn"
+              @click="showCreateServiceAccount = false"
+            >
+              取消
+            </button>
             <button
               type="submit"
               class="button primary tiny-btn"
@@ -2797,7 +3260,11 @@ useRefresh(refresh);
     </div>
 
     <!-- ==================== 模态弹窗 7：签发 API 密钥 ==================== -->
-    <div v-if="showCreateApiKey" class="modal-overlay" @click.self="showCreateApiKey = false">
+    <div
+      v-if="showCreateApiKey"
+      class="modal-overlay"
+      @click.self="showCreateApiKey = false"
+    >
       <div class="modal-dialog modal-dialog-lg" role="dialog" aria-modal="true">
         <div class="modal-header">
           <div class="modal-title-box">
@@ -2812,8 +3279,13 @@ useRefresh(refresh);
           <div class="modal-body">
             <div class="form-grid-2col">
               <label class="form-field">
-                <span class="field-label">所属服务账号 <em class="required">*</em></span>
-                <select v-model="keyForm.service_account_id" class="field-input">
+                <span class="field-label"
+                  >所属服务账号 <em class="required">*</em></span
+                >
+                <select
+                  v-model="keyForm.service_account_id"
+                  class="field-input"
+                >
                   <option value="" disabled>选择服务账号</option>
                   <option
                     v-for="item in serviceAccounts"
@@ -2825,7 +3297,9 @@ useRefresh(refresh);
                 </select>
               </label>
               <label class="form-field">
-                <span class="field-label">密钥描述名称 <em class="required">*</em></span>
+                <span class="field-label"
+                  >密钥描述名称 <em class="required">*</em></span
+                >
                 <input
                   v-model="keyForm.name"
                   placeholder="例如: 生产环境客户端凭据"
@@ -2836,7 +3310,10 @@ useRefresh(refresh);
 
             <div class="form-grid-2col">
               <label class="form-field">
-                <span class="field-label">权限范围 <small class="muted">(可选，留空则继承服务账号)</small></span>
+                <span class="field-label"
+                  >权限范围
+                  <small class="muted">(可选，留空则继承服务账号)</small></span
+                >
                 <input
                   v-model="keyForm.scopes"
                   class="field-input mono"
@@ -2844,7 +3321,10 @@ useRefresh(refresh);
                 />
               </label>
               <label class="form-field">
-                <span class="field-label">过期时间 <small class="muted">(可选，留空永不过期)</small></span>
+                <span class="field-label"
+                  >过期时间
+                  <small class="muted">(可选，留空永不过期)</small></span
+                >
                 <input
                   v-model="keyForm.expires_at"
                   type="datetime-local"
@@ -2856,11 +3336,26 @@ useRefresh(refresh);
             <!-- 适用产品选择 -->
             <div class="form-field">
               <div class="field-label-row">
-                <span class="field-label">产品授权限制 <small class="muted">(可选，留空默认继承全部)</small></span>
+                <span class="field-label"
+                  >产品授权限制
+                  <small class="muted">(可选，留空默认继承全部)</small></span
+                >
                 <div class="chips-quick-actions">
-                  <button type="button" class="link-btn" @click="selectAllKeyProducts">全选</button>
+                  <button
+                    type="button"
+                    class="link-btn"
+                    @click="selectAllKeyProducts"
+                  >
+                    全选
+                  </button>
                   <span class="divider">|</span>
-                  <button type="button" class="link-btn" @click="clearKeyProducts">清空</button>
+                  <button
+                    type="button"
+                    class="link-btn"
+                    @click="clearKeyProducts"
+                  >
+                    清空
+                  </button>
                 </div>
               </div>
               <div class="product-chips-grid">
@@ -2873,7 +3368,10 @@ useRefresh(refresh);
                   @click="toggleKeyProduct(prod.id)"
                 >
                   <div class="chip-check">
-                    <Check v-if="keyForm.product_ids.includes(prod.id)" :size="12" />
+                    <Check
+                      v-if="keyForm.product_ids.includes(prod.id)"
+                      :size="12"
+                    />
                   </div>
                   <div class="chip-text">
                     <strong>{{ prod.name }}</strong>
@@ -2884,11 +3382,19 @@ useRefresh(refresh);
             </div>
           </div>
           <div class="modal-actions">
-            <button type="button" class="button secondary tiny-btn" @click="showCreateApiKey = false">取消</button>
+            <button
+              type="button"
+              class="button secondary tiny-btn"
+              @click="showCreateApiKey = false"
+            >
+              取消
+            </button>
             <button
               type="submit"
               class="button primary tiny-btn"
-              :disabled="mutating || !keyForm.service_account_id || !keyForm.name.trim()"
+              :disabled="
+                mutating || !keyForm.service_account_id || !keyForm.name.trim()
+              "
             >
               <KeyRound :size="13" />确认签发密钥
             </button>
@@ -2898,7 +3404,11 @@ useRefresh(refresh);
     </div>
 
     <!-- ==================== 模态弹窗 8：配置产品授权 ==================== -->
-    <div v-if="showCreateEntitlement" class="modal-overlay" @click.self="showCreateEntitlement = false">
+    <div
+      v-if="showCreateEntitlement"
+      class="modal-overlay"
+      @click.self="showCreateEntitlement = false"
+    >
       <div class="modal-dialog modal-dialog-lg" role="dialog" aria-modal="true">
         <div class="modal-header">
           <div class="modal-title-box">
@@ -2913,8 +3423,12 @@ useRefresh(refresh);
           <div class="modal-body">
             <div class="form-field">
               <div class="field-label-row">
-                <span class="field-label">选择授权产品 <em class="required">*</em></span>
-                <span class="muted field-extra-info">请从平台 9 大核心产品中选择要授权的产品模块</span>
+                <span class="field-label"
+                  >选择授权产品 <em class="required">*</em></span
+                >
+                <span class="muted field-extra-info"
+                  >请从平台 9 大核心产品中选择要授权的产品模块</span
+                >
               </div>
 
               <!-- 产品可视化网格选择器 -->
@@ -2929,20 +3443,37 @@ useRefresh(refresh);
                   <div class="product-card-top">
                     <div class="product-card-title">
                       <strong>{{ prod.name }}</strong>
-                      <span class="product-card-id mono">({{ prod.domain }} · {{ prod.id }})</span>
+                      <span class="product-card-id mono"
+                        >({{ prod.domain }} · {{ prod.id }})</span
+                      >
                     </div>
                     <div class="product-card-radio">
-                      <div class="radio-circle" :class="{ selected: entitlementForm.product_id === prod.id }">
-                        <div v-if="entitlementForm.product_id === prod.id" class="radio-dot"></div>
+                      <div
+                        class="radio-circle"
+                        :class="{
+                          selected: entitlementForm.product_id === prod.id,
+                        }"
+                      >
+                        <div
+                          v-if="entitlementForm.product_id === prod.id"
+                          class="radio-dot"
+                        ></div>
                       </div>
                     </div>
                   </div>
                   <p class="product-card-summary">{{ prod.summary }}</p>
                   <div v-if="prod.scopes?.length" class="product-card-scopes">
-                    <span v-for="scope in prod.scopes.slice(0, 3)" :key="scope" class="mini-scope-tag">
+                    <span
+                      v-for="scope in prod.scopes.slice(0, 3)"
+                      :key="scope"
+                      class="mini-scope-tag"
+                    >
                       {{ labelScopeTag(scope) }}
                     </span>
-                    <span v-if="prod.scopes.length > 3" class="mini-scope-tag muted">
+                    <span
+                      v-if="prod.scopes.length > 3"
+                      class="mini-scope-tag muted"
+                    >
                       +{{ prod.scopes.length - 3 }} 项能力
                     </span>
                   </div>
@@ -2950,19 +3481,32 @@ useRefresh(refresh);
               </div>
             </div>
 
-            <div class="form-grid-2col" style="margin-top: 14px;">
+            <div class="form-grid-2col" style="margin-top: 14px">
               <label class="form-field">
-                <span class="field-label">授权状态 <em class="required">*</em></span>
+                <span class="field-label"
+                  >授权状态 <em class="required">*</em></span
+                >
                 <select v-model="entitlementForm.status" class="field-input">
                   <option value="active">启用授权 (生效中)</option>
                   <option value="suspended">暂停授权 (已停用)</option>
                 </select>
               </label>
 
-              <div class="form-field selected-preview-box" v-if="selectedEntitlementProduct">
-                <span class="field-label">所选产品能力范围 ({{ selectedEntitlementProduct.name }})</span>
+              <div
+                v-if="selectedEntitlementProduct"
+                class="form-field selected-preview-box"
+              >
+                <span class="field-label"
+                  >所选产品能力范围 ({{
+                    selectedEntitlementProduct.name
+                  }})</span
+                >
                 <div class="preview-scopes-list">
-                  <span v-for="sc in selectedEntitlementProduct.scopes" :key="sc" class="badge scope-pill">
+                  <span
+                    v-for="sc in selectedEntitlementProduct.scopes"
+                    :key="sc"
+                    class="badge scope-pill"
+                  >
                     {{ labelScopeTag(sc) }}
                   </span>
                 </div>
@@ -2970,7 +3514,13 @@ useRefresh(refresh);
             </div>
           </div>
           <div class="modal-actions">
-            <button type="button" class="button secondary tiny-btn" @click="showCreateEntitlement = false">取消</button>
+            <button
+              type="button"
+              class="button secondary tiny-btn"
+              @click="showCreateEntitlement = false"
+            >
+              取消
+            </button>
             <button
               type="submit"
               class="button primary tiny-btn"
@@ -2984,7 +3534,11 @@ useRefresh(refresh);
     </div>
 
     <!-- ==================== 模态弹窗 9：新建事件回调订阅 ==================== -->
-    <div v-if="showCreateHook" class="modal-overlay" @click.self="showCreateHook = false">
+    <div
+      v-if="showCreateHook"
+      class="modal-overlay"
+      @click.self="showCreateHook = false"
+    >
       <div class="modal-dialog modal-dialog-lg" role="dialog" aria-modal="true">
         <div class="modal-header">
           <div class="modal-title-box">
@@ -2999,7 +3553,9 @@ useRefresh(refresh);
           <div class="modal-body">
             <div class="form-grid-2col">
               <label class="form-field">
-                <span class="field-label">订阅名称 <em class="required">*</em></span>
+                <span class="field-label"
+                  >订阅名称 <em class="required">*</em></span
+                >
                 <input
                   v-model="hook.name"
                   placeholder="例如: 业务系统事件接收器"
@@ -3007,7 +3563,9 @@ useRefresh(refresh);
                 />
               </label>
               <label class="form-field">
-                <span class="field-label">HTTPS 回调地址 <em class="required">*</em></span>
+                <span class="field-label"
+                  >HTTPS 回调地址 <em class="required">*</em></span
+                >
                 <input
                   v-model="hook.url"
                   type="url"
@@ -3018,7 +3576,9 @@ useRefresh(refresh);
             </div>
 
             <div class="form-field">
-              <span class="field-label">签名密钥 (Secret) <em class="required">* (至少16位)</em></span>
+              <span class="field-label"
+                >签名密钥 (Secret) <em class="required">* (至少16位)</em></span
+              >
               <div class="password-input-box">
                 <input
                   v-model="hook.secret"
@@ -3030,8 +3590,8 @@ useRefresh(refresh);
                 <button
                   type="button"
                   class="icon-toggle-btn"
-                  @click="showHookSecret = !showHookSecret"
                   :title="showHookSecret ? '隐藏密码' : '显示密码'"
+                  @click="showHookSecret = !showHookSecret"
                 >
                   <EyeOff v-if="showHookSecret" :size="14" />
                   <Eye v-else :size="14" />
@@ -3040,7 +3600,9 @@ useRefresh(refresh);
             </div>
 
             <div class="form-field">
-              <span class="field-label">订阅事件类型 (可多选) <em class="required">*</em></span>
+              <span class="field-label"
+                >订阅事件类型 (可多选) <em class="required">*</em></span
+              >
               <div class="event-chips-grid">
                 <button
                   v-for="event in eventOptions"
@@ -3058,7 +3620,13 @@ useRefresh(refresh);
             </div>
           </div>
           <div class="modal-actions">
-            <button type="button" class="button secondary tiny-btn" @click="showCreateHook = false">取消</button>
+            <button
+              type="button"
+              class="button secondary tiny-btn"
+              @click="showCreateHook = false"
+            >
+              取消
+            </button>
             <button
               type="submit"
               class="button primary tiny-btn"
@@ -3410,7 +3978,9 @@ useRefresh(refresh);
   font-size: 12px;
   color: var(--graphite, #17211f);
   outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .field-input:focus {
   border-color: var(--color-accent, #087682);
@@ -4645,15 +5215,21 @@ select[multiple] {
 }
 
 @keyframes modalFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .modal-dialog {
   background: #ffffff;
   border: 1px solid var(--line, #e2e8e6);
   border-radius: 8px;
-  box-shadow: 0 20px 50px rgba(15, 23, 21, 0.22), 0 4px 12px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 20px 50px rgba(15, 23, 21, 0.22),
+    0 4px 12px rgba(0, 0, 0, 0.08);
   width: min(640px, 95vw);
   max-height: calc(100vh - 40px);
   display: flex;
@@ -4755,4 +5331,3 @@ select[multiple] {
   flex-shrink: 0;
 }
 </style>
-

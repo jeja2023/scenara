@@ -133,7 +133,7 @@ useRefresh(refresh);
           </div>
         </div>
         <div class="stat-value">{{ models.length }}</div>
-        <div class="stat-desc">4 大业务领域预置算法</div>
+        <div class="stat-desc">仅统计已登记、可追溯的模型包</div>
       </div>
 
       <div class="stat green">
@@ -146,7 +146,7 @@ useRefresh(refresh);
         <div class="stat-value">
           {{ models.filter((item) => item.production_ready).length }}
         </div>
-        <div class="stat-desc">签名校验与合规已确认</div>
+        <div class="stat-desc">已登记模型中通过生产准入的数量</div>
       </div>
 
       <div class="stat amber">
@@ -168,8 +168,10 @@ useRefresh(refresh);
     <section class="panel models-panel">
       <div class="panel-header-custom">
         <div class="header-left">
-          <h2>已装配模型库</h2>
-          <span class="badge">{{ filteredModels.length }} / {{ models.length }}</span>
+          <h2>已登记模型包</h2>
+          <span class="badge"
+            >{{ filteredModels.length }} / {{ models.length }}</span
+          >
         </div>
 
         <div class="header-actions">
@@ -224,7 +226,10 @@ useRefresh(refresh);
       >
         <!-- 1. 模型名称 -->
         <template #model="{ row }">
-          <span class="model-name-text" :title="`${row.model_id} (v${row.version})`">
+          <span
+            class="model-name-text"
+            :title="`${row.model_id} (v${row.version})`"
+          >
             {{ labelModelName(row.model_id) }}
           </span>
         </template>
@@ -267,8 +272,14 @@ useRefresh(refresh);
 
         <!-- 7. 准入状态 -->
         <template #status="{ row }">
-          <span class="badge status-badge" :class="row.production_ready ? 'active' : ''">
-            <span class="status-dot" :class="row.production_ready ? 'dot-active' : 'dot-dev'" />
+          <span
+            class="badge status-badge"
+            :class="row.production_ready ? 'active' : ''"
+          >
+            <span
+              class="status-dot"
+              :class="row.production_ready ? 'dot-active' : 'dot-dev'"
+            />
             {{ row.production_ready ? "生产准入" : "开发测试" }}
           </span>
         </template>
@@ -516,7 +527,6 @@ useRefresh(refresh);
   font-size: 11px !important;
   line-height: 1 !important;
 }
-
 
 .status-dot {
   width: 6px;

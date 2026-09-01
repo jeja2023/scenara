@@ -5,6 +5,8 @@ import json
 import os
 import re
 import sqlite3
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -13,6 +15,8 @@ from uuid import uuid4
 from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
+
+from scenara_data import __version__
 
 
 class DatasetCreate(BaseModel):
@@ -191,7 +195,20 @@ def validate_object_reference(value: object) -> dict[str, Any]:
 def create_data_app(*, service_token: str = "", store: DataStore | None = None) -> FastAPI:
     state_path = os.getenv("SCENARA_DATA_STATE_PATH", "").strip()
     store = store or DataStore(state_path or None)
-    app = FastAPI(title="Scenara Data", version="0.3.0.dev25")
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
+        if not service_token:
+            raise RuntimeError(
+                "SCENARA_DATA_PLATFORM_SERVICE_TOKEN is required; "
+                "the Data service must not start without service authentication"
+            )
+        try:
+            yield
+        finally:
+            store.close()
+
+    app = FastAPI(title="Scenara Data", version=__version__, lifespan=lifespan)
     app.state.data_store = store
 
     def context(request: Request, authorization: str | None, tenant: str | None, project: str | None) -> tuple[str, str, str]:
@@ -743,6 +760,6 @@ def create_data_app(*, service_token: str = "", store: DataStore | None = None) 
     return app
 
 
-app = create_data_app(service_token=os.getenv("SCENARA_DATA_SERVICE_TOKEN", "").strip())
+app = create_data_app(service_token=os.getenv("SCENARA_DATA_PLATFORM_SERVICE_TOKEN", "").strip())
 
 __all__ = ["DataStore", "app", "create_data_app"]

@@ -1,20 +1,20 @@
 {
   "name": "scenara",
-  "version": "0.3.0-dev.38",
+  "version": "0.3.0-dev.39",
   "private": true,
   "license": "MIT",
   "scripts": {
-    "check": "npm run console:check && npm run sdk:check",
-    "console:check": "npm run typecheck -w @scenara/console && npm run test -w @scenara/console && npm run build -w @scenara/console",
-    "console:dev": "npm run dev -w @scenara/console",
-    "console:lint": "npm run lint -w @scenara/console",
-    "console:test": "npm run test -w @scenara/console",
-    "console:e2e": "npm run test:e2e -w @scenara/console",
-    "console:typecheck": "npm run typecheck -w @scenara/console",
-    "console:build": "npm run build -w @scenara/console",
-    "console:format": "npm run format -w @scenara/console",
-    "console:format:check": "npm run format:check -w @scenara/console",
-    "sdk:check": "npm run check -w scenara-sdk",
-    "sdk:build": "npm run build -w scenara-sdk"
+    "check": "pnpm run console:check && pnpm run sdk:check",
+    "console:check": "pnpm --filter @scenara/console run typecheck && pnpm --filter @scenara/console run lint && pnpm --filter @scenara/console run format:check && pnpm --filter @scenara/console run test && pnpm --filter @scenara/console run build",
+    "console:dev": "pnpm --filter @scenara/console run dev",
+    "console:lint": "pnpm --filter @scenara/console run lint",
+    "console:test": "pnpm --filter @scenara/console run test",
+    "console:e2e": "pnpm --filter @scenara/console run test:e2e",
+    "console:typecheck": "pnpm --filter @scenara/console run typecheck",
+    "console:build": "pnpm --filter @scenara/console run build",
+    "console:format": "pnpm --filter @scenara/console run format",
+    "console:format:check": "pnpm --filter @scenara/console run format:check",
+    "sdk:check": "pnpm --filter @scenara/sdk run check",
+    "sdk:build": "pnpm --filter @scenara/sdk run build"
   }
 }

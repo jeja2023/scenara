@@ -14,13 +14,25 @@ import {
   Video,
   X,
 } from "@lucide/vue";
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from "vue";
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  reactive,
+  ref,
+  watch,
+} from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { useRouter, type Router } from "vue-router";
 import { api, apiBlob, userFacingError } from "../api";
 import { labelMediaKind } from "../labels";
 import DataTable from "../components/DataTable.vue";
-import type { MediaAsset, MediaSource, MediaSourceProbe, TableColumn } from "../types";
+import type {
+  MediaAsset,
+  MediaSource,
+  MediaSourceProbe,
+  TableColumn,
+} from "../types";
 
 type AssetKindFilter = "" | "image" | "video" | "document";
 type AssetDomainFilter = "" | "fashion" | "portrait" | "behavior" | "ocr";
@@ -29,7 +41,13 @@ type MediaTab = "files" | "streams";
 const PAGE_SIZE = 20;
 
 const assetColumns: TableColumn<MediaAsset>[] = [
-  { key: "select", label: "", width: "32px", class: "check-col", headerClass: "check-col" },
+  {
+    key: "select",
+    label: "",
+    width: "32px",
+    class: "check-col",
+    headerClass: "check-col",
+  },
   { key: "asset_id", label: "标识", class: "mono truncate" },
   { key: "domain", label: "所属领域" },
   { key: "kind", label: "类型" },
@@ -444,8 +462,16 @@ useRefresh(refresh);
         :offset="offset"
         :page-size="PAGE_SIZE"
         :index-offset="offset"
-        :row-class="(asset: MediaAsset) => ({ 'selected-row': selectedForDelete.has(asset.asset_id) })"
-        :empty-text="kindFilter || domainFilter ? '没有符合当前筛选条件的资产' : '暂无文件资产'"
+        :row-class="
+          (asset: MediaAsset) => ({
+            'selected-row': selectedForDelete.has(asset.asset_id),
+          })
+        "
+        :empty-text="
+          kindFilter || domainFilter
+            ? '没有符合当前筛选条件的资产'
+            : '暂无文件资产'
+        "
         @page-change="onPageChange"
       >
         <template #header-select>
@@ -460,10 +486,24 @@ useRefresh(refresh);
           />
         </template>
         <template #domain="{ row }">
-          <span v-if="row.domain === 'fashion'" class="badge domain-badge-fashion">服饰风格</span>
-          <span v-else-if="row.domain === 'portrait'" class="badge domain-badge-portrait">人像解析</span>
-          <span v-else-if="row.domain === 'behavior'" class="badge domain-badge-behavior">行为分析</span>
-          <span v-else-if="row.domain === 'ocr'" class="badge domain-badge-ocr">文字识别</span>
+          <span
+            v-if="row.domain === 'fashion'"
+            class="badge domain-badge-fashion"
+            >服饰风格</span
+          >
+          <span
+            v-else-if="row.domain === 'portrait'"
+            class="badge domain-badge-portrait"
+            >人像解析</span
+          >
+          <span
+            v-else-if="row.domain === 'behavior'"
+            class="badge domain-badge-behavior"
+            >行为分析</span
+          >
+          <span v-else-if="row.domain === 'ocr'" class="badge domain-badge-ocr"
+            >文字识别</span
+          >
           <span v-else class="badge domain-badge-general">通用公共</span>
         </template>
         <template #kind="{ row }">
@@ -491,9 +531,7 @@ useRefresh(refresh);
             >
               <component
                 :is="
-                  expandedAssets.has(row.asset_id)
-                    ? ChevronDown
-                    : ChevronRight
+                  expandedAssets.has(row.asset_id) ? ChevronDown : ChevronRight
                 "
                 :size="13"
               />
@@ -529,16 +567,10 @@ useRefresh(refresh);
           </div>
         </template>
         <template #subrow="{ row, totalColspan }">
-          <tr
-            v-if="expandedAssets.has(row.asset_id)"
-            class="metadata-row"
-          >
+          <tr v-if="expandedAssets.has(row.asset_id)" class="metadata-row">
             <td :colspan="totalColspan">
               <dl class="metadata-list">
-                <div
-                  v-for="[label, value] in metadataItems(row)"
-                  :key="label"
-                >
+                <div v-for="[label, value] in metadataItems(row)" :key="label">
                   <dt>{{ label }}</dt>
                   <dd>{{ value }}</dd>
                 </div>
@@ -589,10 +621,9 @@ useRefresh(refresh);
         empty-text="暂无视频流源"
       >
         <template #status="{ row }">
-          <span
-            v-if="probeText(row.source_id)"
-            class="badge completed"
-          >{{ probeText(row.source_id) }}</span>
+          <span v-if="probeText(row.source_id)" class="badge completed">{{
+            probeText(row.source_id)
+          }}</span>
           <span v-else class="muted">未探测</span>
         </template>
         <template #actions="{ row }">

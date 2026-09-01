@@ -62,13 +62,13 @@ def _local_context(request_id: str) -> PrincipalContext:
 
 async def _main() -> dict[str, object]:
     started = time.perf_counter()
-    # The local Data development server defaults to this token unless its
-    # launching shell supplied SCENARA_DATA_SERVICE_TOKEN explicitly.  Do not
+    # The local Data development server uses the same inbound credential that
+    # Core uses for outbound Data requests. Do not
     # read a .env file here: it may not be the environment of the running
     # process and would make this qualification misleading.
-    token = os.getenv("SCENARA_DATA_SERVICE_TOKEN", "scenara-data-dev-token").strip()
+    token = os.getenv("SCENARA_DATA_PLATFORM_SERVICE_TOKEN", "scenara-data-dev-token").strip()
     if not token:
-        raise RuntimeError("SCENARA_DATA_SERVICE_TOKEN must not be empty")
+        raise RuntimeError("SCENARA_DATA_PLATFORM_SERVICE_TOKEN must not be empty")
     identifier = uuid4().hex[:12]
     intent = CreateDatasetRequest(
         name=f"Core Data cutover simulation {identifier}",

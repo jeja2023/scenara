@@ -20,11 +20,7 @@ import { useRoute, useRouter } from "vue-router";
 import { api, userFacingError } from "../api";
 import DataTable from "../components/DataTable.vue";
 import ResultDetailDrawer from "../components/ResultDetailDrawer.vue";
-import {
-  labelDomain,
-  labelMediaKind,
-  labelRunStatus,
-} from "../labels";
+import { labelDomain, labelMediaKind, labelRunStatus } from "../labels";
 import type {
   Domain,
   DomainManifest,
@@ -42,11 +38,20 @@ const columns: TableColumn<ResultSummary>[] = [
   { key: "media_kind", label: "资产类型", width: "80px" },
   { key: "summary", label: "解析成果概况", width: "200px" },
   { key: "status", label: "状态", width: "80px" },
-  { key: "created_at", label: "解析时间", class: "muted time-cell", width: "140px" },
-  { key: "actions", label: "操作", align: "right", headerAlign: "right", width: "110px" },
+  {
+    key: "created_at",
+    label: "解析时间",
+    class: "muted time-cell",
+    width: "140px",
+  },
+  {
+    key: "actions",
+    label: "操作",
+    align: "right",
+    headerAlign: "right",
+    width: "110px",
+  },
 ];
-
-
 
 const router: Router = useRouter();
 const route = useRoute();
@@ -150,7 +155,6 @@ function onDetailClosed(): void {
     void router.replace({ query: q });
   }
 }
-
 
 function openWorkspace(item: ResultSummary): void {
   void router.push({ path: "/parse", query: { run: item.run_id } });
@@ -257,7 +261,12 @@ useRefresh(refresh);
         </div>
 
         <div class="select-field">
-          <select v-model="domain" class="filter-select" aria-label="筛选领域" @change="onFilterChange">
+          <select
+            v-model="domain"
+            class="filter-select"
+            aria-label="筛选领域"
+            @change="onFilterChange"
+          >
             <option value="">全部领域</option>
             <option
               v-for="item in domains"
@@ -320,20 +329,31 @@ useRefresh(refresh);
       >
         <!-- 1. 标识 / 资源名称（严格单行） -->
         <template #title="{ row }">
-          <div class="result-title-cell" :title="`${resultTitle(row)} (${row.run_id})`">
-            <component :is="resultIcon(row)" :size="14" class="result-kind-icon" />
+          <div
+            class="result-title-cell"
+            :title="`${resultTitle(row)} (${row.run_id})`"
+          >
+            <component
+              :is="resultIcon(row)"
+              :size="14"
+              class="result-kind-icon"
+            />
             <strong class="result-name">{{ resultTitle(row) }}</strong>
           </div>
         </template>
 
         <!-- 2. 领域 -->
         <template #domain="{ row }">
-          <span class="badge status-badge" :class="row.domain">{{ labelDomain(row.domain) }}</span>
+          <span class="badge status-badge" :class="row.domain">{{
+            labelDomain(row.domain)
+          }}</span>
         </template>
 
         <!-- 3. 资产类型 -->
         <template #media_kind="{ row }">
-          <span class="badge status-badge media-badge">{{ labelMediaKind(row.media_kind) }}</span>
+          <span class="badge status-badge media-badge">{{
+            row.media_kind ? labelMediaKind(row.media_kind) : "-"
+          }}</span>
         </template>
 
         <!-- 4. 解析成果概况（严格单行） -->
@@ -341,26 +361,35 @@ useRefresh(refresh);
           <span class="result-summary-text">
             <template v-if="row.domain === 'portrait'">
               <strong>{{ row.person_count }}</strong> 个人员
-              <small v-if="row.face_count" class="muted">({{ row.face_count }} 人脸)</small>
+              <small v-if="row.face_count" class="muted"
+                >({{ row.face_count }} 人脸)</small
+              >
             </template>
             <template v-else-if="row.domain === 'ocr'">
               <strong>{{ row.ocr_block_count }}</strong> 个文本块
-              <small v-if="row.text_length" class="muted">({{ formatBytesCount(row.text_length) }} 字符)</small>
+              <small v-if="row.text_length" class="muted"
+                >({{ formatBytesCount(row.text_length) }} 字符)</small
+              >
             </template>
             <template v-else>
-              <strong>{{ row.unit_count }}</strong> 单元 · <strong>{{ row.object_count }}</strong> 对象
+              <strong>{{ row.unit_count }}</strong> 单元 ·
+              <strong>{{ row.object_count }}</strong> 对象
             </template>
           </span>
         </template>
 
         <!-- 5. 状态 -->
         <template #status="{ row }">
-          <span class="badge status-badge" :class="row.status">{{ labelRunStatus(row.status) }}</span>
+          <span class="badge status-badge" :class="row.status">{{
+            labelRunStatus(row.status)
+          }}</span>
         </template>
 
         <!-- 6. 解析时间 -->
         <template #created_at="{ row }">
-          <span class="muted time-cell mono">{{ formatDate(row.created_at) }}</span>
+          <span class="muted time-cell mono">{{
+            formatDate(row.created_at)
+          }}</span>
         </template>
 
         <!-- 7. 操作（微型按钮 20px） -->
@@ -546,7 +575,6 @@ useRefresh(refresh);
   line-height: 20px;
 }
 
-
 .media-badge {
   background: #f0f4f3;
   color: #3b504b;
@@ -608,4 +636,3 @@ useRefresh(refresh);
   color: var(--accent-strong, #0ea5e9);
 }
 </style>
-

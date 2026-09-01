@@ -6,7 +6,7 @@ import {
   ScanFace,
   Sparkles,
 } from "@lucide/vue";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, type Component } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { RouterLink } from "vue-router";
 import { api, userFacingError } from "../api";
@@ -25,14 +25,14 @@ const pipelines = ref<Pipeline[]>([]);
 const error = ref("");
 const loading = ref(false);
 
-const domainIconsMap: Record<string, any> = {
+const domainIconsMap: Record<string, Component> = {
   portrait: ScanFace,
   ocr: FileText,
   behavior: Activity,
   fashion: Sparkles,
 };
 
-function domainIcon(domainId: string) {
+function domainIcon(domainId: string): Component {
   return domainIconsMap[domainId] || ScanFace;
 }
 

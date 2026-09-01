@@ -181,6 +181,14 @@ const currentHtmlLayout = computed<string>(() => {
   return ocrPayload.value?.html_layout ?? "";
 });
 
+const currentHtmlLayoutAspectRatio = computed<string>(() => {
+  const match = currentHtmlLayout.value.match(
+    /data-width="(\d+)"\s+data-height="(\d+)"/,
+  );
+  if (!match?.[1] || !match[2]) return "4 / 3";
+  return `${match[1]} / ${match[2]}`;
+});
+
 async function copyRawOcrText(): Promise<void> {
   if (!ocrText.value) return;
   try {
@@ -189,7 +197,9 @@ async function copyRawOcrText(): Promise<void> {
     setTimeout(() => {
       copiedText.value = false;
     }, 2000);
-  } catch {}
+  } catch {
+    // Clipboard access can be unavailable in embedded or non-secure contexts.
+  }
 }
 
 function exportHtmlLayout(): void {
@@ -246,15 +256,15 @@ const hasMediaMetadataItems = computed(() => {
   if (!m) return false;
   return Boolean(
     (m.width && m.height) ||
-      m.duration_ms != null ||
-      m.fps != null ||
-      m.codec ||
-      m.format ||
-      m.sample_strategy ||
-      m.frames_read != null ||
-      m.reconnect_count != null ||
-      m.elapsed_ms != null ||
-      m.timestamp_source,
+    m.duration_ms != null ||
+    m.fps != null ||
+    m.codec ||
+    m.format ||
+    m.sample_strategy ||
+    m.frames_read != null ||
+    m.reconnect_count != null ||
+    m.elapsed_ms != null ||
+    m.timestamp_source,
   );
 });
 const genericPayload = computed<Record<string, unknown> | null>(() => {
@@ -301,9 +311,7 @@ const objectColumns: TableColumn<{
 
 function formatBox(
   item:
-    | { x: number; y: number; width: number; height: number }
-    | null
-    | undefined,
+    { x: number; y: number; width: number; height: number } | null | undefined,
 ): string {
   if (!item) return "-";
   return [item.x, item.y, item.width, item.height]
@@ -419,7 +427,10 @@ async function loadDetail(runId: string): Promise<void> {
         typeof currentRes.domain_payload?.text === "string"
           ? currentRes.domain_payload.text.length
           : 0;
-      const totalObjs = currentRes.units.reduce((s, u) => s + u.objects.length, 0);
+      const totalObjs = currentRes.units.reduce(
+        (s, u) => s + u.objects.length,
+        0,
+      );
 
       resolvedSummary.value = {
         result_id: currentRes.run_id,
@@ -430,7 +441,8 @@ async function loadDetail(runId: string): Promise<void> {
         asset_id: runInfo?.asset_id ?? null,
         source_id: runInfo?.source_id ?? null,
         media_kind: runInfo?.source_id ? "stream" : "image",
-        resource_name: runInfo?.asset_id || runInfo?.source_id || currentRes.run_id,
+        resource_name:
+          runInfo?.asset_id || runInfo?.source_id || currentRes.run_id,
         unit_count: currentRes.units.length,
         object_count: totalObjs,
         person_count: persons,
@@ -515,10 +527,7 @@ watch(
             >
               {{ labelDomain(currentSummary.domain) }}
             </span>
-            <span
-              v-if="currentSummary?.media_kind"
-              class="badge media-badge"
-            >
+            <span v-if="currentSummary?.media_kind" class="badge media-badge">
               {{ labelMediaKind(currentSummary.media_kind) }}
             </span>
             <span
@@ -529,7 +538,11 @@ watch(
               {{ labelRunStatus(currentSummary.status) }}
             </span>
           </div>
-          <h3>{{ currentSummary ? resultTitle(currentSummary) : (props.runId || "") }}</h3>
+          <h3>
+            {{
+              currentSummary ? resultTitle(currentSummary) : props.runId || ""
+            }}
+          </h3>
           <p v-if="currentSummary" class="detail-description">
             {{ resultDescription }}
           </p>
@@ -586,11 +599,17 @@ watch(
             </div>
             <div v-if="currentSummary.domain === 'portrait'">
               <dt>人员 / 人脸</dt>
-              <dd>{{ currentSummary.person_count ?? 0 }} / {{ currentSummary.face_count ?? 0 }}</dd>
+              <dd>
+                {{ currentSummary.person_count ?? 0 }} /
+                {{ currentSummary.face_count ?? 0 }}
+              </dd>
             </div>
             <div v-else-if="currentSummary.domain === 'ocr'">
               <dt>文本块 / 字符</dt>
-              <dd>{{ currentSummary.ocr_block_count ?? 0 }} / {{ currentSummary.text_length ?? 0 }}</dd>
+              <dd>
+                {{ currentSummary.ocr_block_count ?? 0 }} /
+                {{ currentSummary.text_length ?? 0 }}
+              </dd>
             </div>
             <div v-else-if="currentSummary.domain === 'fashion'">
               <dt>识别目标</dt>
@@ -603,7 +622,10 @@ watch(
           </dl>
 
           <!-- 媒体技术元数据网格（如有） -->
-          <dl v-if="mediaMetadata && hasMediaMetadataItems" class="metadata-grid">
+          <dl
+            v-if="mediaMetadata && hasMediaMetadataItems"
+            class="metadata-grid"
+          >
             <div v-if="mediaMetadata.width && mediaMetadata.height">
               <dt>画面尺寸</dt>
               <dd>{{ mediaMetadata.width }} × {{ mediaMetadata.height }}</dd>
@@ -638,10 +660,11 @@ watch(
             </div>
             <div v-if="mediaMetadata.timestamp_source" class="metadata-wide">
               <dt>时间戳来源</dt>
-              <dd>{{ labelTimestampSource(mediaMetadata.timestamp_source) }}</dd>
+              <dd>
+                {{ labelTimestampSource(mediaMetadata.timestamp_source) }}
+              </dd>
             </div>
           </dl>
-
 
           <template v-if="result">
             <!-- 两栏式科学布局：左侧时间轴，右侧特征图片与目标明细 -->
@@ -660,16 +683,24 @@ watch(
                     v-for="(unit, idx) in result.units"
                     :key="unit.unit_id"
                     class="timeline-card"
-                    :class="{ selected: selectedUnit?.unit_id === unit.unit_id }"
+                    :class="{
+                      selected: selectedUnit?.unit_id === unit.unit_id,
+                    }"
                     @click="selectedUnit = unit"
                   >
                     <div class="timeline-card-main">
                       <span class="timeline-seq">#{{ idx + 1 }}</span>
                       <div class="timeline-info">
                         <strong class="timeline-time">
-                          {{ unit.page_number ? `第 ${unit.page_number} 页` : formatUnitPosition(unit) }}
+                          {{
+                            unit.page_number
+                              ? `第 ${unit.page_number} 页`
+                              : formatUnitPosition(unit)
+                          }}
                         </strong>
-                        <span class="timeline-res">{{ unit.width }} × {{ unit.height }}</span>
+                        <span class="timeline-res"
+                          >{{ unit.width }} × {{ unit.height }}</span
+                        >
                       </div>
                     </div>
                     <span
@@ -692,7 +723,12 @@ watch(
                       <strong>当前单元特征图片</strong>
                     </div>
                     <small v-if="selectedUnit" class="muted">
-                      {{ selectedUnit.page_number ? `第 ${selectedUnit.page_number} 页` : formatUnitPosition(selectedUnit) }} · {{ selectedUnit.objects.length }} 个识别目标
+                      {{
+                        selectedUnit.page_number
+                          ? `第 ${selectedUnit.page_number} 页`
+                          : formatUnitPosition(selectedUnit)
+                      }}
+                      · {{ selectedUnit.objects.length }} 个识别目标
                     </small>
                   </div>
                   <div class="panel-body feature-crops-body">
@@ -704,7 +740,10 @@ watch(
                 </div>
 
                 <!-- OCR 综合展示面板（HTML 排版、合规审查、海报轮播、原始文本） -->
-                <div v-if="currentSummary.domain === 'ocr'" class="panel ocr-panel">
+                <div
+                  v-if="currentSummary.domain === 'ocr'"
+                  class="panel ocr-panel"
+                >
                   <div class="panel-header ocr-panel-header">
                     <div class="ocr-tabs">
                       <button
@@ -751,7 +790,9 @@ watch(
                       >
                         <Film :size="14" />
                         <span>大屏海报集</span>
-                        <span class="tab-badge info">{{ ocrSlides.length }}</span>
+                        <span class="tab-badge info">{{
+                          ocrSlides.length
+                        }}</span>
                       </button>
                       <button
                         type="button"
@@ -771,13 +812,27 @@ watch(
                           type="button"
                           class="button small"
                           :class="underlayMode ? 'primary' : 'secondary'"
-                          :title="underlayMode ? '退出左右双屏对照' : '开启左右双屏对照'"
+                          :title="
+                            underlayMode
+                              ? '退出左右双屏对照'
+                              : '开启左右双屏对照'
+                          "
                           :disabled="underlayLoading"
                           @click="toggleUnderlayMode"
                         >
-                          <Loader2 v-if="underlayLoading" :size="13" class="spin" />
+                          <Loader2
+                            v-if="underlayLoading"
+                            :size="13"
+                            class="spin"
+                          />
                           <Columns2 v-else :size="13" />
-                          {{ underlayLoading ? "加载原图中..." : underlayMode ? "退出双屏" : "左右双屏" }}
+                          {{
+                            underlayLoading
+                              ? "加载原图中..."
+                              : underlayMode
+                                ? "退出双屏"
+                                : "左右双屏"
+                          }}
                         </button>
                         <button
                           type="button"
@@ -796,7 +851,11 @@ watch(
                           title="复制全部纯文本"
                           @click="copyRawOcrText"
                         >
-                          <Check v-if="copiedText" :size="13" class="text-success" />
+                          <Check
+                            v-if="copiedText"
+                            :size="13"
+                            class="text-success"
+                          />
                           <Copy v-else :size="13" />
                           {{ copiedText ? "已复制" : "复制文本" }}
                         </button>
@@ -806,7 +865,10 @@ watch(
 
                   <div class="panel-body ocr-panel-body">
                     <!-- Tab 1: 视觉仿真排版 -->
-                    <div v-show="activeOcrTab === 'layout'" class="ocr-layout-view">
+                    <div
+                      v-show="activeOcrTab === 'layout'"
+                      class="ocr-layout-view"
+                    >
                       <div
                         v-if="currentHtmlLayout"
                         class="ocr-layout-canvas-wrapper"
@@ -841,37 +903,83 @@ watch(
                             <Layout :size="13" />
                             <strong>1:1 视觉仿真排版还原</strong>
                           </div>
-                          <div class="ocr-html-rendered" v-html="currentHtmlLayout" />
+                          <iframe
+                            class="ocr-html-rendered"
+                            :srcdoc="currentHtmlLayout"
+                            :style="{
+                              aspectRatio: currentHtmlLayoutAspectRatio,
+                            }"
+                            sandbox=""
+                            referrerpolicy="no-referrer"
+                            title="OCR 版面排版还原"
+                          />
                         </div>
                       </div>
                       <div v-else class="empty-state">
                         <Layout :size="32" class="muted" />
-                        <p>当前单元未生成 HTML 排版，请确认流水线已开启版面排版还原。</p>
+                        <p>
+                          当前单元未生成 HTML
+                          排版，请确认流水线已开启版面排版还原。
+                        </p>
                       </div>
                     </div>
 
                     <!-- Tab 2: 文本合规质检报告 -->
-                    <div v-show="activeOcrTab === 'compliance'" class="ocr-compliance-view">
-                      <div v-if="complianceReport" class="compliance-report-container">
-                        <div class="compliance-summary-card" :class="complianceReport.status">
+                    <div
+                      v-show="activeOcrTab === 'compliance'"
+                      class="ocr-compliance-view"
+                    >
+                      <div
+                        v-if="complianceReport"
+                        class="compliance-report-container"
+                      >
+                        <div
+                          class="compliance-summary-card"
+                          :class="complianceReport.status"
+                        >
                           <div class="summary-icon">
-                            <ShieldAlert v-if="complianceReport.status === 'block'" :size="24" />
-                            <ShieldAlert v-else-if="complianceReport.status === 'suspect'" :size="24" />
+                            <ShieldAlert
+                              v-if="complianceReport.status === 'block'"
+                              :size="24"
+                            />
+                            <ShieldAlert
+                              v-else-if="complianceReport.status === 'suspect'"
+                              :size="24"
+                            />
                             <ShieldCheck v-else :size="24" />
                           </div>
                           <div class="summary-content">
                             <div class="summary-title-row">
-                              <span class="compliance-status-tag" :class="complianceReport.status">
-                                {{ complianceReport.status === 'block' ? '严重违规' : complianceReport.status === 'suspect' ? '疑似存疑' : '合规通过' }}
+                              <span
+                                class="compliance-status-tag"
+                                :class="complianceReport.status"
+                              >
+                                {{
+                                  complianceReport.status === "block"
+                                    ? "严重违规"
+                                    : complianceReport.status === "suspect"
+                                      ? "疑似存疑"
+                                      : "合规通过"
+                                }}
                               </span>
-                              <span class="risk-score">风险评分: {{ (complianceReport.risk_score * 100).toFixed(0) }}</span>
+                              <span class="risk-score"
+                                >风险评分:
+                                {{
+                                  (complianceReport.risk_score * 100).toFixed(0)
+                                }}</span
+                              >
                             </div>
-                            <p class="summary-desc">{{ complianceReport.summary }}</p>
+                            <p class="summary-desc">
+                              {{ complianceReport.summary }}
+                            </p>
                           </div>
                         </div>
 
                         <!-- 违规命中列表 -->
-                        <div v-if="complianceReport.hits?.length" class="compliance-hits-list">
+                        <div
+                          v-if="complianceReport.hits?.length"
+                          class="compliance-hits-list"
+                        >
                           <div
                             v-for="(hit, idx) in complianceReport.hits"
                             :key="idx"
@@ -880,20 +988,30 @@ watch(
                           >
                             <div class="hit-header">
                               <span class="hit-word-badge">{{ hit.word }}</span>
-                              <span class="hit-category">{{ hit.rule_category }}</span>
+                              <span class="hit-category">{{
+                                hit.rule_category
+                              }}</span>
                               <span
                                 v-if="hit.rule_id?.startsWith('custom_')"
                                 class="hit-custom-tag"
                               >
                                 企业自定义
                               </span>
-                              <span class="hit-severity-badge" :class="hit.severity">
-                                {{ hit.severity === 'block' ? '禁止发布' : '建议修改' }}
+                              <span
+                                class="hit-severity-badge"
+                                :class="hit.severity"
+                              >
+                                {{
+                                  hit.severity === "block"
+                                    ? "禁止发布"
+                                    : "建议修改"
+                                }}
                               </span>
                             </div>
                             <div class="hit-body">
                               <div class="hit-ref">
-                                <strong>法规依据:</strong> {{ hit.legal_reference }}
+                                <strong>法规依据:</strong>
+                                {{ hit.legal_reference }}
                               </div>
                               <div class="hit-sug">
                                 <strong>处置建议:</strong> {{ hit.suggestion }}
@@ -904,7 +1022,9 @@ watch(
                         <div v-else class="compliance-all-clear">
                           <ShieldCheck :size="40" class="text-success" />
                           <h4>未检测到违规极限词或风险信息</h4>
-                          <p class="muted">符合《中华人民共和国广告法》及公共内容安全要求</p>
+                          <p class="muted">
+                            符合《中华人民共和国广告法》及公共内容安全要求
+                          </p>
                         </div>
                       </div>
                       <div v-else class="empty-state">
@@ -913,14 +1033,20 @@ watch(
                     </div>
 
                     <!-- Tab 3: 大屏海报轮播集 -->
-                    <div v-show="activeOcrTab === 'slides'" class="ocr-slides-view">
+                    <div
+                      v-show="activeOcrTab === 'slides'"
+                      class="ocr-slides-view"
+                    >
                       <div class="slides-grid">
                         <div
                           v-for="(slide, idx) in ocrSlides"
                           :key="slide.slide_id"
                           class="slide-card"
                           :class="{ active: activeSlideIndex === idx }"
-                          @click="activeSlideIndex = idx; activeOcrTab = 'layout'"
+                          @click="
+                            activeSlideIndex = idx;
+                            activeOcrTab = 'layout';
+                          "
                         >
                           <div class="slide-card-header">
                             <span class="slide-title">海报 #{{ idx + 1 }}</span>
@@ -929,15 +1055,28 @@ watch(
                               class="slide-status-tag"
                               :class="slide.compliance.status"
                             >
-                              {{ slide.compliance.status === 'block' ? '违规' : slide.compliance.status === 'suspect' ? '存疑' : '合规' }}
+                              {{
+                                slide.compliance.status === "block"
+                                  ? "违规"
+                                  : slide.compliance.status === "suspect"
+                                    ? "存疑"
+                                    : "合规"
+                              }}
                             </span>
                           </div>
                           <div class="slide-card-body">
                             <p class="slide-text-snippet">{{ slide.text }}</p>
                           </div>
                           <div class="slide-card-footer">
-                            <span class="slide-count">轮播 {{ slide.display_count }} 次</span>
-                            <span v-if="slide.duration_seconds" class="slide-dur">展示 {{ slide.duration_seconds.toFixed(1) }}s</span>
+                            <span class="slide-count"
+                              >轮播 {{ slide.display_count }} 次</span
+                            >
+                            <span
+                              v-if="slide.duration_seconds"
+                              class="slide-dur"
+                              >展示
+                              {{ slide.duration_seconds.toFixed(1) }}s</span
+                            >
                             <span class="slide-action">查看排版 →</span>
                           </div>
                         </div>
@@ -963,7 +1102,10 @@ watch(
                 />
 
                 <!-- 当前单元识别对象明细表 -->
-                <div v-if="selectedUnit?.objects.length" class="panel objects-panel">
+                <div
+                  v-if="selectedUnit?.objects.length"
+                  class="panel objects-panel"
+                >
                   <div class="panel-header">
                     <div class="column-title">
                       <Layers :size="15" />
@@ -1503,6 +1645,10 @@ watch(
 
 .ocr-html-rendered {
   width: 100%;
+  min-height: 240px;
+  display: block;
+  border: 0;
+  background: #ffffff;
 }
 
 /* Compliance Report View */

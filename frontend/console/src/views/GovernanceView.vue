@@ -3,8 +3,6 @@ import {
   Activity,
   Check,
   CheckCircle2,
-  Clock,
-  Database,
   FileClock,
   FileSpreadsheet,
   Filter,
@@ -15,12 +13,9 @@ import {
   RefreshCw,
   Save,
   Search,
-  Server,
   Shield,
   ShieldAlert,
   ShieldCheck,
-  Sparkles,
-  Users,
   X,
 } from "@lucide/vue";
 import { computed, onMounted, reactive, ref } from "vue";
@@ -44,8 +39,20 @@ const lifecycleColumns: TableColumn<RecordMap>[] = [
   { key: "project_id", label: "目标项目标识", width: "160px" },
   { key: "action", label: "申请动作", width: "130px" },
   { key: "reason", label: "变更原因说明" },
-  { key: "status", label: "审批状态", width: "110px", align: "center", headerAlign: "center" },
-  { key: "operations", label: "审批操作", align: "right", headerAlign: "right", width: "130px" },
+  {
+    key: "status",
+    label: "审批状态",
+    width: "110px",
+    align: "center",
+    headerAlign: "center",
+  },
+  {
+    key: "operations",
+    label: "审批操作",
+    align: "right",
+    headerAlign: "right",
+    width: "130px",
+  },
 ];
 
 const lifecycle = ref<RecordMap[]>([]);
@@ -107,8 +114,12 @@ const filteredLifecycle = computed(() => {
     }
     if (searchQuery.value.trim()) {
       const q = searchQuery.value.trim().toLowerCase();
-      const matchProject = String(item.project_id || "").toLowerCase().includes(q);
-      const matchReason = String(item.reason || "").toLowerCase().includes(q);
+      const matchProject = String(item.project_id || "")
+        .toLowerCase()
+        .includes(q);
+      const matchReason = String(item.reason || "")
+        .toLowerCase()
+        .includes(q);
       return matchProject || matchReason;
     }
     return true;
@@ -272,9 +283,12 @@ async function probeAdapter(path: string, item: RecordMap): Promise<void> {
   probingIds.value.add(probeKey);
   error.value = "";
   try {
-    await api(`/api/v1/${path}/${encodeURIComponent(String(item.record_id))}/probe`, {
-      method: "POST",
-    });
+    await api(
+      `/api/v1/${path}/${encodeURIComponent(String(item.record_id))}/probe`,
+      {
+        method: "POST",
+      },
+    );
     await refresh();
   } catch (caught) {
     error.value = userFacingError(caught, "适配器健康探测异常");
@@ -345,7 +359,9 @@ useRefresh(refresh);
           </div>
         </div>
         <strong class="stat-value">{{ pendingCount }}</strong>
-        <small class="stat-desc">共 {{ lifecycle.length }} 项生命周期变更</small>
+        <small class="stat-desc"
+          >共 {{ lifecycle.length }} 项生命周期变更</small
+        >
       </article>
 
       <article class="stat green">
@@ -366,8 +382,12 @@ useRefresh(refresh);
             <History :size="15" />
           </div>
         </div>
-        <strong class="stat-value">{{ retentionForm.retention_days }} 天</strong>
-        <small class="stat-desc">{{ retentionForm.enabled ? "自动归档与轮转已生效" : "自动轮转已暂停" }}</small>
+        <strong class="stat-value"
+          >{{ retentionForm.retention_days }} 天</strong
+        >
+        <small class="stat-desc">{{
+          retentionForm.enabled ? "自动归档与轮转已生效" : "自动轮转已暂停"
+        }}</small>
       </article>
 
       <article class="stat teal">
@@ -451,7 +471,9 @@ useRefresh(refresh);
             />
           </div>
 
-          <span class="badge count-badge">共 {{ lifecycle.length }} 条记录</span>
+          <span class="badge count-badge"
+            >共 {{ lifecycle.length }} 条记录</span
+          >
         </div>
 
         <div class="filter-right">
@@ -490,7 +512,10 @@ useRefresh(refresh);
 
           <!-- 2. 动作 -->
           <template #action="{ row }">
-            <span class="badge action-badge" :class="actionBadgeClass(row.action)">
+            <span
+              class="badge action-badge"
+              :class="actionBadgeClass(row.action)"
+            >
               {{ labelAction(row.action) }}
             </span>
           </template>
@@ -501,7 +526,7 @@ useRefresh(refresh);
               class="single-line-text reason-text"
               :title="String(row.reason || '')"
             >
-              {{ row.reason || '-' }}
+              {{ row.reason || "-" }}
             </span>
           </template>
 
@@ -509,13 +534,31 @@ useRefresh(refresh);
           <template #status="{ row }">
             <span
               class="badge status-badge"
-              :class="row.status === 'approved' ? 'active' : row.status === 'pending' ? 'warn-badge' : 'error-badge'"
+              :class="
+                row.status === 'approved'
+                  ? 'active'
+                  : row.status === 'pending'
+                    ? 'warn-badge'
+                    : 'error-badge'
+              "
             >
               <span
                 class="status-dot"
-                :class="row.status === 'approved' ? 'dot-active' : row.status === 'pending' ? 'dot-warn' : 'dot-error'"
+                :class="
+                  row.status === 'approved'
+                    ? 'dot-active'
+                    : row.status === 'pending'
+                      ? 'dot-warn'
+                      : 'dot-error'
+                "
               />
-              {{ row.status === 'approved' ? '已批准' : row.status === 'pending' ? '待审批' : '已拒绝' }}
+              {{
+                row.status === "approved"
+                  ? "已批准"
+                  : row.status === "pending"
+                    ? "待审批"
+                    : "已拒绝"
+              }}
             </span>
           </template>
 
@@ -546,7 +589,10 @@ useRefresh(refresh);
     </div>
 
     <!-- ==================== Tab 2: 审计保留与合规策略 ==================== -->
-    <div v-if="activeTab === 'retention'" class="tab-content retention-layout-grid">
+    <div
+      v-if="activeTab === 'retention'"
+      class="tab-content retention-layout-grid"
+    >
       <!-- 左侧：策略配置卡片 -->
       <section class="panel retention-config-card">
         <div class="panel-header">
@@ -554,14 +600,18 @@ useRefresh(refresh);
             <History :size="15" class="header-icon" />
             <div>
               <h3>审计日志数据生命周期配置</h3>
-              <p>设置全局审计事件与合规证据归档的最短保留周期与自动化维护策略</p>
+              <p>
+                设置全局审计事件与合规证据归档的最短保留周期与自动化维护策略
+              </p>
             </div>
           </div>
         </div>
 
         <form class="retention-form-body" @submit.prevent="saveRetention">
           <div class="form-field">
-            <span class="field-label">日志保留天数 (Retention Days) <em class="required">*</em></span>
+            <span class="field-label"
+              >日志保留天数 (Retention Days) <em class="required">*</em></span
+            >
             <div class="retention-input-row">
               <input
                 v-model.number="retentionForm.retention_days"
@@ -609,7 +659,10 @@ useRefresh(refresh);
                 </button>
               </div>
             </div>
-            <small class="field-hint">建议根据行业合规（如等保三级、GDPR）要求设置不低于 180 天的保留期。</small>
+            <small class="field-hint"
+              >建议根据行业合规（如等保三级、GDPR）要求设置不低于 180
+              天的保留期。</small
+            >
           </div>
 
           <div class="switches-list">
@@ -621,7 +674,9 @@ useRefresh(refresh);
               />
               <div class="switch-text-box">
                 <strong>启用审计日志自动清理与轮转</strong>
-                <p>系统将在每日凌晨闲时自动归档并清理超出保留天数的历史审计事件，保持数据库轻量高效。</p>
+                <p>
+                  系统将在每日凌晨闲时自动归档并清理超出保留天数的历史审计事件，保持数据库轻量高效。
+                </p>
               </div>
             </label>
 
@@ -633,7 +688,9 @@ useRefresh(refresh);
               />
               <div class="switch-text-box">
                 <strong>审计日志导出要求合规审批 (Export Approval)</strong>
-                <p>开启后，导出审计归档或证据包需经平台管理员/安全主管审核批准后方可下载。</p>
+                <p>
+                  开启后，导出审计归档或证据包需经平台管理员/安全主管审核批准后方可下载。
+                </p>
               </div>
             </label>
           </div>
@@ -648,7 +705,8 @@ useRefresh(refresh);
               <span>保存保留策略</span>
             </button>
             <span v-if="retention" class="current-config-pill">
-              当前运行配置：{{ retention.retention_days }} 天 · {{ retention.enabled ? '自动清理生效中' : '自动清理未启用' }}
+              当前运行配置：{{ retention.retention_days }} 天 ·
+              {{ retention.enabled ? "自动清理生效中" : "自动清理未启用" }}
             </span>
           </div>
         </form>
@@ -669,17 +727,24 @@ useRefresh(refresh);
         <div class="compliance-body">
           <div class="guide-item">
             <strong class="guide-title">等保 2.0 / 等保三级要求</strong>
-            <p>《网络安全法》第二十一条规定：采取监测、记录网络运行状态、网络安全事件的技术措施，并按照规定留存相关的网络日志不少于<strong>六个月（180天）</strong>。</p>
+            <p>
+              《网络安全法》第二十一条规定：采取监测、记录网络运行状态、网络安全事件的技术措施，并按照规定留存相关的网络日志不少于<strong>六个月（180天）</strong>。
+            </p>
           </div>
 
           <div class="guide-item">
             <strong class="guide-title">不可篡改与只读保护</strong>
-            <p>所有审计事件写入即不可变更（Append-Only），系统自动生成不可变流水号与 SHA256 签名，保障司法证据效力。</p>
+            <p>
+              所有审计事件写入即不可变更（Append-Only），系统自动生成不可变流水号与
+              SHA256 签名，保障司法证据效力。
+            </p>
           </div>
 
           <div class="guide-item">
             <strong class="guide-title">多租户生命周期隔离</strong>
-            <p>项目生命周期的变更（停用、恢复、销毁）全程记录于审计中心，支持随时导出合规归档证据包。</p>
+            <p>
+              项目生命周期的变更（停用、恢复、销毁）全程记录于审计中心，支持随时导出合规归档证据包。
+            </p>
           </div>
         </div>
       </section>
@@ -702,7 +767,9 @@ useRefresh(refresh);
             </select>
           </label>
 
-          <span class="badge count-badge">共 {{ allAdapters.length }} 个外部引擎适配器</span>
+          <span class="badge count-badge"
+            >共 {{ allAdapters.length }} 个外部引擎适配器</span
+          >
         </div>
 
         <div class="filter-right">
@@ -765,12 +832,20 @@ useRefresh(refresh);
 
             <button
               class="button secondary tiny-btn probe-action-btn"
-              :disabled="probingIds.has(String(adapter.raw.record_id || adapter.probePath))"
+              :disabled="
+                probingIds.has(
+                  String(adapter.raw.record_id || adapter.probePath),
+                )
+              "
               @click="probeAdapter(adapter.probePath, adapter.raw)"
             >
               <RefreshCw
                 :size="11"
-                :class="{ spinning: probingIds.has(String(adapter.raw.record_id || adapter.probePath)) }"
+                :class="{
+                  spinning: probingIds.has(
+                    String(adapter.raw.record_id || adapter.probePath),
+                  ),
+                }"
               />
               <span>立即探测</span>
             </button>
@@ -804,7 +879,9 @@ useRefresh(refresh);
           <div class="modal-body">
             <div class="form-grid-2col">
               <label class="form-field">
-                <span class="field-label">目标项目标识 <em class="required">*</em></span>
+                <span class="field-label"
+                  >目标项目标识 <em class="required">*</em></span
+                >
                 <input
                   v-model="lifecycleForm.project_id"
                   placeholder="例如: default / smart-campus"
@@ -815,17 +892,23 @@ useRefresh(refresh);
               </label>
 
               <label class="form-field">
-                <span class="field-label">生命周期动作 <em class="required">*</em></span>
+                <span class="field-label"
+                  >生命周期动作 <em class="required">*</em></span
+                >
                 <select v-model="lifecycleForm.action" class="field-input">
                   <option value="disable">停用项目 (暂停API访问与调度)</option>
                   <option value="restore">恢复项目 (重新激活已停用项目)</option>
-                  <option value="delete">删除项目 (申请彻底销毁项目资产)</option>
+                  <option value="delete">
+                    删除项目 (申请彻底销毁项目资产)
+                  </option>
                 </select>
               </label>
             </div>
 
-            <label class="form-field" style="margin-top: 12px;">
-              <span class="field-label">变更原因说明 <em class="required">*</em></span>
+            <label class="form-field" style="margin-top: 12px">
+              <span class="field-label"
+                >变更原因说明 <em class="required">*</em></span
+              >
               <textarea
                 v-model="lifecycleForm.reason"
                 placeholder="请详细描述本次项目生命周期变更的业务背景、合规依据与影响范围..."

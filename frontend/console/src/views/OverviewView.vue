@@ -14,7 +14,7 @@ import {
   ShieldCheck,
   Sparkles,
 } from "@lucide/vue";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, type Component } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { api, userFacingError } from "../api";
 import {
@@ -137,14 +137,14 @@ function labelLayer(value: ProductLayer): string {
   return layerLabels[value] || value;
 }
 
-const domainIconsMap: Record<string, any> = {
+const domainIconsMap: Record<string, Component> = {
   portrait: ScanFace,
   ocr: FileText,
   behavior: Activity,
   fashion: Sparkles,
 };
 
-function domainIcon(domainId: string) {
+function domainIcon(domainId: string): Component {
   return domainIconsMap[domainId] || ScanFace;
 }
 
@@ -179,16 +179,6 @@ function domainLabel(value: string): string {
     domains.value.find((item) => item.domain_id === value)?.display_name ||
     labelDomain(value)
   );
-}
-
-interface FullCapabilityItem {
-  id: string;
-  domain: string;
-  name: string;
-  readiness: "ready" | "fallback" | "placeholder";
-  productionReady: boolean;
-  model: string;
-  detail: string;
 }
 
 const selectedDomainFilter = ref<string>("all");
@@ -383,7 +373,8 @@ const domainEngineSummaries = computed(() => [
     id: "portrait",
     name: "人像视觉分析",
     englishName: "Portrait Analysis",
-    description: "基于 YOLOv8、OSNet IBN、SCRFD、ArcFace 与 OpenGait 构建的人像端到端视觉中枢。",
+    description:
+      "基于 YOLOv8、OSNet IBN、SCRFD、ArcFace 与 OpenGait 构建的人像端到端视觉中枢。",
     capabilitiesCount: 7,
     models: [
       { name: "人员检测", file: "models/yolov8n.onnx" },
@@ -399,7 +390,8 @@ const domainEngineSummaries = computed(() => [
     id: "ocr",
     name: "OCR 智能文档",
     englishName: "Document & Video OCR",
-    description: "基于 PP-OCRv4 文本定位识别套件与自适应动静态帧差去重推理引擎。",
+    description:
+      "基于 PP-OCRv4 文本定位识别套件与自适应动静态帧差去重推理引擎。",
     capabilitiesCount: 4,
     models: [
       { name: "文本检测", file: "models/ocr/ch_PP-OCRv4_det_infer" },
@@ -412,7 +404,8 @@ const domainEngineSummaries = computed(() => [
     id: "behavior",
     name: "行为动作识别",
     englishName: "Behavior Analysis",
-    description: "结合人体骨架与时序时空特征，精准识别吸烟、摔倒、搏斗等 50+ 动作模式与异常告警。",
+    description:
+      "结合人体骨架与时序时空特征，精准识别吸烟、摔倒、搏斗等 50+ 动作模式与异常告警。",
     capabilitiesCount: 3,
     models: [
       { name: "骨架感知", file: "YOLOv8 Pose Skeleton (17点)" },
@@ -424,7 +417,8 @@ const domainEngineSummaries = computed(() => [
     id: "fashion",
     name: "服饰风格识别",
     englishName: "Fashion & Cosplay",
-    description: "精准识别 Cosplay 角色、二次元与日常服饰风格（JK、Lolita、汉服等）和配饰属性。",
+    description:
+      "精准识别 Cosplay 角色、二次元与日常服饰风格（JK、Lolita、汉服等）和配饰属性。",
     capabilitiesCount: 3,
     models: [
       { name: "风格分类器", file: "Fashion Style Engine" },
@@ -495,7 +489,8 @@ useRefresh(refresh);
         <div class="header-left">
           <h2>AI 视觉模型与多领域推理引擎</h2>
           <p>
-            平台装载的离线多模态视觉推理引擎与 17 项全流程算法能力，支持端到端就绪分析。
+            平台装载的离线多模态视觉推理引擎与 17
+            项全流程算法能力，支持端到端就绪分析。
           </p>
         </div>
         <div class="header-right">
@@ -504,8 +499,15 @@ useRefresh(refresh);
             @click="showCapabilityTable = !showCapabilityTable"
           >
             <Layers :size="14" />
-            <span>{{ showCapabilityTable ? "收起能力明细矩阵" : "查看 17 项能力规格明细" }}</span>
-            <component :is="showCapabilityTable ? ChevronUp : ChevronDown" :size="14" />
+            <span>{{
+              showCapabilityTable
+                ? "收起能力明细矩阵"
+                : "查看 17 项能力规格明细"
+            }}</span>
+            <component
+              :is="showCapabilityTable ? ChevronUp : ChevronDown"
+              :size="14"
+            />
           </button>
           <span class="badge active">全领域模型已就绪 (100%)</span>
         </div>
@@ -526,7 +528,9 @@ useRefresh(refresh);
               <strong>{{ domain.name }}</strong>
               <small>{{ domain.englishName }}</small>
             </div>
-            <span class="badge active">{{ domain.capabilitiesCount }} 项已就绪</span>
+            <span class="badge active"
+              >{{ domain.capabilitiesCount }} 项已就绪</span
+            >
           </div>
 
           <p class="engine-desc">{{ domain.description }}</p>
@@ -560,7 +564,8 @@ useRefresh(refresh);
             </button>
           </div>
           <small class="muted">
-            显示 {{ filteredCapabilities.length }} 项中的 {{ readyCapabilitiesCount }} 项生产就绪算法
+            显示 {{ filteredCapabilities.length }} 项中的
+            {{ readyCapabilitiesCount }} 项生产就绪算法
           </small>
         </div>
 
@@ -606,7 +611,9 @@ useRefresh(refresh);
           <h2>最近运行动态</h2>
           <p>实时查看多领域解析任务队列与执行状态。</p>
         </div>
-        <RouterLink class="button secondary" to="/runs">查看全部队列</RouterLink>
+        <RouterLink class="button secondary" to="/runs"
+          >查看全部队列</RouterLink
+        >
       </div>
 
       <DataTable
@@ -629,7 +636,8 @@ useRefresh(refresh);
           </span>
         </template>
         <template #pipeline="{ row }">
-          {{ labelPipeline(row.pipeline.pipeline_id) }} · {{ row.pipeline.version }}
+          {{ labelPipeline(row.pipeline.pipeline_id) }} ·
+          {{ row.pipeline.version }}
         </template>
         <template #status="{ row }">
           <span class="badge" :class="row.status">{{
@@ -664,9 +672,12 @@ useRefresh(refresh);
               {{ labelMaturity(product.maturity) }}
             </span>
           </div>
-          <p class="product-mini-desc">{{ labelProductSummary(product.product_id) }}</p>
+          <p class="product-mini-desc">
+            {{ labelProductSummary(product.product_id) }}
+          </p>
           <small class="product-mini-gate">
-            {{ labelLayer(product.layer) }} · {{ labelProductGate(product.product_id) }}
+            {{ labelLayer(product.layer) }} ·
+            {{ labelProductGate(product.product_id) }}
           </small>
         </article>
       </div>
@@ -680,8 +691,12 @@ useRefresh(refresh);
             :key="product.product_id"
             class="foundation-chip"
           >
-            <span class="chip-name">{{ labelProduct(product.product_id) }}</span>
-            <span class="badge" :class="product.maturity">{{ labelMaturity(product.maturity) }}</span>
+            <span class="chip-name">{{
+              labelProduct(product.product_id)
+            }}</span>
+            <span class="badge" :class="product.maturity">{{
+              labelMaturity(product.maturity)
+            }}</span>
           </div>
         </div>
       </div>
@@ -716,25 +731,39 @@ useRefresh(refresh);
             </span>
           </div>
 
-          <p class="repo-desc">{{ labelRepositorySummary(repository.repository_id) }}</p>
+          <p class="repo-desc">
+            {{ labelRepositorySummary(repository.repository_id) }}
+          </p>
 
           <div class="repo-responsibilities">
             <div class="resp-block">
               <span class="resp-label plus">核心职责：</span>
               <span class="resp-text">
-                {{ repository.responsibilities.map(labelRepositoryResponsibility).join("、") }}
+                {{
+                  repository.responsibilities
+                    .map(labelRepositoryResponsibility)
+                    .join("、")
+                }}
               </span>
             </div>
             <div class="resp-block">
               <span class="resp-label minus">排除职责：</span>
               <span class="resp-text muted">
-                {{ repository.excluded_responsibilities.map(labelRepositoryResponsibility).join("、") }}
+                {{
+                  repository.excluded_responsibilities
+                    .map(labelRepositoryResponsibility)
+                    .join("、")
+                }}
               </span>
             </div>
           </div>
 
           <div class="repo-gate-footer">
-            <small>门禁要求：{{ labelRepositoryGate(repository.repository_id) }}</small>
+            <small
+              >门禁要求：{{
+                labelRepositoryGate(repository.repository_id)
+              }}</small
+            >
           </div>
         </article>
       </div>
@@ -754,7 +783,9 @@ useRefresh(refresh);
           </div>
         </div>
         <div class="rule-group">
-          <strong class="rule-title"><ShieldCheck :size="13" /> 强制边界：</strong>
+          <strong class="rule-title"
+            ><ShieldCheck :size="13" /> 强制边界：</strong
+          >
           <div class="rule-tags">
             <span
               v-for="rule in repositoryTopology.boundary_rules"
@@ -858,7 +889,10 @@ useRefresh(refresh);
   display: flex;
   flex-direction: column;
   gap: 3px;
-  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+  transition:
+    transform 140ms ease,
+    box-shadow 140ms ease,
+    border-color 140ms ease;
 }
 
 .stat:hover {
@@ -1090,8 +1124,14 @@ useRefresh(refresh);
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .matrix-table-toolbar {
@@ -1138,10 +1178,22 @@ useRefresh(refresh);
   font-weight: 600;
 }
 
-.domain-pill.portrait { background: #e0f2fe; color: #0369a1; }
-.domain-pill.ocr { background: #fef3c7; color: #b45309; }
-.domain-pill.behavior { background: #f3e8ff; color: #7e22ce; }
-.domain-pill.fashion { background: #fce7f3; color: #be185d; }
+.domain-pill.portrait {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+.domain-pill.ocr {
+  background: #fef3c7;
+  color: #b45309;
+}
+.domain-pill.behavior {
+  background: #f3e8ff;
+  color: #7e22ce;
+}
+.domain-pill.fashion {
+  background: #fce7f3;
+  color: #be185d;
+}
 
 .pi-cap-name strong {
   font-size: 12.5px;
@@ -1162,7 +1214,9 @@ useRefresh(refresh);
 /* ========================================================
    3. 最近运行动态与表格层级 (Runs Table)
    ======================================================== */
-.runs-panel, .product-matrix-panel, .repository-topology-panel {
+.runs-panel,
+.product-matrix-panel,
+.repository-topology-panel {
   background: #fff;
   border: 1px solid var(--line, #e2e8e6);
   border-radius: var(--radius-md, 8px);
@@ -1364,8 +1418,12 @@ useRefresh(refresh);
   font-size: 11.5px;
 }
 
-.resp-label.plus { color: #087682; }
-.resp-label.minus { color: #b45309; }
+.resp-label.plus {
+  color: #087682;
+}
+.resp-label.minus {
+  color: #b45309;
+}
 
 .resp-text {
   color: #334155;

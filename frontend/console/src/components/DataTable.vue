@@ -1,24 +1,15 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="T extends object">
 import { computed, ref, watch } from "vue";
 import DataTablePagination from "./DataTablePagination.vue";
+import type { TableColumn } from "../types";
 
-export interface TableColumn<T = any> {
-  key: string;
-  label?: string;
-  width?: string;
-  minWidth?: string;
-  align?: "left" | "center" | "right";
-  headerAlign?: "left" | "center" | "right";
-  class?: string;
-  headerClass?: string;
-  style?: Record<string, string | number> | string;
-  formatter?: (value: any, row: T, index: number) => any;
-}
+type TableRow = T;
+type RowClass = string | string[] | Record<string, boolean>;
 
 interface Props {
-  columns: TableColumn[];
-  items?: any[];
-  rowKey?: string | ((row: any, index: number) => string | number);
+  columns: TableColumn<T>[];
+  items?: TableRow[];
+  rowKey?: string | ((row: TableRow, index: number) => string | number);
   showIndex?: boolean;
   indexLabel?: string;
   indexWidth?: string;
@@ -35,11 +26,12 @@ interface Props {
   showPageSizeSelector?: boolean;
   showJumper?: boolean;
   paginate?: boolean;
-  rowClass?: string | ((row: any, index: number) => any);
+  rowClass?: RowClass | ((row: TableRow, index: number) => RowClass);
 }
 
 const props = withDefaults(defineProps<Props>(), {
   items: () => [],
+  rowKey: undefined,
   showIndex: true,
   indexLabel: "序号",
   indexWidth: "50px",
@@ -49,11 +41,14 @@ const props = withDefaults(defineProps<Props>(), {
   emptyText: "暂无数据",
   tableClass: "",
   wrapperClass: "",
+  total: undefined,
+  offset: undefined,
   pageSize: 20,
   pageSizeOptions: () => [10, 20, 50, 100],
   showPageSizeSelector: true,
   showJumper: true,
   paginate: true,
+  rowClass: undefined,
 });
 
 const emit = defineEmits<{
@@ -61,7 +56,7 @@ const emit = defineEmits<{
   (e: "update:offset", newOffset: number): void;
   (e: "pageSizeChange", newPageSize: number): void;
   (e: "update:pageSize", newPageSize: number): void;
-  (e: "rowClick", row: any, index: number, event: MouseEvent): void;
+  (e: "rowClick", row: TableRow, index: number, event: MouseEvent): void;
 }>();
 
 const isServerPaginated = computed(() => props.total !== undefined);
@@ -133,42 +128,62 @@ const totalColspan = computed(() => {
   return (props.showIndex ? 1 : 0) + (props.columns?.length || 0);
 });
 
-function getRowKey(row: any, index: number): string | number {
+function getRowKey(row: TableRow, index: number): string | number {
+  const record = row as Record<string, unknown>;
   if (typeof props.rowKey === "function") {
     return props.rowKey(row, index);
   }
-  if (typeof props.rowKey === "string" && row && row[props.rowKey] !== undefined) {
-    return row[props.rowKey];
+  if (typeof props.rowKey === "string" && record[props.rowKey] !== undefined) {
+    const key = record[props.rowKey];
+    return typeof key === "string" || typeof key === "number"
+      ? key
+      : calculatedIndexOffset.value + index;
   }
-  if (row) {
-    if (row.id !== undefined) return row.id;
-    if (row.run_id !== undefined) return row.run_id;
-    if (row.result_id !== undefined) return row.result_id;
-    if (row.asset_id !== undefined) return row.asset_id;
-    if (row.source_id !== undefined) return row.source_id;
-    if (row.user_id !== undefined) return row.user_id;
-    if (row.model_id !== undefined) return row.model_id + (row.version || "");
-    if (row.key_id !== undefined) return row.key_id;
-    if (row.record_id !== undefined) return row.record_id;
-    if (row.event_id !== undefined) return row.event_id;
-    if (row.endpoint_id !== undefined) return row.endpoint_id;
-    if (row.delivery_id !== undefined) return row.delivery_id;
-    if (row.pipeline_id !== undefined) return row.pipeline_id + (row.version || "");
-    if (row.object_id !== undefined) return row.object_id;
+  for (const field of [
+    "id",
+    "run_id",
+    "result_id",
+    "asset_id",
+    "source_id",
+    "user_id",
+    "key_id",
+    "record_id",
+    "event_id",
+    "endpoint_id",
+    "delivery_id",
+    "object_id",
+  ]) {
+    const key = record[field];
+    if (typeof key === "string" || typeof key === "number") return key;
+  }
+  for (const field of ["model_id", "pipeline_id"]) {
+    const key = record[field];
+    if (typeof key === "string") {
+      const version = record.version;
+      return (
+        key +
+        (typeof version === "string" || typeof version === "number"
+          ? version
+          : "")
+      );
+    }
   }
   return calculatedIndexOffset.value + index;
 }
 
-function resolveRowClass(row: any, index: number): any {
+function resolveRowClass(row: TableRow, index: number): RowClass | undefined {
   if (typeof props.rowClass === "function") {
     return props.rowClass(row, index);
   }
   return props.rowClass;
 }
 
-function getCellValue(row: any, column: TableColumn, index: number): any {
-  if (!row) return "";
-  const raw = row[column.key];
+function getCellValue(
+  row: TableRow,
+  column: TableColumn<T>,
+  index: number,
+): unknown {
+  const raw = (row as Record<string, unknown>)[column.key];
   if (typeof column.formatter === "function") {
     return column.formatter(raw, row, index);
   }
@@ -190,7 +205,7 @@ function handlePageSizeChange(newPageSize: number): void {
   emit("pageChange", 0);
 }
 
-function handleRowClick(row: any, index: number, event: MouseEvent): void {
+function handleRowClick(row: TableRow, index: number, event: MouseEvent): void {
   emit("rowClick", row, index, event);
 }
 </script>
@@ -215,7 +230,11 @@ function handleRowClick(row: any, index: number, event: MouseEvent): void {
               :style="[
                 col.width ? { width: col.width } : {},
                 col.minWidth ? { minWidth: col.minWidth } : {},
-                col.headerAlign ? { textAlign: col.headerAlign } : col.align ? { textAlign: col.align } : {},
+                col.headerAlign
+                  ? { textAlign: col.headerAlign }
+                  : col.align
+                    ? { textAlign: col.align }
+                    : {},
                 typeof col.style === 'object' ? col.style : {},
               ]"
             >

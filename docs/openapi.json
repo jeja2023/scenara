@@ -7277,6 +7277,18 @@
             ],
             "title": "Password"
           },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
           "user_id": {
             "anyOf": [
               {
@@ -16722,6 +16734,18 @@
             ],
             "title": "Email"
           },
+          "phone": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phone"
+          },
           "tenant_id": {
             "$ref": "#/components/schemas/AccessId"
           },
@@ -17358,7 +17382,7 @@
   "info": {
     "description": "Scenara 景枢视觉 AI 中枢平台",
     "title": "Scenara API",
-    "version": "0.3.0.dev38"
+    "version": "0.3.0.dev39"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -28387,7 +28411,7 @@
     },
     "/api/v1/platform/portrait-intelligence": {
       "get": {
-        "description": "Portrait Intelligence Foundation Platform contract.\n\nReturns the six strategic modules, three core assets, and per-capability\nreadiness state derived from the installed model-capabilities configuration.\nThis endpoint reflects *intent and current readiness*, not deployed model\nquality.  Refer to ``model-capabilities.yml`` for the authoritative\ncapability status used at inference time.",
+        "description": "Return the Portrait Intelligence Foundation Platform contract.\n\nThe response reports strategic modules, core assets, and capability\nreadiness derived from the installed configuration. It describes\ncurrent readiness rather than deployed model quality.",
         "operationId": "platform_portrait_intelligence_api_v1_platform_portrait_intelligence_get",
         "parameters": [
           {

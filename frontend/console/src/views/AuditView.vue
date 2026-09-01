@@ -99,7 +99,9 @@ function formatTime(epoch: number): string {
   return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
 }
 
-function formatEvidence(evidence: Record<string, unknown> | null | undefined): string {
+function formatEvidence(
+  evidence: Record<string, unknown> | null | undefined,
+): string {
   if (!evidence || Object.keys(evidence).length === 0) return "-";
   return JSON.stringify(evidence);
 }
@@ -172,7 +174,11 @@ useRefresh(refresh);
         </div>
         <div class="filter-item">
           <span class="filter-label">结果</span>
-          <select v-model="filters.outcome" class="filter-select" @change="refresh">
+          <select
+            v-model="filters.outcome"
+            class="filter-select"
+            @change="refresh"
+          >
             <option value="">全部</option>
             <option value="success">成功</option>
             <option value="failure">失败</option>
@@ -200,10 +206,16 @@ useRefresh(refresh);
           <span class="badge">{{ total }}</span>
         </div>
         <div class="header-actions">
-          <button class="button secondary export-btn" @click="exportAudit('csv')">
+          <button
+            class="button secondary export-btn"
+            @click="exportAudit('csv')"
+          >
             <Download :size="13" />导出 CSV
           </button>
-          <button class="button secondary export-btn" @click="exportAudit('json')">
+          <button
+            class="button secondary export-btn"
+            @click="exportAudit('json')"
+          >
             <Download :size="13" />导出 JSON
           </button>
         </div>
@@ -231,7 +243,10 @@ useRefresh(refresh);
 
         <!-- 2. 操作 -->
         <template #action="{ row }">
-          <span class="single-line-text action-name" :title="`ID: ${row.event_id}`">
+          <span
+            class="single-line-text action-name"
+            :title="`ID: ${row.event_id}`"
+          >
             {{ row.action }}
           </span>
         </template>
@@ -248,7 +263,9 @@ useRefresh(refresh);
 
         <!-- 4. 主体 -->
         <template #principal_id="{ row }">
-          <span class="single-line-text mono principal-name">{{ row.principal_id || '-' }}</span>
+          <span class="single-line-text mono principal-name">{{
+            row.principal_id || "-"
+          }}</span>
         </template>
 
         <!-- 5. 结果 -->
@@ -401,7 +418,6 @@ useRefresh(refresh);
   gap: 4px;
 }
 
-
 /* 锁定表格容器最小高度防止跳动 */
 :deep(.audit-table-wrapper .table-scroll) {
   min-height: 480px;
@@ -484,7 +500,6 @@ useRefresh(refresh);
   color: var(--muted, #64716d);
   line-height: 20px;
 }
-
 
 .status-badge {
   display: inline-flex;

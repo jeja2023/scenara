@@ -3,40 +3,60 @@ import {
   Archive,
   Check,
   CheckCircle2,
-  Clock,
   Database,
-  FileCheck,
-  FileClock,
-  FileSpreadsheet,
   FileText,
-  Filter,
   FolderArchive,
   Layers,
   Plus,
   RefreshCw,
   Search,
-  Shield,
-  ShieldCheck,
   Sparkles,
   UploadCloud,
   Video,
-  X,
 } from "@lucide/vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 
 import { api, userFacingError } from "../api";
 import DataTable from "../components/DataTable.vue";
-import type { DatasetRecord, DatasetVersion, MediaAsset, TableColumn } from "../types";
+import type {
+  DatasetRecord,
+  DatasetVersion,
+  MediaAsset,
+  TableColumn,
+} from "../types";
 
 const versionColumns: TableColumn<DatasetVersion>[] = [
   { key: "version", label: "版本号", width: "120px" },
   { key: "item_count", label: "包含资产数", width: "120px" },
-  { key: "manifest_sha256", label: "Manifest 指纹 (SHA256)", class: "mono", width: "190px" },
-  { key: "quality_score", label: "质量评分", width: "110px", align: "center", headerAlign: "center" },
-  { key: "status", label: "准入状态", width: "110px", align: "center", headerAlign: "center" },
+  {
+    key: "manifest_sha256",
+    label: "Manifest 指纹 (SHA256)",
+    class: "mono",
+    width: "190px",
+  },
+  {
+    key: "quality_score",
+    label: "质量评分",
+    width: "110px",
+    align: "center",
+    headerAlign: "center",
+  },
+  {
+    key: "status",
+    label: "准入状态",
+    width: "110px",
+    align: "center",
+    headerAlign: "center",
+  },
   { key: "updated_at", label: "更新时间", width: "150px" },
-  { key: "actions", label: "生命周期流转", width: "130px", align: "right", headerAlign: "right" },
+  {
+    key: "actions",
+    label: "生命周期流转",
+    width: "130px",
+    align: "right",
+    headerAlign: "right",
+  },
 ];
 
 const datasets = ref<DatasetRecord[]>([]);
@@ -75,10 +95,6 @@ const selectedDataset = computed(
     ) ?? null,
 );
 
-const selectedAssets = computed(() =>
-  assets.value.filter((item) => selectedAssetIds.value.includes(item.asset_id)),
-);
-
 const activeDatasetsCount = computed(
   () => datasets.value.filter((d) => d.status === "active").length,
 );
@@ -101,9 +117,15 @@ const filteredDatasets = computed(() => {
     }
     if (datasetSearchQuery.value.trim()) {
       const q = datasetSearchQuery.value.trim().toLowerCase();
-      const matchName = String(item.name || "").toLowerCase().includes(q);
-      const matchId = String(item.dataset_id || "").toLowerCase().includes(q);
-      const matchDesc = String(item.description || "").toLowerCase().includes(q);
+      const matchName = String(item.name || "")
+        .toLowerCase()
+        .includes(q);
+      const matchId = String(item.dataset_id || "")
+        .toLowerCase()
+        .includes(q);
+      const matchDesc = String(item.description || "")
+        .toLowerCase()
+        .includes(q);
       return matchName || matchId || matchDesc;
     }
     return true;
@@ -114,9 +136,15 @@ const filteredAssets = computed(() => {
   if (!assetSearchQuery.value.trim()) return assets.value;
   const q = assetSearchQuery.value.trim().toLowerCase();
   return assets.value.filter((a) => {
-    const matchName = String(a.filename || "").toLowerCase().includes(q);
-    const matchId = String(a.asset_id || "").toLowerCase().includes(q);
-    const matchKind = String(a.kind || "").toLowerCase().includes(q);
+    const matchName = String(a.filename || "")
+      .toLowerCase()
+      .includes(q);
+    const matchId = String(a.asset_id || "")
+      .toLowerCase()
+      .includes(q);
+    const matchKind = String(a.kind || "")
+      .toLowerCase()
+      .includes(q);
     return matchName || matchId || matchKind;
   });
 });
@@ -280,7 +308,11 @@ async function transition(
         body: JSON.stringify({ status }),
       },
     );
-    notifySuccess(status === "published" ? `版本 v${version.version} 已正式发布` : `版本状态已流转至 ${statusLabel(status)}`);
+    notifySuccess(
+      status === "published"
+        ? `版本 v${version.version} 已正式发布`
+        : `版本状态已流转至 ${statusLabel(status)}`,
+    );
     await refresh();
   } catch (caught) {
     error.value = userFacingError(caught, "版本状态更新失败");
@@ -377,7 +409,10 @@ useRefresh(refresh);
           </div>
         </div>
         <strong class="stat-value">{{ activeDatasetsCount }} 个</strong>
-        <small class="stat-desc">{{ draftDatasetsCount }} 个草稿 · {{ archivedDatasetsCount }} 个已归档</small>
+        <small class="stat-desc"
+          >{{ draftDatasetsCount }} 个草稿 ·
+          {{ archivedDatasetsCount }} 个已归档</small
+        >
       </article>
 
       <article class="stat amber">
@@ -388,7 +423,9 @@ useRefresh(refresh);
           </div>
         </div>
         <strong class="stat-value">{{ versions.length }} 个版本</strong>
-        <small class="stat-desc">{{ selectedDataset ? `当前: ${selectedDataset.name}` : '未选择数据集' }}</small>
+        <small class="stat-desc">{{
+          selectedDataset ? `当前: ${selectedDataset.name}` : "未选择数据集"
+        }}</small>
       </article>
 
       <article class="stat teal">
@@ -457,26 +494,48 @@ useRefresh(refresh);
             "
           >
             <div class="card-top-row">
-              <strong class="card-name" :title="dataset.name">{{ dataset.name }}</strong>
+              <strong class="card-name" :title="dataset.name">{{
+                dataset.name
+              }}</strong>
               <span
                 class="badge status-badge"
-                :class="dataset.status === 'active' ? 'active' : dataset.status === 'archived' ? 'error-badge' : 'warn-badge'"
+                :class="
+                  dataset.status === 'active'
+                    ? 'active'
+                    : dataset.status === 'archived'
+                      ? 'error-badge'
+                      : 'warn-badge'
+                "
               >
                 <span
                   class="status-dot"
-                  :class="dataset.status === 'active' ? 'dot-active' : dataset.status === 'archived' ? 'dot-error' : 'dot-warn'"
+                  :class="
+                    dataset.status === 'active'
+                      ? 'dot-active'
+                      : dataset.status === 'archived'
+                        ? 'dot-error'
+                        : 'dot-warn'
+                  "
                 />
-                {{ dataset.status === 'active' ? '使用中' : dataset.status === 'archived' ? '已归档' : '草稿' }}
+                {{
+                  dataset.status === "active"
+                    ? "使用中"
+                    : dataset.status === "archived"
+                      ? "已归档"
+                      : "草稿"
+                }}
               </span>
             </div>
 
             <p class="card-desc" :title="dataset.description">
-              {{ dataset.description || '暂无说明' }}
+              {{ dataset.description || "暂无说明" }}
             </p>
 
             <div class="card-footer-row">
               <span class="mono card-id">{{ dataset.dataset_id }}</span>
-              <span class="card-time">{{ formatTime(dataset.updated_at) }}</span>
+              <span class="card-time">{{
+                formatTime(dataset.updated_at)
+              }}</span>
             </div>
           </button>
 
@@ -495,13 +554,31 @@ useRefresh(refresh);
             <div class="workspace-title-box">
               <div class="dataset-heading-row">
                 <h2>{{ selectedDataset.name }}</h2>
-                <span class="badge status-badge" :class="selectedDataset.status === 'active' ? 'active' : 'warn-badge'">
-                  <span class="status-dot" :class="selectedDataset.status === 'active' ? 'dot-active' : 'dot-warn'" />
+                <span
+                  class="badge status-badge"
+                  :class="
+                    selectedDataset.status === 'active'
+                      ? 'active'
+                      : 'warn-badge'
+                  "
+                >
+                  <span
+                    class="status-dot"
+                    :class="
+                      selectedDataset.status === 'active'
+                        ? 'dot-active'
+                        : 'dot-warn'
+                    "
+                  />
                   {{ statusLabel(selectedDataset.status) }}
                 </span>
-                <span class="mono dataset-id-tag">ID: {{ selectedDataset.dataset_id }}</span>
+                <span class="mono dataset-id-tag"
+                  >ID: {{ selectedDataset.dataset_id }}</span
+                >
               </div>
-              <p class="dataset-lead-desc">{{ selectedDataset.description || "未填写用途与授权边界说明" }}</p>
+              <p class="dataset-lead-desc">
+                {{ selectedDataset.description || "未填写用途与授权边界说明" }}
+              </p>
             </div>
 
             <div class="workspace-actions">
@@ -529,7 +606,9 @@ useRefresh(refresh);
               <div class="header-left">
                 <Layers :size="14" class="header-icon" />
                 <h3>数据集版本准入与生命周期流转</h3>
-                <span class="badge count-badge">{{ versions.length }} 个版本</span>
+                <span class="badge count-badge"
+                  >{{ versions.length }} 个版本</span
+                >
               </div>
             </div>
 
@@ -549,19 +628,34 @@ useRefresh(refresh);
 
               <!-- 2. 包含资产数 -->
               <template #item_count="{ row }">
-                <span class="bold">{{ row.item_count || (row.asset_ids ? row.asset_ids.length : 0) }} 项资产</span>
+                <span class="bold"
+                  >{{
+                    row.item_count || (row.asset_ids ? row.asset_ids.length : 0)
+                  }}
+                  项资产</span
+                >
               </template>
 
               <!-- 3. Manifest SHA256 -->
               <template #manifest_sha256="{ row }">
                 <span class="mono sha-text" :title="row.manifest_sha256">
-                  {{ row.manifest_sha256 ? row.manifest_sha256.slice(0, 20) + '…' : '-' }}
+                  {{
+                    row.manifest_sha256
+                      ? row.manifest_sha256.slice(0, 20) + "…"
+                      : "-"
+                  }}
                 </span>
               </template>
 
               <!-- 4. 质量评分 -->
               <template #quality_score="{ row }">
-                <span v-if="row.quality_score !== null && row.quality_score !== undefined" class="quality-badge">
+                <span
+                  v-if="
+                    row.quality_score !== null &&
+                    row.quality_score !== undefined
+                  "
+                  class="quality-badge"
+                >
                   {{ row.quality_score.toFixed(2) }}
                 </span>
                 <span v-else class="text-muted">未评分</span>
@@ -571,11 +665,23 @@ useRefresh(refresh);
               <template #status="{ row }">
                 <span
                   class="badge status-badge"
-                  :class="row.status === 'published' ? 'active' : row.status === 'retired' ? 'error-badge' : 'warn-badge'"
+                  :class="
+                    row.status === 'published'
+                      ? 'active'
+                      : row.status === 'retired'
+                        ? 'error-badge'
+                        : 'warn-badge'
+                  "
                 >
                   <span
                     class="status-dot"
-                    :class="row.status === 'published' ? 'dot-active' : row.status === 'retired' ? 'dot-error' : 'dot-warn'"
+                    :class="
+                      row.status === 'published'
+                        ? 'dot-active'
+                        : row.status === 'retired'
+                          ? 'dot-error'
+                          : 'dot-warn'
+                    "
                   />
                   {{ statusLabel(row.status) }}
                 </span>
@@ -583,7 +689,9 @@ useRefresh(refresh);
 
               <!-- 6. 更新时间 -->
               <template #updated_at="{ row }">
-                <span class="mono time-text">{{ formatTime(row.updated_at || row.created_at) }}</span>
+                <span class="mono time-text">{{
+                  formatTime(row.updated_at || row.created_at)
+                }}</span>
               </template>
 
               <!-- 7. 操作 -->
@@ -616,7 +724,9 @@ useRefresh(refresh);
                   >
                     <Archive :size="11" />退役
                   </button>
-                  <span v-if="row.status === 'retired'" class="text-muted">已归档退役</span>
+                  <span v-if="row.status === 'retired'" class="text-muted"
+                    >已归档退役</span
+                  >
                 </div>
               </template>
             </DataTable>
@@ -630,7 +740,7 @@ useRefresh(refresh);
           <p>请从左侧目录中选择或新建一个数据集以进行版本治理与生命周期管理</p>
           <button
             class="button primary tiny-btn"
-            style="margin-top: 8px;"
+            style="margin-top: 8px"
             @click="showCreateDatasetModal = true"
           >
             <Plus :size="13" />创建第一个数据集
@@ -658,7 +768,9 @@ useRefresh(refresh);
         <form @submit.prevent="createDataset">
           <div class="modal-body">
             <label class="form-field">
-              <span class="field-label">数据集名称 <em class="required">*</em></span>
+              <span class="field-label"
+                >数据集名称 <em class="required">*</em></span
+              >
               <input
                 v-model="datasetForm.name"
                 placeholder="例如: 2026年园区人像与行为特征样本库"
@@ -668,8 +780,10 @@ useRefresh(refresh);
               />
             </label>
 
-            <label class="form-field" style="margin-top: 12px;">
-              <span class="field-label">用途与授权边界详细说明 <em class="required">*</em></span>
+            <label class="form-field" style="margin-top: 12px">
+              <span class="field-label"
+                >用途与授权边界详细说明 <em class="required">*</em></span
+              >
               <textarea
                 v-model="datasetForm.description"
                 placeholder="请清晰记录该数据集的业务用途、标注规范、合规授权来源与使用边界说明..."
@@ -712,7 +826,9 @@ useRefresh(refresh);
             <UploadCloud :size="17" class="modal-title-icon" />
             <div>
               <h3>构建数据集新版本 · {{ selectedDataset?.name }}</h3>
-              <p>从数据资产库中勾选关联资产，打包并生成 Manifest SHA256 校验指纹</p>
+              <p>
+                从数据资产库中勾选关联资产，打包并生成 Manifest SHA256 校验指纹
+              </p>
             </div>
           </div>
         </div>
@@ -720,7 +836,9 @@ useRefresh(refresh);
           <div class="modal-body">
             <div class="form-grid-2col">
               <label class="form-field">
-                <span class="field-label">版本号 (Version) <em class="required">*</em></span>
+                <span class="field-label"
+                  >版本号 (Version) <em class="required">*</em></span
+                >
                 <input
                   v-model="versionForm.version"
                   placeholder="例如: 2026.09.01 或 1.0.0"
@@ -743,9 +861,11 @@ useRefresh(refresh);
               </label>
             </div>
 
-            <label class="form-field" style="margin-top: 10px;">
+            <label class="form-field" style="margin-top: 10px">
               <div class="field-label-row">
-                <span class="field-label">Manifest SHA-256 校验指纹 <em class="required">*</em></span>
+                <span class="field-label"
+                  >Manifest SHA-256 校验指纹 <em class="required">*</em></span
+                >
                 <button
                   type="button"
                   class="text-action-link"
@@ -765,11 +885,14 @@ useRefresh(refresh);
             </label>
 
             <!-- 资产选择器 -->
-            <div class="asset-selector-panel" style="margin-top: 12px;">
+            <div class="asset-selector-panel" style="margin-top: 12px">
               <div class="asset-selector-toolbar">
                 <div class="selector-left">
                   <strong>选择要打包关联的数据资产：</strong>
-                  <span class="badge count-badge">已选 {{ selectedAssetIds.length }} / {{ filteredAssets.length }} 项</span>
+                  <span class="badge count-badge"
+                    >已选 {{ selectedAssetIds.length }} /
+                    {{ filteredAssets.length }} 项</span
+                  >
                 </div>
                 <div class="selector-right">
                   <div class="search-box search-sm">
@@ -786,12 +909,20 @@ useRefresh(refresh);
                     :disabled="!filteredAssets.length"
                     @click="toggleSelectAllAssets"
                   >
-                    {{ selectedAssetIds.length === filteredAssets.length && filteredAssets.length > 0 ? '取消全选' : '全选' }}
+                    {{
+                      selectedAssetIds.length === filteredAssets.length &&
+                      filteredAssets.length > 0
+                        ? "取消全选"
+                        : "全选"
+                    }}
                   </button>
                 </div>
               </div>
 
-              <div v-if="filteredAssets.length" class="asset-selection-scroll-list">
+              <div
+                v-if="filteredAssets.length"
+                class="asset-selection-scroll-list"
+              >
                 <label
                   v-for="asset in filteredAssets"
                   :key="asset.asset_id"
@@ -804,11 +935,17 @@ useRefresh(refresh);
                     @change="toggleAsset(asset.asset_id)"
                   />
                   <div class="asset-type-icon">
-                    <Video v-if="asset.kind === 'video' || asset.kind === 'stream'" :size="13" />
+                    <Video
+                      v-if="asset.kind === 'video' || asset.kind === 'stream'"
+                      :size="13"
+                    />
                     <FileText v-else :size="13" />
                   </div>
                   <div class="asset-item-content">
-                    <strong class="asset-filename" :title="asset.filename || asset.asset_id">
+                    <strong
+                      class="asset-filename"
+                      :title="asset.filename || asset.asset_id"
+                    >
                       {{ asset.filename || asset.asset_id }}
                     </strong>
                     <small class="asset-meta-text">
@@ -838,9 +975,14 @@ useRefresh(refresh);
             <button
               type="submit"
               class="button primary tiny-btn"
-              :disabled="saving || !versionForm.version.trim() || versionForm.manifest_sha256.length !== 64"
+              :disabled="
+                saving ||
+                !versionForm.version.trim() ||
+                versionForm.manifest_sha256.length !== 64
+              "
             >
-              <UploadCloud :size="13" />确认构建新版本 (关联 {{ selectedAssetIds.length }} 项资产)
+              <UploadCloud :size="13" />确认构建新版本 (关联
+              {{ selectedAssetIds.length }} 项资产)
             </button>
           </div>
         </form>

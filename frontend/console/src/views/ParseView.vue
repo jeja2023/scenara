@@ -241,8 +241,14 @@ function handleRoiMouseDown(e: MouseEvent): void {
   const bounds = getMediaContentBounds(stageEl);
   const clientXRel = e.clientX - stage.left;
   const clientYRel = e.clientY - stage.top;
-  const x = Math.max(0, Math.min(1, (clientXRel - bounds.renderLeft) / bounds.renderWidth));
-  const y = Math.max(0, Math.min(1, (clientYRel - bounds.renderTop) / bounds.renderHeight));
+  const x = Math.max(
+    0,
+    Math.min(1, (clientXRel - bounds.renderLeft) / bounds.renderWidth),
+  );
+  const y = Math.max(
+    0,
+    Math.min(1, (clientYRel - bounds.renderTop) / bounds.renderHeight),
+  );
   roiStart.value = { x, y };
   roiCurrent.value = { x, y };
 
@@ -259,8 +265,14 @@ function handleRoiMouseMove(e: MouseEvent): void {
   const bounds = getMediaContentBounds(stageEl);
   const clientXRel = e.clientX - stage.left;
   const clientYRel = e.clientY - stage.top;
-  const x = Math.max(0, Math.min(1, (clientXRel - bounds.renderLeft) / bounds.renderWidth));
-  const y = Math.max(0, Math.min(1, (clientYRel - bounds.renderTop) / bounds.renderHeight));
+  const x = Math.max(
+    0,
+    Math.min(1, (clientXRel - bounds.renderLeft) / bounds.renderWidth),
+  );
+  const y = Math.max(
+    0,
+    Math.min(1, (clientYRel - bounds.renderTop) / bounds.renderHeight),
+  );
   roiCurrent.value = { x, y };
 }
 
@@ -274,8 +286,14 @@ function handleRoiMouseUp(e?: MouseEvent): void {
     const bounds = getMediaContentBounds(mediaStageRef.value);
     const clientXRel = e.clientX - stage.left;
     const clientYRel = e.clientY - stage.top;
-    const x = Math.max(0, Math.min(1, (clientXRel - bounds.renderLeft) / bounds.renderWidth));
-    const y = Math.max(0, Math.min(1, (clientYRel - bounds.renderTop) / bounds.renderHeight));
+    const x = Math.max(
+      0,
+      Math.min(1, (clientXRel - bounds.renderLeft) / bounds.renderWidth),
+    );
+    const y = Math.max(
+      0,
+      Math.min(1, (clientYRel - bounds.renderTop) / bounds.renderHeight),
+    );
     roiCurrent.value = { x, y };
   }
 
@@ -453,20 +471,17 @@ const selectedObjects = computed(() => selectedUnit.value?.objects ?? []);
 
 const roiBoxStyle = computed(() => {
   void stageRectVersion.value;
-  let x1 = 0;
-  let y1 = 0;
-  let x2 = 0;
-  let y2 = 0;
-  if (isDrawingRoi.value && roiStart.value && roiCurrent.value) {
-    x1 = Math.min(roiStart.value.x, roiCurrent.value.x);
-    x2 = Math.max(roiStart.value.x, roiCurrent.value.x);
-    y1 = Math.min(roiStart.value.y, roiCurrent.value.y);
-    y2 = Math.max(roiStart.value.y, roiCurrent.value.y);
-  } else if (selectedRoi.value) {
-    [x1, y1, x2, y2] = selectedRoi.value;
-  } else {
-    return null;
-  }
+  const coordinates: [number, number, number, number] | null =
+    isDrawingRoi.value && roiStart.value && roiCurrent.value
+      ? [
+          Math.min(roiStart.value.x, roiCurrent.value.x),
+          Math.min(roiStart.value.y, roiCurrent.value.y),
+          Math.max(roiStart.value.x, roiCurrent.value.x),
+          Math.max(roiStart.value.y, roiCurrent.value.y),
+        ]
+      : selectedRoi.value;
+  if (!coordinates) return null;
+  const [x1, y1, x2, y2] = coordinates;
 
   const stageEl = mediaStageRef.value;
   if (stageEl) {
@@ -536,18 +551,14 @@ function isParameterWide(
   if (["custom_sensitive_words", "compliance_whitelist", "roi"].includes(key)) {
     return true;
   }
-  if (
-    key === "language_hint" ||
-    key === "min_score" ||
-    key === "max_pages"
-  ) {
+  if (key === "language_hint" || key === "min_score" || key === "max_pages") {
     return false;
   }
   if (definition.control === "text") {
     return Boolean(
       definition.placeholder?.includes("，") ||
-        definition.placeholder?.includes(",") ||
-        definition.placeholder?.includes("换行"),
+      definition.placeholder?.includes(",") ||
+      definition.placeholder?.includes("换行"),
     );
   }
   return false;
@@ -581,7 +592,6 @@ function formatOptionLabel(key: string, option: string): string {
   }
   return option;
 }
-
 
 const currentDomainLabel = computed(
   () => selectedDomainManifest.value?.display_name || labelDomain(domain.value),
@@ -736,7 +746,9 @@ function extractLocalVideoFrame(selectedFile: File): void {
   tempVideo.onloadeddata = () => {
     try {
       tempVideo.currentTime = 0.001;
-    } catch {}
+    } catch {
+      // Seeking may be rejected until enough media data has buffered.
+    }
   };
   tempVideo.onseeked = () => {
     try {
@@ -751,7 +763,9 @@ function extractLocalVideoFrame(selectedFile: File): void {
           serverPreviewUrl.value = dataUrl;
         }
       }
-    } catch {}
+    } catch {
+      // A malformed local video should not prevent the caller from continuing.
+    }
     URL.revokeObjectURL(tempVideo.src);
   };
   tempVideo.onerror = () => {
@@ -819,7 +833,9 @@ function handleVideoLoadedData(): void {
   if (video && video.currentTime === 0) {
     try {
       video.currentTime = 0.001;
-    } catch {}
+    } catch {
+      // Seeking may be rejected until enough media data has buffered.
+    }
   }
 }
 
@@ -1525,7 +1541,8 @@ function formatOverlayBadge(item: VisionObject): string {
   const scoreStr = item.score != null ? ` ${item.score.toFixed(2)}` : "";
   const attrs = item.attributes as Record<string, unknown> | undefined;
   if (attrs?.action_label) return `${attrs.action_label}${scoreStr}`;
-  if (attrs?.character_name && attrs?.style_label) return `${attrs.character_name} · ${attrs.style_label}${scoreStr}`;
+  if (attrs?.character_name && attrs?.style_label)
+    return `${attrs.character_name} · ${attrs.style_label}${scoreStr}`;
   if (attrs?.style_label) return `${attrs.style_label}${scoreStr}`;
   if (attrs?.character_name) return `${attrs.character_name}${scoreStr}`;
   if (attrs?.accessory_label) return `${attrs.accessory_label}${scoreStr}`;
@@ -1901,7 +1918,13 @@ onBeforeUnmount(() => {
                 @click="toggleRoiDrawing"
               >
                 <Crop :size="13" />
-                {{ isDrawingRoi ? "正在拖拽圈选 (松开完成)" : (selectedRoi ? "重新圈选区域" : "圈选识别区域 (ROI)") }}
+                {{
+                  isDrawingRoi
+                    ? "正在拖拽圈选 (松开完成)"
+                    : selectedRoi
+                      ? "重新圈选区域"
+                      : "圈选识别区域 (ROI)"
+                }}
               </button>
               <span v-if="selectedRoi" class="roi-badge">
                 ROI: [{{ selectedRoi.map((v) => v.toFixed(3)).join(", ") }}]
@@ -1927,10 +1950,7 @@ onBeforeUnmount(() => {
             @mousedown="handleRoiMouseDown"
           >
             <!-- 圈选专用防劫持透明捕获层 -->
-            <div
-              v-if="isDrawingRoi"
-              class="roi-drawing-layer"
-            />
+            <div v-if="isDrawingRoi" class="roi-drawing-layer" />
             <img
               v-if="mode === 'image' && displayedMediaUrl"
               :src="displayedMediaUrl"
@@ -2159,7 +2179,10 @@ onBeforeUnmount(() => {
             <div class="library-picker-row">
               <label>
                 <span>已登记视频流</span>
-                <select v-model="sourceId" @change="loadStreamPreview(sourceId)">
+                <select
+                  v-model="sourceId"
+                  @change="loadStreamPreview(sourceId)"
+                >
                   <option value="">登记新视频流</option>
                   <option
                     v-for="source in sources"
@@ -2331,7 +2354,9 @@ onBeforeUnmount(() => {
           </template>
 
           <div v-if="parameterEntries.length" class="domain-parameters">
-            <span class="control-label domain-params-heading">领域参数配置</span>
+            <span class="control-label domain-params-heading"
+              >领域参数配置</span
+            >
             <!-- 紧凑水平开关胶囊行 -->
             <div
               v-if="booleanParameterEntries.length"
@@ -2347,7 +2372,9 @@ onBeforeUnmount(() => {
                 :class="{ active: Boolean(pipelineParameters[key]) }"
                 :aria-pressed="Boolean(pipelineParameters[key])"
                 :title="definition.description"
-                @click="pipelineParameters[key] = !Boolean(pipelineParameters[key])"
+                @click="
+                  pipelineParameters[key] = !Boolean(pipelineParameters[key])
+                "
               >
                 {{ definition.label }}
               </button>
@@ -2468,10 +2495,12 @@ onBeforeUnmount(() => {
       >
         <template #pipeline="{ row }">
           <strong>{{ labelPipeline(row.pipeline.pipeline_id) }}</strong>
-          <small v-if="row.pipeline.version" class="muted"> · {{ row.pipeline.version }}</small>
+          <small v-if="row.pipeline.version" class="muted">
+            · {{ row.pipeline.version }}</small
+          >
         </template>
         <template #asset_source="{ row }">
-          {{ row.asset_id || row.source_id || '-' }}
+          {{ row.asset_id || row.source_id || "-" }}
         </template>
         <template #status="{ row }">
           <span class="badge" :class="row.status">{{
@@ -2493,10 +2522,7 @@ onBeforeUnmount(() => {
       </DataTable>
     </section>
 
-    <ResultDetailDrawer
-      v-model:open="isDetailOpen"
-      :run-id="detailRunId"
-    />
+    <ResultDetailDrawer v-model:open="isDetailOpen" :run-id="detailRunId" />
   </section>
 </template>
 

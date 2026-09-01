@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import time
 from datetime import UTC, datetime
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 from uuid import uuid4
 
 from scenara.domains.portrait.service import PortraitRepository
@@ -532,7 +532,11 @@ class SurveillanceService:
         bindings_by_capability = {item.capability: item for item in result.models}
         started = run.parameters.get("recording_started_at")
         base_time = float(started) if isinstance(started, int | float) and not isinstance(started, bool) else time.time()
-        source = "recording" if isinstance(started, int | float) and not isinstance(started, bool) else "processing_time"
+        source: Literal["recording", "processing_time"] = (
+            "recording"
+            if isinstance(started, int | float) and not isinstance(started, bool)
+            else "processing_time"
+        )
         artifact = next((item for item in reversed(result.artifacts) if item.artifact_type == "unit_frame"), None)
         public_tracks = getattr(result.domain_payload, "tracks", [])
         trajectory_refs = {
@@ -583,7 +587,11 @@ class SurveillanceService:
             if not isinstance(track, dict):
                 continue
             evidence: list[ObservationEvidence] = []
-            for modality, key, capability in (("body", "template", "body_embedding"), ("face", "face_template", "face_embedding")):
+            evidence_specs: tuple[tuple[Literal["body", "face"], str, str], ...] = (
+                ("body", "template", "body_embedding"),
+                ("face", "face_template", "face_embedding"),
+            )
+            for modality, key, capability in evidence_specs:
                 template = track.get(key)
                 vector = template.get("embedding") if isinstance(template, dict) else None
                 binding = bindings_by_capability.get(capability)

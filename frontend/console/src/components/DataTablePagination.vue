@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "@lucide/vue";
+import {
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+} from "@lucide/vue";
 
 interface Props {
   total: number;
@@ -46,12 +51,19 @@ const totalPages = computed(() => {
   return Math.max(1, Math.ceil(props.total / props.pageSize));
 });
 
-watch(currentPage, (page) => {
-  jumperValue.value = page;
-}, { immediate: true });
+watch(
+  currentPage,
+  (page) => {
+    jumperValue.value = page;
+  },
+  { immediate: true },
+);
 
 function goToPage(nextOffset: number): void {
-  const boundedOffset = Math.max(0, Math.min(nextOffset, (totalPages.value - 1) * props.pageSize));
+  const boundedOffset = Math.max(
+    0,
+    Math.min(nextOffset, (totalPages.value - 1) * props.pageSize),
+  );
   emit("update:offset", boundedOffset);
   emit("change", boundedOffset);
 }
@@ -73,8 +85,15 @@ function handlePageSizeSelect(event: Event): void {
 }
 
 function handleJumperBlurOrEnter(): void {
-  const targetPage = typeof jumperValue.value === "string" ? parseInt(jumperValue.value, 10) : jumperValue.value;
-  if (!Number.isNaN(targetPage) && targetPage >= 1 && targetPage <= totalPages.value) {
+  const targetPage =
+    typeof jumperValue.value === "string"
+      ? parseInt(jumperValue.value, 10)
+      : jumperValue.value;
+  if (
+    !Number.isNaN(targetPage) &&
+    targetPage >= 1 &&
+    targetPage <= totalPages.value
+  ) {
     handlePageClick(targetPage);
   } else {
     jumperValue.value = currentPage.value;
@@ -102,7 +121,8 @@ const pageNumbers = computed<(number | string)[]>(() => {
   <div v-if="total > 0" class="pagination data-table-pagination">
     <div class="pagination-left">
       <span class="pagination-info">
-        显示第 <strong>{{ startNumber }}-{{ endNumber }}</strong> 条，共 <strong>{{ total }}</strong> 条记录
+        显示第 <strong>{{ startNumber }}-{{ endNumber }}</strong> 条，共
+        <strong>{{ total }}</strong> 条记录
       </span>
       <div v-if="showPageSizeSelector" class="pagination-size-wrapper">
         <select

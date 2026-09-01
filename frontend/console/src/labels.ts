@@ -11,7 +11,8 @@ const domainDescriptionLabels: Record<string, string> = {
   portrait: "检测人员并分析人像相关的视觉特征。",
   ocr: "从图片、视频和文档中提取文字、版面结构与阅读顺序。",
   behavior: "识别视频中的人物动作和行为模式,支持50+常见行为类别。",
-  fashion: "识别 Cosplay 角色、服装风格(JK、Lolita、汉服等)和配饰,支持二次元文化和时尚分析。",
+  fashion:
+    "识别 Cosplay 角色、服装风格(JK、Lolita、汉服等)和配饰,支持二次元文化和时尚分析。",
 };
 
 const capabilityLabels: Record<string, string> = {
@@ -112,16 +113,15 @@ const adapterLabels: Record<string, string> = {
 
 const licenseLabels: Record<string, string> = {
   "Apache-2.0": "开源 Apache 2.0",
-  "MIT": "开源 MIT",
+  MIT: "开源 MIT",
   "AGPL-3.0": "开源 AGPL 3.0",
   "GPL-3.0": "开源 GPL 3.0",
   "BSD-3-Clause": "开源 BSD 3-Clause",
-  "Proprietary": "商业专有协议",
-  "Commercial": "商业授权许可",
+  Proprietary: "商业专有协议",
+  Commercial: "商业授权许可",
 };
 
 const pipelineLabels: Record<string, string> = {
-
   "ocr.document": "OCR 文档识别",
   "portrait.analysis": "人像综合分析",
   "portrait.person-detection": "人员检测",
@@ -642,8 +642,10 @@ export function labelCapability(value: string): string {
 }
 
 export function labelModelName(modelId: string): string {
-
-  return modelNameLabels[modelId] ?? humanizeIdentifier(modelId.replace(/^scenara\.[^.]+\./, ""));
+  return (
+    modelNameLabels[modelId] ??
+    humanizeIdentifier(modelId.replace(/^scenara\.[^.]+\./, ""))
+  );
 }
 
 export function labelAdapter(adapter: string): string {
@@ -655,7 +657,6 @@ export function labelLicense(licenseId: string): string {
 }
 
 export function labelPipeline(value: string): string {
-
   return pipelineLabels[value] ?? humanizeIdentifier(value);
 }
 
@@ -1020,5 +1021,3 @@ const modalityLabels: Record<string, string> = {
 export function labelModality(modality: string): string {
   return modalityLabels[modality] ?? modality;
 }
-
-

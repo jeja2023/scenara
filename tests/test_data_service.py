@@ -16,6 +16,27 @@ from scenara.platform.repository_contracts import DatasetVersionReference
 
 
 @pytest.mark.asyncio
+async def test_standalone_data_service_refuses_to_start_without_service_token() -> None:
+    app = create_data_app()
+    with pytest.raises(RuntimeError, match="SCENARA_DATA_PLATFORM_SERVICE_TOKEN"):
+        async with app.router.lifespan_context(app):
+            pass
+
+
+@pytest.mark.asyncio
+async def test_standalone_data_service_uses_only_platform_token_name() -> None:
+    app = create_data_app(service_token="data-secret")
+    headers = {
+        "Authorization": "Bearer data-secret",
+        "X-Scenara-Tenant-Id": "tenant_a",
+        "X-Scenara-Project-Id": "project_a",
+    }
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://data") as client:
+        response = await client.get("/internal/v1/datasets", headers={**headers, "Authorization": "Bearer legacy"})
+    assert response.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_standalone_data_service_is_tenant_scoped_and_idempotent() -> None:
     store = DataStore()
     app = create_data_app(service_token="data-secret", store=store)

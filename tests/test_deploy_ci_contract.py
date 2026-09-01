@@ -151,6 +151,12 @@ def test_compose_hardens_runtime_and_separates_service_credentials() -> None:
     assert services["api"]["ports"] == ["${SCENARA_BIND_ADDRESS:-127.0.0.1}:${SCENARA_HTTP_PORT:-8000}:8000"]
 
 
+def test_legacy_inference_settings_do_not_define_authentication() -> None:
+    settings_source = (ROOT / "app/settings.py").read_text(encoding="utf-8")
+    for name in ("LOCAL_AUTH_", "OIDC_", "JWT_", "RBAC_ENABLED", "AUTH_REQUIRED"):
+        assert name not in settings_source
+
+
 def test_kubernetes_foundation_has_security_gpu_migration_and_network_controls() -> None:
     kustomization = yaml.safe_load((ROOT / "deploy/kubernetes/kustomization.yaml").read_text(encoding="utf-8"))
     assert {"scheduler.yaml", "networkpolicy.yaml"} <= set(kustomization["resources"])

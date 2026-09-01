@@ -17,7 +17,6 @@ from app.runtime_defaults import (
     DEFAULT_RATE_LIMIT_BURST,
     DEFAULT_RATE_LIMIT_MAX_BUCKETS,
     DEFAULT_RATE_LIMIT_PER_MINUTE,
-    DEFAULT_TRUSTED_HOSTS,
 )
 
 apply_configuration_overrides()
@@ -89,7 +88,7 @@ def parse_csv_env(name: str, default: str = "") -> list[str]:
     return [item.strip() for item in os.getenv(name, default).split(",") if item.strip()]
 
 
-APP_VERSION = "0.3.0.dev38"
+APP_VERSION = "0.3.0.dev39"
 PORTRAIT_RUNTIME_PROFILE = (
     os.getenv("PORTRAIT_RUNTIME_PROFILE", os.getenv("APP_ENV", "development")).strip().lower() or "development"
 )
@@ -282,73 +281,9 @@ WARMUP_MODELS = [item.strip() for item in os.getenv("WARMUP_MODELS", "").split("
 # 并继续预热其余模型，避免一个坏模型拖垮整个服务启动（其余可用模型仍能对外提供推理）。
 # 严格部署可设为 true，要求所有预热模型必须成功才允许启动。
 WARMUP_FAIL_FAST = parse_bool_env("WARMUP_FAIL_FAST", False)
-API_TOKEN = os.getenv("API_TOKEN")
-API_TOKEN_TENANT_ID = os.getenv("API_TOKEN_TENANT_ID", "").strip()
-API_TOKEN_ALLOW_TENANT_OVERRIDE = parse_bool_env("API_TOKEN_ALLOW_TENANT_OVERRIDE", False)
-LOCAL_AUTH_ENABLED = parse_bool_env("LOCAL_AUTH_ENABLED", True)
-LOCAL_AUTH_ALLOW_REMOTE = parse_bool_env("LOCAL_AUTH_ALLOW_REMOTE", False)
-LOCAL_AUTH_USERNAME = os.getenv("LOCAL_AUTH_USERNAME", "admin").strip() or "admin"
-LOCAL_AUTH_PASSWORD = os.getenv("LOCAL_AUTH_PASSWORD", "123456")
-LOCAL_AUTH_TENANT_ID = os.getenv("LOCAL_AUTH_TENANT_ID", "default").strip() or "default"
-LOCAL_AUTH_SESSION_SECRET = os.getenv(
-    "LOCAL_AUTH_SESSION_SECRET",
-    "portrait-hub-development-local-session-secret",
-)
-LOCAL_AUTH_SESSION_MAX_AGE_SECONDS = max(
-    300,
-    min(parse_int_env("LOCAL_AUTH_SESSION_MAX_AGE_SECONDS", 28_800), 86_400),
-)
-STEP_UP_AUTH_MAX_AGE_SECONDS = max(
-    60,
-    min(parse_int_env("STEP_UP_AUTH_MAX_AGE_SECONDS", 300), 3_600),
-)
-LOCAL_AUTH_COOKIE_SECURE = parse_bool_env(
-    "LOCAL_AUTH_COOKIE_SECURE",
-    PORTRAIT_RUNTIME_PROFILE in {"prod", "production"},
-)
-OIDC_ENABLED = parse_bool_env("OIDC_ENABLED", False)
-OIDC_ISSUER = os.getenv("OIDC_ISSUER", "").strip().rstrip("/")
-OIDC_CLIENT_ID = os.getenv("OIDC_CLIENT_ID", "").strip()
-OIDC_CLIENT_SECRET = os.getenv("OIDC_CLIENT_SECRET", "")
-OIDC_REDIRECT_URI = os.getenv("OIDC_REDIRECT_URI", "").strip()
-OIDC_PROVIDER_NAME = os.getenv("OIDC_PROVIDER_NAME", "企业账号").strip() or "企业账号"
-OIDC_SCOPES = os.getenv("OIDC_SCOPES", "openid profile email groups").strip() or "openid profile email"
-OIDC_ROLE_CLAIM = os.getenv("OIDC_ROLE_CLAIM", "roles").strip() or "roles"
-OIDC_GROUPS_CLAIM = os.getenv("OIDC_GROUPS_CLAIM", "groups").strip() or "groups"
-OIDC_TENANT_CLAIM = os.getenv("OIDC_TENANT_CLAIM", "tenant_id").strip() or "tenant_id"
-OIDC_ROLE_MAPPING = os.getenv("OIDC_ROLE_MAPPING", "{}")
-OIDC_DEFAULT_ROLE = os.getenv("OIDC_DEFAULT_ROLE", "").strip()
-OIDC_DEFAULT_TENANT_ID = os.getenv("OIDC_DEFAULT_TENANT_ID", "").strip()
-OIDC_SESSION_SECRET = os.getenv("OIDC_SESSION_SECRET", "")
-OIDC_SESSION_COOKIE_NAME = (
-    os.getenv("OIDC_SESSION_COOKIE_NAME", "portrait_oidc_session").strip() or "portrait_oidc_session"
-)
-OIDC_SESSION_MAX_AGE_SECONDS = max(300, min(parse_int_env("OIDC_SESSION_MAX_AGE_SECONDS", 28_800), 86_400))
-OIDC_HTTP_TIMEOUT_SECONDS = max(1.0, min(parse_float_env("OIDC_HTTP_TIMEOUT_SECONDS", 10.0), 60.0))
-OIDC_COOKIE_SECURE = parse_bool_env("OIDC_COOKIE_SECURE", True)
-OIDC_ALLOW_INSECURE_HTTP = parse_bool_env("OIDC_ALLOW_INSECURE_HTTP", False)
-OIDC_IDENTITY_ADMIN_URL = os.getenv("OIDC_IDENTITY_ADMIN_URL", "").strip()
-JWT_SECRET = os.getenv("JWT_SECRET")
-JWT_SECRET_ID = os.getenv("JWT_SECRET_ID", "primary").strip()
-JWT_SECRET_KEYRING = os.getenv("JWT_SECRET_KEYRING", "")
-JWT_ISSUER = os.getenv("JWT_ISSUER", "portrait-hub")
-JWT_AUDIENCE = os.getenv("JWT_AUDIENCE", "portrait-hub-api")
-JWT_REQUIRE_EXP = parse_bool_env("JWT_REQUIRE_EXP", True)
-JWT_REQUIRE_ISS = parse_bool_env("JWT_REQUIRE_ISS", True)
-JWT_REQUIRE_AUD = parse_bool_env("JWT_REQUIRE_AUD", True)
-# 安全敏感开关默认取“安全（fail-closed）”值，使得从未加载 .env / docker-compose 的
-# 部署处于锁定状态而非完全开放。已提交的 .env(.example) 与 compose 文件仍会显式设置它们；
-# 本地开发通过 dev_start.py、测试套件通过 tests/conftest.py 重新选用宽松值。
-RBAC_ENABLED = parse_bool_env("RBAC_ENABLED", False)
-AUTH_REQUIRED = parse_bool_env("AUTH_REQUIRED", True)
-# 契约要求 WS 票据 TTL 不超过 60 秒（控制台前端重建方案 §8.1），clamp 上限不得放宽。
-CONSOLE_WS_TICKET_TTL_SECONDS = max(5, min(parse_int_env("CONSOLE_WS_TICKET_TTL_SECONDS", 60), 60))
-CONSOLE_WS_TICKET_MAX_ENTRIES = max(128, min(parse_int_env("CONSOLE_WS_TICKET_MAX_ENTRIES", 4096), 65_536))
-DEBUG_ENDPOINTS_ENABLED = parse_bool_env("DEBUG_ENDPOINTS_ENABLED", False)
-ENABLE_API_DOCS = parse_bool_env("ENABLE_API_DOCS", False)
-TRUSTED_HOSTS = parse_csv_env("TRUSTED_HOSTS", DEFAULT_TRUSTED_HOSTS)
-TENANT_HEADER_REQUIRED = parse_bool_env("TENANT_HEADER_REQUIRED", True)
-JWT_REQUIRE_TENANT = parse_bool_env("JWT_REQUIRE_TENANT", True)
+# API/IAM/OIDC/JWT settings are deliberately owned only by ``scenara.settings``.
+# This module is restricted to model-runtime and inference tuning so legacy
+# runtime imports cannot introduce a second authentication configuration path.
 PORTRAIT_STORAGE_BACKEND = os.getenv("PORTRAIT_STORAGE_BACKEND", "json").strip().lower()
 PORTRAIT_VECTOR_BACKEND = os.getenv("PORTRAIT_VECTOR_BACKEND", "local").strip().lower()
 PORTRAIT_REQUIRE_PRODUCTION_VECTOR_BACKEND = parse_bool_env("PORTRAIT_REQUIRE_PRODUCTION_VECTOR_BACKEND", False)
@@ -426,10 +361,6 @@ MAX_STREAM_EVENT_LIST_LIMIT = parse_int_env("MAX_STREAM_EVENT_LIST_LIMIT", 200)
 PORTRAIT_GALLERY_WAL_ENABLED = parse_bool_env("PORTRAIT_GALLERY_WAL_ENABLED", True)
 PORTRAIT_GALLERY_WAL_COMPACT_EVERY = parse_int_env("PORTRAIT_GALLERY_WAL_COMPACT_EVERY", 250)
 PROMETHEUS_METRICS_CACHE_SECONDS = parse_float_env("PROMETHEUS_METRICS_CACHE_SECONDS", 5.0)
-JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256").strip().upper() or "HS256"
-JWT_PUBLIC_KEY = os.getenv("JWT_PUBLIC_KEY", "")
-JWT_PUBLIC_KEY_PATH = os.getenv("JWT_PUBLIC_KEY_PATH", "")
-JWT_PUBLIC_KEYRING = os.getenv("JWT_PUBLIC_KEYRING", "")
 OPENTELEMETRY_ENABLED = parse_bool_env("OPENTELEMETRY_ENABLED", False)
 OTEL_SERVICE_NAME = os.getenv("OTEL_SERVICE_NAME", "portrait-hub")
 OTEL_EXPORTER_OTLP_ENDPOINT = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")

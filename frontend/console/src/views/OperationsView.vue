@@ -136,11 +136,7 @@ useRefresh(refresh);
     </div>
     <section class="panel">
       <div class="panel-header"><h2>门禁状态与校验</h2></div>
-      <DataTable
-        :columns="checkColumns"
-        :items="checkRows"
-        :loading="loading"
-      >
+      <DataTable :columns="checkColumns" :items="checkRows" :loading="loading">
         <template #name="{ row }">
           <strong>{{ row.name }}</strong>
         </template>

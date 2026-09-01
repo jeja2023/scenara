@@ -49,7 +49,9 @@ const dragStartPanY = ref(0);
 const transformStyle = computed(() => ({
   transform: `translate(${panX.value}px, ${panY.value}px) scale(${zoom.value})`,
   transformOrigin: "center center",
-  transition: isDragging.value ? "none" : "transform 0.15s cubic-bezier(0.2, 0, 0, 1)",
+  transition: isDragging.value
+    ? "none"
+    : "transform 0.15s cubic-bezier(0.2, 0, 0, 1)",
 }));
 
 function resetZoom(): void {
@@ -599,7 +601,8 @@ onBeforeUnmount(reset);
             上一个
           </button>
           <span class="lightbox-hint">
-            按 Esc 关闭，← → 切换对象 · 滚轮 / +/- 缩放 · 拖拽平移 · 双击 / F 聚焦目标
+            按 Esc 关闭，← → 切换对象 · 滚轮 / +/- 缩放 · 拖拽平移 · 双击 / F
+            聚焦目标
           </span>
           <button
             class="button secondary"

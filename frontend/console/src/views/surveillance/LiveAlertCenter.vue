@@ -1,12 +1,5 @@
 <script setup lang="ts">
-import {
-  BellRing,
-  Camera,
-  Radio,
-  Trash2,
-  Volume2,
-  VolumeX,
-} from "@lucide/vue";
+import { BellRing, Camera, Radio, Trash2, Volume2, VolumeX } from "@lucide/vue";
 import { onBeforeUnmount, onMounted, ref } from "vue";
 
 import { api, apiStream, streamJsonEvents, userFacingError } from "../../api";
@@ -115,7 +108,11 @@ onBeforeUnmount(() => controller?.abort());
         <span class="live-status-pill" :class="{ online: connected }">
           <span class="pulse-dot"></span>
           <Radio :size="13" />
-          <span>{{ connected ? "实时事件流已连接 (Active)" : "事件流重连中 (Connecting...)" }}</span>
+          <span>{{
+            connected
+              ? "实时事件流已连接 (Active)"
+              : "事件流重连中 (Connecting...)"
+          }}</span>
         </span>
 
         <span class="badge count-badge">实时捕获: {{ alerts.length }} 条</span>
@@ -182,19 +179,25 @@ onBeforeUnmount(() => controller?.abort());
               <Camera :size="13" class="cam-icon" />
               <strong>{{ alert.camera_id }}</strong>
             </div>
-            <span class="badge modality-badge">{{ labelModality(alert.modality) }}</span>
+            <span class="badge modality-badge">{{
+              labelModality(alert.modality)
+            }}</span>
           </div>
 
           <div class="identity-info-row">
             <span class="identity-label">目标身份:</span>
-            <span class="mono identity-val">{{ alert.portrait_identity_id }}</span>
+            <span class="mono identity-val">{{
+              alert.portrait_identity_id
+            }}</span>
           </div>
 
           <div class="footer-stats-row">
             <span class="occurrence-text">
               已累计出现 <strong>{{ alert.occurrence_count }}</strong> 次
             </span>
-            <span class="max-score-text">最高 {{ (alert.max_score * 100).toFixed(1) }}%</span>
+            <span class="max-score-text"
+              >最高 {{ (alert.max_score * 100).toFixed(1) }}%</span
+            >
           </div>
         </div>
       </article>
@@ -205,7 +208,9 @@ onBeforeUnmount(() => controller?.abort());
         <BellRing :size="36" class="radar-icon" />
       </div>
       <p class="empty-title">正在监听实时布控告警事件流</p>
-      <p class="empty-sub">当摄像头检测到符合布控名单的目标时，将在此处实时推送告警抓拍与研判卡片</p>
+      <p class="empty-sub">
+        当摄像头检测到符合布控名单的目标时，将在此处实时推送告警抓拍与研判卡片
+      </p>
     </div>
   </main>
 </template>

@@ -54,7 +54,9 @@ function formatCell(value: unknown): string {
   return typeof value === "object" ? JSON.stringify(value) : String(value);
 }
 
-function getDynamicColumns(rows: Array<Record<string, unknown>>): TableColumn<Record<string, unknown>>[] {
+function getDynamicColumns(
+  rows: Array<Record<string, unknown>>,
+): TableColumn<Record<string, unknown>>[] {
   return tableColumns(rows).map((column) => ({
     key: column,
     label: labelFieldKey(column),
@@ -86,11 +88,7 @@ function getDynamicColumns(rows: Array<Record<string, unknown>>): TableColumn<Re
         :page-size-options="[5, 10, 20, 50, 100]"
         empty-text="暂无数据"
       >
-        <template
-          v-for="col in tableColumns(rows)"
-          :key="col"
-          #[col]="{ row }"
-        >
+        <template v-for="col in tableColumns(rows)" :key="col" #[col]="{ row }">
           {{ formatCell(row[col]) }}
         </template>
       </DataTable>

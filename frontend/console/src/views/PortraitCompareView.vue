@@ -6,17 +6,22 @@ import {
   RotateCcw,
   ScanFace,
   ShieldCheck,
-  Sparkles,
   Upload,
   UserCheck,
-  Users,
   X,
   XCircle,
 } from "@lucide/vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 
-import { api, apiBlob, apiForm, blobToDataUrl, revokeBlobUrl, userFacingError } from "../api";
+import {
+  api,
+  apiBlob,
+  apiForm,
+  blobToDataUrl,
+  revokeBlobUrl,
+  userFacingError,
+} from "../api";
 import type { MediaAsset } from "../types";
 
 interface PortraitInputSummary {
@@ -252,14 +257,30 @@ useRefresh(refreshAssets);
           </div>
         </div>
         <strong class="stat-value">
-          {{ result ? (result.mode === 'image' ? '本地图片 1:1' : result.mode === 'asset' ? '资产库 1:1' : '混合输入 1:1') : '1:1 人像比对' }}
+          {{
+            result
+              ? result.mode === "image"
+                ? "本地图片 1:1"
+                : result.mode === "asset"
+                  ? "资产库 1:1"
+                  : "混合输入 1:1"
+              : "1:1 人像比对"
+          }}
         </strong>
         <small class="stat-desc">高维生物特征余弦相似度核验</small>
       </article>
 
       <article
         class="stat"
-        :class="result ? (result.matched === true ? 'green' : result.matched === false ? 'amber' : 'teal') : 'teal'"
+        :class="
+          result
+            ? result.matched === true
+              ? 'green'
+              : result.matched === false
+                ? 'amber'
+                : 'teal'
+            : 'teal'
+        "
       >
         <div class="stat-top-row">
           <span class="stat-title">判定结论</span>
@@ -270,7 +291,9 @@ useRefresh(refreshAssets);
           </div>
         </div>
         <strong class="stat-value">{{ verdictLabel }}</strong>
-        <small class="stat-desc">{{ result ? `阈值: ${result.threshold ?? threshold}` : '等待两侧人像输入' }}</small>
+        <small class="stat-desc">{{
+          result ? `阈值: ${result.threshold ?? threshold}` : "等待两侧人像输入"
+        }}</small>
       </article>
 
       <article class="stat amber">
@@ -280,8 +303,14 @@ useRefresh(refreshAssets);
             <Layers :size="15" />
           </div>
         </div>
-        <strong class="stat-value">{{ result ? `${(result.score * 100).toFixed(2)}%` : '-' }}</strong>
-        <small class="stat-desc">{{ result ? `特征欧氏距离 ${result.distance.toFixed(4)}` : '余弦相似度 [-1.0 ~ 1.0]' }}</small>
+        <strong class="stat-value">{{
+          result ? `${(result.score * 100).toFixed(2)}%` : "-"
+        }}</strong>
+        <small class="stat-desc">{{
+          result
+            ? `特征欧氏距离 ${result.distance.toFixed(4)}`
+            : "余弦相似度 [-1.0 ~ 1.0]"
+        }}</small>
       </article>
 
       <article class="stat teal">
@@ -403,7 +432,9 @@ useRefresh(refreshAssets);
             <select
               :value="leftAssetId"
               class="field-select"
-              @change="setAsset('left', ($event.target as HTMLSelectElement).value)"
+              @change="
+                setAsset('left', ($event.target as HTMLSelectElement).value)
+              "
             >
               <option value="">从数据资产库选择...</option>
               <option
@@ -461,7 +492,9 @@ useRefresh(refreshAssets);
             <select
               :value="rightAssetId"
               class="field-select"
-              @change="setAsset('right', ($event.target as HTMLSelectElement).value)"
+              @change="
+                setAsset('right', ($event.target as HTMLSelectElement).value)
+              "
             >
               <option value="">从数据资产库选择...</option>
               <option
@@ -484,7 +517,13 @@ useRefresh(refreshAssets);
             <h3>1:1 研判结果报告</h3>
           </div>
           <span v-if="result" class="badge status-badge active">
-            {{ result.mode === "asset" ? "资产比对" : result.mode === "mixed" ? "混合输入" : "图片比对" }}
+            {{
+              result.mode === "asset"
+                ? "资产比对"
+                : result.mode === "mixed"
+                  ? "混合输入"
+                  : "图片比对"
+            }}
           </span>
         </div>
 
@@ -501,17 +540,27 @@ useRefresh(refreshAssets);
             <ScanFace v-else :size="22" />
             <div class="verdict-text-box">
               <strong>{{ verdictLabel }}</strong>
-              <small>{{ result.matched === true ? '双侧人脸生物特征达到同人判定阈值' : '双侧特征余弦相似度未达到判定标准' }}</small>
+              <small>{{
+                result.matched === true
+                  ? "双侧人脸生物特征达到同人判定阈值"
+                  : "双侧特征余弦相似度未达到判定标准"
+              }}</small>
             </div>
           </div>
 
           <div class="score-card">
-            <span class="score-num">{{ (result.score * 100).toFixed(2) }}%</span>
-            <span class="score-label">余弦相似度分数 ({{ result.score.toFixed(4) }})</span>
+            <span class="score-num"
+              >{{ (result.score * 100).toFixed(2) }}%</span
+            >
+            <span class="score-label"
+              >余弦相似度分数 ({{ result.score.toFixed(4) }})</span
+            >
             <div class="score-progress-bar">
               <div
                 class="score-progress-fill"
-                :style="{ width: `${Math.max(0, Math.min(100, result.score * 100))}%` }"
+                :style="{
+                  width: `${Math.max(0, Math.min(100, result.score * 100))}%`,
+                }"
               />
             </div>
           </div>
@@ -519,15 +568,21 @@ useRefresh(refreshAssets);
           <div class="result-metrics-grid">
             <div class="metric-item">
               <span class="metric-label">特征欧氏距离</span>
-              <strong class="metric-val mono">{{ result.distance.toFixed(4) }}</strong>
+              <strong class="metric-val mono">{{
+                result.distance.toFixed(4)
+              }}</strong>
             </div>
             <div class="metric-item">
               <span class="metric-label">判定阈值</span>
-              <strong class="metric-val mono">{{ result.threshold?.toFixed(2) ?? threshold }}</strong>
+              <strong class="metric-val mono">{{
+                result.threshold?.toFixed(2) ?? threshold
+              }}</strong>
             </div>
             <div class="metric-item span-full">
               <span class="metric-label">特征空间契约</span>
-              <strong class="metric-val mono accent-text">{{ result.feature_space_id }}</strong>
+              <strong class="metric-val mono accent-text">{{
+                result.feature_space_id
+              }}</strong>
             </div>
           </div>
 

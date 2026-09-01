@@ -1,24 +1,57 @@
 {
   "schema_version": "1.2",
-  "release": "0.3.0-dev.34",
+  "release": "0.3.0-dev.39",
   "release_identity": {
     "source_commit": null,
     "image_digest": null,
     "offline_bundle_sha256": null,
-    "openapi_sha256": "0728a626447c40ec0e773faef9bee2fcd5038ed7918a3a459ba2b6b731525577",
+    "openapi_sha256": "c2bb6dd993fc67add28d7aa7be3a4657ed323e74255ff8ebac71d36c30ad30c0",
     "model_set_sha256": null
   },
   "entries": [
-    {"evidence_type": "backup_restore", "status": "pending"},
-    {"evidence_type": "behavior_evaluation", "status": "pending"},
-    {"evidence_type": "fashion_evaluation", "status": "pending"},
-    {"evidence_type": "gpu_capacity", "status": "pending"},
-    {"evidence_type": "integration_services", "status": "pending"},
-    {"evidence_type": "model_rights", "status": "pending"},
-    {"evidence_type": "ocr_evaluation", "status": "pending"},
-    {"evidence_type": "offline_install", "status": "pending"},
-    {"evidence_type": "portrait_evaluation", "status": "pending"},
-    {"evidence_type": "security_assessment", "status": "pending"},
-    {"evidence_type": "software_license", "status": "pending"}
+    {
+      "evidence_type": "backup_restore",
+      "status": "pending"
+    },
+    {
+      "evidence_type": "behavior_evaluation",
+      "status": "pending"
+    },
+    {
+      "evidence_type": "fashion_evaluation",
+      "status": "pending"
+    },
+    {
+      "evidence_type": "gpu_capacity",
+      "status": "pending"
+    },
+    {
+      "evidence_type": "integration_services",
+      "status": "pending"
+    },
+    {
+      "evidence_type": "model_rights",
+      "status": "pending"
+    },
+    {
+      "evidence_type": "ocr_evaluation",
+      "status": "pending"
+    },
+    {
+      "evidence_type": "offline_install",
+      "status": "pending"
+    },
+    {
+      "evidence_type": "portrait_evaluation",
+      "status": "pending"
+    },
+    {
+      "evidence_type": "security_assessment",
+      "status": "pending"
+    },
+    {
+      "evidence_type": "software_license",
+      "status": "pending"
+    }
   ]
 }
