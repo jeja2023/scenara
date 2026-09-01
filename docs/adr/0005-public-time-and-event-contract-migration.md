@@ -1,24 +1,16 @@
-# ADR 0005: Public time and event contract migration
+# ADR 0005：公共时间与事件契约迁移
 
-- Status: accepted
-- Date: 2026-08-20
+- 状态：已接受 (accepted)
+- 日期：2026-08-20
 
-## Decision
+## 决策
 
-New public events use a versioned envelope with UTC RFC 3339 `occurred_at`,
-producer, tenant/project, request, and trace context. Run SSE and Webhook
-deliveries use event version `1.0`.
+新增的公共事件使用带版本控制的信封结构，包含 UTC RFC 3339 格式的 `occurred_at`、生产方、租户/项目、请求上下文与追踪上下文。Run SSE 与 Webhook 投递使用事件版本 `1.0`。
 
-Existing public resource timestamps remain numeric epoch seconds during the
-`0.3.x` compatibility window. The next API major version will publish RFC 3339
-timestamp fields as the canonical values and retain legacy epoch values only
-for the announced compatibility period. Duration and media timeline fields
-remain explicitly suffixed with `_ms`.
+现有的公共资源时间戳在 `0.3.x` 兼容性窗口期内保留为数值型 Unix 秒级时间戳。下一个 API Major 主版本将发布 RFC 3339 格式的时间戳字段作为权威标准值，并仅在公布的兼容期内保留旧版秒级时间戳。持续时长与媒体时间轴字段继续显式使用 `_ms` 后缀。
 
-## Consequences
+## 影响
 
-- Consumers must treat `event_version` as part of event compatibility.
-- Event consumers deduplicate by `event_id` and must accept at-least-once delivery.
-- A bulk timestamp type replacement is prohibited before the major-version
-  contract, generated SDKs, Console formatters, and migration evidence ship
-  together.
+- 消费方必须将 `event_version` 视为事件兼容性的一部分。
+- 事件消费方通过 `event_id` 进行去重，且必须接受“至少一次（at-least-once）”投递。
+- 在主版本契约、生成的 SDK、控制台格式化工具和迁移验证证据共同交付之前，禁止对时间戳类型进行破坏性全量替换。

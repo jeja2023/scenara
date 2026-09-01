@@ -1,24 +1,22 @@
-# Scenara cross-repository contracts
+# Scenara 跨仓库契约规范
 
-The current published contract package is `@scenara/repository-contracts` version `1.2.0`. It contains one Draft 2020-12 JSON Schema and one valid example for each cross-repository payload, plus a checksummed manifest.
+当前已发布的契约包为 `@scenara/repository-contracts` 版本 `1.2.0`。它为每个跨仓库有效负载包含一个 Draft 2020-12 JSON Schema 和一个有效示例，外加一个带校验和的清单文件。
 
-## Contracts
+## 契约列表
 
-| Contract | Producer | Consumer | Transport |
+| 契约名称 | 生产方 (Producer) | 消费方 (Consumer) | 传输协议 (Transport) |
 |---|---|---|---|
-| `model-package-admission` | `scenara-model` | `scenara` | immutable manifest |
-| `deployment-feedback` | `scenara` | `scenara-model` | event / signed webhook |
-| `hard-sample-handoff` | `scenara` | `scenara-data` | immutable manifest |
-| `dataset-version-input` | `scenara-data` | `scenara-model` | versioned API |
-| `domain-annotation-schema` | `scenara-contracts` | `scenara-data` | immutable manifest |
+| `model-package-admission` | `scenara-model` | `scenara` | 不可变清单 (immutable manifest) |
+| `deployment-feedback` | `scenara` | `scenara-model` | 领域事件 / 签名 Webhook |
+| `hard-sample-handoff` | `scenara` | `scenara-data` | 不可变清单 (immutable manifest) |
+| `dataset-version-input` | `scenara-data` | `scenara-model` | 版本化 API |
+| `domain-annotation-schema` | `scenara-contracts` | `scenara-data` | 不可变清单 (immutable manifest) |
 
-`release-index.json` locks every published manifest by SHA-256. A published directory is immutable; incompatible changes require a new major release, while backward-compatible additions require a new minor release.
+`release-index.json` 通过 SHA-256 锁定每个已发布的清单。已发布的目录是不可变的；不兼容的变更需要升级 Major 主版本，向后兼容的新增特性需要升级 Minor 次版本。
 
-## Time fields
+## 时间字段规范
 
-The `created_at` field in `hard-sample-handoff`, `dataset-version-input`, and
-`deployment-feedback` is a UTC RFC3339 string. It must end with `Z`; an optional
-fractional second may contain one to six digits. For example:
+`hard-sample-handoff`、`dataset-version-input` 和 `deployment-feedback` 中的 `created_at` 字段均为 UTC RFC3339 字符串格式。必须以 `Z` 结尾；可选的小数秒可包含 1 到 6 位数字。例如：
 
 ```json
 {
@@ -26,20 +24,17 @@ fractional second may contain one to six digits. For example:
 }
 ```
 
-Consumers must validate this format at the contract boundary. Internal
-database or queue adapters may convert the value to a native timestamp or Unix
-epoch for storage, but must preserve the represented instant and must not
-expose the internal representation in cross-repository payloads.
+消费方必须在契约边界验证此格式。内部数据库或队列适配器可以将其转换为原生时间戳或 Unix 时间戳进行存储，但必须保留表示的瞬时时间，且不得在跨仓库负载中暴露内部表示。
 
-## Provider verification
+## 生产方验证
 
-Generate and verify the committed package:
+生成并验证已提交的契约包：
 
 ```bash
 python scripts/repository_contracts.py --check
 ```
 
-Validate a producer document before publishing it:
+在发布前校验生产方契约文档：
 
 ```bash
 python scripts/repository_contracts.py \
@@ -48,7 +43,7 @@ python scripts/repository_contracts.py \
   --verify-document model-package.json
 ```
 
-Build the deterministic release bundle used by CI:
+构建 CI 所需的确定性发布归档包：
 
 ```bash
 python scripts/repository_contracts.py \
@@ -56,9 +51,9 @@ python scripts/repository_contracts.py \
   --bundle repository-contracts-1.2.0.zip
 ```
 
-## Consumer compatibility
+## 消费方兼容性
 
-When preparing a later contract release, run the candidate against the last published directory:
+在准备后续契约版本时，针对上一个已发布目录运行候选版本：
 
 ```bash
 python scripts/repository_contracts.py \
@@ -67,6 +62,6 @@ python scripts/repository_contracts.py \
   --check
 ```
 
-The compatibility gate resolves local schema references and rejects new required properties, removed properties, enum or union narrowing, type narrowing, newly tightened string/number/array limits, and closed additional properties. Consumer repositories should also validate their own captured payload fixtures against the published schemas.
+兼容性门禁会解析本地 schema 引用，并自动拒绝新增必填属性、删除属性、枚举/联合类型缩窄、数据类型缩窄、新增收紧的字符串/数字/数组限制以及封闭额外属性。消费方仓库也应针对已发布的 schema 校验自身捕获的负载样本。
 
-`--verify-document` runs both Draft 2020-12 validation and the canonical semantic validator. The semantic pass verifies cross-field digest equality for model packages and dataset references and recomputes the canonical hard-sample manifest checksum.
+`--verify-document` 会同时运行 Draft 2020-12 校验与标准语义校验器。语义阶段会校验模型包与数据集引用的跨字段摘要一致性，并重新计算标准难例清单校验和。

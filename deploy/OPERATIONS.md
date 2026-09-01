@@ -51,13 +51,13 @@ Scenara 1.0 不提供破坏性 down migration。发生不兼容 schema 变更时
 - Redis 侧：检查 `scenara:runs:batch` / `scenara:runs:stream` 的 consumer group、pending 数和 lag。只有 API 在写 stream、没有消费者时，Run 会持续显示 `queued`，图片解码器本身尚未开始执行。
 - worker 启动后若仍不前进，检查模型加载日志、CUDA/CPU provider、PostgreSQL/S3 连接和 `QUEUE_UNAVAILABLE` / `PIPELINE_ERROR`；首次加载模型可能需要数秒到数十秒，但不应无限停留在 `queued`。
 
-## Redis Run queue recovery
+## Redis 任务队列恢复
 
-PostgreSQL is the source of truth for Run state and the certified S3 provider retains uploaded media. If Redis Run streams are lost, stop both workers and run the following command before restarting them:
+PostgreSQL 是任务运行状态（Run State）的权威数据源，经过认证的 S3 存储提供商保留已上传的媒体数据。若 Redis Run 流数据丢失，请在重启 worker 之前停止两个 worker 并执行以下命令：
 
     python scripts/rebuild_redis_queue.py --env-file deploy/.env.production
 
-The command requires PostgreSQL, S3/MinIO, and Redis backends. It enumerates every non-terminal Run, verifies each retained media object, and atomically repopulates the empty batch and stream queues. It refuses to run when either Redis Run stream already contains messages, or when a Run record or required media object is missing. The JSON output records the number of recoverable, verified, and enqueued Runs for release evidence.
+该命令需要 PostgreSQL、S3/MinIO 和 Redis 后端连接。它会枚举每个非终态的 Run，校验每个保留的媒体对象，并原子地重新填充空的批处理和流式队列。当任一 Redis Run 流已包含消息，或者缺少 Run 记录/必需的媒体对象时，它会拒绝执行。输出的 JSON 会记录可恢复、已验证和已入队 Run 的数量，作为发布证据凭据。
 
 ## 已知限制
 

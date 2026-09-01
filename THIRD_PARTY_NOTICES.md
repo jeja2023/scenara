@@ -1,5 +1,5 @@
-# Third-party notices
+# 第三方声明与许可声明
 
-Dependencies are installed from the lock files and retain their original licenses. A release must generate an SBOM and license inventory from the exact image and lock-file revisions; this document is not a substitute for that generated evidence.
+所有依赖组件均从版本锁文件安装并保留其原有的开源许可。发布版本必须基于确切的镜像与锁文件版本生成 SBOM（软件物料清单）和许可证清单；本文档不能替代自动生成的发布证据。
 
-Model weights are not licensed by this repository. Model cards and configuration examples do not grant a right to download, redistribute, or commercially use the referenced artifacts.
+本代码仓库不提供任何模型权重的再分发许可。模型卡（Model Card）与配置示例并不赋予下载、再分发或商业化使用所引用模型制品的权利。

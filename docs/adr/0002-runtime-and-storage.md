@@ -1,24 +1,14 @@
-# ADR 0002: Runtime processes and storage authority
+# ADR 0002：运行时进程与存储权威
 
-- Status: accepted
-- Date: 2026-07-29
+- 状态：已接受 (accepted)
+- 日期：2026-07-29
 
-## Decision
+## 决策
 
-Scenara ships a modular API/control-plane process, a batch GPU worker, a stream
-worker, and a governance scheduler. They share versioned contracts and obtain
-operators and pipelines from the same build-time registry.
+Scenara 交付模块化的 API/控制面进程、批处理 GPU worker、流式 worker 和治理调度器。它们共享版本化契约，并从同一个构建时注册表中获取算子和流水线。
 
-Run delivery is at least once. Workers acquire leases and all persistent state
-transitions use optimistic revisions in PostgreSQL, so retrying a delivery must
-not create a second run or publish a second logical result. Events use a
-monotonic per-run identifier and clients deduplicate by `(run_id, event_id)`.
+任务投递为“至少一次（at least once）”。Worker 获取租约，并且所有持久化状态转换在 PostgreSQL 中使用乐观版本控制，因此重试投递绝不会创建第二个 Run 或发布第二个逻辑结果。事件使用单调递增的单 Run 标识符，客户端通过 `(run_id, event_id)` 进行去重。
 
-S3 objects are immutable after publication. A result reference is committed only
-after the object is written and includes its SHA-256 checksum. Deleting media or
-biometric subjects removes both the database record and referenced objects.
+S3 对象在发布后是不可变的。只有在对象写入并包含其 SHA-256 校验和之后，结果引用才会被提交。删除媒体数据或生物识别主体时，会同时移除数据库记录与引用的对象。
 
-Immutable publication is enforced with conditional writes and checksum metadata,
-including multipart completion. Provider lifecycle rules are a delayed safety net;
-PostgreSQL retention records and the governance scheduler remain authoritative.
-
+不可变发布通过条件写入和校验和元数据进行强制约束，包括分片上传完成阶段。存储提供商的生命周期规则作为延迟安全网；PostgreSQL 保留记录和治理调度器保持权威性。

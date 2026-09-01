@@ -1,29 +1,21 @@
-# Certified S3 object providers
+# 经过认证的 S3 对象存储提供商
 
-Scenara depends on the S3 contract, not on a specific storage product. PostgreSQL
-is the source of truth for records and object references. Certified S3 providers
-store original media, previews, run artifacts, and immutable structured results.
+Scenara 依赖于标准 S3 契约，而非特定的存储产品。PostgreSQL 是业务记录和对象引用的权威数据源。经过认证的 S3 提供商负责存储原始媒体、预览图、运行产物以及不可变的结构化解析结果。
 
-## Provider status
+## 提供商状态
 
-| Provider | Status | Intended deployment |
+| 提供商 | 状态 | 预期部署场景 |
 |---|---|---|
-| MinIO | Certified baseline | Single-site private and offline deployments |
-| Amazon S3 | Candidate | AWS-managed production |
-| Alibaba Cloud OSS S3 API | Candidate | Mainland China managed production |
-| Ceph RGW | Candidate | Existing private-cloud storage platforms |
+| MinIO | 经认证基线（Certified baseline） | 单节点私有化与离线部署 |
+| Amazon S3 | 候选支持（Candidate） | AWS 托管生产环境 |
+| 阿里云 OSS (S3 API) | 候选支持（Candidate） | 中国大陆云托管生产环境 |
+| Ceph RGW | 候选支持（Candidate） | 既有私有云存储平台 |
 
-Candidate means that the adapter is configurable for the provider, not that the
-release has qualification evidence for it. A provider becomes certified only
-after its target version passes `tests/object_store_contract.py` against the real
-service and the resulting report is attached to release evidence.
+“候选支持”意味着适配器可针对该提供商进行配置，并不代表当前发布版本已具备其资格凭据。提供商只有在针对真实服务通过 `tests/object_store_contract.py` 目标版本测试并将生成的报告附加到发布证据后，才会成为“经认证”。
 
-The contract covers immutable idempotent upload and concurrent conflict rejection,
-checksum-protected multipart upload, full and file-based download verification,
-metadata, existence, deletion, reconnect recovery, presigned PUT/GET, and tagged
-lifecycle rules.
+该契约涵盖不可变幂等上传与并发冲突拒绝、带校验和保护的分片上传、完整及基于文件的下载验证、元数据、存在性检查、删除、重连恢复、预签名 PUT/GET 以及带标签的生命周期规则。
 
-Run the S3 qualification tests with provider-specific environment variables:
+使用特定提供商的环境变量运行 S3 资质测试：
 
 ```powershell
 $env:SCENARA_RUN_INTEGRATION = "1"
@@ -33,61 +25,35 @@ $env:SCENARA_INTEGRATION_S3_SECRET_KEY = "..."
 python -m pytest -q tests/integration/test_services.py -k "s3_provider or presigned_media"
 ```
 
-Use an isolated qualification bucket. The suite creates unique keys and removes
-them, while the lifecycle test updates bucket lifecycle configuration.
+请使用隔离的测试存储桶。测试套件会创建唯一键并将其删除，而生命周期测试会更新存储桶的生命周期配置。
 
-## Integrity and immutability
+## 完整性与不可变性
 
-All published writes are immutable by default. `If-None-Match: *` prevents a
-different payload from replacing an existing key; retrying the same key and
-SHA-256 is idempotent. Multipart completion uses the same condition. The only
-mutable object class is encrypted internal secret storage, which opts into an
-explicit atomic overwrite path.
+默认情况下，所有已发布的写入操作均为不可变的。`If-None-Match: *` 可防止不同有效负载替换现有键；使用相同的键和 SHA-256 重试是幂等的。分片上传完成也使用相同的条件。唯一可变的对象类别是加密的内部机密存储，它采用了显式的原子覆盖路径。
 
-Every write stores SHA-256 as S3 metadata and sends the native S3 checksum when
-supported. Media execution, result loading, artifact reads, and Redis queue
-recovery compare object bytes or metadata with the PostgreSQL reference.
+每次写入都会将 SHA-256 作为 S3 元数据存储，并在受支持时发送原生 S3 校验和。媒体执行、结果加载、产物读取和 Redis 队列恢复会将对象字节或元数据与 PostgreSQL 引用进行对比。
 
-## Credentials, TLS, and encryption
+## 凭据、TLS 与加密
 
-Static credentials remain supported for MinIO and offline installations. Leave
-the access key, secret key, and session token empty to use the AWS/default
-credential provider chain, including instance roles and workload identity. STS
-session credentials can be supplied with `SCENARA_S3_SESSION_TOKEN`.
+MinIO 和离线安装继续支持静态凭据。将 access key、secret key 和 session token 留空可使用 AWS/默认凭据提供者链（包括实例角色和工作负载身份）。STS 会话凭据可以通过 `SCENARA_S3_SESSION_TOKEN` 提供。
 
-TLS verification is enabled by default. `SCENARA_S3_CA_BUNDLE` installs a private
-CA trust path. `SCENARA_S3_SERVER_SIDE_ENCRYPTION` supports `AES256` and `aws:kms`;
-the latter may use `SCENARA_S3_KMS_KEY_ID`.
+TLS 验证默认启用。`SCENARA_S3_CA_BUNDLE` 可配置私有 CA 信任路径。`SCENARA_S3_SERVER_SIDE_ENCRYPTION` 支持 `AES256` 和 `aws:kms`；后者可以使用 `SCENARA_S3_KMS_KEY_ID`。
 
-`SCENARA_S3_ADDRESSING_STYLE` accepts `auto`, `path`, or `virtual`. MinIO commonly
-uses `path`; OSS normally requires `virtual`.
+`SCENARA_S3_ADDRESSING_STYLE` 接受 `auto`、`path` 或 `virtual`。MinIO 通常使用 `path`；OSS 通常需要 `virtual`。
 
-## Lifecycle ownership
+## 生命周期归属
 
-PostgreSQL retention records and the Scenara scheduler remain authoritative.
-When `SCENARA_S3_LIFECYCLE_ENABLED=true`, the provider installs tag-based rules
-for raw media, previews, and structured results one day after the application
-retention deadline. This grace period lets the scheduler mark database records
-first. Incomplete direct uploads expire after one day.
+PostgreSQL 数据保留记录和 Scenara 调度器保持权威性。当 `SCENARA_S3_LIFECYCLE_ENABLED=true` 时，提供商会在应用保留截止日期后一天为原始媒体、预览和结构化结果安装基于标签的规则。该宽限期允许调度器先标记数据库记录。未完成的直传文件将在一天后过期。
 
-Enable lifecycle management only for an identity allowed to call
-`PutBucketLifecycleConfiguration`. Otherwise provision equivalent rules outside
-Scenara and keep the setting false.
+仅对具有调用 `PutBucketLifecycleConfiguration` 权限的身份启用生命周期管理。否则，请在 Scenara 外部配置等效规则并将该设置保持为 false。
 
-## Direct transfer
+## 客户端直传
 
-Set `SCENARA_S3_PRESIGNED_URLS_ENABLED=true` to expose the controlled direct
-transfer workflow:
+设置 `SCENARA_S3_PRESIGNED_URLS_ENABLED=true` 以暴露受控的直传工作流：
 
-1. `POST /api/v1/media/uploads/presign` binds a PUT URL to tenant, project,
-   filename, content type, exact byte length, SHA-256, and expiry.
-2. The client uploads bytes directly to the provider using every returned header.
-3. `POST /api/v1/media/uploads/complete` verifies the HMAC token, size, and digest
-   before creating the asset and deleting the pending object.
-4. `GET /api/v1/media/assets/{asset_id}/download-url` returns a short-lived GET URL
-   only after authorization and integrity verification.
+1. `POST /api/v1/media/uploads/presign` 将 PUT URL 绑定到租户、项目、文件名、内容类型、精确字节长度、SHA-256 和过期时间。
+2. 客户端使用返回的全部请求头将字节直接上传到存储提供商。
+3. `POST /api/v1/media/uploads/complete` 在创建资产并删除待处理对象之前，验证 HMAC 令牌、大小和摘要。
+4. `GET /api/v1/media/assets/{asset_id}/download-url` 仅在授权和完整性验证后返回短期的 GET URL。
 
-In container deployments, set `SCENARA_S3_PUBLIC_ENDPOINT_URL` to an endpoint
-reachable by external clients. The internal endpoint remains available for API
-and worker traffic. Python SDK `upload_asset_direct` and TypeScript SDK
-`uploadAssetDirect` implement this workflow.
+在容器部署中，将 `SCENARA_S3_PUBLIC_ENDPOINT_URL` 设置为外部客户端可访问的端点。内部端点仍可用于 API 和 worker 流量。Python SDK `upload_asset_direct` 和 TypeScript SDK `uploadAssetDirect` 实现了此工作流。

@@ -1,31 +1,22 @@
-# Scenara brand assets
+# Scenara 景枢品牌视觉资产
 
-Use `scenara-mark.svg` on light surfaces and `scenara-mark-inverse.svg` on dark
-surfaces. Both preserve the official violet, electric-blue, and cyan ribbon
-gradients. `scenara-mark-mono.svg` inherits `currentColor` for one-color output.
-The app icon uses its fixed midnight background; no other asset adds a
-background container.
+在浅色背景上使用 `scenara-mark.svg`，在深色背景上使用 `scenara-mark-inverse.svg`。两者均保留官方的紫罗兰色、电光蓝和青色曲面缎带渐变。`scenara-mark-mono.svg` 继承 `currentColor` 用于单色输出。应用图标使用其固定的午夜黑背景；其他资产均不添加背景容器。
 
-## Geometry baseline
+## 几何基线
 
-The current source geometry is fixed to the 64 x 64 view box:
+当前源几何图形固定在 64 x 64 视图框内：
 
-- The vertical axis is `x = 32`.
-- The four-point center star is centered at `(32, 32)`.
-- The upper/left ribbon is offset by `-3` units on the y axis.
-- The lower/right ribbon is the same master curve rotated 180 degrees around
-  `(32, 32)` and offset by `+3` units on the y axis.
+- 垂直中轴为 `x = 32`。
+- 四向中心星居中于 `(32, 32)`。
+- 上方/左侧曲面缎带在 Y 轴方向偏移 `-3` 个单位。
+- 下方/右侧曲面缎带为同一母版曲线绕 `(32, 32)` 旋转 180 度并在 Y 轴方向偏移 `+3` 个单位。
 
-All supplied variants use this same geometry. The application icon and favicon
-apply only their own background and scale. Do not create a second hand-tuned
-path, move the center star with a ribbon, or alter the ribbon gap in a product
-surface.
+所有提供的变体均使用这一相同的几何结构。应用图标与 favicon 仅应用各自的背景和缩放。禁止创建第二套手工调整的路径、随曲面缎带移动中心星或在产品界面中修改缎带间距。
 
-- Mark clear space: at least 16 units in the 64-unit source view box.
-- Mark minimum size: 24 px digital and 8 mm print.
-- Horizontal wordmark minimum width: 120 px digital and 32 mm print.
-- Vertical wordmark minimum width: 88 px digital and 24 mm print.
-- Do not crop, recolor, rotate, stretch, outline, shadow, change the ribbon gap,
-  or alter the supplied gradients.
-- Use `Scenara 景枢` in product presentation and `Scenara` in compact technical UI.
-- Use the brand line `连接视觉 · 理解世界` only in presentation contexts, not in compact product controls.
+- 图标安全留白：在 64 单位源视图框中至少留出 16 个单位。
+- 图标最小尺寸：数字屏幕 24 px，印刷 8 mm。
+- 横版字标最小宽度：数字屏幕 120 px，印刷 32 mm。
+- 竖版字标最小宽度：数字屏幕 88 px，印刷 24 mm。
+- 禁止裁剪、重新着色、旋转、拉伸、描边、添加阴影、修改缎带间距或更改提供的渐变。
+- 在产品宣传与展示中使用 `Scenara 景枢`，在紧凑的技术 UI 中使用 `Scenara`。
+- 品牌口号 `连接视觉 · 理解世界` 仅用于展示与宣传场景，不得置于紧凑的产品控件中。

@@ -1,5 +1,5 @@
-# Security policy
+# 安全政策与漏洞通报规范
 
-Do not open a public issue containing credentials, private media, biometric data, internal addresses or exploit details. Report suspected vulnerabilities privately to the repository owner through GitHub private vulnerability reporting.
+禁止在公开 Issue 中包含凭证密钥、私有媒体、生物识别数据、内部网络地址或漏洞利用细节。如发现潜在安全漏洞，请通过 GitHub 私密漏洞通报通道（Private Vulnerability Reporting）私下向仓库所有者报告。
 
-Supported security work currently targets the unreleased `0.x` line. No production SLA is offered before Scenara 1.0 qualification.
+当前安全支持针对未正式发布的 `0.x` 开发分支。在 Scenara 1.0 正式认证完成前，不提供商业化生产 SLA 保证。

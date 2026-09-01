@@ -2,35 +2,35 @@
 
 升级、恢复式回滚、运行探针、指标和告警基线见 [OPERATIONS.md](OPERATIONS.md)；上线逐项验收见 [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md)。
 
-The supported 1.0 target is Ubuntu x86_64 with Docker Engine, Docker Compose v2, and one or more measurable NVIDIA GPUs. PostgreSQL/pgvector, Redis, and MinIO are part of the production Compose topology. The data-service images are pinned by manifest digest. Python production dependencies are installed only from `requirements/production.lock` with SHA-256 verification.
+支持的 1.0 目标系统为 Ubuntu x86_64，配备 Docker Engine、Docker Compose v2 和一个或多个可测量的 NVIDIA GPU。PostgreSQL/pgvector、Redis 和 MinIO 属于生产 Compose 拓扑的一部分。数据服务镜像通过清单摘要固定。Python 生产依赖项仅从 `requirements/production.lock` 安装，并经过 SHA-256 校验。
 
-## Configure
+## 配置
 
-Generate a deployment candidate outside the repository, then fill external endpoints, image digest, allowed hosts and approved model factories:
+在代码仓库外生成部署候选环境文件，然后填写外部端点、镜像摘要、允许的主机名和经过批准的模型工厂：
 
     python scripts/generate_production_env.py --output /secure/scenara.env
     python scripts/validate_production_config.py --env-file /secure/scenara.env
 
-The validator does not print secret values. On Linux it rejects group/world-readable env files, reused trust-boundary secrets, short credentials, invalid Fernet keys, wildcard Host/proxy trust, unqualified built-in adapters, mutable image references and non-TLS Data URLs unless isolated internal HTTP is explicitly allowed.
+校验器不会打印机密值。在 Linux 上，它会拒绝具有组/全局可读权限的环境文件、跨信任边界复用的机密、过短的凭证、无效的 Fernet 密钥、通配符 Host/代理信任、未经认证的内置适配器、可变的镜像引用以及非 TLS 的 Data URL（除非显式允许隔离的内部 HTTP）。
 
-The default `deploy/compose.yml` is the personal deployment profile. It uses the local policy provider and does not require, read, or mount an enterprise license. The signed enterprise policy implementation remains available as an optional extension. To enable it, set `SCENARA_ENTERPRISE_LICENSE_FILE` and `SCENARA_ENTERPRISE_PUBLIC_KEY_FILE` to readable files and add `-f deploy/compose.enterprise.yml` to each Compose command.
+默认的 `deploy/compose.yml` 为个人部署配置文件。它使用本地策略提供者，不需要、不读取也不挂载企业许可证。签名企业策略实现作为可选扩展提供。要启用它，请将 `SCENARA_ENTERPRISE_LICENSE_FILE` 和 `SCENARA_ENTERPRISE_PUBLIC_KEY_FILE` 设置为可读文件，并在每个 Compose 命令中添加 `-f deploy/compose.enterprise.yml`。
 
-Both GPU workers request all visible GPUs by default. A qualified production host should normally pin different `GPU_DEVICE_IDS` per worker through a Compose override; sharing all GPUs is only a starting topology and requires measured concurrency evidence. The legacy inference adapter discovers visible devices from `CUDA_VISIBLE_DEVICES`, NVIDIA device nodes, or `nvidia-smi`.
+两个 GPU worker 默认请求所有可见的 GPU。合格的生产主机通常应通过 Compose 覆盖配置为每个 worker 分配不同的 `GPU_DEVICE_IDS`；共享所有 GPU 仅作为初始拓扑，需要经过测量的并发证据。传统推理适配器从 `CUDA_VISIBLE_DEVICES`、NVIDIA 设备节点或 `nvidia-smi` 发现可见设备。
 
-The qualified model package directory must include private OCR, Behavior and Fashion adapter modules named by `SCENARA_OCR_ENGINE_FACTORY`, `SCENARA_BEHAVIOR_ENGINE_FACTORY` and `SCENARA_FASHION_ENGINE_FACTORY`. Each factory must return a qualified engine with immutable model identity, `production_ready=true`, the required inference methods and declared capabilities. Compose mounts this directory read-only at `/opt/scenara/models`. Built-in reference adapters are intentionally rejected by production validation.
+经过认证的模型包目录必须包含由 `SCENARA_OCR_ENGINE_FACTORY`、`SCENARA_BEHAVIOR_ENGINE_FACTORY` 和 `SCENARA_FASHION_ENGINE_FACTORY` 指定的私有 OCR、Behavior 和 Fashion 适配器模块。每个工厂必须返回一个具有不可变模型标识、`production_ready=true`、所需推理方法和声明能力的合格引擎。Compose 将此目录只读挂载在 `/opt/scenara/models`。内置的参考适配器在生产校验中会被显式拒绝。
 
-Validate without starting services. The Compose `preflight` one-shot service repeats runtime validation before API startup:
+在不启动服务的情况下进行验证。Compose `preflight` 一次性服务在 API 启动前重复运行时验证：
 
     docker compose --env-file /secure/scenara.env -f deploy/compose.yml config --quiet
 
-Build and push the release image in CI, record its digest in `SCENARA_IMAGE_REFERENCE`, then start behind a TLS reverse proxy. Do not use `--build` with a digest-pinned production reference. The default host binding is `127.0.0.1:8000`; direct non-loopback HTTP requires an explicit unsafe override:
+在 CI 中构建并推送发布镜像，将其摘要记录在 `SCENARA_IMAGE_REFERENCE` 中，然后在 TLS 反向代理后启动。请勿对固定摘要的生产引用使用 `--build`。默认的主机绑定为 `127.0.0.1:8000`；直接非回环 HTTP 访问需要显式的不安全覆盖配置：
 
     docker compose --env-file /secure/scenara.env -f deploy/compose.yml pull
     docker compose --env-file /secure/scenara.env -f deploy/compose.yml run --rm preflight
     docker compose --env-file /secure/scenara.env -f deploy/compose.yml run --rm migrate
     docker compose --env-file /secure/scenara.env -f deploy/compose.yml up -d --no-build --wait
 
-For the optional enterprise profile, validate and start with both files:
+对于可选的企业配置文件，使用这两个文件进行验证和启动：
 
     docker compose --env-file /secure/scenara.env \
       -f deploy/compose.yml -f deploy/compose.enterprise.yml config --quiet
@@ -41,59 +41,49 @@ For the optional enterprise profile, validate and start with both files:
     docker compose --env-file /secure/scenara.env \
       -f deploy/compose.yml -f deploy/compose.enterprise.yml up -d --no-build --wait
 
-After the API health check passes, open the bundled Chinese console through the configured TLS domain, for example `https://scenara.example.com/console/`. Port 8000 remains loopback-only. The same versioned image serves the API and console, so an offline deployment cannot accidentally combine different contract versions.
+API 健康检查通过后，通过配置的 TLS 域名打开内置的中文控制台，例如 `https://scenara.example.com/console/`。8000 端口仍仅限回环访问。相同的版本化镜像同时提供 API 和控制台服务，因此离线部署不会意外混合不同的契约版本。
 
-Private RTSP/RTMP/HTTP source addresses are rejected by default. Set `SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES=true` only when the deployment network isolates workers from management and metadata endpoints; URL credentials remain encrypted in the configured Secret Store.
+私有 RTSP/RTMP/HTTP 源地址默认被拒绝。仅当部署网络将 worker 与管理和元数据端点隔离时，才设置 `SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES=true`；URL 凭证在配置的机密存储中保持加密。
 
-The API, batch worker, stream worker, and scheduler share one versioned image. Batch and real-time runs use separate Redis stream consumer groups.
+API、批处理 worker、流式 worker 和调度器共享同一个版本化镜像。批处理和实时运行使用独立的 Redis 流消费者组。
 
-## Offline bundle
+## 离线安装包
 
-On a connected Ubuntu build host:
-
-    SCENARA_COMPOSE_ENV_FILE=deploy/.env.production \
-
-Private RTSP/RTMP/HTTP source addresses are rejected by default. Set `SCENARA_ALLOW_PRIVATE_MEDIA_SOURCES=true` only when the deployment network isolates workers from management and metadata endpoints; URL credentials remain encrypted in the configured Secret Store.
-
-The API, batch worker, stream worker, and scheduler share one versioned image. Batch and real-time runs use separate Redis stream consumer groups.
-
-## Offline bundle
-
-On a connected Ubuntu build host:
+在联网的 Ubuntu 构建主机上：
 
     SCENARA_COMPOSE_ENV_FILE=deploy/.env.production \
       SCENARA_MODEL_BUNDLE_DIR=/secure/qualified-model-packages \
       deploy/scripts/build-offline-bundle.sh /srv/scenara-release
 
-Transfer the generated tar archive through the project's controlled channel, extract it, then install on the target:
+通过项目的受控渠道传输生成的 tar 压缩包，解压后在目标机器上安装：
 
     deploy/scripts/install-offline.sh \
       /srv/scenara-offline-0.3.0-dev.41 \
       /secure/scenara.env \
       /secure/offline-installer-result.json
 
-The qualified model package directory is mandatory and is copied into the checksummed offline bundle; the repository never supplies or substitutes model weights. The installer verifies Ubuntu 24.04 x86_64, Docker Engine 27+, Docker Compose 2.29+, CUDA 12.8 driver compatibility, and at least one measurable NVIDIA GPU before loading images. All visible GPUs are exposed to both GPU workers by default; the installer records GPU count and aggregate memory but imposes no fixed GPU-count or memory limit. It starts Compose with `--no-build --wait`, verifies the dependency readiness endpoint and Chinese console, and rejects any required service that is not running. The optional third argument is written atomically as a schema-version 1.0 JSON result and is never allowed to overwrite an existing file.
+经过认证的模型包目录是必需的，并被复制到带校验和的离线包中；仓库从不提供或替换模型权重。在加载镜像之前，安装程序会验证 Ubuntu 24.04 x86_64、Docker Engine 27+、Docker Compose 2.29+、CUDA 12.8 驱动兼容性以及至少一个可测量的 NVIDIA GPU。所有可见的 GPU 默认暴露给两个 GPU worker；安装程序记录 GPU 数量和总显存，但不施加固定的 GPU 数量或显存限制。它使用 `--no-build --wait` 启动 Compose，验证依赖就绪端点和中文控制台，并拒绝任何未运行的必需服务。可选的第三个参数以 schema-version 1.0 JSON 结果原子写入，且不允许覆盖现有文件。
 
-The builder also writes `scenara-offline-<tag>.release-identity.json` beside the archive. It records the source commit, application image digest, archive SHA-256, OpenAPI SHA-256, and aggregate qualified-model-set SHA-256 required by the strict release manifest. Keep this companion file with the release artifacts.
+构建器还会在压缩包旁写入 `scenara-offline-<tag>.release-identity.json`。它记录了严格发布清单所需的源提交、应用镜像摘要、压缩包 SHA-256、OpenAPI SHA-256 以及聚合的合格模型集 SHA-256。请将此伴随文件与发布产物一起保存。
 
-Model weights are not bundled by this repository. Install only packages that pass MODEL_ASSETS.md and the strict release evidence gate.
+本仓库不捆绑模型权重。仅安装符合 MODEL_ASSETS.md 并通过严格发布证据门禁的模型包。
 
-## Backup and restore
+## 备份与恢复
 
-Create and verify a PostgreSQL plus MinIO backup:
+创建并验证 PostgreSQL 与 MinIO 备份：
 
     SCENARA_COMPOSE_ENV_FILE=/secure/scenara.env \
       deploy/scripts/backup.sh /srv/backups/scenara-2026-07-29
 
-Restore is destructive and requires explicit confirmation:
+恢复操作具有破坏性，需要显式确认：
 
     SCENARA_COMPOSE_ENV_FILE=/secure/scenara.env \
       deploy/scripts/restore.sh /srv/backups/scenara-2026-07-29 --confirm
 
-Redis is intentionally excluded because it is a delivery, lease, and short-term event service rather than a system of record. PostgreSQL and MinIO are restored before workers restart.
+Redis 被显式排除在备份之外，因为它是投递、租约和短期事件服务，而非记录系统。PostgreSQL 和 MinIO 在 worker 重启前恢复。
 
-CI may set `SCENARA_RESTORE_DATA_ONLY=true` to exercise PostgreSQL and MinIO restoration without starting GPU workers. This mode is not valid 1.0 release evidence; the target-host drill must use the default full restart path.
+CI 可以设置 `SCENARA_RESTORE_DATA_ONLY=true` 来演练 PostgreSQL 和 MinIO 的恢复，而不启动 GPU worker。此模式不能作为有效的 1.0 发布证据；目标主机演练必须使用默认的完整重启路径。
 
-Backups record container image names, Compose version, the SHA-256 of the deployment file, and source commit provenance. Resolved Compose configuration is deliberately excluded because it contains deployment secrets.
+备份记录容器镜像名称、Compose 版本、部署文件的 SHA-256 和源码提交溯源。解析后的 Compose 配置被显式排除，因为它包含部署机密。
 
-A successful script run is not release evidence by itself. Record the target, execution timestamp, checksums, recovery objectives, and observed loss window in the strict evidence manifest.
+脚本运行成功本身不能作为发布证据。请在严格证据清单中记录目标、执行时间戳、校验和、恢复目标以及观察到的数据丢失窗口。

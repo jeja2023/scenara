@@ -1,12 +1,8 @@
-# Qualification Input Contracts
+# 资格认证输入契约规范
 
-The qualification generator creates a candidate passed report only when the
-referenced raw files prove every required condition. It does not update the
-release manifest. Relative paths are resolved from the directory containing
-the top-level input JSON. Every top-level input uses schema version 1.0 and an
-evidence type matching the command.
+资格认证生成器仅在引用的原始文件证明满足每项必需条件时，才会生成候选的 passed 评估报告。它不会自动更新发布清单。相对路径根据包含顶级输入 JSON 的目录进行解析。每个顶级输入均使用 schema version 1.0，且证据类型与执行命令相匹配。
 
-Generate a candidate, inspect it, and then record it:
+生成候选报告、检查并记录：
 
     python scripts/prepare_release_evidence.py gpu_capacity /secure/gpu-input.json \
       --target "Ubuntu 24.04 capacity host" \
@@ -14,19 +10,13 @@ Generate a candidate, inspect it, and then record it:
 
     python scripts/record_release_evidence.py /secure/gpu-capacity-report.json
 
-The first command leaves the manifest unchanged. The second command changes
-only the matching pending entry. Both commands refuse to overwrite completed
-evidence or an existing output file.
+第一个命令不会修改清单。第二个命令仅更新匹配的 pending 待处理条目。两个命令均拒绝覆盖已完成的证据或已存在的输出文件。
 
-## Evaluation Input
+## 1. 算法评估输入 (Evaluation Input)
 
-Use portrait_evaluation, ocr_evaluation, behavior_evaluation, or fashion_evaluation. The dataset manifest contains a
-non-empty dataset_version and rights_cleared set to true. The threshold file
-contains fixed_at, thresholds, and tolerances. Threshold keys end in _min or
-_max; tolerances cover exactly the same metrics. The fixed_at timestamp must
-predate both independent run timestamps.
+使用 `portrait_evaluation`、`ocr_evaluation`、`behavior_evaluation` 或 `fashion_evaluation`。数据集清单必须包含非空的 `dataset_version` 并将 `rights_cleared` 设为 `true`。阈值文件包含 `fixed_at`、`thresholds` 与 `tolerances`。阈值键以 `_min` 或 `_max` 结尾；容差覆盖完全相同的指标。`fixed_at` 时间戳必须早于两次独立运行的时间戳。
 
-Top-level input:
+顶级输入 JSON：
 
     {
       "schema_version": "1.0",
@@ -40,7 +30,7 @@ Top-level input:
       ]
     }
 
-Threshold file:
+阈值文件 JSON：
 
     {
       "fixed_at": "2026-08-12T01:00:00Z",
@@ -48,7 +38,7 @@ Threshold file:
       "tolerances": {"map": 0.01}
     }
 
-Each run output:
+每次运行输出 JSON：
 
     {
       "run_id": "portrait-run-a",
@@ -57,14 +47,11 @@ Each run output:
       "metrics": {"map": 0.91}
     }
 
-The generator hashes the dataset manifest, threshold file, and run outputs. It
-independently evaluates every threshold and the cross-run tolerance.
+生成器会对数据集清单、阈值文件和运行输出计算哈希，并独立评估每个阈值和跨次运行的容差。
 
-## GPU Capacity Input
+## 2. GPU 算力容量输入 (GPU Capacity Input)
 
-GPU memory is a measured descriptive value. There is no 24 GB lower bound and
-no upper bound. Qualification depends on finite measurements, peak VRAM fitting
-the measured device, and five successful scenario outputs.
+GPU 显存是一个实测描述性数值，不设 24 GB 的下限或上限。资格认证取决于有限实测值、适配实测设备的峰值显存以及五个成功的场景输出。
 
     {
       "schema_version": "1.0",
@@ -93,16 +80,15 @@ the measured device, and five successful scenario outputs.
       }
     }
 
-Each scenario output identifies itself and has a zero exit code, for example:
+每个场景输出需标识自身且退出码为 0，例如：
 
     {"scenario": "burst", "exit_code": 0}
 
-All five files must be unique. Their SHA-256 values and the top-level raw input
-digest are computed by the generator.
+全部五个文件必须唯一。它们的 SHA-256 值与顶级原始输入摘要由生成器自动计算。
 
-## Model Rights Input
+## 3. 模型权利输入 (Model Rights Input)
 
-The input points to every real model artifact and rights-record JSON:
+输入指向每个真实模型制品和权利记录 JSON：
 
     {
       "schema_version": "1.0",
@@ -115,36 +101,29 @@ The input points to every real model artifact and rights-record JSON:
       ]
     }
 
-Each rights record also uses schema version 1.0 and evidence type model_rights.
-It contains model_id, model_version, artifact_sha256, license_identifier,
-license_source_uri, source_uri, and these four true flags:
-intended_use_allowed, redistribution_allowed, rights_cleared, and
-source_identity_verified. The declared digest must match the artifact computed
-by the generator. The rights record itself is also hashed.
+每个权利记录同样使用 schema version 1.0 与 evidence type `model_rights`。它包含 `model_id`、`model_version`、`artifact_sha256`、`license_identifier`、`license_source_uri`、`source_uri` 以及以下四个为 `true` 的布尔标志：`intended_use_allowed`、`redistribution_allowed`、`rights_cleared` 和 `source_identity_verified`。声明的摘要必须与生成器计算的制品摘要一致。权利记录本身也会被计算哈希。
 
-## Offline Installation Input
+## 4. 离线安装输入 (Offline Installation Input)
 
-On the isolated blank Ubuntu 24.04 host, ask the installer to write its atomic
-structured result as the third argument:
+在隔离的空白 Ubuntu 24.04 主机上，让安装脚本将原子结构化结果写入第三个参数：
 
     deploy/scripts/install-offline.sh \
-      /srv/scenara-offline-0.3.0-dev.25 \
+      /srv/scenara-offline-0.3.0-dev.41 \
       /secure/scenara.env \
       /secure/offline-installer-result.json
 
-Run the example clients and core Parse smoke check separately. Each produces a
-unique JSON output with its check identity and zero exit code, for example:
+单独运行示例客户端和核心 Parse 冒烟检查。每个检查产生一个带自身检查标识和退出码为 0 的唯一 JSON 输出，例如：
 
     {"check": "core_parse", "exit_code": 0}
 
-Then provide:
+然后提供顶级输入：
 
     {
       "schema_version": "1.0",
       "evidence_type": "offline_install",
       "blank_host": true,
       "isolated_network": true,
-      "bundle_path": "scenara-offline-0.3.0-dev.25.tar.gz",
+      "bundle_path": "scenara-offline-0.3.0-dev.41.tar.gz",
       "installer_result_path": "offline-installer-result.json",
       "source_commit_path": "source-commit.txt",
       "check_results": {
@@ -153,6 +132,4 @@ Then provide:
       }
     }
 
-The installer result supplies the verified host, measured GPU memory, checksum
-state, health and console checks, and all seven required service states. The
-generator hashes the installer result, bundle, and external smoke outputs.
+安装器结果提供已验证的主机、实测 GPU 显存、校验和状态、健康和控制台检查，以及所有七个必需的服务状态。生成器会对安装器结果、安装包和外部冒烟输出计算哈希。

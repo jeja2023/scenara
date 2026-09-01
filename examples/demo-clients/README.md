@@ -15,4 +15,4 @@ node examples/demo-clients/node_demo_client.js --dry-run
 node examples/demo-clients/node_demo_client.js --asset-id ast_example --domain portrait
 ```
 
-The examples never print the API token. The Python example demonstrates image upload through the shortcut API; the Node example demonstrates a Run for an already registered media asset or source.
+示例脚本绝不会打印 API 令牌。Python 示例演示通过快捷 API 进行图片上传解析；Node 示例演示针对已登记的媒体资产或媒体源创建并轮询 Run 任务。

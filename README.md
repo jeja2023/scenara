@@ -18,6 +18,8 @@ Scenara 作为平台母品牌，统一规划 Parse、Model、Data、Edge、Flow�
 当前版本已提供产品目录、仓库拓扑、正式跨仓库契约、Organization、Project、User、Role、Membership、Service Account、API Key 与 Product Entitlement，并支持平台根令牌、按项目绑定的服务账号 API Key 以及用户名密码登录。`0.3.0-dev.41` 完成了控制台视觉设计紧凑化、控件规范统一（按钮/搜索/过滤/分页）与模型管理下拉筛选重构，并修复 CSS `line-clamp` 标准兼容性告警。Core 已通过版本化 Data 客户端接入 Dataset、Version、Annotation 和 Hard Sample 的独立服务边界；完整切流步骤见 [Data 切流操作说明](docs/strategy/DATA_PLATFORM_CUTOVER.md)。完整成熟度、依赖顺序与非目标见 [产品矩阵](docs/strategy/PRODUCT_MATRIX.md)，当前仓库与独立 Model/Data 仓库的分工见 [仓库拓扑](docs/strategy/REPOSITORY_TOPOLOGY.md)，五条可发布契约见 [契约包](contracts/repository/README.md)，认证和授权边界见 [访问底座](docs/strategy/ACCESS_FOUNDATION.md)，人像 AI 长期演进方向见 [人像智能基础平台战略](docs/strategy/PORTRAIT_INTELLIGENCE_STRATEGY.md)，升级影响见 [0.3.0-dev.41 发布说明](docs/release/0.3.0-dev.41.md)。
 
 解析控制台采用“解析 -> 领域”的工作区结构，人像和 OCR 文档分别进入独立领域页面；图片、视频、文档和视频流是页面内部的数据类型标签，例如 `parse/portrait/image` 与 `parse/ocr/document` 仍可作为深链路访问。每个领域工作区内完成上传、参数配置、运行进度、当前结果查看与历史恢复；“数据资产”和“运行”页面分别承担文件/视频流来源管理与运行生命周期管理，新增的“解析结果”页面负责跨领域、跨任务浏览和筛选结果。领域菜单由后端 `DomainManifest` 驱动，新领域接入时不需要重新拆分前端解析流程。
+
+```mermaid
 flowchart LR
     C["Client / Console"] --> A["Scenara API"]
     A --> M["Data Assets"]
@@ -80,9 +82,6 @@ API 默认位于 `http://127.0.0.1:8000`，Console 开发服务器位于 `http:/
 
 本仓库采用 [MIT License](LICENSE)，允许个人或组织使用、修改和部署；第三方组件、模型权利、数据集和媒体资产仍受其各自许可及适用法律约束。
 默认 Compose 部署为个人模式，不要求企业许可证。企业签名许可证校验代码保留在 `scenara.enterprise`，通过 `deploy/compose.enterprise.yml` 显式叠加后才启用。
-Current release baseline: `0.3.0-dev.41` (`0.3.0.dev41` for Python packages).
+当前发布基线：`0.3.0-dev.41`（Python 包为 `0.3.0.dev41`）。
 
-Object storage is provider-neutral at the platform boundary. MinIO is the
-private-deployment baseline; certified S3-compatible alternatives and the
-checksum, immutability, lifecycle, TLS, credential, and direct-transfer
-qualification contract are documented in [OBJECT_STORAGE_PROVIDERS.md](docs/OBJECT_STORAGE_PROVIDERS.md).
+对象存储在平台边界保持对提供商中立。MinIO 为私有化部署基线；经认证的兼容 S3 的替代方案以及校验和、不可变性、生命周期、TLS、凭据和直传资质契约详见 [OBJECT_STORAGE_PROVIDERS.md](docs/OBJECT_STORAGE_PROVIDERS.md)。

@@ -1,8 +1,8 @@
-# Model asset policy
+# 模型资产政策规范
 
-- Do not commit model weights, customer media, evaluation samples, engine caches, or derived biometric templates.
-- Every registered artifact must provide source, owner, license, redistribution decision, SHA-256, model card, input/output contract, evaluation report and regression samples.
-- A production profile rejects fallback, placeholder, unverified digest and unapproved license states.
-- Public examples may contain only synthetic inputs or assets with explicit redistribution permission.
-- Portrait candidates such as YOLO, SCRFD, ArcFace, OSNet, RTMPose and OpenGait are capability references, not approved bundled assets.
-- OCR and PDF runtimes must pass the same dependency, model and dataset license review before inclusion.
+- 禁止向代码仓库提交模型权重文件、客户媒体数据、评估样本集、推理引擎缓存或派生的生物特征模板。
+- 每一个登记的模型制品必须提供：来源出处、所有权人、授权许可、再分发决策、不可变 SHA-256 校验和、模型卡（Model Card）、输入/输出契约、评估报告以及回归验证样本。
+- 生产环境配置（Production Profile）严格拒绝回退降级（fallback）、占位符（placeholder）、未校验摘要（unverified digest）以及未经批准的许可证状态。
+- 公开示例与测试用例中仅允许使用合成数据或具有明确再分发授权的公开资产。
+- 候选人像模型（如 YOLO、SCRFD、ArcFace、OSNet、RTMPose 和 OpenGait）仅作为算法能力参考标准，并非仓库内置捆绑资产。
+- OCR 与 PDF 解析运行时在纳入支持前，必须通过完全相同的依赖项、算法模型和数据集版权许可审查。

@@ -1,113 +1,84 @@
-# Scenara implementation and acceptance matrix
+# Scenara 景枢实现与验收矩阵
 
-This matrix is the repository-level checklist for `Scenara 景枢全面优化升级方案.md`.
-`complete` requires implementation plus the evidence named in the last column.
-Items that require licensed model assets or target hardware remain incomplete
-until reproducible objective evidence is committed.
+本矩阵是 `Scenara 景枢全面优化升级方案.md` 的仓库级任务清单。
+“已完成（complete）”要求不仅具备代码实现，还必须具备最后一栏所列出的客观证据。
+凡需授权模型资产或目标硬件环境的条目，在提交可复现的客观证据前均保持未完成状态。
 
-Current development version: `0.3.0-dev.41` (`0.3.0.dev41` for Python packages).
+当前开发版本：`0.3.0-dev.41`（Python 包版本为 `0.3.0.dev41`）。
 
-## Release Gate Status
-The `0.3.0-dev.41` engineering baseline adds full-project audit remediation, cross-platform and runtime-operations hardening, and global UI compactness/design system standardization: synchronized CI/workspace commands, API/SDK contracts, strict Python and Console quality gates, deployment version convergence, unified Core/Data authentication, fail-closed model registration, sandboxed OCR layout rendering, centralized settings ownership, complete API-router modularization (leaving `server.py` with application infrastructure only), Windows UTC fallback, protected alert-image loading, debounced filters, bounded list rendering, automatic alert-stream reconnect, complete physical extraction of all six AccessView Tabs and nine write/key-display dialogs, complete Parse workbench decomposition into toolbar/media/input/history components plus ROI/run-tracking/preview/parameter/media-input composables, standardized compact controls across all pages, and model type dropdown filtering.
-Formal 1.0 release evidence remains fail-closed until the required evaluation,
-GPU capacity, offline-install, and model-rights checks are supplied for
-`0.3.0-dev.41`. Existing integration, security, backup/restore, and software-license
-reports are digest-bound to the current OpenAPI contract; historical reports
-remain archived and are not reused as current-release evidence. This personal
-project does not require named approvers or legal/commercial sign-off records.
+## 发布门禁状态
 
-## Implementation Parity Matrix
-The `0.3.0-dev.41` baseline processes finite video and PDF inputs to EOF unless callers
-explicitly request a compatibility cap. Continuous streams are archived into linked Run
-segments under one Stream Session, while inference batches publish `result.delta` events
-and append-only Result shards. Production uses the local personal policy by default; the signed enterprise policy
-provider remains available through the opt-in Compose extension. The baseline also adds indexed and expiring Session
-authentication, paginated/streaming audit access, bulk Result reads, SSE
-fallback control, Console auth-expiry handling, composable/router extraction,
-and `runtime-state/logs/` governance. Portrait video and stream results omit
-zero-object units while retaining analyzed sample counts and original hit
-timestamps; normal finite-media EOF is reported as successful source completion.
-It also completes the cross-video pedestrian Re-ID loop: in-video tracklets,
-long-term identity registration across Runs and cameras, camera topology and
-transition constraints, adjudication actions, public identity queries, and
-real two-video end-to-end coverage. Dataset, Version and Annotation requests now enter through Core's stable public API and are delegated to the configured Data platform client; the local adapter remains limited to development and migration verification.
+`0.3.0-dev.41` 工程基线包含全项目审计整改、跨平台与运行时运维加固、以及全局 UI 紧凑度与设计系统标准化：同步 CI/工作区命令、API/SDK 契约、严格的 Python 与 Console 质量门禁、部署版本收敛、统一 Core/Data 鉴权、关闭式模型登记校验、沙箱化 OCR 排版渲染、集中式配置归属、完整的 API 路由模块化拆分（`server.py` 仅保留应用基础架构）、Windows UTC 回退保护、受保护的告警图片加载、防抖过滤、有界列表渲染、告警流自动重连、AccessView 六大标签页与九个弹窗的完全物理组件化抽离、Parse 工作台完整解耦为工具栏/媒体/输入/历史组件及 ROI/任务跟踪/预览/参数/媒体输入 Composables、全页面紧凑控件规范以及模型类型下拉筛选重构。
+正式 1.0 发布证据在补齐 `0.3.0-dev.41` 所需的算法评估、GPU 容量、离线安装和模型权利检查前，严格保持关闭状态（fail-closed）。既有的集成、安全、备份恢复和软件许可证报告均与当前 OpenAPI 契约摘要绑定；历史报告保持归档，不作为当前版本的发布证据。本个人项目不需要指定审批人或法律/商业签署记录。
 
-| Stage | Deliverable | Status | Evidence required |
+## 功能对齐矩阵
+
+`0.3.0-dev.41` 基线默认将有限视频和 PDF 输入处理至文件末尾（EOF），除非调用方显式指定兼容性上限。持续视频流在一个 Stream Session 下归档为关联的 Run 分段，推理批次发布 `result.delta` 增量事件并追加写入不可变结果分片。生产环境默认采用本地个人策略；签名企业策略提供者通过可选的 Compose 扩展提供。基线还增加了带索引与过期机制的 Session 认证、分页/流式审计访问、批量结果读取、SSE 回退控制、控制台认证过期处理、Composable/路由拆分以及 `runtime-state/logs/` 日志治理。人像视频和流式结果省略零目标单元，同时保留已分析样本数和原始命中时间戳；正常的有限媒体 EOF 报告为源处理成功。
+本版本还补齐了跨视频行人重识别（Re-ID）闭环：视频内轨迹片段（Tracklets）、跨 Run 与跨摄像头的长期身份注册、摄像头拓扑与互斥约束、人工研判动作、公开身份查询以及真实的双视频端到端覆盖。Dataset、Version 和 Annotation 请求现已统一通过 Core 的稳定公开 API 进入，并转发至配置的 Data 平台客户端；本地适配器仅限于开发和迁移验证。
+
+| 阶段 | 交付物 | 状态 | 所需证据 |
 |---|---|---|---|
-| 0.1 | Brand, license, provenance, boundaries, ADR, OpenAPI, migration, CI, production Compose | engineering complete; license self-check recorded | repository, contract, Compose gates, and exact software-license hash |
-| 0.2 | Portrait and OCR vertical Media/Run/Operator/Pipeline/Result paths | complete | deterministic domain contract tests |
-| 0.3 | Image, video, PDF, stream, scheduling, checkpoint, SSE, webhook, feature store, retention, result shards | qualified on isolated local services | reproducible PostgreSQL/pgvector, Redis, and MinIO integration report recorded |
-| 0.4 | Detection, ReID, face, pose, parsing, apparel, segmentation, gait, quality fusion | implemented; model qualification pending | licensed model packages and fixed Portrait evaluation report required |
-| 0.4a | In-video tracklets plus cross-camera long-term trajectory: multi-modal fusion, camera topology and mutual-exclusion constraints, real media timeline, capped template galleries, human adjudication, and cross-video identity persistence | implemented; model qualification pending | trajectory domain tests, PostgreSQL migration, camera-registry API, console adjudication route, SDK and OpenAPI drift checks, and real two-video E2E coverage |
-| 0.5 | OCR detection/recognition, reading order, title, paragraph, image, table layout | implemented; model qualification pending | fixed Chinese/rotated/PDF/layout evaluation report required |
-| 0.6 | License, entitlements, quota, metering, SLA, incident, support, compliance evidence via policy provider | complete | signed-license, fail-closed quota, incident, support, and evidence tests |
-| 0.7 | Overview, product catalog, media, runs, results, Portrait, OCR, pipeline, models, access, operations, enterprise and feedback console; Chinese-first UI contract; Python and generated TS SDKs | complete | 12-route desktop/mobile browser checks, visible-English leakage scan, frontend tests, static `/console/` delivery, SDK and OpenAPI drift tests |
-| 0.8 | Product matrix and shared IAM foundation: organizations, projects, users, roles, memberships, service accounts, API keys, product-aware authorization, lifecycle controls, identity-provider configuration/probes, sessions, quotas, audit retention, local metering and seat limits | development complete; external federation and payment settlement remain deployment-gated | API/service tests, PostgreSQL migrations, lifecycle approval tests, one-time secret handling, scope narrowing, quota fail-closed tests, tenant isolation, Console and SDK contract checks |
-| 0.9 | Versioned repository topology plus four published cross-repository contracts, Core-to-Data remote client, checksummed migration export and cutover procedure | standalone Data development service, Core integration and local contract tests complete; production deployment/import/backup/recovery evidence remains gated | topology/catalog API tests, Data client compatibility/identity/idempotency tests, migration checksums, Draft 2020-12 schemas and examples, SHA-256 release lock, deterministic CI bundle, provider validation and backward-compatibility tests |
-| 1.0 | Ubuntu Compose, NVIDIA capacity qualification, PostgreSQL/pgvector, Redis, MinIO, offline install, backup/restore | implementation and local recovery drill complete; target qualification pending | strict release gate requires measured capacity, offline, and reproducible recovery reports |
-| 1.1 | Feedback review, verified Run/Result provenance, compliant hard-sample manifests, formal model admission, governed lifecycle, per-capability runtime switching, deployment-feedback outbox, and rollback | complete | immutable admission, evidence/state-machine, Run binding freeze, exact legacy-runtime selection, signed webhook delivery, SDK, console, PostgreSQL and compatibility tests |
-| 2.0 | Trigger-based new Domain expansion plus shared Flow/Search/Edge/Agent control-plane foundations | development seed complete; production qualification intentionally gated | two validated customer scenarios, legal model/data, owner and operations budget |
+| 0.1 | 品牌、许可证、出处溯源、架构边界、ADR、OpenAPI、迁移规范、CI、生产 Compose | 工程已完成；已记录许可证自检 | 仓库门禁、契约测试、Compose 门禁及确切的软件许可证哈希 |
+| 0.2 | 人像与 OCR 垂直 Media/Run/Operator/Pipeline/Result 链路 | 已完成 | 确定性领域契约测试 |
+| 0.3 | 图片、视频、PDF、视频流、任务调度、检查点、SSE、Webhook、特征库、数据保留、结果分片 | 已在隔离本地服务通过验证 | 已记录可复现的 PostgreSQL/pgvector、Redis 和 MinIO 集成测试报告 |
+| 0.4 | 目标检测、ReID、人脸、人体姿态、语义分割、服饰属性、细粒度分割、步态、质量融合 | 代码已实现；待模型资格认证 | 需授权模型包及固定的 Portrait 评估报告 |
+| 0.4a | 视频内轨迹片段与跨摄像头长期轨迹：多模态融合、摄像头拓扑与互斥约束、真实媒体时间轴、受限模板库、人工研判、跨视频身份持久化 | 代码已实现；待模型资格认证 | 轨迹领域测试、PostgreSQL 迁移、摄像头注册 API、控制台研判路由、SDK 与 OpenAPI 漂移检查及真实双视频端到端覆盖 |
+| 0.5 | OCR 文本检测/识别、阅读顺序、标题、段落、图片、表格版面分析 | 代码已实现；待模型资格认证 | 需固定的中文/旋转/PDF/版面评估报告 |
+| 0.6 | 许可证、产品权益、配额、计量、SLA、事件响应、支持、合规证据（通过策略提供者） | 已完成 | 签名许可证、关闭式配额、安全事件、技术支持与合规证据测试 |
+| 0.7 | 总览、产品目录、媒体、运行、结果、人像、OCR、流水线、模型、访问控制、运维监控、企业中心与反馈控制台；中文优先 UI 契约；Python 及生成的 TS SDK | 已完成 | 12 个路由的桌面/移动端浏览器验证、可见英文泄露扫描、前端测试、静态 `/console/` 托管、SDK 与 OpenAPI 漂移测试 |
+| 0.8 | 产品矩阵与共享 IAM 底座：组织、项目、用户、角色、成员关系、服务账号、API Key、按产品授权、生命周期控制、身份提供商配置/探测、会话、配额、审计保留、本地计量与席位限制 | 开发已完成；外部联合认证与支付结算受部署门禁约束 | API/服务测试、PostgreSQL 迁移、生命周期审批测试、一次性机密处理、范围收窄、配额关闭式测试、租户隔离、Console 与 SDK 契约检查 |
+| 0.9 | 版本化仓库拓扑及四个已发布跨仓库契约、Core 到 Data 远程客户端、带校验和的迁移导出与切流操作规范 | 独立 Data 开发服务、Core 集成与本地契约测试已完成；生产部署/导入/备份/恢复证据受门禁约束 | 拓扑/产品目录 API 测试、Data 客户端兼容性/身份/幂等性测试、迁移校验和、Draft 2020-12 schemas 与示例、SHA-256 发布锁定、确定性 CI 归档包、提供方验证与向后兼容性测试 |
+| 1.0 | Ubuntu Compose、NVIDIA 算力资格认证、PostgreSQL/pgvector、Redis、MinIO、离线安装、备份与恢复 | 实现与本地恢复演练已完成；目标环境资格待认证 | 严格发布门禁需实测容量、离线包与可复现的恢复报告 |
+| 1.1 | 反馈审查、已验证的 Run/Result 溯源、合规难例清单、正式模型准入、治理生命周期、按能力运行时切换、部署反馈发件箱与回滚 | 已完成 | 不可变准入、证据/状态机、Run 绑定冻结、旧版运行时精确匹配、签名 Webhook 投递、SDK、控制台、PostgreSQL 与兼容性测试 |
+| 2.0 | 基于触发器的新 Domain 扩展及共享 Flow/Search/Edge/Agent 控制面底座 | 开发基础已就绪；生产资格认证按规范受门禁约束 | 两个经过验证的客户场景、合规模型/数据、负责人与运维预算 |
 
-## Release gates
+## 发布门禁列表
 
-- [x] Source capability matrix marks each imported capability migrated,
-  reimplemented, or explicitly retired.
-- [x] Architecture and public contract suites pass.
-- [x] PostgreSQL/pgvector, Redis, and MinIO qualification report exists, including Redis pending-message recovery and full empty-stream rebuild from PostgreSQL/MinIO.
-- [x] SSRF, malicious image/PDF, decompression bomb, authorization, credential
-  redaction, embedding authorization, audit fail-closed, and biometric deletion
-  tests pass.
-- [ ] Versioned and rights-cleared Portrait and OCR evaluation manifests and
-  reproducible reports exist.
-- [ ] Measured GPU sustained load, burst, VRAM pressure, backpressure, and recovery
-  reports exist from the supported target.
-- [x] Repository gates cover secret patterns, model asset policy, MIT
-  license, provenance, security policy, and legacy brand identifiers. CI also
-  generates dependency license inventories and an SBOM.
-- [x] The exact MIT `LICENSE` text and SPDX identifier are recorded in a
-  self-check report bound to its SHA-256; no legal approval record is required.
-- [x] PostgreSQL + MinIO backup/restore evidence exists and verifies tenants, projects, media, Runs, Results, Pipelines, Models, audit, and biometric records.
-- [ ] Offline installation evidence exists from an isolated blank target host.
+- [x] 源能力矩阵将每个导入的能力标记为已迁移、已重新实现或明确停用。
+- [x] 架构与公共契约测试套件全部通过。
+- [x] 存在 PostgreSQL/pgvector、Redis 和 MinIO 资格认证报告，包含 Redis 挂起消息恢复以及基于 PostgreSQL/MinIO 的空流完整重建。
+- [x] SSRF、恶意图片/PDF、解压炸弹、权限授权、凭据脱敏、特征嵌入授权、审计防篡改关闭以及生物特征删除测试全部通过。
+- [ ] 存在版本化且权利合规的人像和 OCR 评估清单与可复现报告。
+- [ ] 存在支持的目标硬件上的 GPU 持续负载、突发、显存压力、背压和恢复实测报告。
+- [x] 仓库门禁覆盖机密模式、模型资产政策、MIT 许可证、出处溯源、安全政策以及旧版品牌标识。CI 同时生成依赖项许可证清单和 SBOM。
+- [x] 确切的 MIT `LICENSE` 文本和 SPDX 标识符记录在与其 SHA-256 绑定的自检报告中；无需法务审批记录。
+- [x] 存在 PostgreSQL + MinIO 备份与恢复证据，验证了租户、项目、媒体、Run、Result、Pipeline、Model、审计和生物特征记录。
+- [ ] 存在来自隔离空白目标主机的离线安装证据。
 
-The `1.0` version must not be published while any box above is unchecked.
+若上述任一选项未勾选，严禁发布 `1.0` 正式版。
 
-## Current local verification
+## 当前本地验证记录
 
-The contract, observability, version and release-hardening regression was executed on 2026-08-20; the Core boundary, version synchronization and Console regression checks were executed on 2026-08-16; earlier release-evidence, browser and decode checks below remain supporting implementation evidence only:
+契约、可观测性、版本和发布加固回归测试于 2026-08-20 执行；Core 边界、版本同步和 Console 回归检查于 2026-08-16 执行；以下早期的发布证据、浏览器和解码检查仅作为支持性实现证据：
 
-| Check | Result |
+| 检查项 | 结果 |
 |---|---|
-| Full Python baseline for `0.3.0-dev.41` | 317 passed, 12 integration-marked tests deselected; Ruff, strict Mypy, OpenAPI/SDK drift, repository contracts, and implementation/development gates pass |
-| Security contract suite | 62 passed, 0 skipped; CI runs it once (the coverage job ignores the six security regression files, measured at 65.01% without them) |
-| Console regression for `0.3.0-dev.41` | typecheck, ESLint, Prettier, production build and 26 unit tests passed; TypeScript SDK checks passed; all six Access tabs and nine dialogs are independently-owned Vue components |
-| Compose/Kubernetes tag convergence | deployment entrypoints resolve to `0.3.0-dev.41`; Data uses the same versioned service-token contract |
-| Core Data split regression | Core remote-client tests plus standalone Data service/Core round-trip, token rejection and no-token startup tests passed; production migration, import, backup/restore and cutover evidence remain gated |
-| Console workspace regression | typecheck, lint, format, 26 unit tests and production build passed; OCR layout is sandboxed and Data/Model views expose registered state clearly |
-| `.venv\\Scripts\\python.exe -m pytest -q` | 217 passed, 9 integration tests skipped in 57.55s; includes two-video trajectory ReID and `/api/v1/parse/video` shortcut coverage |
-| Real GOP keyframe cross-check | PyAV and Scenara both selected frames `0, 12, 24, 36, 48, 60, 72, 84, 96, 108`; normal decode no longer uses the FFmpeg raw-only keyframe flag |
-| Real-time video and stream browser qualification | HEVC file Run `run_915a658dcd69469a81877c21ee2f22ab` exposed 8/16/24-unit partial results before completing 32 units with 21 objects; HTTP MPEG-TS Run `run_2e3c39dd7f6b4c4aa65f27b3820a277c` exposed units 1-8 individually and completed with 7 objects; after an API container force-recreate, persisted Source `src_1cd455c67c7548cdad6aa9f35f1ed63a` successfully previewed and Run `run_9816db5634ec4b13a057e36566901224` exposed 4/8 units before completing with 9 objects; crop JPEGs, 1920x1080 full frames, highlights, and Results-page replay loaded successfully |
-| `SCENARA_RUN_INTEGRATION=1 .venv\\Scripts\\python.exe -m pytest -q -m integration tests/integration -rs` | 12 passed, 0 skipped in 5.98s against isolated Docker-backed PostgreSQL/pgvector, Redis and MinIO; Redis rebuild, duplicate prevention and artifact persistence verified |
-| Security contract suite | 61 passed, 0 skipped in 35.52s; SSRF, malicious media, authorization, credential redaction, audit fail-closed and biometric deletion covered |
-| `scripts/local_backup_restore_drill.ps1` | passed; PostgreSQL and MinIO plus nine business-entity classes restored; RPO 3.967s and RTO 5.358s |
-| `pnpm run check` plus Console lint/format checks | passed; 26 Console tests, typecheck, production build, warning-free ESLint, Prettier, and 2 TypeScript SDK contract tests |
-| `npm run console:e2e` | 50 passed across desktop Chrome and mobile Chromium viewports; login, all workspaces, media controls, governance workflows, Chinese copy, ownership topology and horizontal overflow checked |
-| Ruff (including `app/` correctness rules), Mypy, OpenAPI/SDK drift, published repository-contract drift/compatibility, repository gate, implementation release gate | all passed |
-| `python -m pip_audit -r requirements/dev.txt` and `pnpm audit --audit-level high` | no known vulnerabilities in the committed dependency definitions |
-| Deployment script syntax | all `deploy/scripts/*.sh` files passed `bash -n` in a cached Linux container |
-| Strict `python scripts/release_gate.py` | fails closed, as designed, for the 11 missing reproducible evidence types: backup/restore, behavior/fashion/portrait/OCR evaluation, GPU capacity, integration services, model rights, offline install, security assessment, and software license; no implementation or contract-drift errors remain |
+| `0.3.0-dev.41` 全量 Python 基线 | 317 项通过，12 项标记为 integration 的测试跳过；Ruff、严格 Mypy、OpenAPI/SDK 漂移、仓库契约及实现/开发门禁全部通过 |
+| 安全契约测试套件 | 62 项通过，0 项跳过；CI 统一运行一次（覆盖率任务忽略 6 个安全回归文件，未计算时为 65.01%） |
+| `0.3.0-dev.41` 控制台回归 | 类型检查、ESLint、Prettier、生产构建与 26 项单元测试全部通过；TypeScript SDK 检查通过；Access 6 个标签页与 9 个弹窗全部独立组件化 |
+| Compose/Kubernetes 镜像标签收敛 | 部署入口统一解析为 `0.3.0-dev.41`；Data 使用同版本的服务令牌契约 |
+| Core 与 Data 拆分回归 | Core 远程客户端测试与独立 Data 服务/Core 往返、令牌拒绝与无令牌启动测试全部通过；生产迁移、导入、备份恢复与切流证据受门禁保护 |
+| 控制台工作区回归 | 类型检查、代码检查、代码格式化、26 项单元测试与生产构建全部通过；OCR 排版完全沙箱化，Data/Model 视图清晰展示登记状态 |
+| `.venv\Scripts\python.exe -m pytest -q` | 217 项通过，9 项集成测试跳过，耗时 57.55s；包含双视频轨迹 ReID 与 `/api/v1/parse/video` 快捷路径覆盖 |
+| 真实 GOP 关键帧交叉校验 | PyAV 与 Scenara 均提取帧 `0, 12, 24, 36, 48, 60, 72, 84, 96, 108`；正常解码不再使用 FFmpeg raw-only 关键帧标志 |
+| 实时视频与流式浏览器环境认证 | HEVC 文件 Run `run_915a658dcd69469a81877c21ee2f22ab` 在完成 32 单元 21 个目标前正常展示 8/16/24 单元部分结果；HTTP MPEG-TS Run `run_2e3c39dd7f6b4c4aa65f27b3820a277c` 逐一展示 1-8 单元并完成 7 个目标；API 容器强制重建后，持久化媒体源 `src_1cd455c67c7548cdad6aa9f35f1ed63a` 成功预览且 Run `run_9816db5634ec4b13a057e36566901224` 在完成 9 个目标前展示 4/8 单元；裁剪 JPEG、1920x1080 完整帧、高亮标记与结果页回放均正常加载 |
+| `SCENARA_RUN_INTEGRATION=1 .venv\Scripts\python.exe -m pytest -q -m integration tests/integration -rs` | 12 项通过，0 项跳过，在隔离的 Docker 后端 PostgreSQL/pgvector、Redis 和 MinIO 下耗时 5.98s；Redis 重建、重复防范与产物持久化均验证通过 |
+| 安全契约测试套件 | 61 项通过，0 项跳过，耗时 35.52s；覆盖 SSRF、恶意媒体、权限校验、凭证脱敏、审计关闭式防篡改与生物特征删除 |
+| `scripts/local_backup_restore_drill.ps1` | 通过；恢复了 PostgreSQL、MinIO 及 9 类业务实体；RPO 3.967s，RTO 5.358s |
+| `pnpm run check` 及控制台 lint/format 检查 | 通过；26 项控制台测试、类型检查、生产构建、无警告 ESLint、Prettier 以及 2 项 TypeScript SDK 契约测试全部通过 |
+| `npm run console:e2e` | 桌面端 Chrome 与移动端 Chromium 视口共 50 项通过；覆盖登录、全部工作区、媒体控件、治理工作流、中文文案、归属拓扑与水平溢出检查 |
+| Ruff（含 `app/` 正确性规则）、Mypy、OpenAPI/SDK 漂移、已发布仓库契约漂移/兼容性、仓库门禁、实现发布门禁 | 全部通过 |
+| `python -m pip_audit -r requirements/dev.txt` 与 `pnpm audit --audit-level high` | 已提交的依赖定义中无已知安全漏洞 |
+| 部署脚本语法检查 | 所有 `deploy/scripts/*.sh` 文件在缓存的 Linux 容器中通过 `bash -n` 校验 |
+| 严格模式 `python scripts/release_gate.py` | 按设计关闭（fail-closed），针对 11 项缺失的可复现证据：备份恢复、行为/服饰/人像/OCR 评估、GPU 容量、集成服务、模型权利、离线安装、安全评估与软件许可证；无任何实现或契约漂移错误残留 |
 
-Local results do not yet satisfy the measured target-GPU workload, per-model rights
-records, fixed Portrait/OCR evaluation sets, or isolated Ubuntu offline-install
-requirements. GPU count and memory are recorded as descriptive hardware evidence,
-while qualification depends on the measured workload and five required scenario
-outcomes; no fixed GPU-count or memory threshold is imposed by the deployment.
-These items remain unchecked until reproducible objective evidence is recorded.
+本地测试结果尚未满足目标 GPU 实测负载、每模型权利记录、固定人像/OCR 评估集或隔离 Ubuntu 离线安装要求。GPU 数量和显存作为描述性硬件证据记录，资格认证取决于实测负载和 5 项必需的场景输出；部署配置不施加固定的 GPU 数量或显存阈值。在记录可复现的客观证据前，这些条目保持未勾选。
 
-## Product matrix gates after 0.3.0
+## 0.3.0 后的产品矩阵门禁
 
-- Local username/password login, interactive sessions, identity-provider registration/probes, user lifecycle checks, and login-time Membership/Role scope resolution are implemented; signed OIDC/SAML/SCIM assertion exchange remains deployment-gated.
-- Quota plans, fail-closed usage checks, billing accounts, idempotent metering, usage aggregation, and seat limits are implemented; payment settlement, invoices, taxes and self-service purchase remain deployment-gated.
-- Project disable/restore/delete approval requests and audit retention policy/purge controls are implemented; tenant-scoped audit search and JSON/CSV export remain available.
-- Annotation task/review plus provider probes, Edge device/sync/deployment acknowledgements, Search evaluation/ranking profiles with weighted retrieval plus index-backend/reranker probes, Flow run/condition/approval/webhook execution, Worker leases, and Agent least-scope approval/execution with trace/evaluation/memory records are implemented. Qdrant, Triton and MLflow provider boundaries plus thresholded automatic model rollback are implemented; real provider clusters, ANN/semantic model execution and model training remain gated. Kubernetes deployments and HPA are provided as a pre-production topology and still require target-cluster evidence.
-- These capabilities must extend the shared IAM and product catalog instead of introducing per-product identity, authorization or deployment stacks.
-- The current repository remains the platform integration repository. Model training stays in its existing professional repository; Data is split only after first-class dataset ownership and versioned handoff contracts are stable.
+- 本地用户名/密码登录、交互式会话、身份提供商登记/探测、用户生命周期检查以及登录时成员关系/角色范围解析均已实现；签名 OIDC/SAML/SCIM 断言交换受部署门禁约束。
+- 配额方案、关闭式用量检查、结算账户、幂等计量、用量聚合与席位限制均已实现；支付结算、发票、税费和自助购买受部署门禁约束。
+- 项目禁用/恢复/删除审批请求以及审计保留策略/清理控制均已实现；租户作用域审计搜索与 JSON/CSV 导出持续可用。
+- 标注任务/审查及标注商探测、边缘设备/同步/部署确认、带加权检索与索引后端/重排探测的 Search 评估/排序配置、Flow 运行/条件/审批/Webhook 执行、Worker 租约以及带追踪/评估/记忆记录的 Agent 最小权限审批/执行均已实现。Qdrant、Triton 和 MLflow 提供商边界及带阈值的自动模型回滚已实现；真实提供商集群、ANN/语义模型执行和模型训练受门禁约束。Kubernetes 部署与 HPA 作为准生产拓扑提供，仍需目标集群证据。
+- 这些能力必须扩展共享的 IAM 和产品目录，而不是引入独立的产品身份、授权或部署栈。
+- 当前仓库保持为平台集成仓库。模型训练保留在现有的专业仓库中；Data 仅在一等数据集所有权和版本化交接契约稳定后才进行拆分。
