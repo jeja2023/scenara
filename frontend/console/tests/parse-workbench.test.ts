@@ -16,6 +16,7 @@ const routerMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("vue-router", () => ({
+  RouterLink: { template: "<a><slot /></a>" },
   useRoute: () => ({ query: {} }),
   useRouter: () => routerMocks,
 }));

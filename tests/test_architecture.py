@@ -43,6 +43,103 @@ def test_public_error_codes_are_registered() -> None:
     assert emitted <= REGISTERED_ERROR_CODES
 
 
+def test_core_api_domains_are_owned_by_dedicated_routers() -> None:
+    server = Path("scenara/server.py").read_text(encoding="utf-8")
+    expected = {
+        "access.py": ("build_access_router", "/api/v1/platform/organizations"),
+        "agents.py": ("build_agents_router", "/api/v1/agents/tools"),
+        "data_governance.py": (
+            "build_data_governance_router",
+            "/api/v1/data/annotation-tasks",
+        ),
+        "datasets.py": ("build_datasets_router", "/api/v1/datasets"),
+        "edge.py": ("build_edge_router", "/api/v1/edge/devices"),
+        "enterprise.py": ("build_enterprise_router", "/api/v1/enterprise/status"),
+        "feedback.py": ("build_feedback_router", "/api/v1/feedback"),
+        "flows.py": ("build_flows_router", "/api/v1/flows"),
+        "iam.py": ("build_iam_router", "/api/v1/platform/identity-providers"),
+        "media.py": ("build_media_router", "/api/v1/media/assets"),
+        "operations.py": ("build_operations_router", "/api/v1/system/status"),
+        "parse.py": ("build_parse_router", "/api/v1/parse/image"),
+        "portrait.py": ("build_portrait_router", "/api/v1/portrait/identities"),
+        "portrait_intelligence.py": (
+            "build_portrait_intelligence_router",
+            "/api/v1/portrait/clusters",
+        ),
+        "runs.py": ("build_runs_router", "/api/v1/runs"),
+        "search.py": ("build_search_router", "/api/v1/search/text"),
+        "surveillance.py": ("build_surveillance_router", "/api/v1/surveillance/watchlists"),
+    }
+    for filename, (factory, endpoint) in expected.items():
+        router = Path("scenara/api/routers") / filename
+        source = router.read_text(encoding="utf-8")
+        assert factory in source
+        assert endpoint in source
+        assert endpoint not in server
+
+
+def test_access_view_uses_domain_tabs_and_dialog_components() -> None:
+    view = Path("frontend/console/src/views/AccessView.vue").read_text(encoding="utf-8")
+    assert '<section class="page access-page">' in view
+    assert "<style scoped>" not in view
+    for component in (
+        "FoundationTab",
+        "IdentityTab",
+        "CredentialsTab",
+        "ProductsTab",
+        "EventsTab",
+        "ConnectionTab",
+        "IdentityDialogs",
+        "CredentialsDialogs",
+        "ProductsDialog",
+        "EventsDialog",
+        "IssuedKeyDialog",
+    ):
+        assert f"{component}.vue" in view
+        assert f"<{component}" in view
+
+
+def test_parse_view_delegates_history_roi_and_styles() -> None:
+    view = Path("frontend/console/src/views/ParseView.vue").read_text(
+        encoding="utf-8"
+    )
+    assert "ParseHistoryPanel.vue" in view
+    assert "useRoiSelection" in view
+    assert 'src="./parse/parse-workbench.css"' in view
+    for filename in (
+        "ParseHistoryPanel.vue",
+        "ParseInputControls.vue",
+        "ParseMediaPreview.vue",
+        "ParseWorkspaceToolbar.vue",
+        "parse-workbench.css",
+        "useParseMediaInput.ts",
+        "useParseParameters.ts",
+        "useRoiSelection.ts",
+        "useResultPreview.ts",
+        "useRunTracker.ts",
+    ):
+        assert (Path("frontend/console/src/views/parse") / filename).is_file()
+    for module in (
+        "ParseHistoryPanel",
+        "ParseInputControls",
+        "ParseMediaPreview",
+        "ParseWorkspaceToolbar",
+        "useParseMediaInput",
+        "useParseParameters",
+        "useResultPreview",
+        "useRunTracker",
+    ):
+        assert module in view
+
+
+def test_feedback_view_owns_no_embedded_page_styles() -> None:
+    view = Path("frontend/console/src/views/FeedbackView.vue").read_text(
+        encoding="utf-8"
+    )
+    assert 'src="./feedback/feedback-workbench.css"' in view
+    assert (Path("frontend/console/src/views/feedback/feedback-workbench.css")).is_file()
+
+
 def test_platform_kernel_has_no_domain_id_branching() -> None:
     violations: list[str] = []
     for path in Path("scenara/platform").glob("*.py"):

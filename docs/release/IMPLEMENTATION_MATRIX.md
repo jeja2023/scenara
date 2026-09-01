@@ -8,7 +8,7 @@ until reproducible objective evidence is committed.
 Current development version: `0.3.0-dev.40` (`0.3.0.dev40` for Python packages).
 
 ## Release Gate Status
-The `0.3.0-dev.40` engineering baseline adds full-project audit remediation plus cross-platform and runtime-operations hardening: synchronized CI/workspace commands, API/SDK contracts, strict Python and Console quality gates, deployment version convergence, unified Core/Data authentication, fail-closed model registration, sandboxed OCR layout rendering, centralized settings ownership, catalog and surveillance router modularization, Windows UTC fallback, protected alert-image loading, debounced filters, bounded list rendering, and automatic alert-stream reconnect.
+The `0.3.0-dev.40` engineering baseline adds full-project audit remediation plus cross-platform and runtime-operations hardening: synchronized CI/workspace commands, API/SDK contracts, strict Python and Console quality gates, deployment version convergence, unified Core/Data authentication, fail-closed model registration, sandboxed OCR layout rendering, centralized settings ownership, complete API-router modularization (leaving `server.py` with application infrastructure only), Windows UTC fallback, protected alert-image loading, debounced filters, bounded list rendering, automatic alert-stream reconnect, complete physical extraction of all six AccessView Tabs and nine write/key-display dialogs, and complete Parse workbench decomposition into toolbar/media/input/history components plus ROI, run-tracking, preview, parameter and media-input composables.
 Formal 1.0 release evidence remains fail-closed until the required evaluation,
 GPU capacity, offline-install, and model-rights checks are supplied for
 `0.3.0-dev.40`. Existing integration, security, backup/restore, and software-license
@@ -77,9 +77,9 @@ The contract, observability, version and release-hardening regression was execut
 
 | Check | Result |
 |---|---|
-| Full Python baseline for `0.3.0-dev.40` | Ruff, strict Mypy, OpenAPI/SDK drift, repository contracts, and implementation/development gates pass; targeted regression groups pass |
+| Full Python baseline for `0.3.0-dev.40` | 317 passed, 12 integration-marked tests deselected; Ruff, strict Mypy, OpenAPI/SDK drift, repository contracts, and implementation/development gates pass |
 | Security contract suite | 62 passed, 0 skipped; CI runs it once (the coverage job ignores the six security regression files, measured at 65.01% without them) |
-| Console regression for `0.3.0-dev.40` | typecheck, ESLint, Prettier, production build and 26 unit tests passed; TypeScript SDK checks passed |
+| Console regression for `0.3.0-dev.40` | typecheck, ESLint, Prettier, production build and 26 unit tests passed; TypeScript SDK checks passed; all six Access tabs and nine dialogs are independently-owned Vue components |
 | Compose/Kubernetes tag convergence | deployment entrypoints resolve to `0.3.0-dev.40`; Data uses the same versioned service-token contract |
 | Core Data split regression | Core remote-client tests plus standalone Data service/Core round-trip, token rejection and no-token startup tests passed; production migration, import, backup/restore and cutover evidence remain gated |
 | Console workspace regression | typecheck, lint, format, 26 unit tests and production build passed; OCR layout is sandboxed and Data/Model views expose registered state clearly |
@@ -94,7 +94,7 @@ The contract, observability, version and release-hardening regression was execut
 | Ruff (including `app/` correctness rules), Mypy, OpenAPI/SDK drift, published repository-contract drift/compatibility, repository gate, implementation release gate | all passed |
 | `python -m pip_audit -r requirements/dev.txt` and `pnpm audit --audit-level high` | no known vulnerabilities in the committed dependency definitions |
 | Deployment script syntax | all `deploy/scripts/*.sh` files passed `bash -n` in a cached Linux container |
-| Strict `python scripts/release_gate.py` | fails closed only for `gpu_capacity`, `model_rights`, `ocr_evaluation`, `offline_install`, and `portrait_evaluation`; no implementation or report-digest errors remain |
+| Strict `python scripts/release_gate.py` | fails closed, as designed, for the 11 missing reproducible evidence types: backup/restore, behavior/fashion/portrait/OCR evaluation, GPU capacity, integration services, model rights, offline install, security assessment, and software license; no implementation or contract-drift errors remain |
 
 Local results do not yet satisfy the measured target-GPU workload, per-model rights
 records, fixed Portrait/OCR evaluation sets, or isolated Ubuntu offline-install

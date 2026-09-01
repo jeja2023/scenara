@@ -98,7 +98,9 @@ def build_audit_router(
             offset=offset,
             limit=limit,
         )
-        return envelope(request, AuditEventPage(items=page, offset=offset, limit=limit, total=total))  # type: ignore[return-value]
+        return envelope(
+            request, AuditEventPage(items=page, offset=offset, limit=limit, total=total)
+        )  # type: ignore[return-value]
 
     @router.get("/api/v1/audit/export", tags=["Operations"])
     async def export_audit_events(
@@ -120,7 +122,9 @@ def build_audit_router(
             "created_after": created_after,
             "created_before": created_before,
         }
-        total = await runtime.state.count_audit_events(context.tenant_id, context.project_id, **filters)
+        total = await runtime.state.count_audit_events(
+            context.tenant_id, context.project_id, **filters
+        )
 
         async def pages() -> AsyncIterator[list[AuditEventView]]:
             offset = 0
@@ -148,13 +152,19 @@ def build_audit_router(
                         if not first:
                             yield ","
                         first = False
-                        yield json.dumps(event.model_dump(mode="json"), ensure_ascii=False, separators=(",", ":"))
+                        yield json.dumps(
+                            event.model_dump(mode="json"),
+                            ensure_ascii=False,
+                            separators=(",", ":"),
+                        )
                 yield f'],"offset":0,"limit":{total},"total":{total}}}'
 
             return StreamingResponse(
                 json_stream(),
                 media_type="application/json",
-                headers={"Content-Disposition": "attachment; filename=scenara-audit.json"},
+                headers={
+                    "Content-Disposition": "attachment; filename=scenara-audit.json"
+                },
             )
 
         async def csv_stream() -> AsyncIterator[str]:
