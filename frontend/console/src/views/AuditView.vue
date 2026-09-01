@@ -26,7 +26,7 @@ const columns: TableColumn<AuditEvent>[] = [
   { key: "resource", label: "资源", width: "160px" },
   { key: "principal_id", label: "主体", width: "120px" },
   { key: "outcome", label: "结果", width: "100px" },
-  { key: "evidence", label: "证据" },
+  { key: "evidence", label: "详情" },
 ];
 
 function resetFilters(): void {
@@ -259,7 +259,7 @@ useRefresh(refresh);
           </span>
         </template>
 
-        <!-- 6. 证据 -->
+        <!-- 6. 详情 -->
         <template #evidence="{ row }">
           <span
             class="evidence-text mono"
