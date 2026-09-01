@@ -1,11 +1,11 @@
 {
   "schema_version": "1.2",
-  "release": "0.3.0-dev.39",
+  "release": "0.3.0-dev.40",
   "release_identity": {
     "source_commit": null,
     "image_digest": null,
     "offline_bundle_sha256": null,
-    "openapi_sha256": "c2bb6dd993fc67add28d7aa7be3a4657ed323e74255ff8ebac71d36c30ad30c0",
+    "openapi_sha256": "0d947f968c83d7c5630e9f69946755464f8c6809dfc0a8110709b03e04d9501e",
     "model_set_sha256": null
   },
   "entries": [

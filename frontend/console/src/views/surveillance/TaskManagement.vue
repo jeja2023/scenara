@@ -14,6 +14,7 @@ import {
 import { computed, onMounted, reactive, ref } from "vue";
 
 import { api, userFacingError } from "../../api";
+import { useDebouncedRef } from "../../composables/useDebouncedRef";
 import {
   createTask,
   listTasks,
@@ -36,6 +37,7 @@ const loading = ref(false);
 const mutating = ref(false);
 const error = ref("");
 const searchQuery = ref("");
+const debouncedSearchQuery = useDebouncedRef(searchQuery);
 const statusFilter = ref<string>("all");
 const showCreateModal = ref(false);
 
@@ -61,8 +63,8 @@ const filteredTasks = computed(() => {
     if (statusFilter.value !== "all" && item.status !== statusFilter.value) {
       return false;
     }
-    if (searchQuery.value.trim()) {
-      const q = searchQuery.value.trim().toLowerCase();
+    if (debouncedSearchQuery.value.trim()) {
+      const q = debouncedSearchQuery.value.trim().toLowerCase();
       const matchName = item.name.toLowerCase().includes(q);
       const matchId = item.task_id.toLowerCase().includes(q);
       const matchCamera = item.bindings.some((b) =>
@@ -73,6 +75,7 @@ const filteredTasks = computed(() => {
     return true;
   });
 });
+const visibleTasks = computed(() => filteredTasks.value.slice(0, 500));
 
 function getWatchlistName(id: string): string {
   const wl = watchlists.value.find((item) => item.watchlist_id === id);
@@ -236,7 +239,7 @@ onMounted(() => void refresh());
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(task, idx) in filteredTasks" :key="task.task_id">
+            <tr v-for="(task, idx) in visibleTasks" :key="task.task_id">
               <td style="text-align: center" class="muted mono">
                 {{ idx + 1 }}
               </td>
@@ -341,6 +344,11 @@ onMounted(() => void refresh());
                     <Pause :size="11" />暂停
                   </button>
                 </div>
+              </td>
+            </tr>
+            <tr v-if="filteredTasks.length > visibleTasks.length">
+              <td colspan="9" class="list-limit-note">
+                仅展示前 500 条结果，请使用搜索或状态筛选缩小范围。
               </td>
             </tr>
             <tr v-if="!filteredTasks.length">
@@ -620,7 +628,9 @@ onMounted(() => void refresh());
 }
 
 .table-scroll {
-  overflow-x: auto;
+  max-height: min(70vh, 820px);
+  overflow: auto;
+  overscroll-behavior: contain;
   background: #ffffff;
 }
 
@@ -764,6 +774,13 @@ onMounted(() => void refresh());
 }
 
 /* 空状态 */
+.list-limit-note {
+  padding: 10px 14px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted, #64748b);
+}
+
 .empty-cell {
   background: #fafbfb;
   text-align: center;

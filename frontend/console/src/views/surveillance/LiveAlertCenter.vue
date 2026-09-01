@@ -2,17 +2,37 @@
 import { BellRing, Camera, Radio, Trash2, Volume2, VolumeX } from "@lucide/vue";
 import { onBeforeUnmount, onMounted, ref } from "vue";
 
-import { api, apiStream, streamJsonEvents, userFacingError } from "../../api";
+import {
+  api,
+  apiImageDataUrl,
+  apiStream,
+  streamJsonEvents,
+  userFacingError,
+} from "../../api";
 import { listAlerts } from "../../api/surveillance";
 import { labelModality } from "../../labels";
 import type { SurveillanceAlert, SurveillanceAlertEvent } from "../../types";
 
 const alerts = ref<SurveillanceAlert[]>([]);
+const snapshotUrls = ref(new Map<string, string>());
+const failedSnapshots = ref(new Set<string>());
 const connected = ref(false);
 const muted = ref(true);
 const error = ref("");
 let controller: AbortController | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+let stopped = false;
+let reconnectAttempt = 0;
 let cursor = 0;
+
+function scheduleReconnect(): void {
+  if (stopped || reconnectTimer !== undefined) return;
+  const delay = Math.min(30_000, 1_000 * 2 ** Math.min(5, reconnectAttempt++));
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = undefined;
+    void connect();
+  }, delay);
+}
 
 function format(value: number): string {
   if (!value) return "-";
@@ -24,10 +44,32 @@ function format(value: number): string {
   });
 }
 
-function snapshot(alert: SurveillanceAlert): string | null {
+function snapshotPath(alert: SurveillanceAlert): string | null {
   return alert.snapshot_artifact_id
     ? `/api/v1/runs/${encodeURIComponent(alert.run_id)}/artifacts/${encodeURIComponent(alert.snapshot_artifact_id)}`
     : null;
+}
+
+function snapshot(alert: SurveillanceAlert): string | null {
+  return snapshotUrls.value.get(alert.alert_id) ?? null;
+}
+
+async function loadSnapshot(alert: SurveillanceAlert): Promise<void> {
+  const path = snapshotPath(alert);
+  if (!path || snapshotUrls.value.has(alert.alert_id)) return;
+  try {
+    const url = await apiImageDataUrl(path);
+    snapshotUrls.value = new Map(snapshotUrls.value).set(alert.alert_id, url);
+  } catch {
+    failedSnapshots.value = new Set(failedSnapshots.value).add(alert.alert_id);
+  }
+}
+
+function retrySnapshot(alert: SurveillanceAlert): void {
+  const next = new Set(failedSnapshots.value);
+  next.delete(alert.alert_id);
+  failedSnapshots.value = next;
+  void loadSnapshot(alert);
 }
 
 function beep(): void {
@@ -48,9 +90,11 @@ function beep(): void {
 async function initial(): Promise<void> {
   const page = await listAlerts("limit=30");
   alerts.value = page.items;
+  await Promise.all(page.items.map(loadSnapshot));
 }
 
 async function connect(): Promise<void> {
+  if (stopped) return;
   controller?.abort();
   controller = new AbortController();
   connected.value = false;
@@ -60,6 +104,7 @@ async function connect(): Promise<void> {
       `/api/v1/surveillance/alerts/live-stream?last_event_id=${cursor}`,
       controller.signal,
     );
+    reconnectAttempt = 0;
     connected.value = true;
     for await (const event of streamJsonEvents<SurveillanceAlertEvent>(
       response,
@@ -74,15 +119,18 @@ async function connect(): Promise<void> {
       );
       if (!alerts.value.some((item) => item.alert_id === alert.alert_id)) {
         alerts.value = [alert, ...alerts.value].slice(0, 30);
+        void loadSnapshot(alert);
         beep();
       }
     }
   } catch (caught) {
     if (!controller?.signal.aborted) {
       error.value = userFacingError(caught, "实时告警连接已断开");
+      scheduleReconnect();
     }
   } finally {
     connected.value = false;
+    if (!stopped && !controller?.signal.aborted) scheduleReconnect();
   }
 }
 
@@ -96,6 +144,10 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => controller?.abort());
+onBeforeUnmount(() => {
+  stopped = true;
+  if (reconnectTimer !== undefined) clearTimeout(reconnectTimer);
+});
 </script>
 
 <template>
@@ -157,7 +209,18 @@ onBeforeUnmount(() => controller?.abort());
           />
           <div v-else class="placeholder-box">
             <Camera :size="28" class="placeholder-icon" />
-            <span>无抓拍图</span>
+            <span>{{
+              failedSnapshots.has(alert.alert_id)
+                ? "抓拍图加载失败"
+                : "无抓拍图"
+            }}</span>
+            <button
+              v-if="failedSnapshots.has(alert.alert_id)"
+              class="button secondary tiny-btn"
+              @click.stop="retrySnapshot(alert)"
+            >
+              重试
+            </button>
           </div>
 
           <!-- 抓拍时间角标 -->

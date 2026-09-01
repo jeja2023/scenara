@@ -5,19 +5,19 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until reproducible objective evidence is committed.
 
-Current development version: `0.3.0-dev.39` (`0.3.0.dev39` for Python packages).
+Current development version: `0.3.0-dev.40` (`0.3.0.dev40` for Python packages).
 
 ## Release Gate Status
-The `0.3.0-dev.39` engineering baseline adds full-project audit remediation: synchronized CI/workspace commands, API/SDK contracts, strict Python and Console quality gates, deployment version convergence, unified Core/Data authentication, fail-closed model registration, sandboxed OCR layout rendering, centralized settings ownership, and catalog-router modularization.
+The `0.3.0-dev.40` engineering baseline adds full-project audit remediation plus cross-platform and runtime-operations hardening: synchronized CI/workspace commands, API/SDK contracts, strict Python and Console quality gates, deployment version convergence, unified Core/Data authentication, fail-closed model registration, sandboxed OCR layout rendering, centralized settings ownership, catalog and surveillance router modularization, Windows UTC fallback, protected alert-image loading, debounced filters, bounded list rendering, and automatic alert-stream reconnect.
 Formal 1.0 release evidence remains fail-closed until the required evaluation,
 GPU capacity, offline-install, and model-rights checks are supplied for
-`0.3.0-dev.39`. Existing integration, security, backup/restore, and software-license
+`0.3.0-dev.40`. Existing integration, security, backup/restore, and software-license
 reports are digest-bound to the current OpenAPI contract; historical reports
 remain archived and are not reused as current-release evidence. This personal
 project does not require named approvers or legal/commercial sign-off records.
 
 ## Implementation Parity Matrix
-The `0.3.0-dev.39` baseline processes finite video and PDF inputs to EOF unless callers
+The `0.3.0-dev.40` baseline processes finite video and PDF inputs to EOF unless callers
 explicitly request a compatibility cap. Continuous streams are archived into linked Run
 segments under one Stream Session, while inference batches publish `result.delta` events
 and append-only Result shards. Production uses the local personal policy by default; the signed enterprise policy
@@ -77,19 +77,19 @@ The contract, observability, version and release-hardening regression was execut
 
 | Check | Result |
 |---|---|
-| Full Python baseline for `0.3.0-dev.39` | Ruff, strict Mypy, OpenAPI/SDK drift, repository contracts, and implementation/development gates pass; targeted regression groups pass |
+| Full Python baseline for `0.3.0-dev.40` | Ruff, strict Mypy, OpenAPI/SDK drift, repository contracts, and implementation/development gates pass; targeted regression groups pass |
 | Security contract suite | 62 passed, 0 skipped; CI runs it once (the coverage job ignores the six security regression files, measured at 65.01% without them) |
-| Console regression for `0.3.0-dev.39` | typecheck, ESLint, Prettier, production build and 25 unit tests passed; TypeScript SDK checks passed |
-| Compose/Kubernetes tag convergence | deployment entrypoints resolve to `0.3.0-dev.39`; Data uses the same versioned service-token contract |
+| Console regression for `0.3.0-dev.40` | typecheck, ESLint, Prettier, production build and 26 unit tests passed; TypeScript SDK checks passed |
+| Compose/Kubernetes tag convergence | deployment entrypoints resolve to `0.3.0-dev.40`; Data uses the same versioned service-token contract |
 | Core Data split regression | Core remote-client tests plus standalone Data service/Core round-trip, token rejection and no-token startup tests passed; production migration, import, backup/restore and cutover evidence remain gated |
-| Console workspace regression | typecheck, lint, format, 25 unit tests and production build passed; OCR layout is sandboxed and Data/Model views expose registered state clearly |
+| Console workspace regression | typecheck, lint, format, 26 unit tests and production build passed; OCR layout is sandboxed and Data/Model views expose registered state clearly |
 | `.venv\\Scripts\\python.exe -m pytest -q` | 217 passed, 9 integration tests skipped in 57.55s; includes two-video trajectory ReID and `/api/v1/parse/video` shortcut coverage |
 | Real GOP keyframe cross-check | PyAV and Scenara both selected frames `0, 12, 24, 36, 48, 60, 72, 84, 96, 108`; normal decode no longer uses the FFmpeg raw-only keyframe flag |
 | Real-time video and stream browser qualification | HEVC file Run `run_915a658dcd69469a81877c21ee2f22ab` exposed 8/16/24-unit partial results before completing 32 units with 21 objects; HTTP MPEG-TS Run `run_2e3c39dd7f6b4c4aa65f27b3820a277c` exposed units 1-8 individually and completed with 7 objects; after an API container force-recreate, persisted Source `src_1cd455c67c7548cdad6aa9f35f1ed63a` successfully previewed and Run `run_9816db5634ec4b13a057e36566901224` exposed 4/8 units before completing with 9 objects; crop JPEGs, 1920x1080 full frames, highlights, and Results-page replay loaded successfully |
 | `SCENARA_RUN_INTEGRATION=1 .venv\\Scripts\\python.exe -m pytest -q -m integration tests/integration -rs` | 12 passed, 0 skipped in 5.98s against isolated Docker-backed PostgreSQL/pgvector, Redis and MinIO; Redis rebuild, duplicate prevention and artifact persistence verified |
 | Security contract suite | 61 passed, 0 skipped in 35.52s; SSRF, malicious media, authorization, credential redaction, audit fail-closed and biometric deletion covered |
 | `scripts/local_backup_restore_drill.ps1` | passed; PostgreSQL and MinIO plus nine business-entity classes restored; RPO 3.967s and RTO 5.358s |
-| `pnpm run check` plus Console lint/format checks | passed; 25 Console tests, typecheck, production build, warning-free ESLint, Prettier, and 2 TypeScript SDK contract tests |
+| `pnpm run check` plus Console lint/format checks | passed; 26 Console tests, typecheck, production build, warning-free ESLint, Prettier, and 2 TypeScript SDK contract tests |
 | `npm run console:e2e` | 50 passed across desktop Chrome and mobile Chromium viewports; login, all workspaces, media controls, governance workflows, Chinese copy, ownership topology and horizontal overflow checked |
 | Ruff (including `app/` correctness rules), Mypy, OpenAPI/SDK drift, published repository-contract drift/compatibility, repository gate, implementation release gate | all passed |
 | `python -m pip_audit -r requirements/dev.txt` and `pnpm audit --audit-level high` | no known vulnerabilities in the committed dependency definitions |

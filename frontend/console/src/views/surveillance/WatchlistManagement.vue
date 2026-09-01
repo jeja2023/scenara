@@ -13,6 +13,7 @@ import {
 import { computed, onMounted, reactive, ref } from "vue";
 
 import { userFacingError } from "../../api";
+import { useDebouncedRef } from "../../composables/useDebouncedRef";
 import {
   createMember,
   createWatchlist,
@@ -29,6 +30,7 @@ const loading = ref(false);
 const mutating = ref(false);
 const error = ref("");
 const searchQuery = ref("");
+const debouncedSearchQuery = useDebouncedRef(searchQuery);
 const categoryFilter = ref<string>("all");
 const showCreateModal = ref(false);
 
@@ -67,8 +69,8 @@ const filteredWatchlists = computed(() => {
     ) {
       return false;
     }
-    if (searchQuery.value.trim()) {
-      const q = searchQuery.value.trim().toLowerCase();
+    if (debouncedSearchQuery.value.trim()) {
+      const q = debouncedSearchQuery.value.trim().toLowerCase();
       return (
         item.name.toLowerCase().includes(q) ||
         item.watchlist_id.toLowerCase().includes(q) ||
@@ -78,6 +80,9 @@ const filteredWatchlists = computed(() => {
     return true;
   });
 });
+const visibleWatchlists = computed(() =>
+  filteredWatchlists.value.slice(0, 500),
+);
 
 async function refresh(): Promise<void> {
   loading.value = true;
@@ -226,7 +231,7 @@ onMounted(() => void refresh());
 
         <div class="watchlist-cards-list">
           <div
-            v-for="item in filteredWatchlists"
+            v-for="item in visibleWatchlists"
             :key="item.watchlist_id"
             class="watchlist-card-item"
             :class="{ selected: selectedId === item.watchlist_id }"
@@ -259,6 +264,12 @@ onMounted(() => void refresh());
             </div>
           </div>
 
+          <p
+            v-if="filteredWatchlists.length > visibleWatchlists.length"
+            class="list-limit-note"
+          >
+            仅展示前 500 条结果，请使用搜索或类别筛选缩小范围。
+          </p>
           <div v-if="!filteredWatchlists.length" class="empty-state">
             <ListChecks :size="32" class="empty-icon" />
             <p>暂无符合条件的布控名单库</p>
@@ -599,6 +610,9 @@ onMounted(() => void refresh());
   display: flex;
   flex-direction: column;
   gap: 6px;
+  max-height: min(62vh, 720px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 8px;
   max-height: calc(100vh - 210px);
   overflow-y: auto;
@@ -830,6 +844,14 @@ onMounted(() => void refresh());
   padding: 2px 8px;
   border: 1px solid var(--line, #e2e8e6);
   vertical-align: middle;
+}
+
+.list-limit-note {
+  margin: 8px 0;
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted, #64748b);
 }
 
 .empty-cell {

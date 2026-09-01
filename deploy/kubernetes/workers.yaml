@@ -29,7 +29,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: worker
-          image: scenara-api:0.3.0-dev.39
+          image: scenara-api:0.3.0-dev.40
           imagePullPolicy: IfNotPresent
           command: ["python3", "-m", "scenara.worker", "--consumer", "batch-k8s", "--lane", "batch"]
           envFrom:
@@ -101,7 +101,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: worker
-          image: scenara-api:0.3.0-dev.39
+          image: scenara-api:0.3.0-dev.40
           imagePullPolicy: IfNotPresent
           command: ["python3", "-m", "scenara.worker", "--consumer", "stream-k8s", "--lane", "stream"]
           envFrom:

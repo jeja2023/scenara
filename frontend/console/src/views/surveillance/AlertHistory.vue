@@ -12,7 +12,7 @@ import {
 } from "@lucide/vue";
 import { onMounted, reactive, ref } from "vue";
 
-import { userFacingError } from "../../api";
+import { apiImageDataUrl, userFacingError } from "../../api";
 import {
   createAlertFeedback,
   listAlerts,
@@ -22,6 +22,8 @@ import { labelModality, labelSurveillanceAlertStatus } from "../../labels";
 import type { SurveillanceAlert } from "../../types";
 
 const alerts = ref<SurveillanceAlert[]>([]);
+const snapshotUrls = ref(new Map<string, string>());
+const failedSnapshots = ref(new Set<string>());
 const total = ref(0);
 const loading = ref(false);
 const mutatingId = ref<string | null>(null);
@@ -59,6 +61,7 @@ async function refresh(): Promise<void> {
     const page = await listAlerts(query());
     alerts.value = page.items;
     total.value = page.total;
+    await Promise.all(page.items.map(loadSnapshot));
   } catch (caught) {
     error.value = userFacingError(caught);
   } finally {
@@ -99,10 +102,32 @@ async function handleCreateFeedback(alert: SurveillanceAlert): Promise<void> {
   }
 }
 
-function artifactUrl(alert: SurveillanceAlert): string | null {
+function artifactPath(alert: SurveillanceAlert): string | null {
   return alert.snapshot_artifact_id
     ? `/api/v1/runs/${encodeURIComponent(alert.run_id)}/artifacts/${encodeURIComponent(alert.snapshot_artifact_id)}`
     : null;
+}
+
+function artifactUrl(alert: SurveillanceAlert): string | null {
+  return snapshotUrls.value.get(alert.alert_id) ?? null;
+}
+
+async function loadSnapshot(alert: SurveillanceAlert): Promise<void> {
+  const path = artifactPath(alert);
+  if (!path || snapshotUrls.value.has(alert.alert_id)) return;
+  try {
+    const url = await apiImageDataUrl(path);
+    snapshotUrls.value = new Map(snapshotUrls.value).set(alert.alert_id, url);
+  } catch {
+    failedSnapshots.value = new Set(failedSnapshots.value).add(alert.alert_id);
+  }
+}
+
+function retrySnapshot(alert: SurveillanceAlert): void {
+  const next = new Set(failedSnapshots.value);
+  next.delete(alert.alert_id);
+  failedSnapshots.value = next;
+  void loadSnapshot(alert);
 }
 
 onMounted(() => void refresh());
@@ -173,7 +198,18 @@ onMounted(() => void refresh());
           />
           <div v-else class="snapshot-placeholder">
             <Camera :size="24" class="placeholder-icon" />
-            <span>无抓拍图</span>
+            <span>{{
+              failedSnapshots.has(alert.alert_id)
+                ? "抓拍图加载失败"
+                : "无抓拍图"
+            }}</span>
+            <button
+              v-if="failedSnapshots.has(alert.alert_id)"
+              class="button secondary tiny-btn"
+              @click.stop="retrySnapshot(alert)"
+            >
+              重试
+            </button>
           </div>
 
           <div class="score-overlay-badge">

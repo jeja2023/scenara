@@ -68,7 +68,7 @@ On a connected Ubuntu build host:
 Transfer the generated tar archive through the project's controlled channel, extract it, then install on the target:
 
     deploy/scripts/install-offline.sh \
-      /srv/scenara-offline-0.3.0-dev.39 \
+      /srv/scenara-offline-0.3.0-dev.40 \
       /secure/scenara.env \
       /secure/offline-installer-result.json
 

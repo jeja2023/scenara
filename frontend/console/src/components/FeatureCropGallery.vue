@@ -232,6 +232,21 @@ function loadCrops(): void {
   }
 }
 
+function retryArtifact(artifactId: string): void {
+  const next = new Set(failed.value);
+  next.delete(artifactId);
+  failed.value = next;
+  void loadArtifact(artifactId);
+}
+
+function handleCropClick(card: CropCard, index: number): void {
+  if (!card.src && failed.value.has(card.artifactId)) {
+    retryArtifact(card.artifactId);
+    return;
+  }
+  void openLightbox(index);
+}
+
 async function openLightbox(index: number): Promise<void> {
   activeIndex.value = index;
   resetZoom();
@@ -411,7 +426,7 @@ onBeforeUnmount(reset);
           },
         ]"
         :title="`${getCropTag(card.object).mainTitle} · 点击查看大图原图`"
-        @click="openLightbox(index)"
+        @click="handleCropClick(card, index)"
       >
         <span class="crop-frame">
           <!-- 醒目角标 -->
@@ -431,9 +446,13 @@ onBeforeUnmount(reset);
             v-if="card.src"
             :src="card.src"
             :alt="`${getCropTag(card.object).mainTitle}裁剪图`"
+            @error="retryArtifact(card.artifactId)"
           />
           <Loader2 v-else-if="card.loading" :size="18" class="spin" />
-          <ImageOff v-else :size="18" />
+          <span v-else class="crop-error-state">
+            <ImageOff :size="18" />
+            <small v-if="failed.has(card.artifactId)">点击重试</small>
+          </span>
         </span>
         <span class="crop-meta">
           <div class="crop-meta-top">
@@ -701,6 +720,14 @@ onBeforeUnmount(reset);
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.crop-error-state {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: #c7d2ce;
+  font-size: 10px;
 }
 .crop-meta {
   display: flex;

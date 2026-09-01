@@ -8,7 +8,7 @@ port used by the portrait-domain matcher.
 from __future__ import annotations
 
 import time
-from datetime import UTC, date, datetime, time as clock_time
+from datetime import UTC, date, datetime, time as clock_time, timezone
 from enum import StrEnum
 from typing import Any, Literal, Protocol
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -83,7 +83,9 @@ class ScheduleWindow(SurveillanceModel):
         if self.start == "24:00":
             raise ValueError("schedule window start cannot be 24:00")
         if self.end != "24:00" and self.start > self.end:
-            raise ValueError("overnight schedule windows must be split into two windows")
+            raise ValueError(
+                "overnight schedule windows must be split into two windows"
+            )
         return self
 
 
@@ -108,6 +110,11 @@ class SurveillanceSchedule(SurveillanceModel):
     @field_validator("timezone")
     @classmethod
     def valid_timezone(cls, value: str) -> str:
+        # UTC/GMT are fixed-offset zones guaranteed by the Python runtime.
+        # Some Windows installations do not ship the optional IANA tzdata
+        # package, so avoid making the most common default depend on it.
+        if value.upper() in {"UTC", "GMT", "ETC/UTC"}:
+            return "UTC"
         try:
             ZoneInfo(value)
         except ZoneInfoNotFoundError as exc:
@@ -121,8 +128,16 @@ class SurveillanceSchedule(SurveillanceModel):
         return self
 
     def is_active(self, moment: float | None = None) -> bool:
-        local = datetime.fromtimestamp(time.time() if moment is None else moment, UTC).astimezone(ZoneInfo(self.timezone))
-        exception = next((item for item in self.exceptions if item.date == local.date().isoformat()), None)
+        target_zone = (
+            timezone.utc if self.timezone == "UTC" else ZoneInfo(self.timezone)
+        )
+        local = datetime.fromtimestamp(
+            time.time() if moment is None else moment, UTC
+        ).astimezone(target_zone)
+        exception = next(
+            (item for item in self.exceptions if item.date == local.date().isoformat()),
+            None,
+        )
         if exception is not None:
             return exception.enabled
         if not self.weekly:
@@ -132,7 +147,11 @@ class SurveillanceSchedule(SurveillanceModel):
             if window.weekday != local.isoweekday():
                 continue
             start = clock_time.fromisoformat(window.start)
-            end = clock_time.max if window.end == "24:00" else clock_time.fromisoformat(window.end)
+            end = (
+                clock_time.max
+                if window.end == "24:00"
+                else clock_time.fromisoformat(window.end)
+            )
             if start <= current < end:
                 return True
         return False
@@ -198,7 +217,11 @@ class WatchlistMember(SurveillanceModel):
 
     @model_validator(mode="after")
     def valid_period(self) -> WatchlistMember:
-        if self.valid_from is not None and self.valid_until is not None and self.valid_until <= self.valid_from:
+        if (
+            self.valid_from is not None
+            and self.valid_until is not None
+            and self.valid_until <= self.valid_from
+        ):
             raise ValueError("member valid_until must be later than valid_from")
         return self
 
@@ -340,7 +363,9 @@ class ObservationBatch(SurveillanceModel):
     first_seen_at: float
     last_seen_at: float
     pts_ms: int | None = Field(default=None, ge=0)
-    timestamp_source: Literal["recording", "decoder_pts", "processing_time"] = "processing_time"
+    timestamp_source: Literal["recording", "decoder_pts", "processing_time"] = (
+        "processing_time"
+    )
     evidence: list[ObservationEvidence] = Field(min_length=1, max_length=2)
     snapshot_artifact_id: str | None = None
     snapshot_object_key: str | None = None
@@ -433,7 +458,9 @@ class UpdateSurveillanceTaskRequest(SurveillanceModel):
     expected_revision: int = Field(ge=1)
     name: str | None = Field(default=None, min_length=1, max_length=160)
     watchlist_ids: list[str] | None = Field(default=None, min_length=1, max_length=128)
-    bindings: list[TaskBinding] | None = Field(default=None, min_length=1, max_length=512)
+    bindings: list[TaskBinding] | None = Field(
+        default=None, min_length=1, max_length=512
+    )
     schedule: SurveillanceSchedule | None = None
     match_policy: MatchPolicy | None = None
     threshold_policy: ThresholdPolicy | None = None
@@ -465,35 +492,55 @@ class SurveillanceConflict(RuntimeError):
 class SurveillanceRepository(Protocol):
     async def create_watchlist(self, watchlist: Watchlist) -> Watchlist: ...
 
-    async def get_watchlist(self, tenant_id: str, project_id: str, watchlist_id: str) -> Watchlist | None: ...
+    async def get_watchlist(
+        self, tenant_id: str, project_id: str, watchlist_id: str
+    ) -> Watchlist | None: ...
 
     async def list_watchlists(
         self, tenant_id: str, project_id: str, *, offset: int, limit: int
     ) -> tuple[list[Watchlist], int]: ...
 
-    async def save_watchlist(self, watchlist: Watchlist, *, expected_revision: int) -> Watchlist: ...
+    async def save_watchlist(
+        self, watchlist: Watchlist, *, expected_revision: int
+    ) -> Watchlist: ...
 
-    async def delete_watchlist(self, tenant_id: str, project_id: str, watchlist_id: str) -> bool: ...
+    async def delete_watchlist(
+        self, tenant_id: str, project_id: str, watchlist_id: str
+    ) -> bool: ...
 
     async def create_member(self, member: WatchlistMember) -> WatchlistMember: ...
 
-    async def get_member(self, tenant_id: str, project_id: str, member_id: str) -> WatchlistMember | None: ...
+    async def get_member(
+        self, tenant_id: str, project_id: str, member_id: str
+    ) -> WatchlistMember | None: ...
 
     async def list_members(
-        self, tenant_id: str, project_id: str, watchlist_id: str, *, offset: int, limit: int
+        self,
+        tenant_id: str,
+        project_id: str,
+        watchlist_id: str,
+        *,
+        offset: int,
+        limit: int,
     ) -> tuple[list[WatchlistMember], int]: ...
 
     async def list_active_members(
         self, tenant_id: str, project_id: str, watchlist_ids: list[str], *, at: float
     ) -> list[WatchlistMember]: ...
 
-    async def save_member(self, member: WatchlistMember, *, expected_revision: int) -> WatchlistMember: ...
+    async def save_member(
+        self, member: WatchlistMember, *, expected_revision: int
+    ) -> WatchlistMember: ...
 
-    async def delete_member(self, tenant_id: str, project_id: str, member_id: str) -> bool: ...
+    async def delete_member(
+        self, tenant_id: str, project_id: str, member_id: str
+    ) -> bool: ...
 
     async def create_task(self, task: SurveillanceTask) -> SurveillanceTask: ...
 
-    async def get_task(self, tenant_id: str, project_id: str, task_id: str) -> SurveillanceTask | None: ...
+    async def get_task(
+        self, tenant_id: str, project_id: str, task_id: str
+    ) -> SurveillanceTask | None: ...
 
     async def list_tasks(
         self, tenant_id: str, project_id: str, *, offset: int, limit: int
@@ -503,15 +550,21 @@ class SurveillanceRepository(Protocol):
         self, tenant_id: str, project_id: str, source_id: str
     ) -> list[SurveillanceTask]: ...
 
-    async def list_active_tasks(self, tenant_id: str, project_id: str) -> list[SurveillanceTask]: ...
+    async def list_active_tasks(
+        self, tenant_id: str, project_id: str
+    ) -> list[SurveillanceTask]: ...
 
-    async def save_task(self, task: SurveillanceTask, *, expected_revision: int) -> SurveillanceTask: ...
+    async def save_task(
+        self, task: SurveillanceTask, *, expected_revision: int
+    ) -> SurveillanceTask: ...
 
     async def list_all_active_tasks(self) -> list[SurveillanceTask]: ...
 
     async def record_alert(self, candidate: AlertCandidate) -> AlertWriteResult: ...
 
-    async def get_alert(self, tenant_id: str, project_id: str, alert_id: str) -> AlertRecord | None: ...
+    async def get_alert(
+        self, tenant_id: str, project_id: str, alert_id: str
+    ) -> AlertRecord | None: ...
 
     async def list_alerts(
         self,
