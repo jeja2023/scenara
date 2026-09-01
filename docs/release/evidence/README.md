@@ -22,7 +22,7 @@
       --target 'Ubuntu 24.04 qualification host with measured NVIDIA device' \
       --output /secure/gpu-capacity-report.json
 
-关于算法评估、GPU 算力容量、模型权利和离线安装的确切输入契约与端到端命令，详见 [QUALIFICATION_INPUTS.md](QUALIFICATION_INPUTS.md)。
+关于算法评估、GPU 算力容量、模型权利和离线安装的确切输入契约与端到端命令，详见 [资格认证输入契约.md](资格认证输入契约.md)。
 
 每个顶级资格输入均使用 schema version 1.0，且证据类型与执行命令相匹配。相对路径根据该输入文件进行解析。生成器自行读取引用的文件并计算其 SHA-256 值；不接受调用方提供的摘要作为替代品。报告绝不从缺失或预估的数值合成，且绝不覆盖已存在的输出。
 

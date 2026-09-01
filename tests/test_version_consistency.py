@@ -48,7 +48,7 @@ def test_release_version_is_consistent_across_deployment_and_documents() -> None
     )
     assert npm_version in (ROOT / "deploy/scripts/build-offline-bundle.sh").read_text(encoding="utf-8")
     assert f"`{npm_version}`" in (ROOT / "README.md").read_text(encoding="utf-8")
-    assert (ROOT / f"docs/release/{npm_version}.md").is_file()
+    assert (ROOT / f"docs/release/{npm_version}发布说明.md").is_file()
 
 
 def test_release_version_is_consistent_for_all_container_entrypoints() -> None:

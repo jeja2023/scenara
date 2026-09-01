@@ -12,24 +12,24 @@ ROOT = Path(__file__).resolve().parents[1]
 REQUIRED = (
     "LICENSE",
     "NOTICE",
-    "PROVENANCE.md",
+    "源码溯源说明.md",
     "source-manifest.json",
-    "MODEL_ASSETS.md",
-    "SECURITY.md",
-    "THIRD_PARTY_NOTICES.md",
+    "模型资产政策.md",
+    "安全政策.md",
+    "第三方声明.md",
     "docs/openapi.json",
 )
 FORBIDDEN_TRACKED = (".env", "runtime-state/", "node_modules/")
 LEGACY_PUBLIC_PATTERN = re.compile(r"(?i)portrait[_ -]?hub|vision[_ -]?hub|PORTRAIT_HUB_|景析")
 LEGACY_PUBLIC_ALLOWLIST = {
     "NOTICE",
-    "PROVENANCE.md",
+    "源码溯源说明.md",
     "README.md",
     "source-manifest.json",
-    "docs/adr/0001-platform-domain-boundaries.md",
-    "docs/release/IMPLEMENTATION_MATRIX.md",
-    "docs/release/PORTRAIT_HUB_CAPABILITY_MATRIX.md",
-    "docs/adr/0003-chinese-brand-jingshu.md",
+    "docs/adr/0001-平台与领域边界.md",
+    "docs/release/实现与验收矩阵.md",
+    "docs/release/PortraitHub能力迁移矩阵.md",
+    "docs/adr/0003-中文品牌统一为景枢.md",
     "scripts/repository_gate.py",
     "Scenara 景枢全面优化升级方案.md",
 }
@@ -98,7 +98,7 @@ def main() -> None:
             and not normalized.startswith(("app/", "models/"))
             and normalized not in LEGACY_PUBLIC_ALLOWLIST
         ):
-            errors.append(f"legacy product identifier in public Scenara surface: {name}")
+            errors.append(f"unapproved legacy brand identifier in tracked file: {name}")
     for card in sorted((ROOT / "models").glob("*.model-card.yml")):
         document = yaml.safe_load(card.read_text(encoding="utf-8"))
         artifact = document.get("model", {}).get("artifact", {}) if isinstance(document, dict) else {}
@@ -112,7 +112,9 @@ def main() -> None:
         if not card.is_file():
             errors.append(f"governance record has no model card: {governance.name}")
     if errors:
-        raise SystemExit("\n".join(errors))
+        for error in errors:
+            print(error)
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

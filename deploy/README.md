@@ -1,6 +1,6 @@
 # Scenara 景枢私有化部署
 
-升级、恢复式回滚、运行探针、指标和告警基线见 [OPERATIONS.md](OPERATIONS.md)；上线逐项验收见 [PRODUCTION_CHECKLIST.md](PRODUCTION_CHECKLIST.md)。
+升级、恢复式回滚、运行探针、指标和告警基线见 [运维基线.md](运维基线.md)；上线逐项验收见 [上线逐项验收清单.md](上线逐项验收清单.md)。
 
 支持的 1.0 目标系统为 Ubuntu x86_64，配备 Docker Engine、Docker Compose v2 和一个或多个可测量的 NVIDIA GPU。PostgreSQL/pgvector、Redis 和 MinIO 属于生产 Compose 拓扑的一部分。数据服务镜像通过清单摘要固定。Python 生产依赖项仅从 `requirements/production.lock` 安装，并经过 SHA-256 校验。
 
@@ -66,7 +66,7 @@ API、批处理 worker、流式 worker 和调度器共享同一个版本化镜�
 
 构建器还会在压缩包旁写入 `scenara-offline-<tag>.release-identity.json`。它记录了严格发布清单所需的源提交、应用镜像摘要、压缩包 SHA-256、OpenAPI SHA-256 以及聚合的合格模型集 SHA-256。请将此伴随文件与发布产物一起保存。
 
-本仓库不捆绑模型权重。仅安装符合 MODEL_ASSETS.md 并通过严格发布证据门禁的模型包。
+本仓库不捆绑模型权重。仅安装符合 [模型资产政策.md](../模型资产政策.md) 并通过严格发布证据门禁的模型包。
 
 ## 备份与恢复
 

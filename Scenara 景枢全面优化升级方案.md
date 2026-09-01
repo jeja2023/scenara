@@ -26,12 +26,12 @@
 | 品牌现状 | `README.md`、品牌规范、控制台、OpenAPI、SDK 文档和品牌资产已统一为“景枢” | 品牌迁移已完成；仓库门禁阻止旧品牌重新进入当前产品表面 |
 | 产品阶段 | 当前版本为 `0.3.0-dev.6`，仓库明确声明尚未发布 1.0（`README.md`） | 所有生产级宣传均受发布门禁约束 |
 | 产品与访问底座 | 11 项产品目录、Organization、Project、User、Role、Membership、Service Account、API Key 与 Product Entitlement 已成为公共契约 | 产品继续共享 IAM、授权、审计和部署栈；身份联邦与商业生命周期仍受门禁约束 |
-| 架构边界 | `platform` 定义契约，`domains` 实现领域，`infrastructure` 实现端口，`enterprise` 通过 Policy Hook 接入（`docs/adr/0001-platform-domain-boundaries.md:14-29`） | 继续采用模块化单体，不拆微服务平台 |
+| 架构边界 | `platform` 定义契约，`domains` 实现领域，`infrastructure` 实现端口，`enterprise` 通过 Policy Hook 接入（`docs/adr/0001-平台与领域边界.md:14-29`） | 继续采用模块化单体，不拆微服务平台 |
 | 正式领域 | Portrait 为正式领域；OCR/Document 为验证领域（`README.md:7-8`） | 2026 年不同时扩张多个新领域 |
 | 媒体范围 | Media/Run/Pipeline/Result 契约已覆盖图片、视频、PDF 和实时流（`README.md:3`） | 以统一媒体与运行契约对外，不为每种媒体另建 API 体系 |
 | 执行内核 | 已有类型化 Operator、版本化 Pipeline、白名单参数、超时/重试和 DAG 校验（`scenara/platform/pipeline.py`） | 近期补齐资格验证和可观测性，不重写编排引擎 |
-| 数据权威 | PostgreSQL 为事实源；Redis 只保存投递、租约和短期事件；S3 保存媒体和不可变结果（`docs/adr/0001-platform-domain-boundaries.md:27-29`） | 禁止把 Redis 当业务数据库，禁止在多处保存不一致状态 |
-| 运行语义 | 至少一次投递、乐观并发、单调事件 ID、不可变结果对象（`docs/adr/0002-runtime-and-storage.md:12-19`） | 重点验证幂等、重试和恢复，不改为“恰好一次”口号 |
+| 数据权威 | PostgreSQL 为事实源；Redis 只保存投递、租约和短期事件；S3 保存媒体和不可变结果（`docs/adr/0001-平台与领域边界.md:27-29`） | 禁止把 Redis 当业务数据库，禁止在多处保存不一致状态 |
+| 运行语义 | 至少一次投递、乐观并发、单调事件 ID、不可变结果对象（`docs/adr/0002-运行时进程与存储权威.md:12-19`） | 重点验证幂等、重试和恢复，不改为“恰好一次”口号 |
 | 控制台 | 已有总览、数据资产、运行、解析结果、人像、OCR、Pipeline、模型、接入、运维和企业模块路由（`frontend/console/src/router.ts`） | 解析工作区保持领域内闭环，跨领域结果统一进入结果中心；再考虑检索与可视化编排 |
 | SDK | Python SDK 与 OpenAPI 生成的 TypeScript SDK 已纳入实现门禁 | 后续必须保持 OpenAPI 与 SDK 零漂移 |
 | 部署基线 | Ubuntu x86_64、Docker Compose、单卡不少于 23,000 MiB 的 NVIDIA GPU、PostgreSQL/pgvector、Redis、MinIO（`deploy/README.md`） | Kubernetes、多节点 HA 和外部向量库不进入 1.0 承诺 |
@@ -172,12 +172,12 @@ flowchart TB
 **工作项**：
 
 - 新增品牌决策记录，明确英文品牌 `Scenara` 不变、中文品牌统一为“景枢”，并记录命名边界、影响范围和回滚原则。
-- 将 `README.md`、`docs/brand/BRAND.md`、发布文档、部署文档、OpenAPI 标题、SDK 文档、示例客户端和控制台可见文案中的旧中文品牌统一替换为“景枢”。
+- 将 `README.md`、`docs/brand/品牌规范.md`、发布文档、部署文档、OpenAPI 标题、SDK 文档、示例客户端和控制台可见文案中的旧中文品牌统一替换为“景枢”。
 - 更新中文横版/竖版字标、应用展示图和品牌资产说明；保留现有抽象 `S` 图形标志、色彩和安全留白规则，除非单独通过视觉评审决定重做。
 - 使用仓库级检索生成品牌迁移清单；旧中文品牌只允许出现在经批准的历史迁移记录中，不能继续出现在当前产品界面、接口描述或交付材料中。
 - 保持 `npm run check` 与 Playwright 桌面/移动浏览器验收全链路通过。
 - 在干净环境重跑 Python、前端、SDK、仓库和实现门禁，记录 commit SHA、依赖锁文件和执行环境。
-- 将 `docs/release/IMPLEMENTATION_MATRIX.md` 的状态与实际 CI 结果对齐；“complete”必须同时满足实现和命名的证据要求。
+- 将 `docs/release/实现与验收矩阵.md` 的状态与实际 CI 结果对齐；“complete”必须同时满足实现和命名的证据要求。
 - 固定 1.0 支持矩阵：Ubuntu 版本、Docker/Compose 版本、NVIDIA Driver/CUDA 组合、GPU 显存下限、浏览器和 SDK 运行时版本。
 - 为九类发布证据建立模板、负责人、签署人和存放路径，其中软件许可证批准必须绑定 LICENSE SHA-256。
 
@@ -367,11 +367,11 @@ flowchart TB
 ## 13. 依据文件
 
 - `README.md`
-- `docs/brand/BRAND.md`
-- `docs/adr/0001-platform-domain-boundaries.md`
-- `docs/adr/0002-runtime-and-storage.md`
-- `docs/release/IMPLEMENTATION_MATRIX.md`
-- `docs/release/PORTRAIT_HUB_CAPABILITY_MATRIX.md`
+- `docs/brand/品牌规范.md`
+- `docs/adr/0001-平台与领域边界.md`
+- `docs/adr/0002-运行时进程与存储权威.md`
+- `docs/release/实现与验收矩阵.md`
+- `docs/release/PortraitHub能力迁移矩阵.md`
 - `scripts/release_gate.py`
 - `scripts/repository_gate.py`
 - `deploy/README.md`
