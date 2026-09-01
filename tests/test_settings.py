@@ -56,6 +56,22 @@ def test_s3_security_configuration_rejects_partial_or_invalid_values(tmp_path) -
         replace(load_settings(), s3_addressing_style="unsupported").validate()
 
 
+def test_direct_multipart_limit_is_positive_and_within_media_limit() -> None:
+    settings = load_settings()
+    with pytest.raises(RuntimeError, match="MULTIPART"):
+        replace(settings, max_multipart_upload_bytes=0).validate()
+    with pytest.raises(RuntimeError, match="cannot exceed"):
+        replace(settings, max_media_bytes=10, max_multipart_upload_bytes=11).validate()
+
+
+def test_postgres_pool_bounds_are_validated() -> None:
+    settings = load_settings()
+    with pytest.raises(RuntimeError, match="MIN_SIZE"):
+        replace(settings, postgres_pool_min_size=0).validate()
+    with pytest.raises(RuntimeError, match="MAX_SIZE"):
+        replace(settings, postgres_pool_min_size=4, postgres_pool_max_size=3).validate()
+
+
 def test_production_security_boundary_requires_strong_distinct_secrets() -> None:
     fernet_key = base64.urlsafe_b64encode(b"x" * 32).decode("ascii")
     settings = replace(

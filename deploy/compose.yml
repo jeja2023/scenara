@@ -13,6 +13,8 @@ x-scenara-environment: &scenara-environment
   SCENARA_DATA_PLATFORM_MAX_RETRIES: ${SCENARA_DATA_PLATFORM_MAX_RETRIES:-2}
   SCENARA_ALLOW_INSECURE_INTERNAL_ENDPOINTS: ${SCENARA_ALLOW_INSECURE_INTERNAL_ENDPOINTS:-false}
   SCENARA_POSTGRES_DSN: postgresql://scenara:${SCENARA_POSTGRES_PASSWORD:?set SCENARA_POSTGRES_PASSWORD}@postgres:5432/scenara
+  SCENARA_POSTGRES_POOL_MIN_SIZE: ${SCENARA_POSTGRES_POOL_MIN_SIZE:-1}
+  SCENARA_POSTGRES_POOL_MAX_SIZE: ${SCENARA_POSTGRES_POOL_MAX_SIZE:-4}
   SCENARA_REDIS_URL: redis://:${SCENARA_REDIS_PASSWORD:?set SCENARA_REDIS_PASSWORD}@redis:6379/0
   SCENARA_S3_ENDPOINT_URL: http://minio:9000
   SCENARA_S3_PUBLIC_ENDPOINT_URL: ${SCENARA_S3_PUBLIC_ENDPOINT_URL:-}
@@ -60,6 +62,7 @@ x-scenara-environment: &scenara-environment
   SCENARA_RUN_ARTIFACT_FRAME_MAX_EDGE: ${SCENARA_RUN_ARTIFACT_FRAME_MAX_EDGE:-1920}
   SCENARA_MAX_IMAGE_BYTES: ${SCENARA_MAX_IMAGE_BYTES:-26214400}
   SCENARA_MAX_MEDIA_BYTES: ${SCENARA_MAX_MEDIA_BYTES:-21474836480}
+  SCENARA_MAX_MULTIPART_UPLOAD_BYTES: ${SCENARA_MAX_MULTIPART_UPLOAD_BYTES:-536870912}
   SCENARA_MEDIA_SAMPLE_INTERVAL_MS: ${SCENARA_MEDIA_SAMPLE_INTERVAL_MS:-1000}
   SCENARA_STREAM_SEGMENT_DURATION_MS: ${SCENARA_STREAM_SEGMENT_DURATION_MS:-300000}
   SCENARA_SURVEILLANCE_ALERT_SNAPSHOT_RETENTION_DAYS: ${SCENARA_SURVEILLANCE_ALERT_SNAPSHOT_RETENTION_DAYS:-30}
@@ -75,7 +78,7 @@ x-scenara-environment: &scenara-environment
   SCENARA_TRAJECTORY_MAX_TEMPLATES: ${SCENARA_TRAJECTORY_MAX_TEMPLATES:-32}
   SCENARA_TRAJECTORY_DEFAULT_TRANSITION_SECONDS: ${SCENARA_TRAJECTORY_DEFAULT_TRANSITION_SECONDS:-0}
 
-x-scenara-image: &scenara-image ${SCENARA_IMAGE_REFERENCE:-scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.41}}
+x-scenara-image: &scenara-image ${SCENARA_IMAGE_REFERENCE:-scenara-api:${SCENARA_IMAGE_TAG:-0.3.0-dev.42}}
 
 x-scenara-service: &scenara-service
   image: *scenara-image
@@ -206,8 +209,7 @@ services:
         mc mb --ignore-existing "local/$${BUCKET}" &&
         (mc admin user info local "$${ACCESS_KEY}" >/dev/null 2>&1 ||
           mc admin user add local "$${ACCESS_KEY}" "$${SECRET_KEY}") &&
-        printf '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:*"],"Resource":["arn:aws:s3:::%s","arn:aws:s3:::%s/*"]}]}'
-          "$${BUCKET}" "$${BUCKET}" > /tmp/scenara-app-policy.json &&
+        printf '%s' "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"s3:*\"],\"Resource\":[\"arn:aws:s3:::$${BUCKET}\",\"arn:aws:s3:::$${BUCKET}/*\"]}]}" > /tmp/scenara-app-policy.json &&
         (mc admin policy info local scenara-app >/dev/null 2>&1 ||
           mc admin policy create local scenara-app /tmp/scenara-app-policy.json) &&
         mc admin policy attach local scenara-app --user "$${ACCESS_KEY}"
@@ -263,7 +265,9 @@ services:
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "batch-gpu-1", "--lane", "batch"]
-    environment: *scenara-environment
+    environment:
+      <<: *scenara-environment
+      GPU_DEVICE_IDS: ${SCENARA_BATCH_GPU_DEVICE_IDS:-}
     depends_on:
       api:
         condition: service_healthy
@@ -277,7 +281,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              count: 1
               capabilities: [gpu]
     restart: unless-stopped
 
@@ -286,7 +290,9 @@ services:
     build:
       context: ..
     command: ["python3", "-m", "scenara.worker", "--consumer", "stream-gpu-1", "--lane", "stream"]
-    environment: *scenara-environment
+    environment:
+      <<: *scenara-environment
+      GPU_DEVICE_IDS: ${SCENARA_STREAM_GPU_DEVICE_IDS:-}
     depends_on:
       api:
         condition: service_healthy
@@ -300,7 +306,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              count: 1
               capabilities: [gpu]
     restart: unless-stopped
 

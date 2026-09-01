@@ -82,6 +82,8 @@ async def test_operational_probes_and_metrics_report_runtime_health(client) -> N
     assert 'scenara_http_requests_total{method="GET",route="/livez",status="200"} 1' in metrics.text
     assert 'scenara_http_request_duration_seconds_bucket{method="GET",route="/livez",le="+Inf"} 1' in metrics.text
     assert 'scenara_http_request_duration_seconds_count{method="GET",route="/readyz"} 1' in metrics.text
+    assert "scenara_run_queue_metrics_up 1" in metrics.text
+    assert 'scenara_run_queue_messages{lane="batch",state="lag"} 0' in metrics.text
     assert (await api.get("/openapi.json")).json()["info"]["version"] == __version__
 
 
@@ -102,6 +104,21 @@ async def test_host_allowlist_and_security_headers(development_settings) -> None
         assert response.headers["referrer-policy"] == "no-referrer"
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="https://evil.example") as api:
         assert (await api.get("/livez")).status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_multipart_limit_is_rejected_before_parsing_upload(development_settings) -> None:
+    settings = replace(development_settings, max_multipart_upload_bytes=64)
+    app = create_app(runtime=build_runtime(settings))
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as api:
+        response = await api.post(
+            "/api/v1/media/assets",
+            files={"file": ("too-large.bin", b"x" * 128, "application/octet-stream")},
+            data={"kind": "document"},
+        )
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "REQUEST_BODY_TOO_LARGE"
+    assert response.headers["x-content-type-options"] == "nosniff"
 
 
 @pytest.mark.asyncio

@@ -127,6 +127,7 @@ function localizedHttpError(status: number, code: string): string {
     PORTRAIT_CONFLICT: "人像数据状态冲突，请刷新后重试",
     PORTRAIT_ENCODING_ERROR: "图片无法提取有效人像特征，请更换清晰图片",
     PORTRAIT_NOT_FOUND: "未找到指定的人像数据",
+    REQUEST_BODY_TOO_LARGE: "文件超过直传限制，请使用对象存储直传",
     STATE_CONFLICT: "数据状态已变化，请刷新后重试",
     TRAJECTORY_CONFLICT: "轨迹身份状态冲突，请刷新后重试",
     TRAJECTORY_NOT_FOUND: "未找到指定的轨迹身份或摄像头",

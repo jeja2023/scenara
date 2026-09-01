@@ -12,7 +12,7 @@ RUN pnpm --filter @scenara/console build
 
 FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04@sha256:9175fa92f96de35a8cfb9493f0dfcf9435c7a597e9d95ad41d2cae382a95e3f9
 
-ARG SCENARA_VERSION=0.3.0-dev.41
+ARG SCENARA_VERSION=0.3.0-dev.42
 ARG SCENARA_SOURCE_COMMIT=unknown
 LABEL org.opencontainers.image.title="Scenara" \
       org.opencontainers.image.version="${SCENARA_VERSION}" \

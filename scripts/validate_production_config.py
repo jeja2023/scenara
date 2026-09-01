@@ -101,6 +101,17 @@ def _fernet_key(value: str) -> bool:
         return False
 
 
+def _positive_int(values: dict[str, str], name: str, default: int) -> tuple[int | None, str | None]:
+    raw = values.get(name, str(default)).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        return None, f"{name} must be an integer"
+    if value < 1:
+        return None, f"{name} must be positive"
+    return value, None
+
+
 def validate(values: dict[str, str], *, file_mode: bool) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
@@ -160,6 +171,24 @@ def validate(values: dict[str, str], *, file_mode: bool) -> tuple[list[str], lis
         errors.append("SCENARA_PRODUCTION_MODELS_REQUIRED must be true")
     if values.get("SCENARA_S3_VERIFY_TLS", "true").lower() != "true":
         warnings.append("S3 TLS verification is disabled; this is acceptable only for an isolated in-cluster endpoint")
+
+    max_media, media_error = _positive_int(values, "SCENARA_MAX_MEDIA_BYTES", 20 * 1024 * 1024 * 1024)
+    max_multipart, multipart_error = _positive_int(
+        values, "SCENARA_MAX_MULTIPART_UPLOAD_BYTES", 512 * 1024 * 1024
+    )
+    for error in (media_error, multipart_error):
+        if error:
+            errors.append(error)
+    if max_media is not None and max_multipart is not None and max_multipart > max_media:
+        errors.append("SCENARA_MAX_MULTIPART_UPLOAD_BYTES cannot exceed SCENARA_MAX_MEDIA_BYTES")
+
+    pool_min, pool_min_error = _positive_int(values, "SCENARA_POSTGRES_POOL_MIN_SIZE", 1)
+    pool_max, pool_max_error = _positive_int(values, "SCENARA_POSTGRES_POOL_MAX_SIZE", 4)
+    for error in (pool_min_error, pool_max_error):
+        if error:
+            errors.append(error)
+    if pool_min is not None and pool_max is not None and pool_max < pool_min:
+        errors.append("SCENARA_POSTGRES_POOL_MAX_SIZE must be at least SCENARA_POSTGRES_POOL_MIN_SIZE")
 
     image = values.get("SCENARA_IMAGE_REFERENCE", "").strip()
     if image and not PLACEHOLDER.search(image) and not SHA256_IMAGE.fullmatch(image):

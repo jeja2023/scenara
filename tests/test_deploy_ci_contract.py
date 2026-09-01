@@ -147,6 +147,10 @@ def test_compose_hardens_runtime_and_separates_service_credentials() -> None:
     init_env = services["minio-init"]["environment"]
     assert init_env["ROOT_USER"].startswith("${SCENARA_MINIO_ROOT_USER:")
     assert init_env["ACCESS_KEY"].startswith("${SCENARA_S3_ACCESS_KEY:")
+    init_command = services["minio-init"]["command"][0]
+    assert "printf '%s'" in init_command
+    assert "arn:aws:s3:::$${BUCKET}" in init_command
+    assert "arn:aws:s3:::$${BUCKET}/*" in init_command
     assert services["api"]["depends_on"]["preflight"]["condition"] == "service_completed_successfully"
     assert services["api"]["ports"] == ["${SCENARA_BIND_ADDRESS:-127.0.0.1}:${SCENARA_HTTP_PORT:-8000}:8000"]
 
@@ -184,15 +188,21 @@ def test_reverse_proxy_example_enforces_tls_and_preserves_streaming() -> None:
     assert "proxy_set_header X-Forwarded-For $remote_addr" in config
     assert "proxy_request_buffering off" in config
     assert "proxy_buffering off" in config
+    assert "client_max_body_size 512m" in config
     assert "return 308 https://$host$request_uri" in config
 
 
-def test_gpu_workers_expose_all_visible_gpus_by_default() -> None:
+def test_gpu_workers_reserve_one_gpu_and_use_independent_device_settings() -> None:
     document = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
-    for service_name in ("batch-worker", "stream-worker"):
+    expected_environment = {
+        "batch-worker": "${SCENARA_BATCH_GPU_DEVICE_IDS:-}",
+        "stream-worker": "${SCENARA_STREAM_GPU_DEVICE_IDS:-}",
+    }
+    for service_name, gpu_device_ids in expected_environment.items():
         reservation = document["services"][service_name]["deploy"]["resources"]["reservations"]
         devices = reservation["devices"]
-        assert devices == [{"driver": "nvidia", "count": "all", "capabilities": ["gpu"]}]
+        assert devices == [{"driver": "nvidia", "count": 1, "capabilities": ["gpu"]}]
+        assert document["services"][service_name]["environment"]["GPU_DEVICE_IDS"] == gpu_device_ids
 
 
 def test_legacy_inference_discovers_visible_gpu_count_without_hardcoding_one(monkeypatch) -> None:
@@ -209,6 +219,9 @@ def test_default_compose_is_personal_mode_without_enterprise_secrets() -> None:
     environment = document["x-scenara-environment"]
     assert environment["SCENARA_ENTERPRISE_POLICY_REQUIRED"] == "${SCENARA_ENTERPRISE_POLICY_REQUIRED:-false}"
     assert environment["GPU_DEVICE_IDS"] == "${GPU_DEVICE_IDS:-}"
+    assert environment["SCENARA_POSTGRES_POOL_MIN_SIZE"] == "${SCENARA_POSTGRES_POOL_MIN_SIZE:-1}"
+    assert environment["SCENARA_POSTGRES_POOL_MAX_SIZE"] == "${SCENARA_POSTGRES_POOL_MAX_SIZE:-4}"
+    assert environment["SCENARA_MAX_MULTIPART_UPLOAD_BYTES"] == "${SCENARA_MAX_MULTIPART_UPLOAD_BYTES:-536870912}"
     assert "SCENARA_ENTERPRISE_LICENSE_PATH" not in environment
     assert "SCENARA_ENTERPRISE_PUBLIC_KEY_PATH" not in environment
     for service in ("api", "batch-worker", "stream-worker", "scheduler"):

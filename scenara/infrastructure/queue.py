@@ -6,7 +6,7 @@ from importlib import import_module
 from typing import Any
 
 from scenara.platform.models import RunRecord
-from scenara.platform.queue import RunHandler
+from scenara.platform.queue import QueueLaneDepth, RunHandler
 
 RUN_STREAM_MAXLEN = 100_000
 """Approximate Redis stream length cap for Run submission streams."""
@@ -44,6 +44,11 @@ class InlineRunQueue:
         task: asyncio.Task[None] = asyncio.create_task(invoke(), name=f"scenara:{run.run_id}")
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
+
+    async def depth(self) -> dict[str, QueueLaneDepth]:
+        # Inline execution starts immediately, so there is no durable backlog.
+        # Keep active task count visible as pending work for local diagnostics.
+        return {"batch": QueueLaneDepth(lag=0, pending=len(self._tasks))}
 
 
 class RedisRunQueue:
@@ -142,6 +147,30 @@ class RedisRunQueue:
         finally:
             await pipeline.reset()
         return len(runs)
+
+    async def depth(self) -> dict[str, QueueLaneDepth]:
+        if self._client is None:
+            raise RuntimeError("Redis run queue is not open")
+        result: dict[str, QueueLaneDepth] = {}
+        for lane in ("batch", "stream"):
+            groups = await self._client.xinfo_groups(f"{self._stream}:{lane}")
+            group_name = f"{self._group}:{lane}"
+            record = next(
+                (
+                    item
+                    for item in groups
+                    if isinstance(item, dict) and str(item.get("name", "")) == group_name
+                ),
+                {},
+            )
+            pending = max(0, int(record.get("pending", 0)))
+            # Redis >= 7 supplies lag in XINFO GROUPS. Older servers expose
+            # no reliable equivalent, so report zero rather than stream
+            # length, which includes acknowledged history.
+            lag_raw = record.get("lag", 0)
+            lag = max(0, int(lag_raw)) if lag_raw is not None else 0
+            result[lane] = QueueLaneDepth(lag=lag, pending=pending)
+        return result
 
     async def _renew_lease(
         self,

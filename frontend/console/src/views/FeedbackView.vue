@@ -11,6 +11,7 @@ import {
   Rocket,
   RotateCcw,
   Search,
+  X,
 } from "@lucide/vue";
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
@@ -613,7 +614,7 @@ useRefresh(refresh);
             <Filter :size="12" class="filter-icon" />
             <span class="filter-label">问题类型:</span>
             <select v-model="feedbackKindFilter" class="filter-select">
-              <option value="all">全部类型 (All)</option>
+              <option value="all">全部类型</option>
               <option value="false_positive">误检</option>
               <option value="false_negative">漏检</option>
               <option value="wrong_attribute">属性错误</option>
@@ -631,9 +632,9 @@ useRefresh(refresh);
             <span class="filter-label">审核状态:</span>
             <select v-model="feedbackStatusFilter" class="filter-select">
               <option value="all">全部状态</option>
-              <option value="pending">待审核 (Pending)</option>
-              <option value="approved">已批准 (Approved)</option>
-              <option value="rejected">已拒绝 (Rejected)</option>
+              <option value="pending">待审核</option>
+              <option value="approved">已批准</option>
+              <option value="rejected">已拒绝</option>
             </select>
           </label>
 
@@ -792,10 +793,10 @@ useRefresh(refresh);
             <Filter :size="12" class="filter-icon" />
             <span class="filter-label">数据用途:</span>
             <select v-model="manifestSplitFilter" class="filter-select">
-              <option value="all">全部用途 (All)</option>
-              <option value="train">训练 (Train)</option>
-              <option value="validation">验证 (Validation)</option>
-              <option value="test">测试 (Test)</option>
+              <option value="all">全部用途</option>
+              <option value="train">训练</option>
+              <option value="validation">验证</option>
+              <option value="test">测试</option>
             </select>
           </label>
 
@@ -905,12 +906,12 @@ useRefresh(refresh);
             <Filter :size="12" class="filter-icon" />
             <span class="filter-label">准入状态:</span>
             <select v-model="releaseStatusFilter" class="filter-select">
-              <option value="all">全部状态 (All)</option>
-              <option value="candidate">候选版本 (Candidate)</option>
-              <option value="validated">验证中 (Validated)</option>
-              <option value="approved">已批准 (Approved)</option>
-              <option value="active">已生效上线 (Active)</option>
-              <option value="retired">已退役下线 (Retired)</option>
+              <option value="all">全部状态</option>
+              <option value="candidate">候选版本</option>
+              <option value="validated">验证中</option>
+              <option value="approved">已批准</option>
+              <option value="active">已生效上线</option>
+              <option value="retired">已退役下线</option>
             </select>
           </label>
 

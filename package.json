@@ -1,8 +1,9 @@
 {
   "name": "scenara",
-  "version": "0.3.0-dev.41",
+  "version": "0.3.0-dev.42",
   "private": true,
   "license": "MIT",
+  "packageManager": "pnpm@10.32.1",
   "scripts": {
     "check": "pnpm run console:check && pnpm run sdk:check",
     "console:check": "pnpm --filter @scenara/console run typecheck && pnpm --filter @scenara/console run lint && pnpm --filter @scenara/console run format:check && pnpm --filter @scenara/console run test && pnpm --filter @scenara/console run build",

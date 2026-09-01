@@ -29,7 +29,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: scheduler
-          image: scenara-api:0.3.0-dev.41
+          image: scenara-api:0.3.0-dev.42
           imagePullPolicy: IfNotPresent
           command:
             [

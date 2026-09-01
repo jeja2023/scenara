@@ -439,11 +439,16 @@ test("平台主题、跳转入口与规范视口保持可用", async ({ page }, 
   for (const [name, width, height] of viewports) {
     await page.setViewportSize({ width, height });
     await page.goto("datasets");
-    await expect(page.locator(".shell")).toHaveAttribute("data-platform", "data");
+    await expect(page.locator(".shell")).toHaveAttribute(
+      "data-platform",
+      "data",
+    );
     expect(
-      await page.locator(".shell").evaluate(
-        (element) => getComputedStyle(element).getPropertyValue("--color-accent").trim(),
-      ),
+      await page
+        .locator(".shell")
+        .evaluate((element) =>
+          getComputedStyle(element).getPropertyValue("--color-accent").trim(),
+        ),
     ).toBe("#2f6b8a");
     expect(
       await page.evaluate(
@@ -458,11 +463,16 @@ test("平台主题、跳转入口与规范视口保持可用", async ({ page }, 
   }
 
   await page.goto("models");
-  await expect(page.locator(".shell")).toHaveAttribute("data-platform", "model");
+  await expect(page.locator(".shell")).toHaveAttribute(
+    "data-platform",
+    "model",
+  );
   expect(
-    await page.locator(".shell").evaluate(
-      (element) => getComputedStyle(element).getPropertyValue("--color-accent").trim(),
-    ),
+    await page
+      .locator(".shell")
+      .evaluate((element) =>
+        getComputedStyle(element).getPropertyValue("--color-accent").trim(),
+      ),
   ).toBe("#6256a8");
   await page.keyboard.press("Tab");
   await expect(page.locator(".skip-link")).toBeFocused();
@@ -573,7 +583,10 @@ test("导航栏直接提供人像解析与 OCR 文档解析入口", async ({ pag
   await page.goto("");
   const mobileMenu = page.locator(".mobile-menu");
   if (await mobileMenu.isVisible()) await mobileMenu.click();
-  const portraitLink = page.getByRole("link", { name: "人像解析", exact: true });
+  const portraitLink = page.getByRole("link", {
+    name: "人像解析",
+    exact: true,
+  });
   await expect(portraitLink).toBeVisible();
   await portraitLink.click();
   await expect(page).toHaveURL(/\/parse\/portrait$/);
@@ -688,7 +701,10 @@ test("parse domain pages keep media tabs inside the workspace", async ({
   const mediaTab = page.getByRole("tab", { name: "视频", exact: true });
   await expect(mediaTab).toHaveAttribute("aria-selected", "true");
 
-  const portraitMenu = page.getByRole("link", { name: "人像解析", exact: true });
+  const portraitMenu = page.getByRole("link", {
+    name: "人像解析",
+    exact: true,
+  });
   await expect(portraitMenu).toBeVisible();
   await expect(page.locator(".parse-media-link")).toHaveCount(0);
   await expect(page.locator(".parse-domain-link small")).toHaveCount(0);
@@ -996,11 +1012,15 @@ test("access management tabs and one-time credential render", async ({
 }) => {
   await page.goto("access");
   await page.getByRole("tab", { name: "服务凭据" }).click();
+  await expect(page.getByRole("heading", { name: "服务账号" })).toBeVisible();
+  await page.getByRole("tab", { name: "API 密钥" }).click();
+  await page.getByRole("button", { name: "签发 API 密钥" }).click();
   await expect(
-    page.getByRole("heading", { name: "创建服务账号" }),
+    page.getByRole("heading", { name: "为服务账号签发新 API 密钥" }),
   ).toBeVisible();
-  await page.getByLabel("密钥名称").fill("控制台持续集成");
-  await page.getByRole("button", { name: "签发密钥" }).click();
+  await page.getByLabel("所属服务账号").selectOption("automation-console");
+  await page.getByLabel("密钥描述名称").fill("控制台持续集成");
+  await page.getByRole("button", { name: "确认签发密钥" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await expect(dialog.locator("input[readonly]")).toHaveValue(

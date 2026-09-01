@@ -338,7 +338,7 @@ describe("console information architecture", () => {
     );
     const surveillance = routes.find((route) => route.name === "surveillance");
     expect(surveillance?.children?.map((route) => route.name)).toEqual([
-      undefined,
+      "surveillance-root",
       "surveillance-watchlists",
       "surveillance-tasks",
       "surveillance-live",

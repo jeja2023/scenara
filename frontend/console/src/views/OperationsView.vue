@@ -97,7 +97,7 @@ useRefresh(refresh);
             <Server :size="15" />
           </div>
         </div>
-        <div class="stat-value">{{ status.profile }}</div>
+        <div class="stat-value">{{ labelRuntime(status.profile) }}</div>
         <div class="stat-desc">环境模式</div>
       </div>
 

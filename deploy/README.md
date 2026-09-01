@@ -15,7 +15,11 @@
 
 默认的 `deploy/compose.yml` 为个人部署配置文件。它使用本地策略提供者，不需要、不读取也不挂载企业许可证。签名企业策略实现作为可选扩展提供。要启用它，请将 `SCENARA_ENTERPRISE_LICENSE_FILE` 和 `SCENARA_ENTERPRISE_PUBLIC_KEY_FILE` 设置为可读文件，并在每个 Compose 命令中添加 `-f deploy/compose.enterprise.yml`。
 
-两个 GPU worker 默认请求所有可见的 GPU。合格的生产主机通常应通过 Compose 覆盖配置为每个 worker 分配不同的 `GPU_DEVICE_IDS`；共享所有 GPU 仅作为初始拓扑，需要经过测量的并发证据。传统推理适配器从 `CUDA_VISIBLE_DEVICES`、NVIDIA 设备节点或 `nvidia-smi` 发现可见设备。
+每个 GPU worker 只请求一张 GPU，避免批处理和实时任务默认同时占用所有显卡。Compose 运行时负责容器级 GPU 隔离；仅在完成容量验证后，才通过 `SCENARA_BATCH_GPU_DEVICE_IDS` 与 `SCENARA_STREAM_GPU_DEVICE_IDS` 固定应用内模型缓存的设备选择。传统推理适配器从容器可见的 CUDA 设备节点或 `nvidia-smi` 发现设备。
+
+HTTP multipart 直传默认限制为 512 MiB，并在 API 读取请求体前按 `Content-Length` 拒绝超限请求；流式落盘仍会对实际字节数复核。更大的媒体必须使用 S3 预签名上传和完成确认接口。`SCENARA_MAX_MEDIA_BYTES` 是资产总上限，不是 API 直传额度。生产容器应同时为临时目录预留至少一个直传上限的空间。
+
+PostgreSQL 连接池默认每进程 `1..4` 条连接。调整 API/worker 副本前，先计算“全部副本 × `SCENARA_POSTGRES_POOL_MAX_SIZE`”，再为迁移、监控和数据库保留连接预留容量；达到数据库连接上限前应部署 PgBouncer。
 
 经过认证的模型包目录必须包含由 `SCENARA_OCR_ENGINE_FACTORY`、`SCENARA_BEHAVIOR_ENGINE_FACTORY` 和 `SCENARA_FASHION_ENGINE_FACTORY` 指定的私有 OCR、Behavior 和 Fashion 适配器模块。每个工厂必须返回一个具有不可变模型标识、`production_ready=true`、所需推理方法和声明能力的合格引擎。Compose 将此目录只读挂载在 `/opt/scenara/models`。内置的参考适配器在生产校验中会被显式拒绝。
 
@@ -58,11 +62,11 @@ API、批处理 worker、流式 worker 和调度器共享同一个版本化镜�
 通过项目的受控渠道传输生成的 tar 压缩包，解压后在目标机器上安装：
 
     deploy/scripts/install-offline.sh \
-      /srv/scenara-offline-0.3.0-dev.41 \
+      /srv/scenara-offline-0.3.0-dev.42 \
       /secure/scenara.env \
       /secure/offline-installer-result.json
 
-经过认证的模型包目录是必需的，并被复制到带校验和的离线包中；仓库从不提供或替换模型权重。在加载镜像之前，安装程序会验证 Ubuntu 24.04 x86_64、Docker Engine 27+、Docker Compose 2.29+、CUDA 12.8 驱动兼容性以及至少一个可测量的 NVIDIA GPU。所有可见的 GPU 默认暴露给两个 GPU worker；安装程序记录 GPU 数量和总显存，但不施加固定的 GPU 数量或显存限制。它使用 `--no-build --wait` 启动 Compose，验证依赖就绪端点和中文控制台，并拒绝任何未运行的必需服务。可选的第三个参数以 schema-version 1.0 JSON 结果原子写入，且不允许覆盖现有文件。
+经过认证的模型包目录是必需的，并被复制到带校验和的离线包中；仓库从不提供或替换模型权重。在加载镜像之前，安装程序会验证 Ubuntu 24.04 x86_64、Docker Engine 27+、Docker Compose 2.29+、CUDA 12.8 驱动兼容性以及至少一个可测量的 NVIDIA GPU。每个 GPU worker 默认只请求一张 GPU；安装程序记录 GPU 数量和总显存，但不施加固定的 GPU 数量或显存限制。它使用 `--no-build --wait` 启动 Compose，验证依赖就绪端点和中文控制台，并拒绝任何未运行的必需服务。可选的第三个参数以 schema-version 1.0 JSON 结果原子写入，且不允许覆盖现有文件。
 
 构建器还会在压缩包旁写入 `scenara-offline-<tag>.release-identity.json`。它记录了严格发布清单所需的源提交、应用镜像摘要、压缩包 SHA-256、OpenAPI SHA-256 以及聚合的合格模型集 SHA-256。请将此伴随文件与发布产物一起保存。
 

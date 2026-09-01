@@ -54,8 +54,10 @@ const apiKeyPagination = defineModel<{ offset: number; pageSize: number }>(
     <div class="domain-tabs" role="tablist" aria-label="服务凭据子视图">
       <button
         type="button"
+        role="tab"
         class="domain-tab-btn"
         :class="{ active: credentialTab === 'service_accounts' }"
+        :aria-selected="credentialTab === 'service_accounts'"
         @click="credentialTab = 'service_accounts'"
       >
         <Users :size="13" />
@@ -64,8 +66,10 @@ const apiKeyPagination = defineModel<{ offset: number; pageSize: number }>(
       </button>
       <button
         type="button"
+        role="tab"
         class="domain-tab-btn"
         :class="{ active: credentialTab === 'api_keys' }"
+        :aria-selected="credentialTab === 'api_keys'"
         @click="credentialTab = 'api_keys'"
       >
         <KeyRound :size="13" />

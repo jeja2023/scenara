@@ -5,7 +5,7 @@ import DataTable from "../../components/DataTable.vue";
 import type { Domain, Run, TableColumn } from "../../types";
 
 const columns: TableColumn<Run>[] = [
-  { key: "run_id", label: "任务 ID", class: "mono truncate" },
+  { key: "run_id", label: "任务标识", class: "mono truncate" },
   { key: "pipeline", label: "流水线", class: "truncate" },
   { key: "asset_source", label: "资产 / 来源", class: "mono truncate" },
   { key: "status", label: "状态" },

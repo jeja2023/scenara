@@ -78,7 +78,7 @@ function selectDomain(event: Event): void {
           <input
             v-model.trim="domainSearch"
             type="search"
-            placeholder="搜索领域名称或 ID"
+            placeholder="搜索领域名称或标识"
             aria-label="搜索领域"
           />
         </div>

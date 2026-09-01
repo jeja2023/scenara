@@ -35,12 +35,18 @@ async def _register_pgvector(connection: Any) -> None:
 class PostgresStateStore(PostgresCatalogMixin):
     """PostgreSQL adapter. Documents retain contract fidelity; columns support operational queries."""
 
-    def __init__(self, dsn: str) -> None:
+    def __init__(self, dsn: str, *, min_size: int = 1, max_size: int = 4) -> None:
         try:
             from psycopg_pool import AsyncConnectionPool
         except ImportError as exc:  # pragma: no cover
             raise RuntimeError("psycopg-pool is required for the PostgreSQL state backend") from exc
-        self._pool: Any = AsyncConnectionPool(dsn, open=False, min_size=1, max_size=10, configure=_register_pgvector)
+        self._pool: Any = AsyncConnectionPool(
+            dsn,
+            open=False,
+            min_size=min_size,
+            max_size=max_size,
+            configure=_register_pgvector,
+        )
 
     @property
     def pool(self) -> Any:

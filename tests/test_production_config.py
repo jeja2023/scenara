@@ -58,6 +58,18 @@ def test_production_configuration_rejects_placeholders_reuse_and_unsafe_networks
     assert "unqualified built-in" in joined
 
 
+def test_production_configuration_rejects_invalid_upload_and_database_capacity_bounds() -> None:
+    values = valid_values()
+    values["SCENARA_MAX_MEDIA_BYTES"] = "100"
+    values["SCENARA_MAX_MULTIPART_UPLOAD_BYTES"] = "101"
+    values["SCENARA_POSTGRES_POOL_MIN_SIZE"] = "3"
+    values["SCENARA_POSTGRES_POOL_MAX_SIZE"] = "2"
+    errors, _ = validate(values, file_mode=True)
+    joined = "\n".join(errors)
+    assert "MULTIPART_UPLOAD_BYTES cannot exceed" in joined
+    assert "POOL_MAX_SIZE must be at least" in joined
+
+
 def test_generated_candidate_replaces_every_generated_secret_placeholder() -> None:
     candidate = render()
     for placeholder in (

@@ -98,7 +98,7 @@ from scenara.platform.models import (
     ApiErrorEnvelope,
     PrincipalContext,
 )
-from scenara.platform.observability import RequestMetrics
+from scenara.platform.observability import RequestMetrics, render_queue_metrics
 from scenara.platform.pipeline import PipelineError
 from scenara.platform.policy import PolicyDenied, PolicyUnavailable, require_allowed
 from scenara.platform.search import (
@@ -320,8 +320,40 @@ def create_app(
         )
         started = time.perf_counter()
         status_code = 500
+        response: Response
         try:
-            response = await call_next(request)
+            content_length = request.headers.get("content-length")
+            is_multipart = request.headers.get("content-type", "").lower().startswith("multipart/form-data")
+            if is_multipart and content_length:
+                try:
+                    declared_length = int(content_length)
+                except ValueError:
+                    response = error_response(
+                        request,
+                        400,
+                        "INVALID_ARGUMENT",
+                        "Content-Length must be a non-negative integer",
+                    )
+                else:
+                    if declared_length < 0:
+                        response = error_response(
+                            request,
+                            400,
+                            "INVALID_ARGUMENT",
+                            "Content-Length must be a non-negative integer",
+                        )
+                    elif declared_length > runtime.settings.max_multipart_upload_bytes:
+                        response = error_response(
+                            request,
+                            413,
+                            "REQUEST_BODY_TOO_LARGE",
+                            "multipart upload exceeds the direct-upload limit; use a presigned upload",
+                            {"max_bytes": runtime.settings.max_multipart_upload_bytes},
+                        )
+                    else:
+                        response = await call_next(request)
+            else:
+                response = await call_next(request)
             status_code = response.status_code
         finally:
             route = request.scope.get("route")
@@ -633,9 +665,17 @@ def create_app(
         context: PrincipalContext = Depends(principal_context),
     ) -> Response:
         await require_allowed(runtime.policy, context, "read", "operations")
+        try:
+            queue_metrics = render_queue_metrics(await runtime.queue.depth(), available=True)
+        except Exception:
+            # Metrics collection must not turn a transient Redis failure into
+            # a monitoring-plane outage; readiness owns dependency health and
+            # this gauge makes the missing signal explicit.
+            queue_metrics = render_queue_metrics(None, available=False)
         return Response(
             content=app.state.request_metrics.render()
-            + runtime.surveillance_metrics.render(),
+            + runtime.surveillance_metrics.render()
+            + queue_metrics,
             media_type="text/plain; version=0.0.4; charset=utf-8",
         )
 

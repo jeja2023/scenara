@@ -1,11 +1,20 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from typing import Protocol
 
 from scenara.platform.models import RunRecord
 
 RunHandler = Callable[[str, str, str], Awaitable[None]]
+
+
+@dataclass(frozen=True, slots=True)
+class QueueLaneDepth:
+    """Backlog and leased-message counts for one execution lane."""
+
+    lag: int
+    pending: int
 
 
 class RunQueue(Protocol):
@@ -19,5 +28,7 @@ class RunQueue(Protocol):
 
     async def enqueue(self, run: RunRecord) -> None: ...
 
+    async def depth(self) -> dict[str, QueueLaneDepth]: ...
 
-__all__ = ["RunHandler", "RunQueue"]
+
+__all__ = ["QueueLaneDepth", "RunHandler", "RunQueue"]

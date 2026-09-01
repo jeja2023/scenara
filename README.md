@@ -2,7 +2,7 @@
 
 Scenara 是面向企业私有化部署的视觉 AI 中枢平台。平台以版本化数据资产、Run、Pipeline 和 Result 契约接收图片、视频、PDF 与实时流，并通过可安装的 Domain 提供强类型视觉能力。当前版本已把同一人的视频内连续出现、跨视频/跨摄像头长期轨迹、人工确认与长期身份查询串成闭环。
 
-当前产品阶段：`0.3.0-dev.41`（Python 包版本为 `0.3.0.dev41`）
+当前产品阶段：`0.3.0-dev.42`（Python 包版本为 `0.3.0.dev42`）
 
 - 正式领域：Portrait（迁移中）
 - 验证领域：OCR / Document
@@ -15,7 +15,7 @@ Scenara 是面向企业私有化部署的视觉 AI 中枢平台。平台以版�
 
 Scenara 作为平台母品牌，统一规划 Parse、Model、Data、Edge、Flow、Search、Agent、Console、API、SDK 与 Index。当前并非 11 套独立系统：Console、API 和 SDK 是共享入口，Index 是共享底座，产品模块继续复用同一平台内核、IAM、授权、审计和部署栈。
 
-当前版本已提供产品目录、仓库拓扑、正式跨仓库契约、Organization、Project、User、Role、Membership、Service Account、API Key 与 Product Entitlement，并支持平台根令牌、按项目绑定的服务账号 API Key 以及用户名密码登录。`0.3.0-dev.41` 完成了控制台视觉设计紧凑化、控件规范统一（按钮/搜索/过滤/分页）与模型管理下拉筛选重构，并修复 CSS `line-clamp` 标准兼容性告警。Core 已通过版本化 Data 客户端接入 Dataset、Version、Annotation 和 Hard Sample 的独立服务边界；完整切流步骤见 [Data 切流操作说明](docs/strategy/数据平台切流操作说明.md)。完整成熟度、依赖顺序与非目标见 [产品矩阵](docs/strategy/产品矩阵.md)，当前仓库与独立 Model/Data 仓库的分工见 [仓库拓扑](docs/strategy/仓库拓扑.md)，五条可发布契约见 [契约包](contracts/repository/README.md)，认证和授权边界见 [访问底座](docs/strategy/访问底座.md)，人像 AI 长期演进方向见 [人像智能基础平台战略](docs/strategy/人像智能基础平台战略.md)，升级影响见 [0.3.0-dev.41 发布说明](docs/release/0.3.0-dev.41发布说明.md)。
+当前版本已提供产品目录、仓库拓扑、正式跨仓库契约、Organization、Project、User、Role、Membership、Service Account、API Key 与 Product Entitlement，并支持平台根令牌、按项目绑定的服务账号 API Key 以及用户名密码登录。`0.3.0-dev.42` 将媒体直传统一为受限流式上传，默认限制为 512 MiB；大文件经带 SHA-256 核验的预签名对象存储上传进入平台。该版本还隔离了 batch/stream GPU、配置化 PostgreSQL 连接池、公开 Redis 队列 lag/pending 指标、加固 Qdrant 特征空间契约并完善控制台解析和凭据交互。完整升级影响见 [0.3.0-dev.42 发布说明](docs/release/0.3.0-dev.42发布说明.md)。Core 已通过版本化 Data 客户端接入 Dataset、Version、Annotation 和 Hard Sample 的独立服务边界；完整切流步骤见 [Data 切流操作说明](docs/strategy/数据平台切流操作说明.md)。完整成熟度、依赖顺序与非目标见 [产品矩阵](docs/strategy/产品矩阵.md)，当前仓库与独立 Model/Data 仓库的分工见 [仓库拓扑](docs/strategy/仓库拓扑.md)，五条可发布契约见 [契约包](contracts/repository/README.md)，认证和授权边界见 [访问底座](docs/strategy/访问底座.md)，人像 AI 长期演进方向见 [人像智能基础平台战略](docs/strategy/人像智能基础平台战略.md)。
 
 解析控制台采用“解析 -> 领域”的工作区结构，人像和 OCR 文档分别进入独立领域页面；图片、视频、文档和视频流是页面内部的数据类型标签，例如 `parse/portrait/image` 与 `parse/ocr/document` 仍可作为深链路访问。每个领域工作区内完成上传、参数配置、运行进度、当前结果查看与历史恢复；“数据资产”和“运行”页面分别承担文件/视频流来源管理与运行生命周期管理，新增的“解析结果”页面负责跨领域、跨任务浏览和筛选结果。领域菜单由后端 `DomainManifest` 驱动，新领域接入时不需要重新拆分前端解析流程。
 
@@ -82,6 +82,6 @@ API 默认位于 `http://127.0.0.1:8000`，Console 开发服务器位于 `http:/
 
 本仓库采用 [MIT License](LICENSE)，允许个人或组织使用、修改和部署；第三方组件、模型权利、数据集和媒体资产仍受其各自许可及适用法律约束。
 默认 Compose 部署为个人模式，不要求企业许可证。企业签名许可证校验代码保留在 `scenara.enterprise`，通过 `deploy/compose.enterprise.yml` 显式叠加后才启用。
-当前发布基线：`0.3.0-dev.41`（Python 包为 `0.3.0.dev41`）。
+当前发布基线：`0.3.0-dev.42`（Python 包为 `0.3.0.dev42`）。
 
 对象存储在平台边界保持对提供商中立。MinIO 为私有化部署基线；经认证的兼容 S3 的替代方案以及校验和、不可变性、生命周期、TLS、凭据和直传资质契约详见 [docs/对象存储提供商认证.md](docs/对象存储提供商认证.md)。

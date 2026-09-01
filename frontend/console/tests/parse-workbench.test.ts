@@ -332,6 +332,7 @@ describe("media parse workbench", () => {
     await wrapper
       .findAll(".input-controls select")[0]!
       .setValue("scene_change");
+    await wrapper.get("button.advanced-parameters-toggle").trigger("click");
     const fields = wrapper.findAll(".parameter-grid input");
     await fields[1]!.setValue("500");
     await fields[2]!.setValue("2500");
@@ -753,6 +754,7 @@ describe("media parse workbench", () => {
       .get('input[placeholder="rtsp://host/path"]')
       .setValue("rtsp://camera.example/live");
     await wrapper.findAll(".input-controls select")[1]!.setValue("keyframe");
+    await wrapper.get("button.advanced-parameters-toggle").trigger("click");
     const fields = wrapper.findAll(".parameter-grid input");
     await fields[1]!.setValue("250");
     await fields[2]!.setValue("5000");

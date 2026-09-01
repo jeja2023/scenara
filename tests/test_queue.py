@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from scenara.infrastructure.queue import RedisRunQueue
+from scenara.platform.queue import QueueLaneDepth
 
 
 class _QueueDrained(RuntimeError):
@@ -80,3 +81,18 @@ async def test_redis_worker_recovers_stale_pending_message() -> None:
     assert calls == [("t", "p", "run-1")]
     assert client.renewals == [("scenara:runs:batch", "scenara-workers:batch", "worker-restarted", "17-0")]
     assert client.acked == [("scenara:runs:batch", "scenara-workers:batch", "17-0")]
+
+
+@pytest.mark.asyncio
+async def test_redis_queue_exposes_lag_and_pending_by_lane() -> None:
+    class MetricsRedis:
+        async def xinfo_groups(self, stream: str) -> list[dict[str, object]]:
+            lane = stream.rsplit(":", 1)[-1]
+            return [{"name": f"scenara-workers:{lane}", "pending": 2, "lag": 7}]
+
+    queue = RedisRunQueue("redis://unused")
+    queue._client = MetricsRedis()
+    assert await queue.depth() == {
+        "batch": QueueLaneDepth(lag=7, pending=2),
+        "stream": QueueLaneDepth(lag=7, pending=2),
+    }

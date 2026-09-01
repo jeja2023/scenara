@@ -58,6 +58,31 @@
   margin-top: 14px;
 }
 
+.ocr-result-panel {
+  margin-top: 14px;
+}
+
+.ocr-result-field {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ocr-result-field textarea {
+  width: 100%;
+  min-height: 116px;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 9px;
+  color: var(--ink);
+  background: var(--surface-soft);
+  font: 13px/1.55 var(--font-mono);
+}
+
 .warning-panel h2 {
   display: inline-flex;
   align-items: center;

@@ -23,6 +23,7 @@ from fastapi import (
     UploadFile,
 )
 
+from scenara.api.uploads import remove_spooled_upload, spool_upload, upload_limit
 from scenara.bootstrap import Runtime
 from scenara.platform.models import (
     ApiEnvelope,
@@ -65,29 +66,6 @@ def build_media_router(
     envelope: EnvelopeFactory,
 ) -> APIRouter:
     router = APIRouter()
-
-    async def spool_upload(file: UploadFile, max_bytes: int) -> Path:
-        handle = tempfile.NamedTemporaryFile(prefix="scenara-upload-", delete=False)
-        path = Path(handle.name)
-        size = 0
-        failed = False
-        try:
-            while chunk := await file.read(1024 * 1024):
-                size += len(chunk)
-                if size > max_bytes:
-                    raise ValueError(f"media exceeds {max_bytes} bytes")
-                await asyncio.to_thread(handle.write, chunk)
-            await asyncio.to_thread(handle.flush)
-            return path
-        except Exception:
-            failed = True
-            raise
-        finally:
-            with suppress(Exception):
-                handle.close()
-            if failed:
-                with suppress(FileNotFoundError, PermissionError):
-                    path.unlink()
 
     def require_presigned_storage() -> None:
         if not runtime.settings.s3_presigned_urls_enabled:
@@ -147,35 +125,26 @@ def build_media_router(
         domain: Annotated[str | None, Form()] = None,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[MediaAsset]:
-        max_read = (
-            runtime.settings.max_image_bytes + 1
+        maximum = (
+            runtime.settings.max_image_bytes
             if kind == MediaKind.IMAGE
-            else runtime.settings.max_media_bytes + 1
+            else runtime.settings.max_media_bytes
         )
-        if kind == MediaKind.VIDEO:
-            path = await spool_upload(file, runtime.settings.max_media_bytes)
-            try:
-                asset = await runtime.runs.create_asset_from_path(
-                    context,
-                    path=str(path),
-                    filename=file.filename,
-                    content_type=file.content_type or "application/octet-stream",
-                    kind=kind,
-                    domain=domain,
-                )
-            finally:
-                with suppress(FileNotFoundError, PermissionError):
-                    path.unlink()
-        else:
-            data = await file.read(max_read)
-            asset = await runtime.runs.create_asset(
+        path = await spool_upload(
+            file,
+            upload_limit(maximum, runtime.settings.max_multipart_upload_bytes),
+        )
+        try:
+            asset = await runtime.runs.create_asset_from_path(
                 context,
-                data=data,
+                path=str(path),
                 filename=file.filename,
                 content_type=file.content_type or "application/octet-stream",
                 kind=kind,
                 domain=domain,
             )
+        finally:
+            remove_spooled_upload(path)
         return envelope(request, asset)
 
     @router.post("/api/v1/media/uploads/presign", tags=["Media"])

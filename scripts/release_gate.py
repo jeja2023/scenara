@@ -123,6 +123,7 @@ REQUIRED_IMPLEMENTATION = (
     "docs/release/0.3.0-dev.39发布说明.md",
     "docs/release/0.3.0-dev.40发布说明.md",
     "docs/release/0.3.0-dev.41发布说明.md",
+    "docs/release/0.3.0-dev.42发布说明.md",
     "docs/release/支持矩阵.md",
     "docs/release/发布证据职责说明.md",
     "docs/release/evidence/资格认证输入契约.md",

@@ -161,7 +161,11 @@ const routes = [
       section: "智能检索",
     },
     children: [
-      { path: "", redirect: { name: "surveillance-live" } },
+      {
+        path: "",
+        name: "surveillance-root",
+        redirect: { name: "surveillance-live" },
+      },
       {
         path: "watchlists",
         name: "surveillance-watchlists",

@@ -46,14 +46,14 @@ function toggleToken(): void {
     <div class="panel-body connection-body">
       <div class="connection-form-grid">
         <label class="form-field">
-          <span class="field-label">接口服务地址 (API Base)</span>
+          <span class="field-label">接口服务地址</span>
           <input
             v-model="draft.apiBase"
             placeholder="例如: http://127.0.0.1:8000 (留空为同源)"
             class="field-input mono"
           />
           <small class="muted field-help"
-            >若前后端分离部署，请指定 Scenara 后端服务根地址</small
+            >若前后端分离部署，请指定平台后端服务根地址</small
           >
         </label>
 
@@ -78,12 +78,12 @@ function toggleToken(): void {
             </button>
           </div>
           <small class="muted field-help"
-            >用于浏览器向平台发起请求时的 Authorization 头部</small
+            >用于浏览器向平台发起请求时的认证请求头</small
           >
         </label>
 
         <label class="form-field">
-          <span class="field-label">租户标识 (Tenant ID)</span>
+          <span class="field-label">租户标识</span>
           <input
             v-model="draft.tenantId"
             placeholder="default"
@@ -92,7 +92,7 @@ function toggleToken(): void {
         </label>
 
         <label class="form-field">
-          <span class="field-label">项目标识 (Project ID)</span>
+          <span class="field-label">项目标识</span>
           <input
             v-model="draft.projectId"
             placeholder="default"

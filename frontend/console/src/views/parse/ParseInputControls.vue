@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Eye, Library, RefreshCw, Upload } from "@lucide/vue";
+import { ref } from "vue";
 import type { MediaMode } from "../../composables/useDomainCatalog";
 import type {
   MediaAsset,
@@ -75,6 +76,8 @@ const emit = defineEmits<{
 function selectSource(): void {
   emit("selectSource", sourceId.value);
 }
+
+const showAdvancedParameters = ref(false);
 </script>
 
 <template>
@@ -251,6 +254,16 @@ function selectSource(): void {
             step="100"
             :disabled="sampleStrategy !== 'interval'"
         /></label>
+      </div>
+      <button
+        type="button"
+        class="button secondary advanced-parameters-toggle"
+        :aria-expanded="showAdvancedParameters"
+        @click="showAdvancedParameters = !showAdvancedParameters"
+      >
+        {{ showAdvancedParameters ? "收起高级参数" : "展开高级参数" }}
+      </button>
+      <div v-if="showAdvancedParameters" class="parameter-grid">
         <label
           ><span>{{
             mode === "stream" ? "开始后跳过（毫秒）" : "起始时间（毫秒）"

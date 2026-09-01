@@ -338,15 +338,15 @@ function toggleSelectAllAssets(): void {
 function statusLabel(status: string): string {
   switch (status) {
     case "draft":
-      return "草稿 (Draft)";
+      return "草稿";
     case "active":
-      return "使用中 (Active)";
+      return "使用中";
     case "archived":
-      return "已归档 (Archived)";
+      return "已归档";
     case "validated":
-      return "已校验 (Validated)";
+      return "已校验";
     case "published":
-      return "已发布 (Published)";
+      return "已发布";
     case "retired":
       return "已退役 (Retired)";
     default:
@@ -473,9 +473,9 @@ useRefresh(refresh);
 
             <select v-model="datasetStatusFilter" class="sidebar-status-select">
               <option value="all">全部状态</option>
-              <option value="active">使用中 (Active)</option>
-              <option value="draft">草稿 (Draft)</option>
-              <option value="archived">已归档 (Archived)</option>
+              <option value="active">使用中</option>
+              <option value="draft">草稿</option>
+              <option value="archived">已归档</option>
             </select>
           </div>
         </div>

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Mapping
 from threading import Lock
+
+from scenara.platform.queue import QueueLaneDepth
 
 HISTOGRAM_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0)
 
@@ -140,4 +143,20 @@ class SurveillanceMetrics:
         return "\n".join(lines) + "\n"
 
 
-__all__ = ["RequestMetrics", "SurveillanceMetrics"]
+def render_queue_metrics(depths: Mapping[str, QueueLaneDepth] | None, *, available: bool) -> str:
+    """Render low-cardinality Redis Stream depth metrics for capacity control."""
+    lines = [
+        "# HELP scenara_run_queue_metrics_up Whether queue depth metrics are available.",
+        "# TYPE scenara_run_queue_metrics_up gauge",
+        f"scenara_run_queue_metrics_up {1 if available else 0}",
+        "# HELP scenara_run_queue_messages Run queue messages by lane and state.",
+        "# TYPE scenara_run_queue_messages gauge",
+    ]
+    for lane, depth in sorted((depths or {}).items()):
+        label = _label(lane)
+        lines.append(f'scenara_run_queue_messages{{lane="{label}",state="lag"}} {max(0, depth.lag)}')
+        lines.append(f'scenara_run_queue_messages{{lane="{label}",state="pending"}} {max(0, depth.pending)}')
+    return "\n".join(lines) + "\n"
+
+
+__all__ = ["RequestMetrics", "SurveillanceMetrics", "render_queue_metrics"]

@@ -69,6 +69,8 @@ class Settings:
     data_platform_max_retries: int
     data_dir: Path
     postgres_dsn: str
+    postgres_pool_min_size: int
+    postgres_pool_max_size: int
     redis_url: str
     qdrant_url: str
     qdrant_api_key: str
@@ -99,6 +101,7 @@ class Settings:
     bootstrap_admin_password: str
     max_image_bytes: int
     max_media_bytes: int
+    max_multipart_upload_bytes: int
     media_sample_interval_ms: int
     stream_segment_duration_ms: int
     enterprise_license_path: Path | None
@@ -143,8 +146,16 @@ class Settings:
             raise RuntimeError("SCENARA_DATA_PLATFORM_URL is required when SCENARA_DATA_PLATFORM_MODE=http")
         if self.data_platform_timeout_seconds <= 0:
             raise RuntimeError("SCENARA_DATA_PLATFORM_TIMEOUT_SECONDS must be positive")
+        if self.postgres_pool_min_size < 1:
+            raise RuntimeError("SCENARA_POSTGRES_POOL_MIN_SIZE must be at least one")
+        if self.postgres_pool_max_size < self.postgres_pool_min_size:
+            raise RuntimeError("SCENARA_POSTGRES_POOL_MAX_SIZE must be at least SCENARA_POSTGRES_POOL_MIN_SIZE")
         if self.qdrant_url and self.qdrant_timeout_seconds <= 0:
             raise RuntimeError("SCENARA_QDRANT_TIMEOUT_SECONDS must be positive")
+        if self.max_multipart_upload_bytes <= 0:
+            raise RuntimeError("SCENARA_MAX_MULTIPART_UPLOAD_BYTES must be positive")
+        if self.max_multipart_upload_bytes > self.max_media_bytes:
+            raise RuntimeError("SCENARA_MAX_MULTIPART_UPLOAD_BYTES cannot exceed SCENARA_MAX_MEDIA_BYTES")
         if bool(self.s3_access_key) != bool(self.s3_secret_key):
             raise RuntimeError("SCENARA_S3_ACCESS_KEY and SCENARA_S3_SECRET_KEY must be configured together")
         if self.s3_session_token and not self.s3_access_key:
@@ -236,6 +247,8 @@ def load_settings() -> Settings:
         data_platform_max_retries=max(0, min(5, int(os.getenv("SCENARA_DATA_PLATFORM_MAX_RETRIES", "2")))),
         data_dir=Path(os.getenv("SCENARA_DATA_DIR", "runtime-state")).resolve(),
         postgres_dsn=_secret("SCENARA_POSTGRES_DSN"),
+        postgres_pool_min_size=max(1, int(os.getenv("SCENARA_POSTGRES_POOL_MIN_SIZE", "1"))),
+        postgres_pool_max_size=max(1, int(os.getenv("SCENARA_POSTGRES_POOL_MAX_SIZE", "4"))),
         redis_url=_secret("SCENARA_REDIS_URL"),
         qdrant_url=os.getenv("SCENARA_QDRANT_URL", "").strip().rstrip("/"),
         qdrant_api_key=_secret("SCENARA_QDRANT_API_KEY"),
@@ -276,6 +289,10 @@ def load_settings() -> Settings:
         bootstrap_admin_password=_secret("SCENARA_BOOTSTRAP_ADMIN_PASSWORD"),
         max_image_bytes=max(1, int(os.getenv("SCENARA_MAX_IMAGE_BYTES", str(25 * 1024 * 1024)))),
         max_media_bytes=max(1, int(os.getenv("SCENARA_MAX_MEDIA_BYTES", str(20 * 1024 * 1024 * 1024)))),
+        max_multipart_upload_bytes=max(
+            1,
+            int(os.getenv("SCENARA_MAX_MULTIPART_UPLOAD_BYTES", str(512 * 1024 * 1024))),
+        ),
         media_sample_interval_ms=max(
             1,
             min(3_600_000, int(os.getenv("SCENARA_MEDIA_SAMPLE_INTERVAL_MS", "1000"))),

@@ -350,6 +350,12 @@ const warningPanelTitle = computed(() => {
   return hasInformational ? "解析提示" : "解析警告";
 });
 const hasResult = computed(() => !!result.value);
+const ocrText = computed(() => {
+  const payload = result.value?.domain_payload as
+    Record<string, unknown> | undefined;
+  const text = payload?.text;
+  return typeof text === "string" ? text : "";
+});
 
 const currentDomainLabel = computed(
   () => selectedDomainManifest.value?.display_name || labelDomain(domain.value),
@@ -614,8 +620,12 @@ async function transitionRun(
     run.value = updated;
     syncRunToHistory(updated);
     if (action === "cancel") {
-      await loadResult(current.run_id, true);
-      void refreshHistory();
+      if (["completed", "failed", "cancelled"].includes(updated.status)) {
+        await loadResult(current.run_id, true);
+        void refreshHistory();
+      } else {
+        await pollRun(updated);
+      }
     } else if (!["completed", "failed", "cancelled"].includes(updated.status)) {
       followRun(updated);
     } else {
@@ -853,6 +863,7 @@ onBeforeUnmount(() => {
         />
 
         <ParseInputControls
+          :key="mode"
           v-model:asset-id="assetId"
           v-model:connect-timeout-ms="connectTimeoutMs"
           v-model:frame-max-edge="frameMaxEdge"
@@ -912,6 +923,27 @@ onBeforeUnmount(() => {
         ><strong>{{ progressPercent }}%</strong
         ><small v-if="progressDetail">{{ progressDetail }}</small></span
       >
+    </section>
+
+    <section
+      v-if="domain === 'ocr' && hasResult"
+      class="panel ocr-result-panel"
+    >
+      <div class="panel-header">
+        <h2>OCR 识别结果</h2>
+        <span class="badge completed">已生成</span>
+      </div>
+      <div class="panel-body">
+        <label class="ocr-result-field">
+          <span>OCR 文本结果</span>
+          <textarea
+            aria-label="OCR 文本结果"
+            :value="ocrText"
+            readonly
+            rows="5"
+          />
+        </label>
+      </div>
     </section>
 
     <section v-if="actionableWarnings.length" class="panel warning-panel">

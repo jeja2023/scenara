@@ -93,9 +93,15 @@ class QdrantFeatureStore:
             raise FeatureStoreError("Qdrant returned invalid JSON") from exc
 
     async def create_space(self, space: FeatureSpace) -> FeatureSpace:
-        existing = self._spaces.get(space.feature_space_id)
-        if existing and existing.model_dump(exclude={"created_at"}) != space.model_dump(exclude={"created_at"}):
-            raise FeatureStoreError("feature space already exists with a different contract")
+        # Recover persisted metadata before attempting a collection mutation.
+        # The in-process cache is intentionally only a cache: a restarted
+        # worker must not be allowed to change a feature space's dimension or
+        # distance metric by recreating its metadata point.
+        existing = await self.get_space(space.feature_space_id)
+        if existing is not None:
+            if existing.model_dump(exclude={"created_at"}) != space.model_dump(exclude={"created_at"}):
+                raise FeatureStoreError("feature space already exists with a different contract")
+            return existing
         collection = self._collection(space, self._prefix)
         # Qdrant uses a collection per vector dimension/metric contract.  The
         # local cache prevents an accidental destructive recreation on startup.
@@ -109,6 +115,12 @@ class QdrantFeatureStore:
         except FeatureStoreError as exc:
             if "(409)" not in str(exc):
                 raise
+            existing = await self.get_space(space.feature_space_id)
+            if existing is None:
+                raise FeatureStoreError("feature space collection exists without a Scenara contract") from exc
+            if existing.model_dump(exclude={"created_at"}) != space.model_dump(exclude={"created_at"}):
+                raise FeatureStoreError("feature space already exists with a different contract") from exc
+            return existing
         # Qdrant has no portable arbitrary collection metadata API.  Keep a
         # deterministic metadata point so a new process can recover the full
         # FeatureSpace contract before serving queries.

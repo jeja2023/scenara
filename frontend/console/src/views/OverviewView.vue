@@ -68,7 +68,7 @@ const capabilityColumns: TableColumn<FullCapabilityItem>[] = [
 ];
 
 const overviewRunColumns: TableColumn<Run>[] = [
-  { key: "run_id", label: "任务 ID", class: "mono" },
+  { key: "run_id", label: "任务标识", class: "mono" },
   { key: "domain", label: "领域" },
   { key: "pipeline", label: "流水线", class: "truncate" },
   { key: "status", label: "状态" },
@@ -257,7 +257,7 @@ const allCapabilitiesList = computed<FullCapabilityItem[]>(() => [
     readiness: "ready",
     productionReady: true,
     model: "models/attribute_reid.onnx",
-    detail: "Attribute ReID 服饰与体貌特征 (256 维)",
+    detail: "服饰与体貌属性特征（256 维）",
   },
 
   // 2. OCR 智能文档领域
@@ -384,58 +384,53 @@ const domainEngineSummaries = computed(() => [
   {
     id: "portrait",
     name: "人像视觉分析",
-    englishName: "Portrait Analysis",
     description:
-      "基于 YOLOv8、OSNet IBN、SCRFD、ArcFace 与 OpenGait 构建的人像端到端视觉中枢。",
+      "集成人员检测、重识别、人脸定位、步态与服饰属性等人像视觉能力。",
     capabilitiesCount: 7,
     models: [
-      { name: "人员检测", file: "models/yolov8n.onnx" },
-      { name: "人体重识别", file: "models/osnet_ibn_x1_0.onnx" },
-      { name: "姿态骨架", file: "models/yolov8n-pose.pt" },
-      { name: "人脸定位", file: "models/scrfd_500m.onnx" },
-      { name: "人脸特征", file: "models/arcface.onnx" },
-      { name: "步态时序", file: "models/opengait_gait3d.onnx" },
-      { name: "服饰属性", file: "models/attribute_reid.onnx" },
+      { name: "人员检测" },
+      { name: "人体重识别" },
+      { name: "姿态骨架" },
+      { name: "人脸定位" },
+      { name: "人脸特征" },
+      { name: "步态时序" },
+      { name: "服饰属性" },
     ],
   },
   {
     id: "ocr",
     name: "OCR 智能文档",
-    englishName: "Document & Video OCR",
-    description:
-      "基于 PP-OCRv4 文本定位识别套件与自适应动静态帧差去重推理引擎。",
+    description: "覆盖文本定位、文字识别、方向纠偏与视频时序去重能力。",
     capabilitiesCount: 4,
     models: [
-      { name: "文本检测", file: "models/ocr/ch_PP-OCRv4_det_infer" },
-      { name: "文字识别", file: "models/ocr/ch_PP-OCRv4_rec_infer" },
-      { name: "方向纠偏", file: "models/ocr/ch_ppocr_mobile_v2.0_cls_infer" },
-      { name: "时序去重", file: "Adaptive Motion Deduplication" },
+      { name: "文本检测" },
+      { name: "文字识别" },
+      { name: "方向纠偏" },
+      { name: "时序去重" },
     ],
   },
   {
     id: "behavior",
     name: "行为动作识别",
-    englishName: "Behavior Analysis",
     description:
       "结合人体骨架与时序时空特征，精准识别吸烟、摔倒、搏斗等 50+ 动作模式与异常告警。",
     capabilitiesCount: 3,
     models: [
-      { name: "骨架感知", file: "YOLOv8 Pose Skeleton (17点)" },
-      { name: "动作分类器", file: "Behavior Action Engine (50+)" },
-      { name: "时空追踪", file: "Spatial-Temporal Tracker" },
+      { name: "骨架感知" },
+      { name: "动作分类器" },
+      { name: "时空追踪" },
     ],
   },
   {
     id: "fashion",
     name: "服饰风格识别",
-    englishName: "Fashion & Cosplay",
     description:
-      "精准识别 Cosplay 角色、二次元与日常服饰风格（JK、Lolita、汉服等）和配饰属性。",
+      "识别角色扮演、二次元与日常服饰风格（学院风、洛丽塔、汉服等）和配饰属性。",
     capabilitiesCount: 3,
     models: [
-      { name: "风格分类器", file: "Fashion Style Engine" },
-      { name: "角色匹配", file: "Cosplay Character Matcher" },
-      { name: "配饰道具", file: "Accessory & Prop Detector" },
+      { name: "风格分类器" },
+      { name: "角色匹配" },
+      { name: "配饰道具" },
     ],
   },
 ]);
@@ -538,7 +533,6 @@ useRefresh(refresh);
             </div>
             <div class="engine-meta">
               <strong>{{ domain.name }}</strong>
-              <small>{{ domain.englishName }}</small>
             </div>
             <span class="badge active"
               >{{ domain.capabilitiesCount }} 项已就绪</span
@@ -555,7 +549,7 @@ useRefresh(refresh);
             >
               <span class="dot ready"></span>
               <span class="model-item-name">{{ mod.name }}</span>
-              <code class="model-item-file">{{ mod.file }}</code>
+              <span class="model-item-file">已配置</span>
             </div>
           </div>
         </article>

@@ -62,11 +62,13 @@ const emit = defineEmits<{
               ? "正在拖拽圈选 (松开完成)"
               : selectedRoi
                 ? "重新圈选区域"
-                : "圈选识别区域 (ROI)"
+                : "圈选识别区域"
           }}
         </button>
         <span v-if="selectedRoi" class="roi-badge">
-          ROI: [{{ selectedRoi.map((value) => value.toFixed(3)).join(", ") }}]
+          区域坐标：[{{
+            selectedRoi.map((value) => value.toFixed(3)).join(", ")
+          }}]
         </span>
       </div>
       <div v-if="selectedRoi" class="roi-toolbar-right">
@@ -207,7 +209,7 @@ const emit = defineEmits<{
         aria-hidden="true"
       />
       <div v-if="roiBoxStyle" class="roi-overlay-box" :style="roiBoxStyle">
-        <span class="roi-box-label">ROI 识别区域</span>
+        <span class="roi-box-label">识别区域</span>
       </div>
     </div>
     <div v-if="overlayStatus" class="overlay-status" aria-live="polite">

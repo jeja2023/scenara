@@ -4,13 +4,10 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, Header, Request, UploadFile
-import asyncio
-from contextlib import suppress
-from pathlib import Path
-import tempfile
 from uuid import uuid4
 
 from scenara.bootstrap import Runtime
+from scenara.api.uploads import remove_spooled_upload, spool_upload, upload_limit
 from scenara.platform.models import (
     ApiEnvelope,
     CreateRunRequest,
@@ -32,31 +29,6 @@ EnvelopeFactory = Callable[[Request, Any], ApiEnvelope[Any]]
 PrincipalDependency = Callable[..., Awaitable[PrincipalContext]]
 
 
-async def spool_upload(file: UploadFile, max_bytes: int) -> Path:
-    """Persist a bounded upload for parse endpoints that require a filesystem path."""
-    handle = tempfile.NamedTemporaryFile(prefix="scenara-upload-", delete=False)
-    path = Path(handle.name)
-    size = 0
-    failed = False
-    try:
-        while chunk := await file.read(1024 * 1024):
-            size += len(chunk)
-            if size > max_bytes:
-                raise ValueError(f"media exceeds {max_bytes} bytes")
-            await asyncio.to_thread(handle.write, chunk)
-        await asyncio.to_thread(handle.flush)
-        return path
-    except Exception:
-        failed = True
-        raise
-    finally:
-        with suppress(Exception):
-            handle.close()
-        if failed:
-            with suppress(FileNotFoundError, PermissionError):
-                path.unlink()
-
-
 def build_parse_router(
     runtime: Runtime, principal_context: PrincipalDependency, envelope: EnvelopeFactory
 ) -> APIRouter:
@@ -72,15 +44,24 @@ def build_parse_router(
         idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[ParseImageResponse]:
-        data = await file.read(runtime.settings.max_image_bytes + 1)
-        asset = await runtime.runs.create_asset(
-            context,
-            data=data,
-            filename=file.filename,
-            content_type=file.content_type or "application/octet-stream",
-            kind=MediaKind.IMAGE,
-            temporary=True,
+        path = await spool_upload(
+            file,
+            upload_limit(
+                runtime.settings.max_image_bytes,
+                runtime.settings.max_multipart_upload_bytes,
+            ),
         )
+        try:
+            asset = await runtime.runs.create_asset_from_path(
+                context,
+                path=str(path),
+                filename=file.filename,
+                content_type=file.content_type or "application/octet-stream",
+                kind=MediaKind.IMAGE,
+                temporary=True,
+            )
+        finally:
+            remove_spooled_upload(path)
         selected_pipeline = pipeline_id or runtime.plugins.default_pipeline_id(domain)
         selected_pipeline_ref = await runtime.runs.resolve_pipeline_ref(
             selected_pipeline, pipeline_version
@@ -123,7 +104,13 @@ def build_parse_router(
         idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[ParseVideoResponse]:
-        path = await spool_upload(file, runtime.settings.max_media_bytes)
+        path = await spool_upload(
+            file,
+            upload_limit(
+                runtime.settings.max_media_bytes,
+                runtime.settings.max_multipart_upload_bytes,
+            ),
+        )
         try:
             asset = await runtime.runs.create_asset_from_path(
                 context,
@@ -134,8 +121,7 @@ def build_parse_router(
                 temporary=True,
             )
         finally:
-            with suppress(FileNotFoundError, PermissionError):
-                path.unlink()
+            remove_spooled_upload(path)
         selected_pipeline = pipeline_id or runtime.plugins.default_pipeline_id(domain)
         selected_pipeline_ref = await runtime.runs.resolve_pipeline_ref(
             selected_pipeline, pipeline_version
@@ -187,15 +173,24 @@ def build_parse_router(
         idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
         context: PrincipalContext = Depends(principal_context),
     ) -> ApiEnvelope[ParseDocumentResponse]:
-        data = await file.read(runtime.settings.max_media_bytes + 1)
-        asset = await runtime.runs.create_asset(
-            context,
-            data=data,
-            filename=file.filename,
-            content_type=file.content_type or "application/pdf",
-            kind=MediaKind.DOCUMENT,
-            temporary=True,
+        path = await spool_upload(
+            file,
+            upload_limit(
+                runtime.settings.max_media_bytes,
+                runtime.settings.max_multipart_upload_bytes,
+            ),
         )
+        try:
+            asset = await runtime.runs.create_asset_from_path(
+                context,
+                path=str(path),
+                filename=file.filename,
+                content_type=file.content_type or "application/pdf",
+                kind=MediaKind.DOCUMENT,
+                temporary=True,
+            )
+        finally:
+            remove_spooled_upload(path)
         selected_pipeline = pipeline_id or runtime.plugins.default_pipeline_id(domain)
         selected_pipeline_ref = await runtime.runs.resolve_pipeline_ref(
             selected_pipeline, pipeline_version

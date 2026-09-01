@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from scenara.infrastructure.qdrant_features import QdrantFeatureStore
-from scenara.platform.features import DistanceMetric, FeatureRecord, FeatureSpace
+from scenara.platform.features import DistanceMetric, FeatureRecord, FeatureSpace, FeatureStoreError
 
 
 class FakeQdrant:
@@ -180,6 +180,25 @@ async def test_qdrant_feature_store_recovers_spaces_after_process_restart() -> N
     recovered = await restarted.get_space(space.feature_space_id)
     assert recovered is not None
     assert recovered.model_id == "osnet"
+
+
+@pytest.mark.asyncio
+async def test_qdrant_feature_store_rejects_contract_change_after_process_restart() -> None:
+    fake = FakeQdrant()
+    first = QdrantFeatureStore("https://qdrant.example", client=fake)  # type: ignore[arg-type]
+    space = FeatureSpace(
+        feature_space_id="person/body/reid",
+        domain="portrait",
+        modality="body",
+        model_id="osnet",
+        model_version="1.0.0",
+        dimension=2,
+        distance_metric=DistanceMetric.COSINE,
+    )
+    await first.create_space(space)
+    restarted = QdrantFeatureStore("https://qdrant.example", client=fake)  # type: ignore[arg-type]
+    with pytest.raises(FeatureStoreError, match="different contract"):
+        await restarted.create_space(space.model_copy(update={"dimension": 3}))
 
 
 @pytest.mark.asyncio

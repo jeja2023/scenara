@@ -166,7 +166,11 @@ def build_runtime(
         fashion_engine = load_fashion_engine(settings.fashion_engine_factory)
     control_plane_store: ControlPlaneStore
     if settings.state_backend == "postgres":
-        postgres_state = PostgresStateStore(settings.postgres_dsn)
+        postgres_state = PostgresStateStore(
+            settings.postgres_dsn,
+            min_size=settings.postgres_pool_min_size,
+            max_size=settings.postgres_pool_max_size,
+        )
         state: StateStore = postgres_state
         access_repository: AccessRepository = PostgresAccessRepository(postgres_state.pool)
         features: FeatureStore = (

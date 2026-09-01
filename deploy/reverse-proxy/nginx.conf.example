@@ -19,7 +19,9 @@ server {
     ssl_session_cache shared:ScenaraTLS:10m;
     ssl_session_tickets off;
 
-    client_max_body_size 20g;
+    # Keep this aligned with SCENARA_MAX_MULTIPART_UPLOAD_BYTES.  Larger
+    # media uses the authenticated S3 presigned-upload flow.
+    client_max_body_size 512m;
     client_body_timeout 300s;
     keepalive_timeout 65s;
 
