@@ -5,9 +5,7 @@ import hashlib
 import json
 import logging
 import os
-import tempfile
 import time
-from datetime import UTC, datetime
 from collections.abc import Sequence
 from contextlib import suppress
 from dataclasses import dataclass
@@ -18,9 +16,9 @@ from uuid import uuid4
 
 from scenara.platform.artifacts import RunArtifactSink
 from scenara.platform.audit import AuditLogger
-from scenara.platform.index import IndexDefinition, IndexRecord, IndexRecordKind, IndexSourceRef, IndexStore
+from scenara.platform.index import IndexStore
 from scenara.platform.media_batch import MediaInput, inspect_media
-from scenara.platform.model_runtime import RuntimeModelBinding, runtime_binding_scope
+from scenara.platform.model_runtime import RuntimeModelBinding
 from scenara.platform.models import (
     TERMINAL_RUN_STATUSES,
     CreateMediaSourceRequest,
@@ -48,10 +46,6 @@ from scenara.platform.models import (
 from scenara.platform.network import validate_external_url
 from scenara.platform.objects import ObjectStore
 from scenara.platform.pipeline import (
-    DomainUnavailable,
-    ExecutionContext,
-    ExecutionControl,
-    ExecutionInterrupted,
     PipelineDefinition,
     PipelineError,
     PipelineRegistry,
@@ -59,21 +53,14 @@ from scenara.platform.pipeline import (
 from scenara.platform.policy import PolicyProvider, require_allowed
 from scenara.platform.queue import RunQueue
 from scenara.platform.secrets import SecretStore
+from scenara.platform.services_errors import (
+    InvalidTransition,
+    ResourceNotFound,
+)
+from scenara.platform.services_execution import RunExecutionMixin
 from scenara.platform.store import StateConflict, StateStore
 
 logger = logging.getLogger(__name__)
-
-
-class ResourceNotFound(RuntimeError):
-    pass
-
-
-class InvalidTransition(RuntimeError):
-    pass
-
-
-class ExecutionStopped(ExecutionInterrupted):
-    pass
 
 
 class ActiveModelResolver(Protocol):
@@ -91,13 +78,17 @@ class RunResultRegistrar(Protocol):
     避免内核依赖任何领域模块。
     """
 
-    async def register_run_result(self, run: RunRecord, result: ResultEnvelope) -> None: ...
+    async def register_run_result(
+        self, run: RunRecord, result: ResultEnvelope
+    ) -> None: ...
 
 
 class RunObservationEvaluator(Protocol):
     """Evaluate an in-memory result snapshot without exposing private vectors publicly."""
 
-    async def evaluate_run_result(self, run: RunRecord, result: ResultEnvelope) -> None: ...
+    async def evaluate_run_result(
+        self, run: RunRecord, result: ResultEnvelope
+    ) -> None: ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,7 +97,7 @@ class CreateRunOutcome:
     created: bool
 
 
-class RunService:
+class RunService(RunExecutionMixin):
     def __init__(
         self,
         *,
@@ -172,7 +163,9 @@ class RunService:
         domain: str | None = None,
         temporary: bool = False,
     ) -> MediaAsset:
-        await require_allowed(self.policy, context, "create", "media_asset", {"kind": kind.value})
+        await require_allowed(
+            self.policy, context, "create", "media_asset", {"kind": kind.value}
+        )
         if not data:
             raise ValueError("media asset is empty")
         if len(data) > self.max_media_bytes:
@@ -188,7 +181,9 @@ class RunService:
             filename=filename,
         )
         try:
-            raw_metadata, preview_data = await asyncio.to_thread(inspect_media, media_input)
+            raw_metadata, preview_data = await asyncio.to_thread(
+                inspect_media, media_input
+            )
             metadata = MediaTechnicalMetadata.model_validate(raw_metadata)
         except PipelineError as exc:
             raise ValueError(f"invalid {kind.value} media: {exc}") from exc
@@ -265,13 +260,19 @@ class RunService:
                 )
             )
             tracked_keys.append(preview_key)
-            await self.policy.consume(context, "media_bytes", len(data), {"asset_id": asset_id})
+            await self.policy.consume(
+                context, "media_bytes", len(data), {"asset_id": asset_id}
+            )
             await self.audit.record(
                 context,
                 action="media.asset.create",
                 resource_type="media_asset",
                 resource_id=asset_id,
-                evidence={"kind": kind.value, "size_bytes": len(data), "sha256": asset.sha256},
+                evidence={
+                    "kind": kind.value,
+                    "size_bytes": len(data),
+                    "sha256": asset.sha256,
+                },
             )
             return stored
         except Exception:
@@ -280,7 +281,9 @@ class RunService:
                     await self.state.mark_objects_deleted(tracked_keys, time.time())
             if stored is not None:
                 with suppress(Exception):
-                    await self.state.delete_asset(context.tenant_id, context.project_id, asset_id)
+                    await self.state.delete_asset(
+                        context.tenant_id, context.project_id, asset_id
+                    )
             with suppress(Exception):
                 await self.objects.delete(object_key)
             with suppress(Exception):
@@ -298,7 +301,9 @@ class RunService:
         domain: str | None = None,
         temporary: bool = False,
     ) -> MediaAsset:
-        await require_allowed(self.policy, context, "create", "media_asset", {"kind": kind.value})
+        await require_allowed(
+            self.policy, context, "create", "media_asset", {"kind": kind.value}
+        )
         source_path = os.path.abspath(path)
         size_bytes = os.path.getsize(source_path)
         if size_bytes <= 0:
@@ -314,9 +319,18 @@ class RunService:
                 while chunk := handle.read(1024 * 1024):
                     digest.update(chunk)
             raw_metadata, preview = inspect_media(
-                MediaInput(kind=kind, content_type=content_type, file_path=source_path, filename=filename)
+                MediaInput(
+                    kind=kind,
+                    content_type=content_type,
+                    file_path=source_path,
+                    filename=filename,
+                )
             )
-            return digest.hexdigest(), MediaTechnicalMetadata.model_validate(raw_metadata), preview
+            return (
+                digest.hexdigest(),
+                MediaTechnicalMetadata.model_validate(raw_metadata),
+                preview,
+            )
 
         try:
             sha256, metadata, preview_data = await asyncio.to_thread(inspect_path)
@@ -386,24 +400,33 @@ class RunService:
                 ),
             ):
                 await self.state.track_object(record)
-            await self.policy.consume(context, "media_bytes", size_bytes, {"asset_id": asset_id})
+            await self.policy.consume(
+                context, "media_bytes", size_bytes, {"asset_id": asset_id}
+            )
             await self.audit.record(
                 context,
                 action="media.asset.create",
                 resource_type="media_asset",
                 resource_id=asset_id,
-                evidence={"kind": kind.value, "size_bytes": size_bytes, "sha256": sha256},
+                evidence={
+                    "kind": kind.value,
+                    "size_bytes": size_bytes,
+                    "sha256": sha256,
+                },
             )
             return stored
         except Exception:
             if stored is not None:
                 with suppress(Exception):
-                    await self.state.delete_asset(context.tenant_id, context.project_id, asset_id)
+                    await self.state.delete_asset(
+                        context.tenant_id, context.project_id, asset_id
+                    )
             with suppress(Exception):
                 await self.objects.delete(object_key)
             with suppress(Exception):
                 await self.objects.delete(preview_key)
             raise
+
     async def sync_pipeline_catalog(self) -> list[PipelineDefinition]:
         for pipeline in self.pipelines.pipelines():
             await self.state.register_pipeline_definition(pipeline)
@@ -422,20 +445,27 @@ class RunService:
             raise PipelineError(f"pipeline not found: {pipeline_id}@{version}")
         compiled = self.pipelines.pipeline(pipeline_id, version, active_only=False)
         if compiled.definition_sha256 != persisted.definition_sha256:
-            raise PipelineError("persisted pipeline does not match the installed implementation")
+            raise PipelineError(
+                "persisted pipeline does not match the installed implementation"
+            )
         if active_only and persisted.status != PipelineStatus.ACTIVE:
             raise PipelineError(f"pipeline is not active: {pipeline_id}@{version}")
         return persisted
 
-    async def resolve_pipeline_ref(self, pipeline_id: str, version: str | None = None) -> PipelineRef:
+    async def resolve_pipeline_ref(
+        self, pipeline_id: str, version: str | None = None
+    ) -> PipelineRef:
         if version is None:
             active = [
                 pipeline
                 for pipeline in await self.sync_pipeline_catalog()
-                if pipeline.pipeline_id == pipeline_id and pipeline.status == PipelineStatus.ACTIVE
+                if pipeline.pipeline_id == pipeline_id
+                and pipeline.status == PipelineStatus.ACTIVE
             ]
             if len(active) != 1:
-                raise PipelineError(f"pipeline must have exactly one active version: {pipeline_id}")
+                raise PipelineError(
+                    f"pipeline must have exactly one active version: {pipeline_id}"
+                )
             version = active[0].version
         await self.pipeline_definition(pipeline_id, version)
         return PipelineRef(pipeline_id=pipeline_id, version=version)
@@ -460,8 +490,12 @@ class RunService:
             raise PipelineError(f"pipeline not found: {pipeline_id}@{version}")
         compiled = self.pipelines.pipeline(pipeline_id, version, active_only=False)
         if persisted.definition_sha256 != compiled.definition_sha256:
-            raise PipelineError("persisted pipeline does not match the installed implementation")
-        updated = await self.state.transition_pipeline_definition(pipeline_id, version, target)
+            raise PipelineError(
+                "persisted pipeline does not match the installed implementation"
+            )
+        updated = await self.state.transition_pipeline_definition(
+            pipeline_id, version, target
+        )
         await self.audit.record(
             context,
             action="pipeline.transition",
@@ -471,19 +505,35 @@ class RunService:
         )
         return updated
 
-    async def get_asset_preview(self, context: PrincipalContext, asset_id: str) -> tuple[bytes, str]:
-        await require_allowed(self.policy, context, "read", "media_asset", {"asset_id": asset_id})
-        asset = await self.state.get_asset(context.tenant_id, context.project_id, asset_id)
-        if asset is None or asset.deleted_at is not None or asset.preview_object_key is None:
+    async def get_asset_preview(
+        self, context: PrincipalContext, asset_id: str
+    ) -> tuple[bytes, str]:
+        await require_allowed(
+            self.policy, context, "read", "media_asset", {"asset_id": asset_id}
+        )
+        asset = await self.state.get_asset(
+            context.tenant_id, context.project_id, asset_id
+        )
+        if (
+            asset is None
+            or asset.deleted_at is not None
+            or asset.preview_object_key is None
+        ):
             raise ResourceNotFound("media asset preview not found")
         return (
-            await self.objects.get(asset.preview_object_key, expected_sha256=asset.preview_sha256),
+            await self.objects.get(
+                asset.preview_object_key, expected_sha256=asset.preview_sha256
+            ),
             asset.preview_content_type or "image/jpeg",
         )
 
     async def delete_asset(self, context: PrincipalContext, asset_id: str) -> None:
-        await require_allowed(self.policy, context, "delete", "media_asset", {"asset_id": asset_id})
-        asset = await self.state.get_asset(context.tenant_id, context.project_id, asset_id)
+        await require_allowed(
+            self.policy, context, "delete", "media_asset", {"asset_id": asset_id}
+        )
+        asset = await self.state.get_asset(
+            context.tenant_id, context.project_id, asset_id
+        )
         if asset is None:
             raise ResourceNotFound("media asset not found")
         if await self.state.has_non_terminal_run(
@@ -507,7 +557,9 @@ class RunService:
         await self.state.mark_objects_deleted(object_keys, time.time())
         await self.state.delete_asset(context.tenant_id, context.project_id, asset_id)
         if self.indexes is not None:
-            await self.indexes.delete_asset(context.tenant_id, context.project_id, asset_id)
+            await self.indexes.delete_asset(
+                context.tenant_id, context.project_id, asset_id
+            )
 
     async def create_source(
         self,
@@ -522,7 +574,10 @@ class RunService:
             allow_credentials=True,
         )
         parsed = urlsplit(request.url)
-        if parsed.scheme.lower() not in {"rtsp", "rtmp", "http", "https"} or not parsed.hostname:
+        if (
+            parsed.scheme.lower() not in {"rtsp", "rtmp", "http", "https"}
+            or not parsed.hostname
+        ):
             raise ValueError("source URL must use rtsp, rtmp, http, or https")
         source_id = f"src_{uuid4().hex}"
         host = parsed.hostname
@@ -554,21 +609,33 @@ class RunService:
         except Exception:
             if stored is not None:
                 with suppress(Exception):
-                    await self.state.delete_source(context.tenant_id, context.project_id, source_id)
+                    await self.state.delete_source(
+                        context.tenant_id, context.project_id, source_id
+                    )
             with suppress(Exception):
                 await self.secrets.delete(source.secret_ref)
             raise
 
-    async def get_source(self, context: PrincipalContext, source_id: str) -> MediaSource:
-        await require_allowed(self.policy, context, "read", "media_source", {"source_id": source_id})
-        source = await self.state.get_source(context.tenant_id, context.project_id, source_id)
+    async def get_source(
+        self, context: PrincipalContext, source_id: str
+    ) -> MediaSource:
+        await require_allowed(
+            self.policy, context, "read", "media_source", {"source_id": source_id}
+        )
+        source = await self.state.get_source(
+            context.tenant_id, context.project_id, source_id
+        )
         if source is None:
             raise ResourceNotFound("media source not found")
         return source
 
     async def delete_source(self, context: PrincipalContext, source_id: str) -> None:
-        await require_allowed(self.policy, context, "delete", "media_source", {"source_id": source_id})
-        source = await self.state.get_source(context.tenant_id, context.project_id, source_id)
+        await require_allowed(
+            self.policy, context, "delete", "media_source", {"source_id": source_id}
+        )
+        source = await self.state.get_source(
+            context.tenant_id, context.project_id, source_id
+        )
         if source is None:
             raise ResourceNotFound("media source not found")
         if await self.state.has_non_terminal_run(
@@ -595,7 +662,9 @@ class RunService:
         timeout_ms: int = 10_000,
     ) -> MediaSourceProbe:
         source = await self.get_source(context, source_id)
-        await require_allowed(self.policy, context, "execute", "media_source", {"source_id": source_id})
+        await require_allowed(
+            self.policy, context, "execute", "media_source", {"source_id": source_id}
+        )
         source_url = await self.secrets.get(source.secret_ref)
         await validate_external_url(
             source_url,
@@ -608,7 +677,11 @@ class RunService:
             raw_metadata, _preview = await asyncio.wait_for(
                 asyncio.to_thread(
                     inspect_media,
-                    MediaInput(kind=MediaKind.STREAM, content_type="application/octet-stream", source_url=source_url),
+                    MediaInput(
+                        kind=MediaKind.STREAM,
+                        content_type="application/octet-stream",
+                        source_url=source_url,
+                    ),
                 ),
                 timeout=timeout_ms / 1000 + 1,
             )
@@ -638,7 +711,9 @@ class RunService:
         timeout_ms: int = 10_000,
     ) -> tuple[bytes, str]:
         source = await self.get_source(context, source_id)
-        await require_allowed(self.policy, context, "execute", "media_source", {"source_id": source_id})
+        await require_allowed(
+            self.policy, context, "execute", "media_source", {"source_id": source_id}
+        )
         source_url = await self.secrets.get(source.secret_ref)
         await validate_external_url(
             source_url,
@@ -650,7 +725,11 @@ class RunService:
             _metadata, preview = await asyncio.wait_for(
                 asyncio.to_thread(
                     inspect_media,
-                    MediaInput(kind=MediaKind.STREAM, content_type="application/octet-stream", source_url=source_url),
+                    MediaInput(
+                        kind=MediaKind.STREAM,
+                        content_type="application/octet-stream",
+                        source_url=source_url,
+                    ),
                 ),
                 timeout=timeout_ms / 1000 + 1,
             )
@@ -669,7 +748,9 @@ class RunService:
         previous_run_id: str | None = None,
     ) -> CreateRunOutcome:
         if not idempotency_key or len(idempotency_key) > 128:
-            raise ValueError("Idempotency-Key is required and must not exceed 128 characters")
+            raise ValueError(
+                "Idempotency-Key is required and must not exceed 128 characters"
+            )
         if (request.asset_id is None) == (request.source_id is None):
             raise ValueError("exactly one of asset_id or source_id is required")
         await require_allowed(
@@ -679,18 +760,28 @@ class RunService:
             "run",
             {"domain": request.domain, "pipeline_id": request.pipeline.pipeline_id},
         )
-        pipeline = await self.pipeline_definition(request.pipeline.pipeline_id, request.pipeline.version)
+        pipeline = await self.pipeline_definition(
+            request.pipeline.pipeline_id, request.pipeline.version
+        )
         if pipeline.domain != request.domain:
             raise ValueError("requested domain does not match pipeline domain")
         effective_parameters = dict(request.parameters)
         media_kind: MediaKind
         if request.asset_id:
-            asset = await self.state.get_asset(context.tenant_id, context.project_id, request.asset_id)
-            if asset is None or asset.deleted_at is not None or asset.original_deleted_at is not None:
+            asset = await self.state.get_asset(
+                context.tenant_id, context.project_id, request.asset_id
+            )
+            if (
+                asset is None
+                or asset.deleted_at is not None
+                or asset.original_deleted_at is not None
+            ):
                 raise ResourceNotFound("media asset not found")
             media_kind = asset.kind
         else:
-            source = await self.state.get_source(context.tenant_id, context.project_id, request.source_id or "")
+            source = await self.state.get_source(
+                context.tenant_id, context.project_id, request.source_id or ""
+            )
             if source is None:
                 raise ResourceNotFound("media source not found")
             media_kind = MediaKind.STREAM
@@ -702,8 +793,12 @@ class RunService:
                 media_kind.value,
             )
         if media_kind == MediaKind.STREAM:
-            effective_parameters.setdefault("stream_segment_duration_ms", self.stream_segment_duration_ms)
-        effective_request = request.model_copy(update={"parameters": effective_parameters})
+            effective_parameters.setdefault(
+                "stream_segment_duration_ms", self.stream_segment_duration_ms
+            )
+        effective_request = request.model_copy(
+            update={"parameters": effective_parameters}
+        )
         self.pipelines.validate_run_parameters(pipeline, effective_parameters)
         now = time.time()
         run = RunRecord(
@@ -721,8 +816,12 @@ class RunService:
             pipeline=request.pipeline,
             asset_id=request.asset_id,
             source_id=request.source_id,
-            stream_session_id=(stream_session_id or f"sts_{uuid4().hex}") if request.source_id else None,
-            stream_segment_index=(stream_segment_index if stream_segment_index is not None else 0)
+            stream_session_id=(stream_session_id or f"sts_{uuid4().hex}")
+            if request.source_id
+            else None,
+            stream_segment_index=(
+                stream_segment_index if stream_segment_index is not None else 0
+            )
             if request.source_id
             else None,
             previous_run_id=previous_run_id,
@@ -731,7 +830,9 @@ class RunService:
             created_at=now,
             updated_at=now,
         )
-        request_hash = hashlib.sha256(effective_request.model_dump_json().encode("utf-8")).hexdigest()
+        request_hash = hashlib.sha256(
+            effective_request.model_dump_json().encode("utf-8")
+        ).hexdigest()
         stored, created = await self.state.create_run_idempotent(
             run,
             idempotency_key=idempotency_key,
@@ -743,18 +844,26 @@ class RunService:
                     context,
                     "runs",
                     1,
-                    {"domain": request.domain, "pipeline_id": request.pipeline.pipeline_id},
+                    {
+                        "domain": request.domain,
+                        "pipeline_id": request.pipeline.pipeline_id,
+                    },
                 )
                 await self.audit.record(
                     context,
                     action="run.create",
                     resource_type="run",
                     resource_id=stored.run_id,
-                    evidence={"domain": request.domain, "pipeline": request.pipeline.model_dump()},
+                    evidence={
+                        "domain": request.domain,
+                        "pipeline": request.pipeline.model_dump(),
+                    },
                 )
             except Exception:
                 with suppress(Exception):
-                    await self.state.delete_run(context.tenant_id, context.project_id, stored.run_id)
+                    await self.state.delete_run(
+                        context.tenant_id, context.project_id, stored.run_id
+                    )
                 raise
             await self._event(stored, "run.queued")
             try:
@@ -771,9 +880,15 @@ class RunService:
             stored = await self.wait(context, stored.run_id, request.wait_ms)
         return CreateRunOutcome(run=stored, created=created)
 
-    async def stream_session(self, context: PrincipalContext, session_id: str) -> StreamSessionView:
-        await require_allowed(self.policy, context, "read", "run", {"stream_session_id": session_id})
-        runs = await self.state.list_runs(context.tenant_id, context.project_id, limit=None)
+    async def stream_session(
+        self, context: PrincipalContext, session_id: str
+    ) -> StreamSessionView:
+        await require_allowed(
+            self.policy, context, "read", "run", {"stream_session_id": session_id}
+        )
+        runs = await self.state.list_runs(
+            context.tenant_id, context.project_id, limit=None
+        )
         segments = sorted(
             (item for item in runs if item.stream_session_id == session_id),
             key=lambda item: (item.stream_segment_index or 0, item.created_at),
@@ -802,14 +917,18 @@ class RunService:
             updated_at=current.updated_at,
         )
 
-    async def cancel_stream_session(self, context: PrincipalContext, session_id: str) -> StreamSessionView:
+    async def cancel_stream_session(
+        self, context: PrincipalContext, session_id: str
+    ) -> StreamSessionView:
         session = await self.stream_session(context, session_id)
         current = await self._get_run(context, session.current_run_id)
         if current.status not in TERMINAL_RUN_STATUSES:
             await self.transition(context, current.run_id, "cancel")
         return await self.stream_session(context, session_id)
 
-    async def wait(self, context: PrincipalContext, run_id: str, wait_ms: int) -> RunRecord:
+    async def wait(
+        self, context: PrincipalContext, run_id: str, wait_ms: int
+    ) -> RunRecord:
         deadline = asyncio.get_running_loop().time() + wait_ms / 1000
         delay = 0.05
         while asyncio.get_running_loop().time() < deadline:
@@ -932,7 +1051,9 @@ class RunService:
         """Load the result index document without materialising sharded units."""
 
         run = await self._get_run(context, run_id)
-        reference = await self.state.get_result_reference(context.tenant_id, context.project_id, run_id)
+        reference = await self.state.get_result_reference(
+            context.tenant_id, context.project_id, run_id
+        )
         if reference is None:
             if run.status in {
                 RunStatus.CANCELLED,
@@ -991,9 +1112,13 @@ class RunService:
                 created_at=run.created_at,
             )
             return synthetic_result, reference
-        document = await self.objects.get(reference.object_key, expected_sha256=reference.sha256)
+        document = await self.objects.get(
+            reference.object_key, expected_sha256=reference.sha256
+        )
         if hashlib.sha256(document).hexdigest() != reference.sha256:
-            raise PipelineError("stored result checksum does not match its database reference")
+            raise PipelineError(
+                "stored result checksum does not match its database reference"
+            )
         return ResultEnvelope.model_validate_json(document), reference
 
     async def result(self, context: PrincipalContext, run_id: str) -> ResultEnvelope:
@@ -1002,10 +1127,17 @@ class RunService:
         if reference.shard_keys:
             if len(reference.shard_keys) != len(reference.shard_sha256):
                 raise PipelineError("stored result shard manifest is invalid")
-            async def load_shard(object_key: str, expected_sha256: str) -> list[MediaUnitResult]:
-                shard = await self.objects.get(object_key, expected_sha256=expected_sha256)
+
+            async def load_shard(
+                object_key: str, expected_sha256: str
+            ) -> list[MediaUnitResult]:
+                shard = await self.objects.get(
+                    object_key, expected_sha256=expected_sha256
+                )
                 if hashlib.sha256(shard).hexdigest() != expected_sha256:
-                    raise PipelineError("stored result shard checksum does not match its reference")
+                    raise PipelineError(
+                        "stored result shard checksum does not match its reference"
+                    )
                 payload = json.loads(shard)
                 if not isinstance(payload, list):
                     raise PipelineError("stored result shard is not a unit list")
@@ -1023,7 +1155,9 @@ class RunService:
             )
             units = [unit for shard in shard_units for unit in shard]
             if len(units) != reference.unit_count:
-                raise PipelineError("stored result shard count does not match its reference")
+                raise PipelineError(
+                    "stored result shard count does not match its reference"
+                )
             result = result.model_copy(update={"units": units})
         return result
 
@@ -1066,11 +1200,17 @@ class RunService:
                     selected.append((object_key, expected_sha256, cursor, shard_end))
                 cursor = shard_end
 
-            async def load_selected(entry: tuple[str, str, int, int]) -> list[MediaUnitResult]:
+            async def load_selected(
+                entry: tuple[str, str, int, int],
+            ) -> list[MediaUnitResult]:
                 object_key, expected_sha256, shard_start, shard_end = entry
-                document = await self.objects.get(object_key, expected_sha256=expected_sha256)
+                document = await self.objects.get(
+                    object_key, expected_sha256=expected_sha256
+                )
                 if hashlib.sha256(document).hexdigest() != expected_sha256:
-                    raise PipelineError("stored result shard checksum does not match its reference")
+                    raise PipelineError(
+                        "stored result shard checksum does not match its reference"
+                    )
                 payload = json.loads(document)
                 if not isinstance(payload, list):
                     raise PipelineError("stored result shard is not a unit list")
@@ -1102,18 +1242,26 @@ class RunService:
 
         await require_allowed(self.policy, context, "read", "run", {"run_id": run_id})
         result, _ = await self._result_index(context, run_id)
-        artifact = next((item for item in result.artifacts if item.artifact_id == artifact_id), None)
+        artifact = next(
+            (item for item in result.artifacts if item.artifact_id == artifact_id), None
+        )
         if artifact is None:
             raise ResourceNotFound("run artifact not found")
         try:
-            data = await self.objects.get(artifact.object_key, expected_sha256=artifact.sha256)
+            data = await self.objects.get(
+                artifact.object_key, expected_sha256=artifact.sha256
+            )
         except Exception as exc:
             raise ResourceNotFound("run artifact is no longer stored") from exc
         if hashlib.sha256(data).hexdigest() != artifact.sha256:
-            raise PipelineError("stored run artifact checksum does not match its result reference")
+            raise PipelineError(
+                "stored run artifact checksum does not match its result reference"
+            )
         return data, artifact.content_type, artifact.sha256
 
-    async def transition(self, context: PrincipalContext, run_id: str, action: str) -> RunRecord:
+    async def transition(
+        self, context: PrincipalContext, run_id: str, action: str
+    ) -> RunRecord:
         await require_allowed(self.policy, context, action, "run", {"run_id": run_id})
         for _ in range(4):
             run = await self._get_run(context, run_id)
@@ -1135,7 +1283,11 @@ class RunService:
             elif action == "cancel":
                 if run.status in TERMINAL_RUN_STATUSES:
                     raise InvalidTransition("a terminal run cannot be cancelled")
-                if run.status in {RunStatus.QUEUED, RunStatus.PAUSED, RunStatus.CANCELLING}:
+                if run.status in {
+                    RunStatus.QUEUED,
+                    RunStatus.PAUSED,
+                    RunStatus.CANCELLING,
+                }:
                     target = RunStatus.CANCELLED
                 else:
                     target = RunStatus.CANCELLING
@@ -1148,7 +1300,9 @@ class RunService:
                     updates["termination_reason"] = "cancelled_by_user"
             updated = run.model_copy(update=updates)
             try:
-                saved = await self.state.save_run(updated, expected_revision=run.revision)
+                saved = await self.state.save_run(
+                    updated, expected_revision=run.revision
+                )
                 await self.audit.record(
                     context,
                     action=f"run.{action}",
@@ -1174,859 +1328,11 @@ class RunService:
             frame_max_edge=self.run_artifact_frame_max_edge,
         )
 
-    async def execute_run(self, tenant_id: str, project_id: str, run_id: str) -> None:
-        run = await self.state.get_run(tenant_id, project_id, run_id)
-        if run is None:
-            raise ResourceNotFound("queued run does not exist")
-        if run.status in TERMINAL_RUN_STATUSES:
-            return
-        sink = self._artifact_sink(run)
-        media_file_path: str | None = None
-        try:
-            run = await self._begin_execution(run)
-            if run.status == RunStatus.CANCELLED:
-                return
-            if run.source_id and run.stream_session_id:
-                await self._event(
-                    run,
-                    "stream.segment.started",
-                    {
-                        "session_id": run.stream_session_id,
-                        "segment_index": run.stream_segment_index or 0,
-                    },
-                )
-            data: bytes | None = None
-            source_url: str | None = None
-            filename: str | None = None
-            content_type = "application/octet-stream"
-            if run.asset_id:
-                asset = await self.state.get_asset(run.tenant_id, run.project_id, run.asset_id)
-                if asset is None or asset.deleted_at is not None or asset.original_deleted_at is not None:
-                    raise ResourceNotFound("media asset disappeared before execution")
-                media_kind = asset.kind
-                filename = asset.filename
-                content_type = asset.content_type
-                if media_kind == MediaKind.VIDEO:
-                    suffix = Path(filename or "media.mp4").suffix or ".mp4"
-                    handle = tempfile.NamedTemporaryFile(prefix="scenara-object-", suffix=suffix, delete=False)
-                    handle.close()
-                    media_file_path = handle.name
-                    await self.objects.get_to_file(
-                        asset.object_key,
-                        Path(media_file_path),
-                        expected_sha256=asset.sha256,
-                    )
-                else:
-                    data = await self.objects.get(asset.object_key, expected_sha256=asset.sha256)
-            else:
-                source = await self.state.get_source(run.tenant_id, run.project_id, run.source_id or "")
-                if source is None:
-                    raise ResourceNotFound("media source disappeared before execution")
-                source_url = await self.secrets.get(source.secret_ref)
-                await validate_external_url(
-                    source_url,
-                    allowed_schemes=frozenset({"rtsp", "rtmp", "http", "https"}),
-                    allow_private=self.allow_private_media_sources,
-                    allow_credentials=True,
-                )
-                media_kind = MediaKind.STREAM
-            pipeline = await self.pipeline_definition(
-                run.pipeline.pipeline_id,
-                run.pipeline.version,
-                active_only=False,
-            )
-            model_bindings = (
-                await self.active_model_resolver.active_runtime_bindings(run.tenant_id, run.project_id)
-                if self.active_model_resolver is not None
-                else {}
-            )
-            checkpoint_run: RunRecord = run
-            execution_run = run
-            published_unit_count = 0
-
-            async def report_progress(progress: float | None, payload: dict[str, Any]) -> None:
-                nonlocal checkpoint_run
-                for _ in range(4):
-                    latest = await self.state.get_run(
-                        execution_run.tenant_id,
-                        execution_run.project_id,
-                        execution_run.run_id,
-                    )
-                    if latest is None:
-                        raise ResourceNotFound("run disappeared while reporting progress")
-                    if latest.status in TERMINAL_RUN_STATUSES:
-                        return
-                    next_progress = (
-                        latest.progress
-                        if progress is None
-                        else max(latest.progress, min(0.99, progress))
-                    )
-                    if progress is None:
-                        await self._event(latest, "run.progress", {"progress": None, **payload})
-                        return
-                    if next_progress <= latest.progress:
-                        return
-                    updated = latest.model_copy(update={"progress": next_progress, "updated_at": time.time()})
-                    try:
-                        saved = await self.state.save_run(updated, expected_revision=latest.revision)
-                    except StateConflict:
-                        continue
-                    checkpoint_run = saved
-                    await self._event(
-                        saved,
-                        "run.progress",
-                        {"progress": saved.progress, **payload},
-                    )
-                    return
-                raise StateConflict("run progress could not be saved")
-
-            async def publish_partial_result(partial: Any) -> None:
-                nonlocal published_unit_count
-                if not isinstance(partial, ResultEnvelope):
-                    raise PipelineError("partial pipeline result is not a ResultEnvelope")
-                if sink is not None and (sink.artifacts or sink.warnings):
-                    partial = partial.model_copy(
-                        update={
-                            "artifacts": [*partial.artifacts, *sink.artifacts],
-                            "warnings": [*partial.warnings, *sink.warnings],
-                        },
-                        deep=True,
-                    )
-                try:
-                    await self._store_result(execution_run, partial, sink, partial=True)
-                    for evaluator in self.observation_evaluators:
-                        try:
-                            await evaluator.evaluate_run_result(execution_run, partial)
-                        except Exception:
-                            # Surveillance and similar observers enrich a run but must not
-                            # turn an otherwise valid parse result into a failed run.
-                            logger.exception("run observation evaluator failed for run %s", execution_run.run_id)
-                    latest = await self.state.get_run(
-                        execution_run.tenant_id,
-                        execution_run.project_id,
-                        execution_run.run_id,
-                    )
-                    if latest is not None and latest.status not in TERMINAL_RUN_STATUSES:
-                        unit_count = len(partial.units)
-                        delta_count = max(0, unit_count - published_unit_count)
-                        if delta_count:
-                            await self._event(
-                                latest,
-                                "result.delta",
-                                {
-                                    "sequence": published_unit_count,
-                                    "unit_offset": published_unit_count,
-                                    "unit_count": delta_count,
-                                    "unit_total": unit_count,
-                                    "result_url": f"/api/v1/runs/{execution_run.run_id}/result"
-                                    f"?unit_offset={published_unit_count}&unit_limit={delta_count}",
-                                },
-                            )
-                            published_unit_count = unit_count
-                        await self._event(
-                            latest,
-                            "result.partial",
-                            {"unit_count": unit_count, "progress": latest.progress},
-                        )
-                except Exception:
-                    logger.exception("could not publish partial result for run %s", execution_run.run_id)
-
-            context = ExecutionContext(
-                run_id=run.run_id,
-                tenant_id=run.tenant_id,
-                project_id=run.project_id,
-                pipeline_id=run.pipeline.pipeline_id,
-                pipeline_version=run.pipeline.version,
-                asset_id=run.asset_id,
-                source_id=run.source_id,
-                filename=filename,
-                content_type=content_type,
-                production=self.production,
-                model_bindings=model_bindings,
-                artifacts=sink,
-                progress_reporter=report_progress,
-                partial_result_publisher=publish_partial_result,
-            )
-
-            async def checkpoint() -> None:
-                await self._checkpoint(checkpoint_run, context.control)
-
-            parameters = {
-                "sample_interval_ms": self.media_sample_interval_ms,
-                **run.parameters,
-            }
-            ignored_max_units = parameters.pop("max_units", None)
-            if ignored_max_units is not None:
-                logger.info(
-                    "ignored legacy max_units=%r while executing stored %s run %s; "
-                    "parse unit limits are not supported",
-                    ignored_max_units,
-                    media_kind.value,
-                    run.run_id,
-                )
-            if media_kind == MediaKind.STREAM:
-                parameters.setdefault("stream_segment_duration_ms", self.stream_segment_duration_ms)
-            if run.stream_segment_index is not None:
-                parameters["stream_segment_index"] = run.stream_segment_index
-            with runtime_binding_scope(model_bindings):
-                result = await self.pipelines.execute(
-                    pipeline,
-                    context,
-                    {
-                        "$media.bytes": data or b"",
-                        "$media.input": MediaInput(
-                            kind=media_kind,
-                            content_type=content_type,
-                            data=data,
-                            source_url=source_url,
-                            file_path=media_file_path,
-                            filename=filename,
-                        ),
-                    },
-                    parameters,
-                    checkpoint,
-                )
-            if not isinstance(result, ResultEnvelope):
-                raise PipelineError("pipeline did not return a ResultEnvelope")
-            if sink is not None and (sink.artifacts or sink.warnings):
-                result = result.model_copy(
-                    update={
-                        "artifacts": [*result.artifacts, *sink.artifacts],
-                        "warnings": [*result.warnings, *sink.warnings],
-                    },
-                    deep=True,
-                )
-            for registrar in self.registrars:
-                try:
-                    await registrar.register_run_result(run, result)
-                except Exception:
-                    # 登记是结果的增益信息，失败不应让整个 run 失败。
-                    logger.exception("run result registrar failed for run %s", run.run_id)
-            await self._store_result(run, result, sink)
-            for evaluator in self.observation_evaluators:
-                try:
-                    await evaluator.evaluate_run_result(run, result)
-                except Exception:
-                    logger.exception("run observation evaluator failed for run %s", run.run_id)
-            latest = await self.state.get_run(run.tenant_id, run.project_id, run.run_id)
-            if latest is None:
-                raise ResourceNotFound("run disappeared during execution")
-            worker_context = PrincipalContext(
-                tenant_id=run.tenant_id,
-                project_id=run.project_id,
-                principal_id=run.principal_id,
-            )
-            await self.audit.record(
-                worker_context,
-                action="run.complete",
-                resource_type="run",
-                resource_id=run.run_id,
-                evidence={"unit_count": len(result.units), "domain": result.domain},
-            )
-            media_termination = next(
-                (
-                    warning.removeprefix("media_termination:")
-                    for warning in result.warnings
-                    if warning.startswith("media_termination:")
-                ),
-                None,
-            )
-            run = await self._set_status(
-                latest,
-                RunStatus.COMPLETED,
-                progress=1.0,
-                completed_at=time.time(),
-                termination_reason=media_termination,
-            )
-            await self._event(
-                run,
-                "result.available",
-                {
-                    "result_schema_version": result.schema_version,
-                    "unit_count": len(result.units),
-                    "result_url": f"/api/v1/runs/{run.run_id}/result",
-                },
-            )
-            if run.source_id and run.stream_session_id and media_termination == "segment_window_completed":
-                await self._rollover_stream_segment(run)
-        except ExecutionStopped:
-            latest = await self.state.get_run(run.tenant_id, run.project_id, run.run_id)
-            if latest and latest.status != RunStatus.CANCELLED:
-                cancelled = await self._set_status(
-                    latest,
-                    RunStatus.CANCELLED,
-                    completed_at=time.time(),
-                    termination_reason="cancelled_by_user",
-                )
-                await self.audit.record(
-                    PrincipalContext(
-                        tenant_id=run.tenant_id,
-                        project_id=run.project_id,
-                        principal_id=run.principal_id,
-                    ),
-                    action="run.cancel",
-                    resource_type="run",
-                    resource_id=run.run_id,
-                    evidence={"status": cancelled.status.value},
-                )
-            try:
-                reference = await self.state.get_result_reference(run.tenant_id, run.project_id, run.run_id)
-                if reference is not None:
-                    if sink is not None:
-                        for record in sink.retention_records(
-                            created_at=run.created_at,
-                            expires_at=run.created_at + self.preview_retention_days * 86_400,
-                        ):
-                            await self.state.track_object(record)
-                    await self._event(
-                        run,
-                        "result.available",
-                        {
-                            "result_schema_version": reference.schema_version,
-                            "unit_count": reference.unit_count,
-                            "result_url": f"/api/v1/runs/{run.run_id}/result",
-                        },
-                    )
-                elif sink is not None:
-                    await sink.discard()
-            except Exception:
-                logger.exception("could not finalize retained partial result for cancelled run %s", run.run_id)
-        except Exception as exc:
-            logger.exception("run execution failed for %s", run.run_id)
-            await self._discard_partial_result(run)
-            if sink is not None:
-                await sink.discard()
-            latest = await self.state.get_run(run.tenant_id, run.project_id, run.run_id)
-            if latest and latest.status not in TERMINAL_RUN_STATUSES:
-                code = "DOMAIN_UNAVAILABLE" if isinstance(exc, DomainUnavailable) else "PIPELINE_EXECUTION_FAILED"
-                failed = await self._set_status(
-                    latest,
-                    RunStatus.FAILED,
-                    completed_at=time.time(),
-                    error_code=code,
-                    termination_reason=str(exc)[:500],
-                )
-                await self._event(failed, "run.error", {"code": code, "message": str(exc)[:500]})
-                await self.audit.record(
-                    PrincipalContext(
-                        tenant_id=run.tenant_id,
-                        project_id=run.project_id,
-                        principal_id=run.principal_id,
-                    ),
-                    action="run.fail",
-                    resource_type="run",
-                    resource_id=run.run_id,
-                    outcome="failure",
-                    evidence={"code": code, "message": str(exc)[:500]},
-                )
-        finally:
-            if media_file_path is not None:
-                with suppress(FileNotFoundError):
-                    os.unlink(media_file_path)
-
-    async def _store_result(
-        self,
-        run: RunRecord,
-        result: ResultEnvelope,
-        sink: RunArtifactSink | None = None,
-        *,
-        partial: bool = False,
-    ) -> ResultReference:
-        run_base_key = f"tenants/{run.tenant_id}/projects/{run.project_id}/runs/{run.run_id}"
-        base_key = f"{run_base_key}/partial" if partial else run_base_key
-        shard_keys: list[str] = []
-        shard_sha256: list[str] = []
-        shard_unit_counts: list[int] = []
-        written_keys: list[str] = []
-        previous = await self.state.get_result_reference(run.tenant_id, run.project_id, run.run_id)
-        try:
-            if partial:
-                previous_count = 0
-                if previous is not None and previous.index_status == "partial":
-                    shard_keys = list(previous.shard_keys)
-                    shard_sha256 = list(previous.shard_sha256)
-                    shard_unit_counts = list(previous.shard_unit_counts)
-                    if len(shard_unit_counts) != len(shard_keys):
-                        shard_unit_counts = [self.result_shard_units] * len(shard_keys)
-                        if shard_unit_counts:
-                            shard_unit_counts[-1] = max(
-                                0,
-                                previous.unit_count - self.result_shard_units * (len(shard_unit_counts) - 1),
-                            )
-                    previous_count = previous.unit_count
-                if len(result.units) < previous_count:
-                    raise PipelineError("partial result unit count must be monotonic")
-                new_units = result.units[previous_count:]
-                for offset in range(0, len(new_units), self.result_shard_units):
-                    units = new_units[offset : offset + self.result_shard_units]
-                    shard_document = json.dumps(
-                        [unit.model_dump(mode="json") for unit in units],
-                        ensure_ascii=False,
-                        sort_keys=True,
-                        separators=(",", ":"),
-                    ).encode("utf-8")
-                    shard_key = f"{base_key}/units-{len(shard_keys):06d}.json"
-                    await self.objects.put(
-                        shard_key,
-                        shard_document,
-                        "application/json",
-                        sha256=hashlib.sha256(shard_document).hexdigest(),
-                        retention_category="structured_result",
-                    )
-                    written_keys.append(shard_key)
-                    shard_keys.append(shard_key)
-                    shard_sha256.append(hashlib.sha256(shard_document).hexdigest())
-                    shard_unit_counts.append(len(units))
-                index_result = result.model_copy(update={"units": []})
-            elif len(result.units) > self.result_shard_units:
-                for offset in range(0, len(result.units), self.result_shard_units):
-                    units = result.units[offset : offset + self.result_shard_units]
-                    shard_document = json.dumps(
-                        [unit.model_dump(mode="json") for unit in units],
-                        ensure_ascii=False,
-                        sort_keys=True,
-                        separators=(",", ":"),
-                    ).encode("utf-8")
-                    shard_key = f"{base_key}/units-{offset // self.result_shard_units:06d}.json"
-                    await self.objects.put(
-                        shard_key,
-                        shard_document,
-                        "application/json",
-                        sha256=hashlib.sha256(shard_document).hexdigest(),
-                        retention_category="structured_result",
-                    )
-                    written_keys.append(shard_key)
-                    shard_keys.append(shard_key)
-                    shard_sha256.append(hashlib.sha256(shard_document).hexdigest())
-                    shard_unit_counts.append(len(units))
-                index_result = result.model_copy(update={"units": []})
-            else:
-                index_result = result
-            result_document = index_result.model_dump_json().encode("utf-8")
-            result_key = (
-                f"{base_key}/result-{len(result.units):012d}-{uuid4().hex}.json"
-                if partial
-                else f"{base_key}/result.json"
-            )
-            await self.objects.put(
-                result_key,
-                result_document,
-                "application/json",
-                sha256=hashlib.sha256(result_document).hexdigest(),
-                retention_category="structured_result",
-            )
-            if previous is None or previous.object_key != result_key:
-                written_keys.append(result_key)
-            asset = (
-                await self.state.get_asset(run.tenant_id, run.project_id, run.asset_id)
-                if run.asset_id
-                else None
-            )
-            source = (
-                await self.state.get_source(run.tenant_id, run.project_id, run.source_id)
-                if run.source_id
-                else None
-            )
-            reference = ResultReference(
-                run_id=run.run_id,
-                object_key=result_key,
-                sha256=hashlib.sha256(result_document).hexdigest(),
-                unit_count=len(result.units),
-                shard_keys=shard_keys,
-                shard_sha256=shard_sha256,
-                shard_unit_counts=shard_unit_counts,
-                domain=result.domain,
-                created_at=result.created_at,
-                asset_id=run.asset_id,
-                source_id=run.source_id,
-                media_kind=asset.kind if asset is not None else (MediaKind.STREAM if source else None),
-                resource_name=asset.filename if asset is not None else source.name if source is not None else None,
-                object_count=sum(len(unit.objects) for unit in result.units),
-                person_count=len(getattr(result.domain_payload, "persons", [])),
-                face_count=len(getattr(result.domain_payload, "faces", [])),
-                ocr_block_count=len(getattr(result.domain_payload, "blocks", [])),
-                text_length=len(getattr(result.domain_payload, "text", "") or ""),
-                warning_count=len(result.warnings),
-                index_status="partial" if partial else "ready",
-            )
-            expires_at = run.created_at + self.structured_result_retention_days * 86_400
-            for object_key in written_keys:
-                await self.state.track_object(
-                    ObjectRetentionRecord(
-                        tenant_id=run.tenant_id,
-                        project_id=run.project_id,
-                        object_key=object_key,
-                        category="structured_result",
-                        owner_type="run_result",
-                        owner_id=run.run_id,
-                        created_at=run.created_at,
-                        expires_at=expires_at,
-                    )
-                )
-            if sink is not None and not partial:
-                # 特征裁剪图和单元帧属于派生预览，遵循预览保留窗口，
-                # 而不是更长的结构化结果保留窗口。
-                for record in sink.retention_records(
-                    created_at=run.created_at,
-                    expires_at=run.created_at + self.preview_retention_days * 86_400,
-                ):
-                    await self.state.track_object(record)
-            if not partial and self.indexes is not None:
-                try:
-                    await self._index_result(run, result)
-                except Exception:
-                    logger.exception("result index update failed for run %s", run.run_id)
-                    reference = reference.model_copy(update={"index_status": "partial"})
-            await self.state.save_result_reference(run.tenant_id, run.project_id, reference)
-            if previous is not None and previous.object_key != reference.object_key:
-                reused = set(reference.shard_keys)
-                previous_keys = [
-                    previous.object_key,
-                    *(key for key in previous.shard_keys if key not in reused),
-                ]
-                for object_key in previous_keys:
-                    with suppress(Exception):
-                        await self.objects.delete(object_key)
-                with suppress(Exception):
-                    await self.state.mark_objects_deleted(previous_keys, time.time())
-            return reference
-        except Exception:
-            for object_key in written_keys:
-                with suppress(Exception):
-                    await self.objects.delete(object_key)
-            with suppress(Exception):
-                await self.state.mark_objects_deleted(written_keys, time.time())
-            raise
-
-    async def _index_result(self, run: RunRecord, result: ResultEnvelope) -> None:
-        if self.indexes is None:
-            return
-        index_id = f"result.{result.domain}"
-        await self.indexes.delete_source(run.tenant_id, run.project_id, "run_result", run.run_id)
-        await self.indexes.create_index(
-            IndexDefinition(
-                index_id=index_id,
-                domain=result.domain,
-                record_kind=IndexRecordKind.MULTIMODAL,
-                text_analyzer="simple",
-            )
-        )
-        index_expires_at = run.created_at + self.structured_result_retention_days * 86_400
-
-        def safe_metadata(value: object) -> dict[str, object]:
-            if not isinstance(value, dict):
-                return {}
-            return {
-                str(key): nested
-                for key, nested in value.items()
-                if str(key) not in {"embedding", "_tracking_embedding", "_face_embedding", "vector", "crop"}
-                and isinstance(nested, (str, int, float, bool, list, dict, type(None)))
-            }
-
-        records: list[IndexRecord] = []
-        for unit in result.units:
-            for item in unit.objects:
-                records.append(
-                    IndexRecord(
-                        record_id=f"idxr_{run.run_id}_{unit.unit_id}_{item.object_id}",
-                        tenant_id=run.tenant_id,
-                        project_id=run.project_id,
-                        index_id=index_id,
-                        domain=result.domain,
-                        kind=IndexRecordKind.MULTIMODAL,
-                        source=IndexSourceRef(
-                            source_type="run_result",
-                            source_id=run.run_id,
-                            asset_id=run.asset_id,
-                            run_id=run.run_id,
-                            unit_id=unit.unit_id,
-                            object_id=item.object_id,
-                            artifact_id=item.crop_artifact_id,
-                            page_number=unit.page_number,
-                            pts_ms=unit.pts_ms,
-                        ),
-                        metadata={
-                            "object_type": item.object_type,
-                            "score": item.score,
-                            "bbox": item.bbox.model_dump(mode="json") if item.bbox else None,
-                            "attributes": safe_metadata(item.attributes),
-                            "source_id": run.source_id,
-                        },
-                        expires_at=index_expires_at,
-                    )
-                )
-        payload = result.domain_payload
-        full_text = str(getattr(payload, "text", "") or "")
-        if full_text:
-            records.append(
-                IndexRecord(
-                    record_id=f"idxr_{run.run_id}_text",
-                    tenant_id=run.tenant_id,
-                    project_id=run.project_id,
-                    index_id=index_id,
-                    domain=result.domain,
-                    kind=IndexRecordKind.MULTIMODAL,
-                    source=IndexSourceRef(
-                        source_type="run_result",
-                        source_id=run.run_id,
-                        asset_id=run.asset_id,
-                        run_id=run.run_id,
-                    ),
-                    text=full_text,
-                    metadata={
-                        "language": getattr(payload, "language", None),
-                        "block_count": len(getattr(payload, "blocks", [])),
-                        "source_id": run.source_id,
-                    },
-                    expires_at=index_expires_at,
-                )
-            )
-        for block in getattr(payload, "blocks", []):
-            block_id = str(getattr(block, "block_id", ""))
-            text = str(getattr(block, "text", "") or "")
-            if not block_id or not text:
-                continue
-            records.append(
-                IndexRecord(
-                    record_id=f"idxr_{run.run_id}_block_{block_id}",
-                    tenant_id=run.tenant_id,
-                    project_id=run.project_id,
-                    index_id=index_id,
-                    domain=result.domain,
-                    kind=IndexRecordKind.MULTIMODAL,
-                    source=IndexSourceRef(
-                        source_type="run_result",
-                        source_id=run.run_id,
-                        asset_id=run.asset_id,
-                        run_id=run.run_id,
-                    ),
-                    text=text,
-                    metadata={
-                        "score": getattr(block, "score", None),
-                        "block_type": getattr(block, "block_type", "text"),
-                        "source_id": run.source_id,
-                    },
-                    expires_at=index_expires_at,
-                )
-            )
-        await self.indexes.upsert_many(records)
-        vector_records: list[IndexRecord] = []
-        for hint in result._index_vectors:
-            vector_index_id = f"result.{hint.feature_space_id}"
-            await self.indexes.create_index(
-                IndexDefinition(
-                    index_id=vector_index_id,
-                    domain=result.domain,
-                    record_kind=IndexRecordKind.VECTOR,
-                    vector_dimension=len(hint.vector),
-                    vector_model_id=hint.model_id,
-                    vector_model_version=hint.model_version,
-                    distance_metric="cosine",
-                    threshold=0.8,
-                )
-            )
-            location: tuple[str | None, int | None, int | None, int | None] = (None, None, None, None)
-            artifact_id: str | None = None
-            for unit in result.units:
-                for item in unit.objects:
-                    if item.object_id == hint.object_id:
-                        location = (unit.unit_id, unit.page_number, unit.pts_ms, unit.index)
-                        artifact_id = item.crop_artifact_id
-                        break
-                if location[0] is not None:
-                    break
-            unit_id, page_number, pts_ms, unit_index = location
-            vector_records.append(
-                IndexRecord(
-                    record_id=f"idxv_{run.run_id}_{hint.object_id}",
-                    tenant_id=run.tenant_id,
-                    project_id=run.project_id,
-                    index_id=vector_index_id,
-                    domain=result.domain,
-                    kind=IndexRecordKind.VECTOR,
-                    source=IndexSourceRef(
-                        source_type="run_result",
-                        source_id=run.run_id,
-                        asset_id=run.asset_id,
-                        run_id=run.run_id,
-                        unit_id=unit_id,
-                        object_id=hint.object_id,
-                        artifact_id=artifact_id,
-                        page_number=page_number,
-                        pts_ms=pts_ms,
-                    ),
-                    vector=hint.vector,
-                    metadata={
-                        "object_type": "face",
-                        "feature_space_id": hint.feature_space_id,
-                        "model_id": hint.model_id,
-                        "model_version": hint.model_version,
-                        "quality": hint.quality,
-                        "unit_index": unit_index,
-                        "source_id": run.source_id,
-                    },
-                    expires_at=index_expires_at,
-                )
-            )
-        await self.indexes.upsert_many(vector_records)
-
-    async def _discard_partial_result(self, run: RunRecord) -> None:
-        try:
-            reference = await self.state.get_result_reference(run.tenant_id, run.project_id, run.run_id)
-        except Exception:
-            logger.exception("could not inspect partial result for run %s", run.run_id)
-            return
-        if reference is None or "/partial/" not in reference.object_key:
-            return
-        object_keys = [reference.object_key, *reference.shard_keys]
-        for object_key in object_keys:
-            with suppress(Exception):
-                await self.objects.delete(object_key)
-        with suppress(Exception):
-            await self.state.mark_objects_deleted(object_keys, time.time())
-
-    async def _begin_execution(self, run: RunRecord) -> RunRecord:
-        for _ in range(4):
-            if run.status in TERMINAL_RUN_STATUSES:
-                return run
-            if run.status == RunStatus.CANCELLING:
-                return await self._set_status(
-                    run,
-                    RunStatus.CANCELLED,
-                    completed_at=time.time(),
-                    termination_reason="cancelled_by_user",
-                )
-            if run.status == RunStatus.QUEUED:
-                try:
-                    return await self._set_status(run, RunStatus.RUNNING, started_at=time.time())
-                except StateConflict:
-                    latest = await self.state.get_run(run.tenant_id, run.project_id, run.run_id)
-                    if latest is None:
-                        raise ResourceNotFound("run disappeared before execution") from None
-                    run = latest
-                    continue
-            if run.status in {RunStatus.RUNNING, RunStatus.PAUSING, RunStatus.PAUSED}:
-                return run
-            raise InvalidTransition(f"run cannot start from {run.status.value}")
-        raise StateConflict("run could not acquire execution state")
-
-    async def _checkpoint(self, run: RunRecord, control: ExecutionControl | None = None) -> None:
-        while True:
-            latest = await self.state.get_run(run.tenant_id, run.project_id, run.run_id)
-            if latest is None:
-                if control is not None:
-                    control.cancel()
-                raise ExecutionStopped
-            if latest.status == RunStatus.CANCELLING:
-                if control is not None:
-                    control.cancel()
-                await self._set_status(
-                    latest,
-                    RunStatus.CANCELLED,
-                    completed_at=time.time(),
-                    termination_reason="cancelled_by_user",
-                )
-                raise ExecutionStopped
-            if latest.status == RunStatus.PAUSING:
-                if control is not None:
-                    control.pause()
-                latest = await self._set_status(latest, RunStatus.PAUSED)
-            if latest.status == RunStatus.PAUSED:
-                if control is not None:
-                    control.pause()
-                await asyncio.sleep(0.1)
-                continue
-            if control is not None:
-                control.resume()
-            return
-
-    async def _set_status(self, run: RunRecord, status: RunStatus, **changes: Any) -> RunRecord:
-        updated = run.model_copy(update={"status": status, "updated_at": time.time(), **changes})
-        saved = await self.state.save_run(updated, expected_revision=run.revision)
-        await self._event(saved, f"run.{status.value}")
-        return saved
-
-    async def _rollover_stream_segment(self, run: RunRecord) -> None:
-        """Queue the next bounded stream segment after a normal segment boundary."""
-
-        if not run.source_id or not run.stream_session_id:
-            return
-        next_index = (run.stream_segment_index or 0) + 1
-        context = PrincipalContext(
-            tenant_id=run.tenant_id,
-            project_id=run.project_id,
-            principal_id=run.principal_id,
-        )
-        request = CreateRunRequest(
-            domain=run.domain,
-            pipeline=run.pipeline,
-            source_id=run.source_id,
-            parameters=dict(run.parameters),
-            priority=run.priority,
-        )
-        try:
-            outcome = await self.create_run(
-                context,
-                request,
-                idempotency_key=f"stream:{run.stream_session_id}:{next_index}",
-                stream_session_id=run.stream_session_id,
-                stream_segment_index=next_index,
-                previous_run_id=run.run_id,
-            )
-            latest = await self.state.get_run(run.tenant_id, run.project_id, run.run_id)
-            if latest is not None and latest.next_run_id != outcome.run.run_id:
-                updated = latest.model_copy(update={"next_run_id": outcome.run.run_id, "updated_at": time.time()})
-                try:
-                    saved = await self.state.save_run(updated, expected_revision=latest.revision)
-                except StateConflict:
-                    saved = latest
-            else:
-                saved = latest or run
-            await self._event(
-                saved,
-                "stream.segment.completed",
-                {
-                    "session_id": run.stream_session_id,
-                    "segment_index": run.stream_segment_index or 0,
-                    "next_run_id": outcome.run.run_id,
-                    "next_segment_index": next_index,
-                },
-            )
-        except Exception as exc:
-            logger.exception("could not roll over stream session %s", run.stream_session_id)
-            await self._event(
-                run,
-                "stream.session.error",
-                {"session_id": run.stream_session_id, "message": str(exc)[:500]},
-            )
-
-    async def _event(self, run: RunRecord, event_type: str, payload: dict[str, Any] | None = None) -> RunEvent:
-        created_at = time.time()
-        occurred_at = datetime.fromtimestamp(created_at, UTC).isoformat().replace("+00:00", "Z")
-        trace_id = run.trace_id or uuid4().hex
-        return await self.state.append_event(
-            run.tenant_id,
-            run.project_id,
-            RunEvent(
-                run_id=run.run_id,
-                event_id=1,
-                event_type=event_type,
-                event_version="1.0",
-                occurred_at=occurred_at,
-                producer="scenara",
-                tenant_id=run.tenant_id,
-                project_id=run.project_id,
-                request_id=run.request_id,
-                trace_id=trace_id,
-                status=run.status,
-                payload=payload or {},
-                created_at=created_at,
-            ),
-        )
-
 
 def sse_payload(event: RunEvent) -> str:
-    data = json.dumps(event.model_dump(mode="json"), ensure_ascii=False, separators=(",", ":"))
+    data = json.dumps(
+        event.model_dump(mode="json"), ensure_ascii=False, separators=(",", ":")
+    )
     return f"id: {event.event_id}\nevent: {event.event_type}\ndata: {data}\n\n"
 
 

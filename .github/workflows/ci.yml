@@ -49,6 +49,7 @@ jobs:
       - name: Verify and package repository contracts
         run: python scripts/repository_contracts.py --check --against contracts/repository/v1.0.1 --bundle repository-contracts-1.1.0.zip
       - run: python scripts/repository_gate.py
+      - run: python scripts/code_size_gate.py
       - run: python scripts/release_gate.py --implementation-only
       - name: Validate deployment shell scripts
         run: bash -n deploy/scripts/*.sh

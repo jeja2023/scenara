@@ -1,12 +1,5 @@
 <script setup lang="ts">
-import {
-  Box,
-  CheckCircle2,
-  Cpu,
-  Filter,
-  Search,
-  X,
-} from "@lucide/vue";
+import { Box, CheckCircle2, Cpu, Filter, Search, X } from "@lucide/vue";
 import { computed, onMounted, ref } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 import { api, userFacingError } from "../api";
