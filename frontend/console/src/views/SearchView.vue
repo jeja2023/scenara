@@ -1045,6 +1045,9 @@ useRefresh(runSearch);
 
 <style scoped>
 .search-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   width: 100%;
 }
 .eyebrow {
