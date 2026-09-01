@@ -116,6 +116,7 @@ REQUIRED_IMPLEMENTATION = (
     "docs/release/0.3.0-dev.34.md",
     "docs/release/0.3.0-dev.39.md",
     "docs/release/0.3.0-dev.40.md",
+    "docs/release/0.3.0-dev.41.md",
     "docs/release/SUPPORT_MATRIX.md",
     "docs/release/EVIDENCE_OWNERS.md",
     "docs/release/evidence/QUALIFICATION_INPUTS.md",

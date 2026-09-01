@@ -2,7 +2,7 @@ name: scenara-data
 
 services:
   data:
-    image: scenara-data:${SCENARA_DATA_IMAGE_TAG:-0.3.0-dev.40}
+    image: scenara-data:${SCENARA_DATA_IMAGE_TAG:-0.3.0-dev.41}
     build:
       context: ..
       dockerfile: Dockerfile.data

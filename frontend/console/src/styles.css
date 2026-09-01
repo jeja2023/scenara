@@ -457,19 +457,39 @@ textarea:focus-visible {
 }
 .button,
 a.button {
-  min-height: 34px;
+  min-height: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  padding: 0 12px;
+  gap: 5px;
+  padding: 0 10px;
   border: 1px solid transparent;
-  border-radius: 5px;
-  font-weight: 650;
-  font-size: 13px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 11.5px;
   cursor: pointer;
   text-decoration: none !important;
-  transition: all 150ms ease;
+  transition: all 140ms ease;
+  line-height: 1;
+}
+.button.tiny-btn,
+.button.btn-sm,
+.button.sm,
+.tiny-btn {
+  min-height: 22px;
+  height: 22px;
+  padding: 0 7px;
+  font-size: 11px;
+  gap: 4px;
+  border-radius: 3px;
+}
+.button.lg,
+.button.large {
+  min-height: 30px;
+  height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
 }
 .button.primary {
   background: var(--teal);
@@ -721,6 +741,24 @@ table .icon-button,
   color: var(--muted, #64716d);
   font-size: 11.5px;
 }
+.pagination-size-select {
+  height: 22px !important;
+  min-height: 22px !important;
+  line-height: 20px !important;
+  padding: 0 4px 0 6px !important;
+  border: 1px solid var(--line, #e2e8e6) !important;
+  border-radius: 3px !important;
+  background: var(--color-surface, #fff) !important;
+  color: var(--color-text, #17211f) !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 120ms ease;
+}
+.pagination-size-select:hover:not(:disabled) {
+  border-color: var(--color-accent, #087682) !important;
+}
 .pagination-controls {
   display: flex;
   align-items: center;
@@ -809,7 +847,7 @@ table .icon-button,
 
 .search-box .search-icon {
   position: absolute;
-  left: 9px;
+  left: 8px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--muted, #64716d);
@@ -819,14 +857,14 @@ table .icon-button,
 
 .search-box .search-input,
 input.search-input {
-  width: 220px;
-  height: 28px !important;
-  min-height: 28px !important;
-  line-height: 28px !important;
-  padding: 0 10px 0 30px !important;
-  font-size: 11.5px !important;
+  width: 200px;
+  height: 24px !important;
+  min-height: 24px !important;
+  line-height: 22px !important;
+  padding: 0 8px 0 26px !important;
+  font-size: 11px !important;
   border: 1px solid var(--line, #e2e8e6) !important;
-  border-radius: 4px !important;
+  border-radius: 3px !important;
   background: #ffffff !important;
   color: var(--graphite, #17211f) !important;
   box-sizing: border-box !important;
@@ -839,22 +877,37 @@ input.search-input {
 
 .search-box.search-sm .search-input,
 .search-box.search-sm input.search-input {
-  width: 180px !important;
+  width: 160px !important;
+  height: 22px !important;
+  min-height: 22px !important;
+  line-height: 20px !important;
+  font-size: 10.5px !important;
+  padding: 0 6px 0 22px !important;
+}
+
+.search-box.search-sm .search-icon {
+  left: 6px;
 }
 
 .search-box.search-md .search-input,
 .search-box.search-md input.search-input {
-  width: 220px !important;
+  width: 200px !important;
 }
 
 .search-box.search-lg .search-input,
 .search-box.search-lg input.search-input {
-  width: 250px !important;
+  width: 230px !important;
+  height: 24px !important;
+  min-height: 24px !important;
+  line-height: 22px !important;
 }
 
 .search-box.search-xl .search-input,
 .search-box.search-xl input.search-input {
-  width: 300px !important;
+  width: 260px !important;
+  height: 26px !important;
+  min-height: 26px !important;
+  line-height: 24px !important;
 }
 
 .search-box .search-input:focus,
@@ -896,6 +949,90 @@ input.search-input::placeholder {
 .search-box .clear-search-btn:hover {
   color: var(--graphite, #17211f);
   background: rgba(0, 0, 0, 0.06);
+}
+
+/* ==========================================================================
+   全局统一工具栏与过滤筛选控件规范 (Global Standard Filter Controls)
+   ========================================================================== */
+.filter-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 4px;
+  padding: 4px 10px;
+  flex-wrap: wrap;
+}
+
+.filter-left,
+.filter-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted, #64716d);
+}
+
+.filter-icon {
+  color: var(--muted, #64716d);
+}
+
+.filter-label {
+  font-weight: 500;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.filter-select,
+select.filter-select {
+  height: 22px !important;
+  min-height: 22px !important;
+  line-height: 20px !important;
+  padding: 0 4px 0 6px !important;
+  font-size: 11px !important;
+  border: 1px solid var(--line, #e2e8e6) !important;
+  border-radius: 3px !important;
+  background: #ffffff !important;
+  color: var(--graphite, #17211f) !important;
+  cursor: pointer;
+  outline: none;
+}
+
+.filter-select:focus,
+select.filter-select:focus {
+  border-color: var(--color-accent, #087682) !important;
+}
+
+.filter-input,
+.date-input,
+input.date-input,
+input.filter-input {
+  height: 22px !important;
+  min-height: 22px !important;
+  line-height: 20px !important;
+  padding: 0 4px !important;
+  font-size: 11px !important;
+  border: 1px solid var(--line, #e2e8e6) !important;
+  border-radius: 3px !important;
+  background: #ffffff !important;
+  color: var(--graphite, #17211f) !important;
+}
+
+.count-badge {
+  background: #edf2f0;
+  color: #45534f;
+  font-size: 10.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
 }
 
 .badge {

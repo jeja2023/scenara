@@ -416,21 +416,21 @@ onBeforeUnmount(() => {
   color: var(--teal);
 }
 .filter-controls select {
-  width: 150px;
-  min-width: 120px;
-  height: 28px;
-  min-height: 28px;
-  padding: 0 8px;
-  font-size: 12px;
+  width: 130px;
+  min-width: 100px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0 4px 0 6px;
+  font-size: 11px;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 3px;
   background-color: var(--color-surface);
 }
 .filter-controls .button {
-  height: 28px;
-  min-height: 28px;
+  height: 24px;
+  min-height: 24px;
   padding: 0 8px;
-  font-size: 12px;
+  font-size: 11px;
 }
 .runs-panel {
   margin-top: 8px;

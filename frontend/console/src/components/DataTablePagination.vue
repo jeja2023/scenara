@@ -238,13 +238,15 @@ const pageNumbers = computed<(number | string)[]>(() => {
 }
 
 .pagination-size-select {
-  height: 24px;
-  padding: 0 6px;
+  height: 22px;
+  min-height: 22px;
+  line-height: 20px;
+  padding: 0 4px 0 6px;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 4px;
+  border-radius: 3px;
   background: var(--color-surface, #fff);
   color: var(--color-text, #17211f);
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   outline: none;
@@ -252,7 +254,7 @@ const pageNumbers = computed<(number | string)[]>(() => {
 }
 
 .pagination-size-select:hover:not(:disabled) {
-  border-color: var(--primary, #0ea5e9);
+  border-color: var(--color-accent, #087682);
 }
 
 .pagination-pages {

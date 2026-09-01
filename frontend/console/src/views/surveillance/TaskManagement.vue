@@ -564,11 +564,11 @@ onMounted(() => void refresh());
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   background: #ffffff;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 6px;
-  padding: 6px 12px;
+  border-radius: 4px;
+  padding: 4px 10px;
   flex-wrap: wrap;
 }
 
@@ -582,8 +582,8 @@ onMounted(() => void refresh());
 .filter-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
+  gap: 4px;
+  font-size: 11px;
   color: var(--muted, #64716d);
 }
 
@@ -593,15 +593,18 @@ onMounted(() => void refresh());
 
 .filter-label {
   font-weight: 500;
+  font-size: 11px;
   white-space: nowrap;
 }
 
 .filter-select {
-  height: 28px;
-  padding: 0 8px;
-  font-size: 11.5px;
+  height: 22px;
+  min-height: 22px;
+  line-height: 20px;
+  padding: 0 4px 0 6px;
+  font-size: 11px;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 4px;
+  border-radius: 3px;
   background: #fafbfb;
   color: var(--graphite, #17211f);
   cursor: pointer;
@@ -614,9 +617,9 @@ onMounted(() => void refresh());
 .count-badge {
   background: #edf2f0;
   color: #45534f;
-  font-size: 11px;
-  padding: 3px 7px;
-  border-radius: 4px;
+  font-size: 10.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
 }
 
 /* 任务列表面板与表格 */

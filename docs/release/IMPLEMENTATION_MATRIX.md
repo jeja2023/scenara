@@ -5,19 +5,19 @@ This matrix is the repository-level checklist for `Scenara 景枢全面优化升
 Items that require licensed model assets or target hardware remain incomplete
 until reproducible objective evidence is committed.
 
-Current development version: `0.3.0-dev.40` (`0.3.0.dev40` for Python packages).
+Current development version: `0.3.0-dev.41` (`0.3.0.dev41` for Python packages).
 
 ## Release Gate Status
-The `0.3.0-dev.40` engineering baseline adds full-project audit remediation plus cross-platform and runtime-operations hardening: synchronized CI/workspace commands, API/SDK contracts, strict Python and Console quality gates, deployment version convergence, unified Core/Data authentication, fail-closed model registration, sandboxed OCR layout rendering, centralized settings ownership, complete API-router modularization (leaving `server.py` with application infrastructure only), Windows UTC fallback, protected alert-image loading, debounced filters, bounded list rendering, automatic alert-stream reconnect, complete physical extraction of all six AccessView Tabs and nine write/key-display dialogs, and complete Parse workbench decomposition into toolbar/media/input/history components plus ROI, run-tracking, preview, parameter and media-input composables.
+The `0.3.0-dev.41` engineering baseline adds full-project audit remediation, cross-platform and runtime-operations hardening, and global UI compactness/design system standardization: synchronized CI/workspace commands, API/SDK contracts, strict Python and Console quality gates, deployment version convergence, unified Core/Data authentication, fail-closed model registration, sandboxed OCR layout rendering, centralized settings ownership, complete API-router modularization (leaving `server.py` with application infrastructure only), Windows UTC fallback, protected alert-image loading, debounced filters, bounded list rendering, automatic alert-stream reconnect, complete physical extraction of all six AccessView Tabs and nine write/key-display dialogs, complete Parse workbench decomposition into toolbar/media/input/history components plus ROI/run-tracking/preview/parameter/media-input composables, standardized compact controls across all pages, and model type dropdown filtering.
 Formal 1.0 release evidence remains fail-closed until the required evaluation,
 GPU capacity, offline-install, and model-rights checks are supplied for
-`0.3.0-dev.40`. Existing integration, security, backup/restore, and software-license
+`0.3.0-dev.41`. Existing integration, security, backup/restore, and software-license
 reports are digest-bound to the current OpenAPI contract; historical reports
 remain archived and are not reused as current-release evidence. This personal
 project does not require named approvers or legal/commercial sign-off records.
 
 ## Implementation Parity Matrix
-The `0.3.0-dev.40` baseline processes finite video and PDF inputs to EOF unless callers
+The `0.3.0-dev.41` baseline processes finite video and PDF inputs to EOF unless callers
 explicitly request a compatibility cap. Continuous streams are archived into linked Run
 segments under one Stream Session, while inference batches publish `result.delta` events
 and append-only Result shards. Production uses the local personal policy by default; the signed enterprise policy
@@ -77,10 +77,10 @@ The contract, observability, version and release-hardening regression was execut
 
 | Check | Result |
 |---|---|
-| Full Python baseline for `0.3.0-dev.40` | 317 passed, 12 integration-marked tests deselected; Ruff, strict Mypy, OpenAPI/SDK drift, repository contracts, and implementation/development gates pass |
+| Full Python baseline for `0.3.0-dev.41` | 317 passed, 12 integration-marked tests deselected; Ruff, strict Mypy, OpenAPI/SDK drift, repository contracts, and implementation/development gates pass |
 | Security contract suite | 62 passed, 0 skipped; CI runs it once (the coverage job ignores the six security regression files, measured at 65.01% without them) |
-| Console regression for `0.3.0-dev.40` | typecheck, ESLint, Prettier, production build and 26 unit tests passed; TypeScript SDK checks passed; all six Access tabs and nine dialogs are independently-owned Vue components |
-| Compose/Kubernetes tag convergence | deployment entrypoints resolve to `0.3.0-dev.40`; Data uses the same versioned service-token contract |
+| Console regression for `0.3.0-dev.41` | typecheck, ESLint, Prettier, production build and 26 unit tests passed; TypeScript SDK checks passed; all six Access tabs and nine dialogs are independently-owned Vue components |
+| Compose/Kubernetes tag convergence | deployment entrypoints resolve to `0.3.0-dev.41`; Data uses the same versioned service-token contract |
 | Core Data split regression | Core remote-client tests plus standalone Data service/Core round-trip, token rejection and no-token startup tests passed; production migration, import, backup/restore and cutover evidence remain gated |
 | Console workspace regression | typecheck, lint, format, 26 unit tests and production build passed; OCR layout is sandboxed and Data/Model views expose registered state clearly |
 | `.venv\\Scripts\\python.exe -m pytest -q` | 217 passed, 9 integration tests skipped in 57.55s; includes two-video trajectory ReID and `/api/v1/parse/video` shortcut coverage |

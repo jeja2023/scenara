@@ -769,29 +769,29 @@ useRefresh(refresh);
   color: var(--teal);
 }
 .filter-controls select {
-  width: 140px;
-  min-width: 110px;
-  height: 28px;
-  min-height: 28px;
-  padding: 0 8px;
-  font-size: 12px;
+  width: 130px;
+  min-width: 100px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0 4px 0 6px;
+  font-size: 11px;
   border: 1px solid var(--line, #cbd3d0);
-  border-radius: 4px;
+  border-radius: 3px;
   background-color: var(--color-surface, #fff);
   color: var(--color-text, #17211f);
 }
 .filter-controls .reset-btn {
-  height: 28px;
-  min-height: 28px;
+  height: 24px;
+  min-height: 24px;
   padding: 0 8px;
-  font-size: 12px;
+  font-size: 11px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 .size-total {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11.5px;
 }
 .header-actions {
   display: flex;
@@ -799,12 +799,12 @@ useRefresh(refresh);
   gap: 8px;
 }
 .header-btn {
-  height: 28px;
-  min-height: 28px;
-  padding: 0 10px;
-  font-size: 12px;
-  gap: 5px;
-  border-radius: 4px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0 8px;
+  font-size: 11.5px;
+  gap: 4px;
+  border-radius: 3px;
 }
 .file-button {
   position: relative;

@@ -1311,11 +1311,11 @@ useRefresh(runSearch);
 .portrait-query-card {
   display: flex;
   align-items: stretch;
-  gap: 16px;
-  padding: 14px 16px;
+  gap: 12px;
+  padding: 8px 12px;
   background: #f8faf9;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 8px;
+  border-radius: 6px;
   transition: border-color 140ms ease;
 }
 .portrait-query-card:focus-within {
@@ -1324,9 +1324,9 @@ useRefresh(runSearch);
 
 /* 缩略图 */
 .portrait-preview-box {
-  width: 66px;
-  height: 66px;
-  border-radius: 6px;
+  width: 52px;
+  height: 52px;
+  border-radius: 4px;
   overflow: hidden;
   background: #fff;
   border: 1.5px dashed #cbd5e1;
@@ -1351,10 +1351,10 @@ useRefresh(runSearch);
 }
 .preview-clear-btn {
   position: absolute;
-  top: 3px;
-  right: 3px;
-  width: 18px;
-  height: 18px;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.7);
   color: #fff;
@@ -1376,7 +1376,7 @@ useRefresh(runSearch);
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
+  gap: 1px;
   color: var(--muted, #64716d);
 }
 .preview-scan-icon {
@@ -1384,7 +1384,7 @@ useRefresh(runSearch);
   opacity: 0.85;
 }
 .preview-tip {
-  font-size: 10px;
+  font-size: 9.5px;
   font-weight: 500;
   color: var(--muted, #64716d);
 }
@@ -1396,27 +1396,27 @@ useRefresh(runSearch);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 8px;
+  gap: 6px;
 }
 .portrait-source-bar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 .portrait-upload-btn {
   position: relative;
   overflow: hidden;
-  height: 32px;
-  min-height: 32px;
-  font-size: 12px;
+  height: 24px;
+  min-height: 24px;
+  font-size: 11px;
   font-weight: 500;
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 0 12px;
+  gap: 4px;
+  padding: 0 8px;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 4px;
+  border-radius: 3px;
   background: #fff;
   color: var(--color-text, #17211f);
   cursor: pointer;
@@ -1435,33 +1435,33 @@ useRefresh(runSearch);
 }
 .portrait-source-sep {
   color: #94a3b8;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
-  padding: 0 2px;
+  padding: 0 1px;
 }
 .portrait-asset-dropdown {
   flex: 1;
-  min-width: 240px;
+  min-width: 200px;
   position: relative;
   display: flex;
   align-items: center;
 }
 .asset-select-icon {
   position: absolute;
-  left: 10px;
+  left: 7px;
   color: #64748b;
   pointer-events: none;
 }
 .portrait-asset-select {
   width: 100%;
-  height: 32px;
-  min-height: 32px;
-  padding: 0 10px 0 30px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0 8px 0 24px;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 4px;
+  border-radius: 3px;
   background: #fff;
   color: var(--color-text, #17211f);
-  font-size: 12px;
+  font-size: 11px;
   outline: none;
   cursor: pointer;
   transition: all 120ms ease;
@@ -1474,17 +1474,17 @@ useRefresh(runSearch);
   box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
 }
 .portrait-clear-btn {
-  height: 32px;
-  min-height: 32px;
-  padding: 0 10px;
-  font-size: 11.5px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0 6px;
+  font-size: 11px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   color: #b91c1c;
   background: #fff;
   border: 1px solid #fecaca;
-  border-radius: 4px;
+  border-radius: 3px;
   cursor: pointer;
   transition: all 120ms ease;
 }
@@ -1497,16 +1497,16 @@ useRefresh(runSearch);
 .portrait-status-hint {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 11.5px;
+  gap: 6px;
+  font-size: 11px;
   line-height: 1.4;
   color: var(--muted, #64716d);
-  min-height: 20px;
+  min-height: 18px;
 }
 .status-badge {
-  padding: 1px 7px;
+  padding: 1px 5px;
   border-radius: 3px;
-  font-size: 10.5px;
+  font-size: 10px;
   font-weight: 600;
   flex-shrink: 0;
 }
@@ -1529,7 +1529,7 @@ useRefresh(runSearch);
 }
 .status-hint-muted {
   color: #64748b;
-  font-size: 11.5px;
+  font-size: 11px;
 }
 
 /* 阈值控件 */
@@ -1537,47 +1537,62 @@ useRefresh(runSearch);
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 5px;
-  padding-left: 16px;
+  align-items: center;
+  gap: 3px;
+  padding-left: 10px;
   border-left: 1px solid var(--line, #e2e8e6);
-  min-width: 120px;
+  width: 78px;
+  min-width: 78px;
+  max-width: 78px;
   flex-shrink: 0;
 }
 .threshold-header {
   display: flex;
   align-items: baseline;
-  justify-content: space-between;
-  gap: 4px;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
 }
 .threshold-title {
-  font-size: 11.5px;
+  font-size: 10px;
   font-weight: 600;
   color: var(--color-text, #17211f);
   white-space: nowrap;
 }
 .threshold-hint {
-  font-size: 10px;
+  font-size: 9px;
   color: #94a3b8;
   white-space: nowrap;
 }
 .threshold-input-group {
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 100%;
 }
 .threshold-field {
-  width: 100%;
-  height: 32px;
-  min-height: 32px;
-  padding: 2px 8px;
+  width: 56px;
+  height: 22px;
+  min-height: 22px;
+  line-height: 20px;
+  padding: 0 4px;
   text-align: center;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 4px;
-  font-size: 12px;
+  border-radius: 3px;
+  font-size: 11px;
   font-weight: 600;
   background: #fff;
   color: var(--color-text, #17211f);
   outline: none;
   transition: all 120ms ease;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+.threshold-field::-webkit-outer-spin-button,
+.threshold-field::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
 }
 .threshold-field:hover {
   border-color: #cbd5e1;

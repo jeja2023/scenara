@@ -1,14 +1,10 @@
 <script setup lang="ts">
 import {
-  Activity,
   Box,
   CheckCircle2,
   Cpu,
-  FileText,
-  Layers,
+  Filter,
   Search,
-  Shirt,
-  User,
   X,
 } from "@lucide/vue";
 import { computed, onMounted, ref } from "vue";
@@ -31,12 +27,12 @@ const searchQuery = ref("");
 const selectedDomain = ref<string>("all");
 const pageSize = ref(10);
 
-const domainTabs = [
-  { id: "all", label: "全部模型", icon: Layers },
-  { id: "portrait", label: "人像视觉", icon: User },
-  { id: "ocr", label: "OCR 文档", icon: FileText },
-  { id: "behavior", label: "行为动作", icon: Activity },
-  { id: "fashion", label: "服饰风格", icon: Shirt },
+const domainOptions = [
+  { id: "all", label: "全部模型" },
+  { id: "portrait", label: "人像视觉" },
+  { id: "ocr", label: "OCR 文档" },
+  { id: "behavior", label: "行为动作" },
+  { id: "fashion", label: "服饰风格" },
 ];
 
 const columns: TableColumn<ModelPackage>[] = [
@@ -175,24 +171,24 @@ useRefresh(refresh);
         </div>
 
         <div class="header-actions">
-          <!-- 领域切换 Tabs -->
-          <div class="domain-tabs">
-            <button
-              v-for="tab in domainTabs"
-              :key="tab.id"
-              type="button"
-              class="domain-tab-btn"
-              :class="{ active: selectedDomain === tab.id }"
-              @click="selectedDomain = tab.id"
-            >
-              <component :is="tab.icon" :size="13" />
-              <span>{{ tab.label }}</span>
-            </button>
-          </div>
+          <!-- 模型类型筛选下拉框 -->
+          <label class="filter-item">
+            <Filter :size="12" class="filter-icon" />
+            <span class="filter-label">模型类型:</span>
+            <select v-model="selectedDomain" class="filter-select">
+              <option
+                v-for="opt in domainOptions"
+                :key="opt.id"
+                :value="opt.id"
+              >
+                {{ opt.label }}
+              </option>
+            </select>
+          </label>
 
           <!-- 快速搜索框 -->
-          <div class="search-box">
-            <Search :size="13" class="search-icon" />
+          <div class="search-box search-sm">
+            <Search :size="12" class="search-icon" />
             <input
               v-model="searchQuery"
               type="text"
@@ -369,46 +365,44 @@ useRefresh(refresh);
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
-/* 领域分类 Tabs */
-.domain-tabs {
-  display: inline-flex;
-  align-items: center;
-  background: #eef2f1;
-  padding: 2px;
-  border-radius: 6px;
-  gap: 2px;
-}
-
-.domain-tab-btn {
-  display: inline-flex;
+.filter-item {
+  display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 9px;
-  border-radius: 4px;
-  border: none;
-  background: transparent;
+  font-size: 11px;
   color: var(--muted, #64716d);
-  font-size: 11.5px;
+}
+
+.filter-icon {
+  color: var(--muted, #64716d);
+}
+
+.filter-label {
   font-weight: 500;
-  cursor: pointer;
-  transition: all 0.15s ease;
+  font-size: 11px;
   white-space: nowrap;
+  color: var(--muted, #64716d);
 }
 
-.domain-tab-btn:hover {
+.filter-select {
+  height: 22px;
+  min-height: 22px;
+  line-height: 20px;
+  padding: 0 4px 0 6px;
+  font-size: 11px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 3px;
+  background: #ffffff;
   color: var(--graphite, #17211f);
-  background: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  outline: none;
 }
-
-.domain-tab-btn.active {
-  color: var(--color-accent-hover, #065e67);
-  background: var(--color-accent-soft, #e4f1f1);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-  font-weight: 600;
+.filter-select:focus {
+  border-color: var(--color-accent, #087682);
 }
 
 /* 固定表格区域最小高度（10条数据），防止切换页码或筛选时表格区域发生高度抖动 */

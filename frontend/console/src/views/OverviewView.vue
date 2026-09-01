@@ -6,10 +6,12 @@ import {
   ChevronUp,
   Cpu,
   FileText,
+  Filter,
   GitBranch,
   Layers,
   Play,
   ScanFace,
+  Search,
   Server,
   ShieldCheck,
   Sparkles,
@@ -182,6 +184,7 @@ function domainLabel(value: string): string {
 }
 
 const selectedDomainFilter = ref<string>("all");
+const capabilitySearchQuery = ref<string>("");
 
 const domainFilterOptions = [
   { id: "all", label: "全部领域" },
@@ -355,12 +358,21 @@ const allCapabilitiesList = computed<FullCapabilityItem[]>(() => [
 ]);
 
 const filteredCapabilities = computed(() => {
-  if (selectedDomainFilter.value === "all") {
-    return allCapabilitiesList.value;
+  let list = allCapabilitiesList.value;
+  if (selectedDomainFilter.value !== "all") {
+    list = list.filter((item) => item.domain === selectedDomainFilter.value);
   }
-  return allCapabilitiesList.value.filter(
-    (item) => item.domain === selectedDomainFilter.value,
-  );
+  if (capabilitySearchQuery.value.trim()) {
+    const q = capabilitySearchQuery.value.trim().toLowerCase();
+    list = list.filter(
+      (item) =>
+        item.name.toLowerCase().includes(q) ||
+        item.model.toLowerCase().includes(q) ||
+        item.detail.toLowerCase().includes(q) ||
+        domainLabel(item.domain).toLowerCase().includes(q),
+    );
+  }
+  return list;
 });
 
 const readyCapabilitiesCount = computed(
@@ -551,22 +563,41 @@ useRefresh(refresh);
 
       <!-- 展开式的全领域能力规格与模型矩阵表格 (仅在用户需要看详细参数时展示) -->
       <div v-if="showCapabilityTable" class="matrix-table-section">
-        <div class="matrix-table-toolbar">
-          <div class="matrix-tabs">
-            <button
-              v-for="opt in domainFilterOptions"
-              :key="opt.id"
-              class="matrix-tab-btn"
-              :class="{ active: selectedDomainFilter === opt.id }"
-              @click="selectedDomainFilter = opt.id"
-            >
-              {{ opt.label }}
-            </button>
+        <div class="matrix-filter-bar">
+          <div class="filter-left">
+            <label class="filter-item">
+              <Filter :size="12" class="filter-icon" />
+              <span class="filter-label">领域筛选:</span>
+              <select v-model="selectedDomainFilter" class="filter-select">
+                <option
+                  v-for="opt in domainFilterOptions"
+                  :key="opt.id"
+                  :value="opt.id"
+                >
+                  {{ opt.label }}
+                </option>
+              </select>
+            </label>
+
+            <div class="search-box search-sm">
+              <Search :size="13" class="search-icon" />
+              <input
+                v-model="capabilitySearchQuery"
+                placeholder="搜索能力名称、模型、特性说明..."
+                class="search-input"
+              />
+            </div>
+
+            <span class="badge count-badge">
+              共 {{ filteredCapabilities.length }} / {{ allCapabilitiesList.length }} 项算法能力
+            </span>
           </div>
-          <small class="muted">
-            显示 {{ filteredCapabilities.length }} 项中的
-            {{ readyCapabilitiesCount }} 项生产就绪算法
-          </small>
+
+          <div class="filter-right">
+            <span v-if="readyCapabilitiesCount > 0" class="badge active">
+              {{ readyCapabilitiesCount }} 项生产就绪算法
+            </span>
+          </div>
         </div>
 
         <DataTable
@@ -1134,38 +1165,84 @@ useRefresh(refresh);
   }
 }
 
-.matrix-table-toolbar {
+.matrix-filter-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.matrix-tabs {
-  display: flex;
-  gap: 4px;
-  background: #f1f5f4;
-  padding: 3px;
-  border-radius: var(--radius-sm, 6px);
-}
-
-.matrix-tab-btn {
-  border: none;
-  background: transparent;
-  padding: 4px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--muted, #64716d);
+  gap: 8px;
+  background: #fafbfb;
+  border: 1px solid var(--line, #e2e8e6);
   border-radius: 4px;
-  cursor: pointer;
-  transition: all 140ms ease;
+  padding: 4px 10px;
+  flex-wrap: wrap;
 }
 
-.matrix-tab-btn.active {
-  background: var(--color-accent-soft, #e4f1f1);
-  color: var(--color-accent-hover, #065e67);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+.matrix-filter-bar .filter-left,
+.matrix-filter-bar .filter-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.matrix-filter-bar .filter-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted, #64716d);
+}
+
+.matrix-filter-bar .filter-icon {
+  color: var(--muted, #64716d);
+}
+
+.matrix-filter-bar .filter-label {
+  font-weight: 500;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.matrix-filter-bar .filter-select {
+  height: 22px;
+  min-height: 22px;
+  line-height: 20px;
+  padding: 0 4px 0 6px;
+  font-size: 11px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: 3px;
+  background: #ffffff;
+  color: var(--graphite, #17211f);
+  cursor: pointer;
+}
+
+.matrix-filter-bar .filter-select:focus {
+  border-color: var(--color-accent, #087682);
+  outline: none;
+}
+
+.matrix-filter-bar .search-box.search-sm .search-input,
+.matrix-filter-bar .search-box.search-sm input.search-input {
+  height: 22px !important;
+  min-height: 22px !important;
+  line-height: 22px !important;
+  font-size: 11px !important;
+  padding: 0 8px 0 26px !important;
+  width: 170px;
+}
+
+.matrix-filter-bar .search-box.search-sm .search-icon {
+  left: 7px;
+  width: 12px;
+  height: 12px;
+}
+
+.matrix-filter-bar .count-badge {
+  background: #edf2f0;
+  color: #45534f;
+  font-size: 10.5px;
+  padding: 2px 6px;
+  border-radius: 3px;
 }
 
 .domain-pill {

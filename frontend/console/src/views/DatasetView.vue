@@ -1170,15 +1170,22 @@ useRefresh(refresh);
 }
 
 .sidebar-status-select {
-  height: 28px;
-  padding: 0 6px;
+  height: 22px;
+  min-height: 22px;
+  line-height: 20px;
+  padding: 0 4px 0 6px;
   font-size: 11px;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 4px;
+  border-radius: 3px;
   background: #ffffff;
   color: var(--graphite, #17211f);
   cursor: pointer;
+  max-width: 105px;
   flex: 1;
+  outline: none;
+}
+.sidebar-status-select:focus {
+  border-color: var(--color-accent, #087682);
 }
 
 .dataset-cards-scroll {
@@ -1238,6 +1245,7 @@ useRefresh(refresh);
   line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

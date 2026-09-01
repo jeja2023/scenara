@@ -744,11 +744,11 @@ useRefresh(refreshAssets);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   background: #ffffff;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 6px;
-  padding: 6px 12px;
+  border-radius: 4px;
+  padding: 4px 10px;
   flex-wrap: wrap;
 }
 
@@ -762,23 +762,24 @@ useRefresh(refreshAssets);
 .filter-item {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
+  gap: 4px;
+  font-size: 11px;
   color: var(--muted, #64716d);
 }
 
 .filter-label {
   font-weight: 500;
+  font-size: 11px;
   white-space: nowrap;
 }
 
 .threshold-input {
-  width: 70px;
-  height: 28px;
-  padding: 0 6px;
-  font-size: 11.5px;
+  width: 58px;
+  height: 22px;
+  padding: 0 4px;
+  font-size: 11px;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 4px;
+  border-radius: 3px;
   background: #fafbfb;
   color: var(--graphite, #17211f);
   text-align: center;
@@ -791,14 +792,16 @@ useRefresh(refreshAssets);
 .quick-pills {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
 }
 
 .quick-pill {
-  padding: 3px 8px;
-  font-size: 11px;
+  padding: 2px 6px;
+  height: 22px;
+  line-height: 18px;
+  font-size: 10.5px;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 4px;
+  border-radius: 3px;
   background: #fafbfb;
   color: var(--graphite, #17211f);
   cursor: pointer;

@@ -463,15 +463,15 @@ useRefresh(refresh);
 }
 
 .result-search {
-  flex: 1 1 240px;
+  flex: 1 1 200px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   background: #ffffff;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 5px;
-  padding: 0 8px;
-  height: 28px;
+  border-radius: 3px;
+  padding: 0 6px;
+  height: 24px;
   box-sizing: border-box;
 }
 
@@ -488,28 +488,28 @@ useRefresh(refresh);
   height: 100%;
   min-height: 0;
   background: transparent;
-  font-size: 11.5px;
+  font-size: 11px;
   outline: none;
 }
 
 .filter-select {
-  height: 28px;
-  line-height: 28px;
-  padding: 0 8px;
+  height: 22px;
+  line-height: 20px;
+  padding: 0 4px 0 6px;
   border: 1px solid var(--line, #e2e8e6);
-  border-radius: 5px;
+  border-radius: 3px;
   background: #ffffff;
   color: var(--graphite, #17211f);
-  font-size: 11.5px;
+  font-size: 11px;
   outline: none;
   box-sizing: border-box;
 }
 
 .filter-btn,
 .parse-btn {
-  height: 28px;
-  padding: 0 10px;
-  font-size: 11.5px;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 11px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
