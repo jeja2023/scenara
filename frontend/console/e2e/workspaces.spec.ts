@@ -54,12 +54,12 @@ const workspaces = [
   ["parse/portrait", "人像解析", "人像解析"],
   ["assets", "数据资产", "数据资产"],
   ["results", "解析结果", "解析结果"],
-  ["search", "综合检索", "综合检索"],
+  ["search", "智能检索", "智能检索"],
   ["runs", "运行历史", "运行历史"],
   ["capabilities", "领域与能力", "领域与能力"],
-  ["pipelines", "流水线", "流水线"],
-  ["models", "模型管理", "模型管理"],
-  ["feedback", "反馈与发布", "反馈与发布"],
+  ["pipelines", "领域与能力", "领域与能力"],
+  ["models", "模型生命周期", "模型生命周期"],
+  ["feedback", "反馈与难例", "反馈与难例"],
   ["access", "接入与权限", "接入与权限"],
   ["operations", "系统运维", "系统运维"],
 ] as const;
@@ -408,7 +408,7 @@ test("username and password login returns to the workspace", async ({
 });
 
 for (const [path, heading, title] of workspaces) {
-  test(`${title} workspace renders without viewport overflow`, async ({
+  test(`${title} (${path || "overview"}) workspace renders without viewport overflow`, async ({
     page,
   }) => {
     const pageErrors: string[] = [];
@@ -479,15 +479,13 @@ test("平台主题、跳转入口与规范视口保持可用", async ({ page }, 
   await expect(page.locator(".skip-link")).toBeVisible();
 });
 
-test("overview exposes repository ownership without leaking backend copy", async ({
+test("overview exposes only installed domain summaries without backend copy", async ({
   page,
 }) => {
   await page.goto("");
-  await expect(page.getByRole("heading", { name: "仓库拓扑" })).toBeVisible();
-  await expect(page.getByText("Scenara 平台集成仓库")).toBeVisible();
-  await expect(page.getByText("Scenara Model 专业仓库")).toBeVisible();
-  await expect(page.getByText("Scenara Data 专业仓库")).toBeVisible();
-  await expect(page.getByText("禁止跨仓库共享数据库")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "领域与工作区" })).toBeVisible();
+  await expect(page.getByText("人像", { exact: true })).toBeVisible();
+  await expect(page.getByText("查看能力详情")).toBeVisible();
   await expect(
     page.getByText("English backend gate must not reach the interface."),
   ).toHaveCount(0);
@@ -1032,12 +1030,13 @@ test("access management tabs and one-time credential render", async ({
     ["成员与角色", "组织"],
     ["产品授权", "项目产品授权"],
     ["事件回调", "事件回调订阅"],
-    ["连接设置", "浏览器连接"],
   ] as const) {
     await page.getByRole("tab", { name: tab }).click();
     await expect(page.getByRole("heading", { name: heading })).toBeVisible();
     await expectChineseInterface(page);
   }
+  await page.getByTitle("连接设置").click();
+  await expect(page.getByRole("heading", { name: "连接设置" })).toBeVisible();
   await expectChineseInterface(page);
   expect(
     await page.evaluate(

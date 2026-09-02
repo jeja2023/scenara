@@ -62,7 +62,7 @@ API、批处理 worker、流式 worker 和调度器共享同一个版本化镜�
 通过项目的受控渠道传输生成的 tar 压缩包，解压后在目标机器上安装：
 
     deploy/scripts/install-offline.sh \
-      /srv/scenara-offline-0.3.0-dev.42 \
+      /srv/scenara-offline-0.3.0-dev.43 \
       /secure/scenara.env \
       /secure/offline-installer-result.json
 

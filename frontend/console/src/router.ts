@@ -15,9 +15,6 @@ import {
   ScanFace,
   Search,
   Server,
-  ShieldCheck,
-  UserCheck,
-  Workflow,
 } from "@lucide/vue";
 import { createRouter, createWebHistory } from "vue-router";
 
@@ -120,24 +117,45 @@ const routes = [
   {
     path: "/search",
     name: "search",
-    component: () => import("./views/SearchView.vue"),
+    component: () => import("./views/search/SearchLayout.vue"),
     meta: {
-      title: "综合检索",
-      description: "跨图像、人像与特征的统一图文检索引擎。",
+      title: "智能检索",
+      description: "统一进行文本、人像检索与人像 1:1 比对。",
       icon: Search,
       section: "智能检索",
     },
+    children: [
+      {
+        path: "",
+        name: "search-root",
+        redirect: { name: "search-query" },
+      },
+      {
+        path: "query",
+        name: "search-query",
+        component: () => import("./views/SearchView.vue"),
+        meta: {
+          title: "智能检索",
+          description: "跨图像、人像与特征的统一图文检索引擎。",
+          hideFromNavigation: true,
+        },
+      },
+      {
+        path: "compare",
+        name: "search-compare",
+        component: () => import("./views/PortraitCompareView.vue"),
+        meta: {
+          title: "人像 1:1 比对",
+          description: "两张人像的同人关联概率判断。",
+          hideFromNavigation: true,
+        },
+      },
+    ],
   },
   {
     path: "/search/portrait-compare",
     name: "portrait-compare",
-    component: () => import("./views/PortraitCompareView.vue"),
-    meta: {
-      title: "人像比对",
-      description: "两张人像 1:1 比对与同人关联概率判断。",
-      icon: UserCheck,
-      section: "智能检索",
-    },
+    redirect: { name: "search-compare" },
   },
   {
     path: "/search/trajectories",
@@ -259,34 +277,54 @@ const routes = [
   },
   {
     path: "/pipelines",
-    name: "pipelines",
-    component: () => import("./views/PipelinesView.vue"),
-    meta: {
-      title: "流水线",
-      description: "查看并调试跨领域分析流水线配置。",
-      icon: Workflow,
-      section: "AI 引擎与模型",
-    },
+    redirect: "/capabilities",
   },
   {
     path: "/models",
-    name: "models",
-    component: () => import("./views/ModelsView.vue"),
+    component: () => import("./views/models/ModelLifecycleLayout.vue"),
     meta: {
-      title: "模型管理",
-      description: "实时模型健康监控与运行参数调优。",
+      title: "模型生命周期",
+      description: "统一管理模型包、准入、发布、回滚与部署证据。",
       icon: Boxes,
       section: "AI 引擎与模型",
       platform: "model",
     },
+    children: [
+      {
+        path: "",
+        redirect: { name: "model-catalog" },
+      },
+      {
+        path: "catalog",
+        name: "model-catalog",
+        component: () => import("./views/ModelsView.vue"),
+        meta: {
+          title: "模型生命周期",
+          description: "查看已登记模型包及其准入状态。",
+          hideFromNavigation: true,
+        },
+      },
+      {
+        path: "releases",
+        name: "model-releases",
+        component: () => import("./views/FeedbackView.vue"),
+        props: { initialTab: "releases", allowedTabs: ["releases"] },
+        meta: {
+          title: "模型发布与准入",
+          description: "管理候选版本、发布流转、回滚和部署审计。",
+          hideFromNavigation: true,
+        },
+      },
+    ],
   },
   {
     path: "/feedback",
     name: "feedback",
     component: () => import("./views/FeedbackView.vue"),
+    props: { initialTab: "feedback", allowedTabs: ["feedback", "manifests"] },
     meta: {
-      title: "反馈与发布",
-      description: "查看系统异常与纠错反馈，管理模型评测、阶段发布及一键回滚。",
+      title: "反馈与难例",
+      description: "管理解析纠错反馈、审核与版本化难例清单。",
       icon: MessageSquarePlus,
       section: "AI 引擎与模型",
     },
@@ -304,38 +342,83 @@ const routes = [
   },
   {
     path: "/operations",
-    name: "operations",
-    component: () => import("./views/OperationsView.vue"),
+    component: () => import("./views/operations/OperationsLayout.vue"),
     meta: {
       title: "系统运维",
-      description: "监控平台核心服务与关键基础设施运行状态。",
+      description: "监控平台核心服务与外部适配器运行状态。",
       icon: Server,
       section: "平台治理与系统",
     },
+    children: [
+      {
+        path: "",
+        name: "operations",
+        component: () => import("./views/OperationsView.vue"),
+        meta: {
+          title: "系统运维",
+          description: "监控平台核心服务与关键基础设施运行状态。",
+          hideFromNavigation: true,
+        },
+      },
+      {
+        path: "integrations",
+        name: "operations-integrations",
+        component: () => import("./views/GovernanceView.vue"),
+        props: { initialTab: "adapters", allowedTabs: ["adapters"] },
+        meta: {
+          title: "集成适配器",
+          description: "查看外部身份、标注、索引和重排适配器的健康状态。",
+          hideFromNavigation: true,
+        },
+      },
+    ],
   },
   {
     path: "/audit",
-    name: "audit",
-    component: () => import("./views/AuditView.vue"),
+    component: () => import("./views/audit/AuditLayout.vue"),
     meta: {
       title: "审计中心",
-      description: "查看全局审计日志、导出证据包与治理统计。",
+      description: "查看审计日志、导出证据包与保留策略。",
       icon: FileClock,
       section: "平台治理与系统",
     },
+    children: [
+      {
+        path: "",
+        name: "audit",
+        component: () => import("./views/AuditView.vue"),
+        meta: {
+          title: "审计中心",
+          description: "查看全局审计日志并导出证据包。",
+          hideFromNavigation: true,
+        },
+      },
+      {
+        path: "retention",
+        name: "audit-retention",
+        component: () => import("./views/GovernanceView.vue"),
+        props: { initialTab: "retention", allowedTabs: ["retention"] },
+        meta: {
+          title: "审计保留策略",
+          description: "配置审计事件与合规证据的保留策略。",
+          hideFromNavigation: true,
+        },
+      },
+    ],
   },
-  { path: "/enterprise", redirect: "/operations" },
   {
-    path: "/governance",
-    name: "governance",
+    path: "/access/lifecycle",
+    name: "access-lifecycle",
     component: () => import("./views/GovernanceView.vue"),
+    props: { initialTab: "lifecycle", allowedTabs: ["lifecycle"] },
     meta: {
-      title: "资源与安全",
-      description: "项目生命周期、审计保留与外部适配器健康。",
-      icon: ShieldCheck,
-      section: "平台治理与系统",
+      title: "项目生命周期",
+      description: "管理项目停用、恢复和删除申请。",
+      hideFromNavigation: true,
     },
   },
+  { path: "/governance", redirect: "/operations/integrations" },
+  { path: "/enterprise", redirect: "/operations" },
   { path: "/:pathMatch(.*)*", redirect: "/" },
 ];
 

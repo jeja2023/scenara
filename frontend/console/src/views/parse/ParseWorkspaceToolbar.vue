@@ -199,21 +199,18 @@ function selectDomain(event: Event): void {
 <style scoped>
 .workbench-config {
   display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  padding: 10px 0;
+  align-items: center;
+  gap: 14px;
+  padding: 0 0 10px;
   border-bottom: 1px solid var(--line);
   flex-wrap: wrap;
 }
-.workbench-config > div:not(.media-modes),
-.pipeline-picker {
-  display: grid;
-  gap: 6px;
-}
 .control-label {
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .capability-modes {
   width: fit-content;
@@ -226,11 +223,15 @@ function selectDomain(event: Event): void {
   gap: 6px;
 }
 .pipeline-picker {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1 1 200px;
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
   max-width: 380px;
+  margin: 0;
+}
+.pipeline-picker select {
+  height: 34px;
   min-width: 180px;
 }
 .media-modes {

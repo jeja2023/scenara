@@ -3,12 +3,7 @@ import type { Component } from "vue";
 import type { ApiKeyRecord } from "../../types";
 
 export type AccessTab =
-  | "foundation"
-  | "identity"
-  | "credentials"
-  | "products"
-  | "events"
-  | "connection";
+  "foundation" | "identity" | "credentials" | "products" | "events";
 
 export type IdentitySubTab =
   "organizations" | "projects" | "users" | "memberships" | "roles";

@@ -1,6 +1,6 @@
 [project]
 name = "scenara"
-version = "0.3.0.dev42"
+version = "0.3.0.dev43"
 requires-python = ">=3.12"
 description = "Scenara self-hosted vision parsing service for system integration"
 license = { file = "LICENSE" }

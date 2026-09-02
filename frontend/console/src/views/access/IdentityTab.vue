@@ -297,6 +297,9 @@ const rolesPagination = defineModel<{ offset: number; pageSize: number }>(
         <button class="button primary tiny-btn" @click="emit('open-project')">
           <Plus :size="13" />新建项目
         </button>
+        <RouterLink class="button secondary tiny-btn" to="/access/lifecycle">
+          项目生命周期
+        </RouterLink>
       </div>
     </div>
 

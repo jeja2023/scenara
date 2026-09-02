@@ -1,6 +1,6 @@
 {
   "name": "scenara",
-  "version": "0.3.0-dev.42",
+  "version": "0.3.0-dev.43",
   "private": true,
   "license": "MIT",
   "packageManager": "pnpm@10.32.1",

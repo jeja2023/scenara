@@ -1,11 +1,4 @@
-import {
-  BellPlus,
-  KeyRound,
-  Settings,
-  Shield,
-  ShieldCheck,
-  Users,
-} from "@lucide/vue";
+import { BellPlus, KeyRound, Shield, ShieldCheck, Users } from "@lucide/vue";
 
 import type { DisplayProduct, AccessTabDefinition } from "./types";
 
@@ -174,5 +167,4 @@ export const tabs: AccessTabDefinition[] = [
   { id: "credentials", label: "服务凭据", icon: KeyRound },
   { id: "products", label: "产品授权", icon: ShieldCheck },
   { id: "events", label: "事件回调", icon: BellPlus },
-  { id: "connection", label: "连接设置", icon: Settings },
 ];

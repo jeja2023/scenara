@@ -18,7 +18,7 @@ import {
   ShieldCheck,
   X,
 } from "@lucide/vue";
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 
 import { api, userFacingError } from "../api";
@@ -33,7 +33,18 @@ type RecordMap = {
 
 type GovernanceTab = "lifecycle" | "retention" | "adapters";
 
-const activeTab = ref<GovernanceTab>("lifecycle");
+const props = withDefaults(
+  defineProps<{
+    initialTab?: GovernanceTab;
+    allowedTabs?: GovernanceTab[];
+  }>(),
+  {
+    initialTab: "lifecycle",
+    allowedTabs: () => ["lifecycle", "retention", "adapters"],
+  },
+);
+
+const activeTab = ref<GovernanceTab>(props.initialTab);
 
 const lifecycleColumns: TableColumn<RecordMap>[] = [
   { key: "project_id", label: "目标项目标识", width: "160px" },
@@ -342,6 +353,13 @@ function actionBadgeClass(action: unknown): string {
 
 onMounted(refresh);
 useRefresh(refresh);
+
+watch(
+  () => props.initialTab,
+  (nextTab) => {
+    if (props.allowedTabs.includes(nextTab)) activeTab.value = nextTab;
+  },
+);
 </script>
 
 <template>
@@ -351,7 +369,10 @@ useRefresh(refresh);
 
     <!-- 1. 顶部数据统计卡片 -->
     <section class="stats">
-      <article class="stat amber">
+      <article
+        v-if="props.allowedTabs.includes('lifecycle')"
+        class="stat amber"
+      >
         <div class="stat-top-row">
           <span class="stat-title">待审批申请</span>
           <div class="stat-icon-badge">
@@ -364,7 +385,10 @@ useRefresh(refresh);
         >
       </article>
 
-      <article class="stat green">
+      <article
+        v-if="props.allowedTabs.includes('lifecycle')"
+        class="stat green"
+      >
         <div class="stat-top-row">
           <span class="stat-title">已批准生效</span>
           <div class="stat-icon-badge">
@@ -375,7 +399,7 @@ useRefresh(refresh);
         <small class="stat-desc">项目停用 / 恢复 / 删除已就绪</small>
       </article>
 
-      <article class="stat teal">
+      <article v-if="props.allowedTabs.includes('retention')" class="stat teal">
         <div class="stat-top-row">
           <span class="stat-title">审计日志保留</span>
           <div class="stat-icon-badge">
@@ -390,7 +414,7 @@ useRefresh(refresh);
         }}</small>
       </article>
 
-      <article class="stat teal">
+      <article v-if="props.allowedTabs.includes('adapters')" class="stat teal">
         <div class="stat-top-row">
           <span class="stat-title">外部适配引擎</span>
           <div class="stat-icon-badge">
@@ -403,9 +427,10 @@ useRefresh(refresh);
     </section>
 
     <!-- 2. 分段 Tab 导航 -->
-    <div class="tabs-header-bar">
+    <div v-if="props.allowedTabs.length > 1" class="tabs-header-bar">
       <nav class="domain-tabs governance-tabs" aria-label="资源与安全模块">
         <button
+          v-if="props.allowedTabs.includes('lifecycle')"
           class="domain-tab-btn"
           :class="{ active: activeTab === 'lifecycle' }"
           @click="activeTab = 'lifecycle'"
@@ -416,6 +441,7 @@ useRefresh(refresh);
         </button>
 
         <button
+          v-if="props.allowedTabs.includes('retention')"
           class="domain-tab-btn"
           :class="{ active: activeTab === 'retention' }"
           @click="activeTab = 'retention'"
@@ -425,6 +451,7 @@ useRefresh(refresh);
         </button>
 
         <button
+          v-if="props.allowedTabs.includes('adapters')"
           class="domain-tab-btn"
           :class="{ active: activeTab === 'adapters' }"
           @click="activeTab = 'adapters'"

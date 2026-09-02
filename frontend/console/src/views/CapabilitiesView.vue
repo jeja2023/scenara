@@ -15,6 +15,7 @@ import {
   labelDomainDescription,
   labelDomainDisplayName,
   labelMediaKind,
+  labelOperator,
   labelPipelineDisplayName,
   labelPipelineStatus,
 } from "../labels";
@@ -133,7 +134,7 @@ useRefresh(refresh);
           </div>
         </div>
         <div class="capability-section">
-          <p class="capability-section-title">已启用能力</p>
+          <p class="capability-section-title">领域声明能力</p>
           <div class="capability-list">
             <span v-for="capability in domain.capabilities" :key="capability">
               {{ labelCapability(capability) }}
@@ -148,16 +149,27 @@ useRefresh(refresh);
           <div
             v-for="pipeline in domainPipelines(domain.domain_id)"
             :key="pipeline.pipeline_id + pipeline.version"
+            class="pipeline-detail"
           >
-            <strong>{{
-              labelPipelineDisplayName(pipeline.pipeline_id)
-            }}</strong>
-            <span class="pipeline-meta">
-              <small>版本 {{ pipeline.version }}</small>
-              <em :class="['pipeline-status', pipeline.status]">
-                {{ labelPipelineStatus(pipeline.status) }}
-              </em>
-            </span>
+            <div class="pipeline-detail-header">
+              <strong>{{
+                labelPipelineDisplayName(pipeline.pipeline_id)
+              }}</strong>
+              <span class="pipeline-meta">
+                <small>版本 {{ pipeline.version }}</small>
+                <em :class="['pipeline-status', pipeline.status]">
+                  {{ labelPipelineStatus(pipeline.status) }}
+                </em>
+              </span>
+            </div>
+            <small class="pipeline-nodes">
+              {{
+                pipeline.nodes
+                  .map((node) => labelOperator(node.operator_id))
+                  .join(" → ")
+              }}
+              · {{ pipeline.pausable ? "支持暂停" : "不支持暂停" }}
+            </small>
           </div>
           <p
             v-if="!domainPipelines(domain.domain_id).length"
@@ -291,12 +303,20 @@ useRefresh(refresh);
   padding-top: 7px;
   border-top: 1px dashed var(--line, #e2e8e6);
 }
-.capability-pipelines div {
+.pipeline-detail {
+  display: grid;
+  gap: 2px;
+}
+.pipeline-detail-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
   font-size: 11.5px;
+}
+.pipeline-nodes {
+  color: var(--muted, #64716d);
+  line-height: 1.35;
 }
 .capability-pipelines strong {
   font-size: 11.5px;

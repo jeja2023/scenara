@@ -1,5 +1,6 @@
 .parse-workbench {
-  gap: 14px;
+  gap: 12px;
+  margin-top: -6px;
 }
 
 .input-layout {

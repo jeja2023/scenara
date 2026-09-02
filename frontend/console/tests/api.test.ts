@@ -305,7 +305,7 @@ describe("console information architecture", () => {
     expect(labelPortraitCapability("pose")).toBe("姿态估计");
   });
 
-  it("maintains distinct parsing workspace navigation routes", () => {
+  it("maintains consolidated workspace navigation routes", () => {
     const names = new Set(
       routes.map((route) => String(route.name ?? "fallback")),
     );
@@ -326,12 +326,8 @@ describe("console information architecture", () => {
         "surveillance",
         "runs",
         "capabilities",
-        "pipelines",
-        "models",
         "access",
-        "operations",
-        "audit",
-        "governance",
+        "access-lifecycle",
         "feedback",
         "fallback",
       ]),
@@ -343,6 +339,18 @@ describe("console information architecture", () => {
       "surveillance-tasks",
       "surveillance-live",
       "surveillance-alerts",
+    ]);
+    const search = routes.find((route) => route.name === "search");
+    expect(search?.children?.map((route) => route.name)).toEqual([
+      "search-root",
+      "search-query",
+      "search-compare",
+    ]);
+    const models = routes.find((route) => route.path === "/models");
+    expect(models?.children?.map((route) => route.name)).toEqual([
+      undefined,
+      "model-catalog",
+      "model-releases",
     ]);
   });
 

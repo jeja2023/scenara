@@ -13,7 +13,7 @@ import {
   Search,
   X,
 } from "@lucide/vue";
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRefresh } from "../composables/useRefresh";
 
 import { api, userFacingError } from "../api";
@@ -41,25 +41,24 @@ import type {
 
 type Tab = "feedback" | "manifests" | "releases";
 
+const props = withDefaults(
+  defineProps<{
+    initialTab?: Tab;
+    allowedTabs?: Tab[];
+  }>(),
+  {
+    initialTab: "feedback",
+    allowedTabs: () => ["feedback", "manifests", "releases"],
+  },
+);
+
 const feedbackColumns: TableColumn<FeedbackRecord>[] = [
   { key: "kind", label: "问题类型", width: "140px" },
   { key: "run_id", label: "运行标识", class: "mono", width: "160px" },
   { key: "model", label: "关联模型", width: "200px" },
   { key: "compliance", label: "合规状态", width: "150px" },
-  {
-    key: "status",
-    label: "审核状态",
-    width: "110px",
-    align: "center",
-    headerAlign: "center",
-  },
-  {
-    key: "actions",
-    label: "审批操作",
-    width: "120px",
-    align: "right",
-    headerAlign: "right",
-  },
+  { key: "status", label: "审核状态", width: "110px", align: "center", headerAlign: "center" },
+  { key: "actions", label: "审批操作", width: "120px", align: "right", headerAlign: "right" },
 ];
 
 const manifestColumns: TableColumn<HardSampleManifest>[] = [
@@ -74,21 +73,9 @@ const manifestColumns: TableColumn<HardSampleManifest>[] = [
 const releaseColumns: TableColumn<ModelRelease>[] = [
   { key: "model_id", label: "模型名称", width: "220px" },
   { key: "version", label: "版本", class: "mono", width: "100px" },
-  {
-    key: "status",
-    label: "准入状态",
-    width: "120px",
-    align: "center",
-    headerAlign: "center",
-  },
+  { key: "status", label: "准入状态", width: "120px", align: "center", headerAlign: "center" },
   { key: "evidence_refs", label: "详情引用", width: "160px" },
-  {
-    key: "actions",
-    label: "准入流转 / 回滚",
-    width: "160px",
-    align: "right",
-    headerAlign: "right",
-  },
+  { key: "actions", label: "准入流转 / 回滚", width: "160px", align: "right", headerAlign: "right" },
 ];
 
 const eventColumns: TableColumn<ModelDeploymentEvent>[] = [
@@ -99,7 +86,7 @@ const eventColumns: TableColumn<ModelDeploymentEvent>[] = [
   { key: "created_at", label: "记录时间" },
 ];
 
-const tab = ref<Tab>("feedback");
+const tab = ref<Tab>(props.initialTab);
 const feedback = ref<FeedbackRecord[]>([]);
 const manifests = ref<HardSampleManifest[]>([]);
 const releases = ref<ModelRelease[]>([]);
@@ -509,6 +496,13 @@ function formatTime(epoch: number): string {
 
 onMounted(refresh);
 useRefresh(refresh);
+
+watch(
+  () => props.initialTab,
+  (nextTab) => {
+    if (props.allowedTabs.includes(nextTab)) tab.value = nextTab;
+  },
+);
 </script>
 
 <template>
@@ -518,7 +512,7 @@ useRefresh(refresh);
 
     <!-- 1. 顶部统一统计卡片 -->
     <section class="stats">
-      <article class="stat amber">
+      <article v-if="props.allowedTabs.includes('feedback')" class="stat amber">
         <div class="stat-top-row">
           <span class="stat-title">待审核反馈</span>
           <div class="stat-icon-badge">
@@ -531,7 +525,7 @@ useRefresh(refresh);
         >
       </article>
 
-      <article class="stat teal">
+      <article v-if="props.allowedTabs.includes('manifests')" class="stat teal">
         <div class="stat-top-row">
           <span class="stat-title">难例数据集</span>
           <div class="stat-icon-badge">
@@ -544,7 +538,7 @@ useRefresh(refresh);
         >
       </article>
 
-      <article class="stat green">
+      <article v-if="props.allowedTabs.includes('releases')" class="stat green">
         <div class="stat-top-row">
           <span class="stat-title">活跃发布版本</span>
           <div class="stat-icon-badge">
@@ -555,7 +549,7 @@ useRefresh(refresh);
         <small class="stat-desc">全周期准入 {{ releases.length }} 个版本</small>
       </article>
 
-      <article class="stat teal">
+      <article v-if="props.allowedTabs.includes('releases')" class="stat teal">
         <div class="stat-top-row">
           <span class="stat-title">受控部署事件</span>
           <div class="stat-icon-badge">
@@ -568,9 +562,10 @@ useRefresh(refresh);
     </section>
 
     <!-- 2. 分段 Tab 切换栏 -->
-    <div class="tabs-header-bar">
+    <div v-if="props.allowedTabs.length > 1" class="tabs-header-bar">
       <nav class="domain-tabs feedback-tabs" aria-label="反馈与发布模块">
         <button
+          v-if="props.allowedTabs.includes('feedback')"
           type="button"
           class="domain-tab-btn"
           :class="{ active: tab === 'feedback' }"
@@ -582,6 +577,7 @@ useRefresh(refresh);
         </button>
 
         <button
+          v-if="props.allowedTabs.includes('manifests')"
           type="button"
           class="domain-tab-btn"
           :class="{ active: tab === 'manifests' }"
@@ -593,6 +589,7 @@ useRefresh(refresh);
         </button>
 
         <button
+          v-if="props.allowedTabs.includes('releases')"
           type="button"
           class="domain-tab-btn"
           :class="{ active: tab === 'releases' }"

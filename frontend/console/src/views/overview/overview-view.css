@@ -2,21 +2,17 @@
   display: flex;
   flex-direction: column;
   gap: 18px;
-  font-family: var(--font-sans);
   color: var(--color-text, #17211f);
 }
 
-/* ========================================================
-   全局面板容器与标题层级规范 (Panel Headers & Typography)
-   ======================================================== */
 .panel {
-  background: var(--color-surface, #fff);
-  border: 1px solid var(--line, #e2e8e6);
-  border-radius: var(--radius-md, 8px);
-  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: var(--radius-md, 8px);
+  background: var(--surface, #fff);
 }
 
 .panel-header {
@@ -27,74 +23,34 @@
   flex-wrap: wrap;
 }
 
-/* 一级/板块大标题 (H2 Standard) */
 .panel-header h2 {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--color-text, #17211f);
   margin: 0;
+  color: var(--color-text, #17211f);
+  font-size: 15px;
   line-height: 1.3;
-  letter-spacing: -0.01em;
 }
 
-/* 板块副说明文本 (Panel Subtitle) */
 .panel-header p {
-  font-size: 12px;
-  color: var(--muted, #64716d);
   margin: 3px 0 0;
+  color: var(--muted, #64716d);
+  font-size: 12px;
   line-height: 1.45;
 }
 
-.header-left h2 {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--color-text, #17211f);
-  margin: 0;
-  line-height: 1.3;
-  letter-spacing: -0.01em;
-}
-
-.header-left p {
-  font-size: 12px;
-  color: var(--muted, #64716d);
-  margin: 3px 0 0;
-  line-height: 1.45;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-/* ========================================================
-   1. 统计卡片栏 (Stats Metrics Bar - 顶层标题/右上徽章 + 中层数值 + 底层辅助)
-   ======================================================== */
 .stats {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
 .stat {
-  padding: 12px 14px;
-  border-radius: var(--radius-sm, 6px);
-  background: #fff;
-  border: 1px solid var(--line, #e2e8e6);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
   display: flex;
   flex-direction: column;
   gap: 3px;
-  transition:
-    transform 140ms ease,
-    box-shadow 140ms ease,
-    border-color 140ms ease;
-}
-
-.stat:hover {
-  transform: translateY(-1px);
-  border-color: var(--line-strong, #b7c2bd);
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
+  padding: 12px 14px;
+  border: 1px solid var(--line, #e2e8e6);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--surface, #fff);
 }
 
 .stat-top-row {
@@ -102,646 +58,149 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  margin-bottom: 2px;
 }
 
-/* 指标小标题 (左上) */
+.stat-title,
+.stat-desc {
+  color: var(--muted, #64716d);
+  font-size: 11px;
+}
+
 .stat-title {
   font-size: 12px;
   font-weight: 600;
-  color: var(--muted, #64716d);
 }
 
-/* 指标右上专属微图标徽章 */
+.stat-value {
+  margin: 3px 0 1px;
+  color: var(--color-text, #17211f);
+  font-size: 23px;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.stat-desc {
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .stat-icon-badge {
+  display: flex;
   width: 26px;
   height: 26px;
-  border-radius: 5px;
-  display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  transition: transform 140ms ease;
-}
-
-.stat:hover .stat-icon-badge {
-  transform: scale(1.08);
+  border-radius: 5px;
 }
 
 .stat.teal .stat-icon-badge {
+  border: 1px solid #ccfbf1;
   background: #f0fdfa;
   color: #0f766e;
-  border: 1px solid #ccfbf1;
 }
 
 .stat.green .stat-icon-badge {
+  border: 1px solid #dcfce7;
   background: #f0fdf4;
   color: #16a34a;
-  border: 1px solid #dcfce7;
 }
 
 .stat.coral .stat-icon-badge {
+  border: 1px solid #ffe4e6;
   background: #fff1f2;
   color: #e11d48;
-  border: 1px solid #ffe4e6;
 }
 
 .stat.amber .stat-icon-badge {
+  border: 1px solid #fef3c7;
   background: #fffbeb;
   color: #d97706;
-  border: 1px solid #fef3c7;
 }
 
-/* 指标大数值 (中层居中突出) */
-.stat-value {
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--color-text, #17211f);
-  line-height: 1.15;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-  margin: 3px 0 1px;
+.domains-panel {
+  gap: 12px;
 }
 
-/* 指标辅助说明 (底层居中) */
-.stat-desc {
-  font-size: 11px;
-  color: #8c9b97;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.35;
-  text-align: center;
-}
-
-/* ========================================================
-   2. AI 视觉多领域与模型引擎全景 (Domain Engine Cards)
-   ======================================================== */
-.toggle-matrix-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.engine-grid {
+.domain-summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
 }
 
-.engine-card {
-  border: 1px solid var(--line, #e2e8e6);
-  border-radius: var(--radius-sm, 6px);
+.domain-summary-card {
+  display: grid;
+  gap: 9px;
   padding: 14px;
-  background: #fff;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  transition: all 160ms ease;
-}
-
-.engine-card:hover {
-  border-color: var(--teal, #087682);
-  box-shadow: 0 4px 12px rgba(8, 118, 130, 0.08);
-}
-
-.engine-card-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.engine-icon-wrap {
-  width: 32px;
-  height: 32px;
+  border: 1px solid var(--line, #e2e8e6);
   border-radius: var(--radius-sm, 6px);
-  background: var(--teal-soft, #f0fdfa);
-  color: var(--teal, #087682);
+  background: var(--surface, #fff);
+}
+
+.domain-summary-title,
+.domain-summary-meta,
+.domain-summary-kinds,
+.domain-tag {
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  gap: 7px;
+  flex-wrap: wrap;
 }
 
-.engine-meta {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
+.domain-summary-title {
+  color: var(--color-accent, #087682);
 }
 
-/* 三级标题 / 领域名称 (H3 Standard) */
-.engine-meta strong {
-  font-size: 13.5px;
-  font-weight: 600;
+.domain-summary-title strong {
   color: var(--color-text, #17211f);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.3;
 }
 
-.engine-meta small {
-  font-size: 11px;
-  color: var(--muted, #64716d);
-  line-height: 1.3;
-}
-
-/* 正文描述 (Body Text) */
-.engine-desc {
-  font-size: 12px;
-  line-height: 1.5;
-  color: #4b5d58;
+.domain-summary-card p {
+  min-height: 34px;
   margin: 0;
-  min-height: 36px;
-}
-
-.engine-models-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding-top: 10px;
-  border-top: 1px dashed var(--line, #e2e8e6);
-}
-
-.model-row-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-}
-
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.dot.ready {
-  background: #16a34a;
-  box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.2);
-}
-
-.model-item-name {
-  font-weight: 600;
-  font-size: 11.5px;
-  color: var(--color-text, #17211f);
-  min-width: 58px;
-  flex-shrink: 0;
-}
-
-.model-item-file {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--teal, #087682);
-  background: var(--teal-soft, #f0fdfa);
-  padding: 1px 6px;
-  border-radius: 3px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* 矩阵表格区域 */
-.matrix-table-section {
-  margin-top: 4px;
-  padding-top: 14px;
-  border-top: 1px solid var(--line, #e2e8e6);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  animation: fadeIn 200ms ease;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.matrix-filter-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  background: #fafbfb;
-  border: 1px solid var(--line, #e2e8e6);
-  border-radius: 4px;
-  padding: 4px 10px;
-  flex-wrap: wrap;
-}
-
-.matrix-filter-bar .filter-left,
-.matrix-filter-bar .filter-right {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.matrix-filter-bar .filter-item {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
   color: var(--muted, #64716d);
-}
-
-.matrix-filter-bar .filter-icon {
-  color: var(--muted, #64716d);
-}
-
-.matrix-filter-bar .filter-label {
-  font-weight: 500;
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.matrix-filter-bar .filter-select {
-  height: 22px;
-  min-height: 22px;
-  line-height: 20px;
-  padding: 0 4px 0 6px;
-  font-size: 11px;
-  border: 1px solid var(--line, #e2e8e6);
-  border-radius: 3px;
-  background: #ffffff;
-  color: var(--graphite, #17211f);
-  cursor: pointer;
-}
-
-.matrix-filter-bar .filter-select:focus {
-  border-color: var(--color-accent, #087682);
-  outline: none;
-}
-
-.matrix-filter-bar .search-box.search-sm .search-input,
-.matrix-filter-bar .search-box.search-sm input.search-input {
-  height: 22px !important;
-  min-height: 22px !important;
-  line-height: 22px !important;
-  font-size: 11px !important;
-  padding: 0 8px 0 26px !important;
-  width: 170px;
-}
-
-.matrix-filter-bar .search-box.search-sm .search-icon {
-  left: 7px;
-  width: 12px;
-  height: 12px;
-}
-
-.matrix-filter-bar .count-badge {
-  background: #edf2f0;
-  color: #45534f;
-  font-size: 10.5px;
-  padding: 2px 6px;
-  border-radius: 3px;
-}
-
-.domain-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 7px;
-  border-radius: 4px;
-  font-size: 11.5px;
-  font-weight: 600;
-}
-
-.domain-pill.portrait {
-  background: #e0f2fe;
-  color: #0369a1;
-}
-.domain-pill.ocr {
-  background: #fef3c7;
-  color: #b45309;
-}
-.domain-pill.behavior {
-  background: #f3e8ff;
-  color: #7e22ce;
-}
-.domain-pill.fashion {
-  background: #fce7f3;
-  color: #be185d;
-}
-
-.pi-cap-name strong {
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--color-text, #17211f);
-}
-
-.cap-model-code {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  padding: 2px 6px;
-  border-radius: 3px;
-  color: #334155;
-}
-
-/* ========================================================
-   3. 最近运行动态与表格层级 (Runs Table)
-   ======================================================== */
-.runs-panel,
-.product-matrix-panel,
-.repository-topology-panel {
-  background: #fff;
-  border: 1px solid var(--line, #e2e8e6);
-  border-radius: var(--radius-md, 8px);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.run-link {
-  font-family: var(--font-mono);
-  color: var(--teal, #087682);
-  font-weight: 600;
   font-size: 12px;
-  text-decoration: none;
+  line-height: 1.45;
 }
 
-.run-link:hover {
-  text-decoration: underline;
+.domain-summary-meta {
+  color: var(--muted, #64716d);
+  font-size: 11px;
+}
+
+.domain-summary-kinds span {
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: var(--teal-soft, #e7f1ee);
+  color: var(--color-accent-hover, #065e67);
+  font-size: 10.5px;
+}
+
+.domain-summary-card .button {
+  justify-content: center;
 }
 
 .domain-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
+  color: var(--muted, #64716d);
   font-size: 12px;
-  font-weight: 500;
-  color: #334155;
 }
 
-/* ========================================================
-   4. 平台产品体系网格化规范 (Product Matrix Cards)
-   ======================================================== */
-.product-mini-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 12px;
-}
-
-.product-mini-item {
-  border: 1px solid var(--line, #e2e8e6);
-  border-radius: var(--radius-sm, 6px);
-  padding: 12px 14px;
-  background: #fafbfb;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  transition: all 140ms ease;
-}
-
-.product-mini-item:hover {
-  border-color: var(--teal, #087682);
-  background: #f7fdfb;
-}
-
-.product-mini-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-/* 产品卡片标题 (H3 Standard) */
-.product-mini-header strong {
-  font-size: 13.5px;
+.run-link {
+  color: var(--color-accent, #087682);
   font-weight: 600;
-  color: var(--color-text, #17211f);
+  text-decoration: none;
 }
 
-/* 产品卡片正文 (Body Text) */
-.product-mini-desc {
-  font-size: 12px;
-  color: #4b5d58;
-  margin: 0;
-  line-height: 1.45;
-}
-
-/* 产品门禁辅助信息 */
-.product-mini-gate {
-  font-size: 11px;
-  color: #8c9b97;
-  line-height: 1.35;
-}
-
-.product-foundation-bar {
-  margin-top: 4px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--line, #e2e8e6);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.foundation-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text, #17211f);
-}
-
-.foundation-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.foundation-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 8px;
-  border: 1px solid var(--line, #e2e8e6);
-  border-radius: 4px;
-  background: #fff;
-  font-size: 11.5px;
-}
-
-.foundation-chip .chip-name {
-  font-weight: 500;
-  color: #17211f;
-}
-
-/* ========================================================
-   5. 仓库拓扑与边界治理层级规范 (Repository Topology Cards)
-   ======================================================== */
-.repository-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-.repo-card {
-  border: 1px solid var(--line, #e2e8e6);
-  border-radius: var(--radius-sm, 6px);
-  padding: 14px;
-  background: #fafbfa;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.repo-card.current {
-  border-color: var(--teal, #087682);
-  background: #f7fdfb;
-}
-
-.repo-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.repo-title-wrap {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-/* 仓库卡片标题 (H3 Standard) */
-.repo-title-wrap strong {
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--color-text, #17211f);
-}
-
-.repo-icon {
-  color: var(--teal, #087682);
-  flex-shrink: 0;
-}
-
-/* 仓库正文描述 (Body Text) */
-.repo-desc {
-  font-size: 12px;
-  color: #4b5d58;
-  margin: 0;
-  line-height: 1.45;
-}
-
-.repo-responsibilities {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  font-size: 11.5px;
-  line-height: 1.4;
-  background: #fff;
-  padding: 8px 10px;
-  border-radius: 4px;
-  border: 1px solid var(--line, #e2e8e6);
-}
-
-.resp-block {
-  display: flex;
-  gap: 4px;
-}
-
-.resp-label {
-  font-weight: 600;
-  flex-shrink: 0;
-  font-size: 11.5px;
-}
-
-.resp-label.plus {
-  color: #087682;
-}
-.resp-label.minus {
-  color: #b45309;
-}
-
-.resp-text {
-  color: #334155;
-}
-
-.repo-gate-footer {
-  font-size: 11px;
-  color: #8c9b97;
-  margin-top: auto;
-  line-height: 1.35;
-}
-
-.topology-rules-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 1px dashed var(--line, #e2e8e6);
-}
-
-.rule-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.rule-title {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text, #17211f);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex-shrink: 0;
-}
-
-.rule-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.rule-pill {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 3px;
-  background: #f1f5f4;
-  color: #334155;
-  border: 1px solid var(--line, #e2e8e6);
-  line-height: 1.4;
-}
-
-.rule-pill.rule-security {
-  background: #fef2f2;
-  color: #991b1b;
-  border-color: #fecaca;
-}
-
-/* ========================================================
-   响应式适配 (Responsive)
-   ======================================================== */
-@media (max-width: 1200px) {
-  .engine-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .repository-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 768px) {
+@media (max-width: 800px) {
   .stats {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .engine-grid {
+}
+
+@media (max-width: 520px) {
+  .stats {
     grid-template-columns: 1fr;
   }
 }

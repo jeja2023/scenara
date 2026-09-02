@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import ConnectionTab from "./access/ConnectionTab.vue";
 import CredentialsTab from "./access/CredentialsTab.vue";
 import CredentialsDialogs from "./access/CredentialsDialogs.vue";
 import FoundationTab from "./access/FoundationTab.vue";
@@ -12,13 +11,7 @@ import IdentityDialogs from "./access/IdentityDialogs.vue";
 import IssuedKeyDialog from "./access/IssuedKeyDialog.vue";
 import { computed, onMounted, reactive, ref, watch } from "vue";
 import { useRefresh } from "../composables/useRefresh";
-import {
-  api,
-  loadConnection,
-  saveConnection,
-  userFacingError,
-  type ConnectionSettings,
-} from "../api";
+import { api, userFacingError } from "../api";
 import { labelProduct, labelProductSummary } from "../labels";
 import type {
   AccessCapabilityStatus,
@@ -60,7 +53,6 @@ import {
 } from "./access/config";
 
 const activeTab = ref<AccessTab>("foundation");
-const form = reactive<ConnectionSettings>(loadConnection());
 const foundation = ref<AccessFoundationStatus | null>(null);
 const iam = ref<IamSummary | null>(null);
 const organizations = ref<Organization[]>([]);
@@ -172,7 +164,6 @@ const showCreateApiKey = ref(false);
 const showCreateEntitlement = ref(false);
 const showCreateHook = ref(false);
 const showHookSecret = ref(false);
-const showConnectionToken = ref(false);
 
 const organizationForm = reactive<OrganizationForm>({ display_name: "" });
 const projectForm = reactive<ProjectForm>({ project_id: "", display_name: "" });
@@ -567,19 +558,6 @@ function formatTime(value?: number | null): string {
 
 function labelContext(value: string, kind: "租户" | "项目"): string {
   return value === "default" ? `默认${kind}` : value;
-}
-
-function applyConnection(): void {
-  saveConnection({ ...form, apiBase: form.apiBase.replace(/\/$/, "") });
-  window.location.reload();
-}
-
-function resetConnection(): void {
-  form.apiBase = "";
-  form.tenantId = "default";
-  form.projectId = "default";
-  form.token = "";
-  applyConnection();
 }
 
 async function refresh(): Promise<void> {
@@ -991,16 +969,6 @@ useRefresh(refresh);
       "
       @update:delivery-pagination="Object.assign(deliveriesPagination, $event)"
     />
-    <ConnectionTab
-      v-else
-      :form="form"
-      :show-token="showConnectionToken"
-      :reset-connection="resetConnection"
-      :apply-connection="applyConnection"
-      @update:form="Object.assign(form, $event)"
-      @update:show-token="showConnectionToken = $event"
-    />
-
     <IdentityDialogs
       v-model:show-create-org="showCreateOrg"
       v-model:show-create-project="showCreateProject"
