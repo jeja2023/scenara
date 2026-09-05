@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tomllib
 from pathlib import Path
+from typing import Any, cast
 
 import yaml
 
@@ -13,11 +14,11 @@ from scenara_sdk import __version__ as sdk_version
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def _json(path: str) -> dict[str, object]:
-    return json.loads((ROOT / path).read_text(encoding="utf-8"))
+def _json(path: str) -> dict[str, Any]:
+    return cast(dict[str, Any], json.loads((ROOT / path).read_text(encoding="utf-8")))
 
 
-def _toml(path: str) -> dict[str, object]:
+def _toml(path: str) -> dict[str, Any]:
     return tomllib.loads((ROOT / path).read_text(encoding="utf-8"))
 
 

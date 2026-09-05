@@ -63,23 +63,31 @@ class PostgresStateStore(PostgresCatalogMixin):
         if not migrations_dir.is_dir():
             return
         async with self._pool.connection() as conn:
-            await conn.execute(
-                """CREATE TABLE IF NOT EXISTS scenara_schema_migrations (
-                    version text PRIMARY KEY,
-                    applied_at timestamptz NOT NULL DEFAULT now()
-                )"""
-            )
-            cursor = await conn.execute("SELECT version FROM scenara_schema_migrations")
-            applied = {str(row[0]) for row in await cursor.fetchall()}
-            for sql_file in sorted(migrations_dir.glob("*.sql")):
-                version = sql_file.stem
-                if version not in applied:
-                    sql_content = sql_file.read_text(encoding="utf-8")
-                    await conn.execute(sql_content)
-                    await conn.execute(
-                        "INSERT INTO scenara_schema_migrations (version) VALUES (%s) ON CONFLICT DO NOTHING",
-                        (version,),
-                    )
+            # 73293272 为 'scenara_schema_migrations' 的固定 32 位哈希值
+            # 会话级 Advisory Lock 防止多进程（API、多个 Worker 进程）并发启动时执行迁移发生竞态
+            migration_lock_id = 73293272
+            await conn.execute("SELECT pg_advisory_lock(%s)", (migration_lock_id,))
+            try:
+                await conn.execute(
+                    """CREATE TABLE IF NOT EXISTS scenara_schema_migrations (
+                        version text PRIMARY KEY,
+                        applied_at timestamptz NOT NULL DEFAULT now()
+                    )"""
+                )
+                cursor = await conn.execute("SELECT version FROM scenara_schema_migrations")
+                applied = {str(row[0]) for row in await cursor.fetchall()}
+                for sql_file in sorted(migrations_dir.glob("*.sql")):
+                    version = sql_file.stem
+                    if version not in applied:
+                        sql_content = sql_file.read_text(encoding="utf-8")
+                        await conn.execute(sql_content)
+                        await conn.execute(
+                            "INSERT INTO scenara_schema_migrations (version) VALUES (%s) ON CONFLICT DO NOTHING",
+                            (version,),
+                        )
+                        applied.add(version)
+            finally:
+                await conn.execute("SELECT pg_advisory_unlock(%s)", (migration_lock_id,))
 
     async def close(self) -> None:
         await self._pool.close()
