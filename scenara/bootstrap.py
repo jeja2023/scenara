@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from contextlib import suppress
 from dataclasses import dataclass
@@ -73,6 +74,8 @@ from scenara.platform.webhook_service import WebhookService
 from scenara.settings import Settings, load_settings
 
 
+logger = logging.getLogger(__name__)
+
 @dataclass(slots=True)
 class Runtime:
     settings: Settings
@@ -139,7 +142,9 @@ class Runtime:
                 await self.control_plane.purge_expired_sessions(time.time())
             except Exception:
                 # 会话清理采用尽力而为策略；即使控制面数据库短暂离线，
-                # 认证功能也必须保持可用。
+                # 认证功能也必须保持可用。持续失败会让过期会话堆积，
+                # 所以要留下痕迹而不是完全静默。
+                logger.warning("过期会话清理失败，将在下一轮重试", exc_info=True)
                 continue
 
     async def health_check(self) -> dict[str, str]:

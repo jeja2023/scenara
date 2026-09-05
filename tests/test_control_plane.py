@@ -4,8 +4,12 @@ import httpx
 import pytest
 
 from scenara.bootstrap import build_runtime
+from scenara.platform.control_plane_store import MemoryControlPlaneStore
 from scenara.platform.models import Membership, PrincipalType, Role, UserAccount
 from scenara.server import create_app
+from tests.control_plane_store_contract import (
+    assert_control_plane_store_contract,
+)
 
 
 @pytest.fixture
@@ -447,3 +451,12 @@ async def test_external_adapter_registration_and_probe_contracts(control_plane_c
     reranker_probe = await api.post(f"/api/v1/search/rerankers/{reranker.json()['data']['record_id']}/probe")
     assert reranker_probe.status_code == 200
     assert reranker_probe.json()["data"]["health"] == "configured"
+
+
+@pytest.mark.asyncio
+async def test_memory_control_plane_store_satisfies_the_shared_contract() -> None:
+    """内存实现与 PostgreSQL 实现共用同一套控制平面契约。"""
+
+    await assert_control_plane_store_contract(
+        MemoryControlPlaneStore(), tenant_id="default", project_id="default"
+    )

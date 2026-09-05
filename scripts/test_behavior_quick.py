@@ -36,9 +36,9 @@ def test_engine_init() -> bool:
     """测试引擎初始化"""
     print("\n2. 测试引擎初始化...")
     try:
-        from scenara.domains.behavior.paddle_production import ProductionPaddleVideoBehaviorEngine
+        from scenara.domains.behavior.paddle_reference_adapter import ReferencePaddleVideoBehaviorEngine
 
-        engine = ProductionPaddleVideoBehaviorEngine(
+        engine = ReferencePaddleVideoBehaviorEngine(
             verify_checksums=False,
             use_gpu=False,
         )
@@ -60,7 +60,7 @@ def test_behavior_prediction() -> bool:
     try:
         import numpy as np
         from PIL import Image
-        from scenara.domains.behavior.paddle_production import ProductionPaddleVideoBehaviorEngine
+        from scenara.domains.behavior.paddle_reference_adapter import ReferencePaddleVideoBehaviorEngine
 
         # 创建测试视频序列(16 帧)
         frames = []
@@ -75,7 +75,7 @@ def test_behavior_prediction() -> bool:
             frames.append(np.array(img))
 
         # 执行行为识别
-        engine = ProductionPaddleVideoBehaviorEngine(
+        engine = ReferencePaddleVideoBehaviorEngine(
             verify_checksums=False,
             use_gpu=False,
         )
@@ -106,7 +106,7 @@ def test_anomaly_detection() -> bool:
     try:
         import numpy as np
         from PIL import Image
-        from scenara.domains.behavior.paddle_production import ProductionPaddleVideoBehaviorEngine
+        from scenara.domains.behavior.paddle_reference_adapter import ReferencePaddleVideoBehaviorEngine
 
         # 创建包含异常变化的视频序列
         frames = []
@@ -121,7 +121,7 @@ def test_anomaly_detection() -> bool:
             frames.append(np.array(img))
 
         # 执行异常检测
-        engine = ProductionPaddleVideoBehaviorEngine(
+        engine = ReferencePaddleVideoBehaviorEngine(
             verify_checksums=False,
             use_gpu=False,
         )
@@ -146,9 +146,9 @@ def test_factory() -> bool:
     """测试工厂函数"""
     print("\n5. 测试工厂函数...")
     try:
-        from scenara.domains.behavior.paddle_production import create_production_behavior_engine
+        from scenara.domains.behavior.paddle_reference_adapter import create_reference_behavior_engine
 
-        engine = create_production_behavior_engine()
+        engine = create_reference_behavior_engine()
         print(f"   ✓ 工厂函数创建引擎成功: {engine.model_id}")
         return True
     except Exception as e:

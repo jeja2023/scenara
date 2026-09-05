@@ -6,8 +6,12 @@ from PIL import Image
 
 from scenara.bootstrap import build_runtime
 from scenara.domains.portrait.encoder import decode_portrait_image
+from scenara.domains.portrait.service import MemoryPortraitRepository
 from scenara.platform.features import DistanceMetric, FeatureSpace
 from scenara.server import create_app
+from tests.portrait_repository_contract import (
+    assert_portrait_repository_contract,
+)
 
 
 def _image_bytes(color: tuple[int, int, int]) -> bytes:
@@ -288,3 +292,12 @@ async def test_expired_biometric_features_are_physically_removed(portrait_client
         == []
     )
     assert await runtime.features.delete_expired(2.0, 100) == 0
+
+
+@pytest.mark.asyncio
+async def test_memory_portrait_repository_satisfies_the_shared_contract() -> None:
+    """内存实现与 PostgreSQL 实现共用同一套人像仓储契约。"""
+
+    await assert_portrait_repository_contract(
+        MemoryPortraitRepository(), tenant_id="default", project_id="default"
+    )

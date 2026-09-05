@@ -20,7 +20,7 @@ def test_settings() -> bool:
         import os
 
         # 临时设置环境变量
-        os.environ["SCENARA_BEHAVIOR_ENGINE_FACTORY"] = "scenara.domains.behavior.paddle_production:create_production_behavior_engine"
+        os.environ["SCENARA_BEHAVIOR_ENGINE_FACTORY"] = "scenara.domains.behavior.paddle_reference_adapter:create_reference_behavior_engine"
 
         settings = load_settings()
         print("   ✓ 配置加载成功")
@@ -39,7 +39,7 @@ def test_factory() -> bool:
     try:
         from scenara.domains.behavior.factory import load_behavior_engine
 
-        factory_path = "scenara.domains.behavior.paddle_production:create_production_behavior_engine"
+        factory_path = "scenara.domains.behavior.paddle_reference_adapter:create_reference_behavior_engine"
         engine = load_behavior_engine(factory_path)
 
         print("   ✓ 工厂函数加载成功")

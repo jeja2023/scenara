@@ -324,12 +324,18 @@ class PostgresSurveillanceRepository(SurveillanceRepository):
     async def list_active_tasks_for_source(self, tenant_id: str, project_id: str, source_id: str) -> list[SurveillanceTask]:
         async with self._pool.connection() as conn:
             cursor = await conn.execute(
-                """SELECT DISTINCT task.document FROM scenara_surveillance_tasks task
-                   JOIN scenara_surveillance_task_bindings binding
-                     ON binding.tenant_id = task.tenant_id AND binding.project_id = task.project_id
-                    AND binding.task_id = task.task_id
+                # 半连接而不是 JOIN + DISTINCT：PostgreSQL 不允许 SELECT DISTINCT
+                # 按未出现在选择列表里的列排序，EXISTS 同时省掉一次去重。
+                """SELECT task.document FROM scenara_surveillance_tasks task
                    WHERE task.tenant_id = %s AND task.project_id = %s
-                     AND task.status = 'active' AND binding.source_id = %s
+                     AND task.status = 'active'
+                     AND EXISTS (
+                       SELECT 1 FROM scenara_surveillance_task_bindings binding
+                       WHERE binding.tenant_id = task.tenant_id
+                         AND binding.project_id = task.project_id
+                         AND binding.task_id = task.task_id
+                         AND binding.source_id = %s
+                     )
                    ORDER BY task.task_id""",
                 (tenant_id, project_id, source_id),
             )

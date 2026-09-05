@@ -47,7 +47,7 @@ def test_production_configuration_rejects_placeholders_reuse_and_unsafe_networks
     values["SCENARA_ALLOWED_HOSTS"] = "*"
     values["SCENARA_FORWARDED_ALLOW_IPS"] = "*"
     values["SCENARA_DATA_PLATFORM_URL"] = "http://data.internal"
-    values["SCENARA_OCR_ENGINE_FACTORY"] = "scenara.domains.ocr.paddle_production:create_production_ocr_engine"
+    values["SCENARA_OCR_ENGINE_FACTORY"] = "scenara.domains.ocr.paddle_reference_adapter:create_reference_ocr_engine"
     errors, _ = validate(values, file_mode=True)
     joined = "\n".join(errors)
     assert "placeholder" in joined

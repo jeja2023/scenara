@@ -43,9 +43,9 @@ def test_engine_init() -> bool:
     """测试引擎初始化"""
     print("\n2. 测试引擎初始化...")
     try:
-        from scenara.domains.ocr.paddle_production import ProductionPaddleOcrEngine
+        from scenara.domains.ocr.paddle_reference_adapter import ReferencePaddleOcrEngine
 
-        engine = ProductionPaddleOcrEngine(verify_checksums=False, use_gpu=False)
+        engine = ReferencePaddleOcrEngine(verify_checksums=False, use_gpu=False)
         print(f"   ✓ 引擎初始化成功: {engine.model_id} v{engine.version}")
         print(f"   ✓ 生产就绪: {engine.production_ready}")
         print(f"   ✓ 能力: {', '.join(engine.production_capabilities)}")
@@ -60,7 +60,7 @@ def test_ocr_prediction() -> bool:
     print("\n3. 测试 OCR 识别...")
     try:
         from PIL import Image, ImageDraw, ImageFont
-        from scenara.domains.ocr.paddle_production import ProductionPaddleOcrEngine
+        from scenara.domains.ocr.paddle_reference_adapter import ReferencePaddleOcrEngine
 
         # 创建测试图像
         img = Image.new("RGB", (400, 100), color="white")
@@ -78,7 +78,7 @@ def test_ocr_prediction() -> bool:
         draw.text((10, 30), text, fill="black", font=font)
 
         # 执行 OCR
-        engine = ProductionPaddleOcrEngine(verify_checksums=False, use_gpu=False)
+        engine = ReferencePaddleOcrEngine(verify_checksums=False, use_gpu=False)
         results = engine.predict(img, min_score=0.0)
 
         if results:
@@ -101,7 +101,7 @@ def test_layout_analysis() -> bool:
     print("\n4. 测试版面分析...")
     try:
         from PIL import Image, ImageDraw
-        from scenara.domains.ocr.paddle_production import ProductionPaddleOcrEngine
+        from scenara.domains.ocr.paddle_reference_adapter import ReferencePaddleOcrEngine
 
         # 创建简单布局的测试图像
         img = Image.new("RGB", (800, 600), color="white")
@@ -113,7 +113,7 @@ def test_layout_analysis() -> bool:
         draw.rectangle([50, 450, 350, 550], outline="blue", width=2)  # 图片区域
 
         # 执行版面分析
-        engine = ProductionPaddleOcrEngine(verify_checksums=False, use_gpu=False)
+        engine = ReferencePaddleOcrEngine(verify_checksums=False, use_gpu=False)
         regions = engine.predict_layout(img)
 
         print(f"   ✓ 检测到 {len(regions)} 个版面区域")
@@ -132,9 +132,9 @@ def test_factory() -> bool:
     """测试工厂函数"""
     print("\n5. 测试工厂函数...")
     try:
-        from scenara.domains.ocr.paddle_production import create_production_ocr_engine
+        from scenara.domains.ocr.paddle_reference_adapter import create_reference_ocr_engine
 
-        engine = create_production_ocr_engine()
+        engine = create_reference_ocr_engine()
         print(f"   ✓ 工厂函数创建引擎成功: {engine.model_id}")
         return True
     except Exception as e:

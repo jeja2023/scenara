@@ -1,8 +1,12 @@
-"""
-生产级服饰风格识别引擎
+"""服饰风格识别的参考适配器（非生产实现）。
 
-基于深度学习模型提供 Cosplay 角色识别、服装风格检测和配饰分析能力。
-支持多种模型: ResNet, EfficientNet, 自定义分类模型。
+本模块给出接入服饰识别引擎所需的接口形状、角色/风格词表与预处理流程，供对接
+方照此实现自己的模型适配器。它自身不含任何模型权重：三个 detect 方法在没有
+模型时返回**与输入图像无关的合成结果**，仅用于打通链路，绝不能当作识别能力。
+
+因此本类声明 `production_ready = False`，
+`scenara.domains.fashion.factory.load_fashion_engine` 会拒绝加载它；真实的生产
+实现在 `scenara.domains.fashion.operators.ProductionFashionEngine`。
 """
 
 from __future__ import annotations
@@ -20,7 +24,8 @@ from scenara.platform.pipeline import DomainUnavailable
 
 logger = logging.getLogger(__name__)
 
-# 模型权重 SHA-256 校验和(生产环境应验证这些值)
+# 占位摘要：本模块不携带权重，这里只演示校验表的结构。接入方必须整表替换为自己
+# 权重的真实 SHA-256；保持占位值会让 _verify_model_checksums 拒绝任何权重文件。
 MODEL_CHECKSUMS = {
     "cosplay_classifier": "d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1",
     "clothing_classifier": "e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2e2",
@@ -115,19 +120,18 @@ ACCESSORY_TYPES = {
 }
 
 
-class ProductionFashionEngine:
-    """
-    生产级服饰风格识别引擎
+class ReferenceFashionEngine:
+    """服饰识别接口的参考实现，不具备识别能力。
 
-    特性:
-    - Cosplay 角色识别(100+ 角色)
-    - 服装风格检测(10+ 风格类别)
-    - 配饰识别
-    - 服饰属性分析(颜色、材质、款式)
-    - 模型权重校验
+    提供的是接口形状与词表：
+    - Cosplay 角色词表（约 20 个示例角色）
+    - 服装风格词表（10 类）
+    - 配饰类别词表
+    - 权重摘要校验流程
+    没有模型时，三个 detect 方法返回与输入无关的合成结果。
     """
 
-    model_id = "fashion-production"
+    model_id = "fashion-reference-adapter"
     production_ready = False
     qualification_status = "unqualified_reference_adapter"
     version = "1.0.0"
@@ -170,6 +174,7 @@ class ProductionFashionEngine:
         self._cosplay_model = None
         self._clothing_model = None
         self._accessory_model = None
+        self._warned: set[str] = set()
 
         # 支持的角色和风格列表
         self.supported_characters = list(COSPLAY_CHARACTERS.keys())
@@ -185,23 +190,41 @@ class ProductionFashionEngine:
         )
 
     def _verify_model_checksums(self) -> None:
-        """验证模型权重文件的 SHA-256 校验和"""
+        """校验权重文件摘要；不匹配即拒绝加载。
+
+        模型资产政策要求生产配置拒绝未校验摘要，所以这里不能只记一条警告就继续：
+        摘要不符意味着权重来源不明，必须让加载失败。
+        """
+
         if not self._model_dir or not self._model_dir.exists():
-            logger.warning("Model directory not found, skipping checksum verification")
-            return
+            raise DomainUnavailable(
+                f"model directory does not exist: {self._model_dir}"
+            )
 
         for model_name, expected_checksum in MODEL_CHECKSUMS.items():
             model_file = self._model_dir / f"{model_name}.pth"
             if not model_file.exists():
-                logger.warning(f"Model file not found: {model_file}")
+                logger.warning("权重文件缺失，对应能力不可用: %s", model_file.name)
                 continue
 
             actual_checksum = self._compute_file_hash(model_file)
             if actual_checksum != expected_checksum:
-                logger.warning(
-                    f"Model checksum mismatch for {model_name}: "
+                raise DomainUnavailable(
+                    f"model checksum mismatch for {model_name}: "
                     f"expected {expected_checksum}, got {actual_checksum}"
                 )
+
+    def _warn_synthetic(self, capability: str) -> None:
+        """首次产生合成输出时告警一次，避免逐帧刷日志。"""
+
+        if capability in self._warned:
+            return
+        self._warned.add(capability)
+        logger.warning(
+            "%s 正在返回与输入无关的合成结果（能力 %s 无模型），不得用于任何判定",
+            self.model_id,
+            capability,
+        )
 
     @staticmethod
     def _compute_file_hash(file_path: Path) -> str:
@@ -256,8 +279,10 @@ class ProductionFashionEngine:
         return self._heuristic_cosplay_detection(image, min_confidence)
 
     def _heuristic_cosplay_detection(self, image: Any, min_confidence: float) -> list[dict[str, Any]]:
-        """启发式 Cosplay 检测(回退方法)"""
+        """无模型时的合成输出，与输入图像无关。"""
         import random
+
+        self._warn_synthetic("cosplay")
 
         # 基于简单的颜色和特征匹配
         if random.random() < 0.4:  # 40% 概率检测到
@@ -300,8 +325,10 @@ class ProductionFashionEngine:
         return self._heuristic_clothing_detection(image, min_confidence)
 
     def _heuristic_clothing_detection(self, image: Any, min_confidence: float) -> list[dict[str, Any]]:
-        """启发式服装风格检测(回退方法)"""
+        """无模型时的合成输出，与输入图像无关。"""
         import random
+
+        self._warn_synthetic("clothing_style")
 
         results = []
         num_styles = random.randint(0, 2)
@@ -354,8 +381,10 @@ class ProductionFashionEngine:
         return self._heuristic_accessory_detection(image, min_confidence)
 
     def _heuristic_accessory_detection(self, image: Any, min_confidence: float) -> list[dict[str, Any]]:
-        """启发式配饰检测(回退方法)"""
+        """无模型时的合成输出，与输入图像无关。"""
         import random
+
+        self._warn_synthetic("accessory")
 
         results = []
         num_accessories = random.randint(0, 3)
@@ -376,7 +405,7 @@ class ProductionFashionEngine:
         return results
 
 
-def create_production_fashion_engine() -> ProductionFashionEngine:
+def create_reference_fashion_engine() -> ReferenceFashionEngine:
     """
     工厂函数,创建生产级服饰识别引擎实例
 
@@ -391,11 +420,11 @@ def create_production_fashion_engine() -> ProductionFashionEngine:
     verify_checksums = os.getenv("SCENARA_FASHION_VERIFY_CHECKSUMS", "true").lower() in ("true", "1", "yes")
     use_gpu = os.getenv("SCENARA_FASHION_USE_GPU", "true").lower() in ("true", "1", "yes")
 
-    return ProductionFashionEngine(
+    return ReferenceFashionEngine(
         verify_checksums=verify_checksums,
         model_dir=model_dir,
         use_gpu=use_gpu,
     )
 
 
-__all__ = ["ProductionFashionEngine", "create_production_fashion_engine"]
+__all__ = ["ReferenceFashionEngine", "create_reference_fashion_engine"]

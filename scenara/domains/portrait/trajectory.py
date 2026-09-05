@@ -114,6 +114,28 @@ class TrajectorySegment(TrajectoryModel):
     created_at: float = Field(default_factory=time.time)
 
 
+class ReachabilityObservation(TrajectoryModel):
+    """时空可达性判定只需要邻近观测的机位与时间边界。"""
+
+    camera_id: str
+    first_seen_at: float
+    last_seen_at: float
+
+
+class ReachabilityProbe(TrajectoryModel):
+    """候选身份在某个观测窗口前后紧邻的观测。
+
+    `previous` 与 `following` 各取时间上最近的一条观测且不限机位：行程约束只
+    在连续两次出现之间成立，所以紧邻观测落在本次机位时就没有发生转移，无需
+    校验行程。`overlapping` 只统计异机位的时间重叠——同一机位内的时间重叠由
+    同一 run 内的 tracklet 归属规则处理，不属于时空冲突。
+    """
+
+    overlapping: bool = False
+    previous: ReachabilityObservation | None = None
+    following: ReachabilityObservation | None = None
+
+
 class TrajectoryIngestResult(TrajectoryModel):
     """单条 tracklet 的登记结果，未登记时给出原因。"""
 
@@ -234,6 +256,16 @@ class TrajectoryRepository(Protocol):
 
     async def delete_segments_for_identity(self, tenant_id: str, project_id: str, identity_id: str) -> int: ...
 
+    async def probe_reachability(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        identity_id: str,
+        camera_id: str,
+        window: tuple[float, float],
+    ) -> ReachabilityProbe: ...
+
     async def put_camera(self, camera: CameraRecord) -> None: ...
 
     async def get_camera(self, tenant_id: str, project_id: str, camera_id: str) -> CameraRecord | None: ...
@@ -340,6 +372,38 @@ class MemoryTrajectoryRepository:
         for key in keys:
             del self._segments[key]
         return len(keys)
+
+    async def probe_reachability(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        identity_id: str,
+        camera_id: str,
+        window: tuple[float, float],
+    ) -> ReachabilityProbe:
+        previous: ReachabilityObservation | None = None
+        following: ReachabilityObservation | None = None
+        for key, item in self._segments.items():
+            if key[:2] != (tenant_id, project_id) or item.identity_id != identity_id:
+                continue
+            if not item.camera_id:
+                continue
+            if _windows_overlap((item.first_seen_at, item.last_seen_at), window):
+                if item.camera_id != camera_id:
+                    return ReachabilityProbe(overlapping=True)
+                continue
+            observation = ReachabilityObservation(
+                camera_id=item.camera_id,
+                first_seen_at=item.first_seen_at,
+                last_seen_at=item.last_seen_at,
+            )
+            if item.last_seen_at <= window[0]:
+                if previous is None or observation.last_seen_at > previous.last_seen_at:
+                    previous = observation
+            elif following is None or observation.first_seen_at < following.first_seen_at:
+                following = observation
+        return ReachabilityProbe(previous=previous, following=following)
 
     async def put_camera(self, camera: CameraRecord) -> None:
         self._cameras[(camera.tenant_id, camera.project_id, camera.camera_id)] = camera.model_copy(deep=True)
@@ -485,12 +549,24 @@ class TrajectoryService:
         camera_id: str,
         window: tuple[float, float],
     ) -> bool:
-        """校验候选身份的相邻观测与本次观测在时空上可达。"""
+        """校验候选身份在时间上紧邻的异机位观测与本次观测是否时空可达。
 
-        segments, _ = await self._repository.list_segments(
-            context.tenant_id, context.project_id, identity_id=identity_id, limit=200
+        行程约束只在相邻的两次出现之间成立。一个人可以先在 A、再到 B、稍后
+        仍留在 B：此时 A 与本次观测的间隔早已超出 A→B 的行程上限，却完全合乎
+        物理。据此只比较紧邻的前后各一条异机位观测，而不是整段历史，否则身份
+        积累的出现越多就越难被复用，最终退化成大量碎片身份。
+        """
+
+        probe = await self._repository.probe_reachability(
+            context.tenant_id,
+            context.project_id,
+            identity_id=identity_id,
+            camera_id=camera_id,
+            window=window,
         )
-        if not segments:
+        if probe.overlapping:
+            return False
+        if probe.previous is None and probe.following is None:
             return True
         transitions = await self._repository.list_transitions(
             context.tenant_id, context.project_id
@@ -501,21 +577,40 @@ class TrajectoryService:
                 transition.min_seconds,
                 transition.max_seconds,
             )
-        for segment in segments:
-            if not segment.camera_id or segment.camera_id == camera_id:
-                continue
-            if _windows_overlap((segment.first_seen_at, segment.last_seen_at), window):
-                return False
-            if segment.last_seen_at <= window[0]:
-                gap = window[0] - segment.last_seen_at
-                key = (segment.camera_id, camera_id)
-            else:
-                gap = segment.first_seen_at - window[1]
-                key = (camera_id, segment.camera_id)
-            minimum, maximum = bounds.get(key, (self._default_transition_seconds, None))
-            if gap < minimum or (maximum is not None and gap > maximum):
-                return False
+        previous = probe.previous
+        if (
+            previous is not None
+            and previous.camera_id != camera_id
+            and not self._gap_allows(
+                bounds,
+                (previous.camera_id, camera_id),
+                window[0] - previous.last_seen_at,
+            )
+        ):
+            return False
+        following = probe.following
+        if (
+            following is not None
+            and following.camera_id != camera_id
+            and not self._gap_allows(
+                bounds,
+                (camera_id, following.camera_id),
+                following.first_seen_at - window[1],
+            )
+        ):
+            return False
         return True
+
+    def _gap_allows(
+        self,
+        bounds: dict[tuple[str, str], tuple[float, float | None]],
+        key: tuple[str, str],
+        gap: float,
+    ) -> bool:
+        """单段转移的间隔是否落在配置的行程区间内。"""
+
+        minimum, maximum = bounds.get(key, (self._default_transition_seconds, None))
+        return gap >= minimum and (maximum is None or gap <= maximum)
 
     async def _candidates(
         self, context: PrincipalContext, embeddings: dict[str, list[float]]

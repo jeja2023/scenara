@@ -6,6 +6,7 @@ import httpx
 import pytest
 
 from scenara.bootstrap import build_runtime
+from scenara.infrastructure.memory_surveillance import MemorySurveillanceRepository
 from scenara.server import create_app
 from scenara.domains.portrait.service import (
     CreateIdentityRequest,
@@ -27,6 +28,9 @@ from scenara.platform.surveillance import (
     ThresholdPolicy,
     TriageAlertRequest,
     SurveillanceSchedule,
+)
+from tests.surveillance_repository_contract import (
+    assert_surveillance_repository_contract,
 )
 
 
@@ -304,3 +308,12 @@ async def test_surveillance_watchlist_api_uses_standard_envelopes(
         )
         assert stale.status_code == 409
         assert stale.json()["error"]["code"] == "SURVEILLANCE_CONFLICT"
+
+
+@pytest.mark.asyncio
+async def test_memory_surveillance_repository_satisfies_the_shared_contract() -> None:
+    """内存实现与 PostgreSQL 实现共用同一套仓储契约。"""
+
+    await assert_surveillance_repository_contract(
+        MemorySurveillanceRepository(), tenant_id="default", project_id="default"
+    )

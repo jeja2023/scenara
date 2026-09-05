@@ -1,6 +1,10 @@
-"""
-生产级 PaddleOCR 引擎适配器
-提供完整的 OCR、版面分析和表格识别能力
+"""基于 PaddleOCR 的文档解析参考适配器（非生产实现）。
+
+本模块给出接入 PaddleOCR 所需的接口形状与调用顺序，供对接方照此实现自己的适配
+器；它自身不携带任何模型权重。
+
+因此本类声明 `production_ready = False`，
+`scenara.domains.ocr.factory.load_ocr_engine` 会拒绝加载它。
 """
 
 from __future__ import annotations
@@ -17,7 +21,8 @@ from scenara.platform.pipeline import DomainUnavailable
 
 logger = logging.getLogger(__name__)
 
-# 模型权重 SHA-256 校验和(生产环境应验证这些值)
+# 占位摘要：本模块不携带权重，这里只演示校验表的结构。接入方必须整表替换为自己
+# 权重的真实 SHA-256；保持占位值会让 _verify_model_checksums 拒绝任何权重文件。
 MODEL_CHECKSUMS = {
     "det": "e8b8e1f8c8a8d8c8e8b8e1f8c8a8d8c8e8b8e1f8c8a8d8c8e8b8e1f8c8a8d8c8",  # 检测模型
     "rec": "f9c9f2f9d9b9f9c9f2f9d9b9f9c9f2f9d9b9f9c9f2f9d9b9f9c9f2f9d9b9f9c9",  # 识别模型
@@ -27,20 +32,15 @@ MODEL_CHECKSUMS = {
 }
 
 
-class ProductionPaddleOcrEngine:
-    """
-    生产级 PaddleOCR 引擎
+class ReferencePaddleOcrEngine:
+    """PaddleOCR 接口的参考实现，不携带模型权重。
 
-    特性:
-    - 完整的 OCR 文本识别
-    - 版面结构分析(标题、段落、图片、表格)
-    - 表格结构化识别(行列、单元格)
-    - 多语言支持
-    - 置信度过滤
-    - 模型权重校验
+    提供的是接入 PaddleOCR 所需的接口形状：文本检测与识别、版面结构分析、表格
+    结构化、多语言与置信度过滤的调用位置，以及权重摘要校验流程。真实识别能力取
+    决于接入方提供的权重。
     """
 
-    model_id = "paddleocr-production"
+    model_id = "paddleocr-reference-adapter"
     layout_model_id = "paddleocr-layout"
     table_model_id = "paddleocr-table"
     production_ready = False
@@ -124,10 +124,16 @@ class ProductionPaddleOcrEngine:
         )
 
     def _verify_model_checksums(self) -> None:
-        """验证模型权重文件的 SHA-256 校验和"""
+        """校验权重文件摘要；不匹配即拒绝加载。
+
+        模型资产政策要求生产配置拒绝未校验摘要，所以这里不能只记一条警告就继续：
+        摘要不符意味着权重来源不明，必须让加载失败。
+        """
+
         if not self._model_dir or not self._model_dir.exists():
-            logger.warning("Model directory not found, skipping checksum verification")
-            return
+            raise DomainUnavailable(
+                f"model directory does not exist: {self._model_dir}"
+            )
 
         for model_name, expected_checksum in MODEL_CHECKSUMS.items():
             model_path = self._model_dir / model_name / "inference.pdmodel"
@@ -382,7 +388,7 @@ class ProductionPaddleOcrEngine:
         return None
 
 
-def create_production_ocr_engine() -> ProductionPaddleOcrEngine:
+def create_reference_ocr_engine() -> ReferencePaddleOcrEngine:
     """
     工厂函数,创建生产级 OCR 引擎实例
 
@@ -397,11 +403,11 @@ def create_production_ocr_engine() -> ProductionPaddleOcrEngine:
     verify_checksums = os.getenv("SCENARA_OCR_VERIFY_CHECKSUMS", "true").lower() in ("true", "1", "yes")
     use_gpu = os.getenv("SCENARA_OCR_USE_GPU", "true").lower() in ("true", "1", "yes")
 
-    return ProductionPaddleOcrEngine(
+    return ReferencePaddleOcrEngine(
         verify_checksums=verify_checksums,
         model_dir=model_dir,
         use_gpu=use_gpu,
     )
 
 
-__all__ = ["ProductionPaddleOcrEngine", "create_production_ocr_engine"]
+__all__ = ["ReferencePaddleOcrEngine", "create_reference_ocr_engine"]

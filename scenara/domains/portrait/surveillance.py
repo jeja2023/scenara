@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import time
 from datetime import UTC, datetime
 from typing import Any, Literal, Protocol
@@ -48,6 +49,8 @@ from scenara.platform.surveillance import (
     WatchlistPage,
 )
 
+
+logger = logging.getLogger(__name__)
 
 class StreamRunPort(Protocol):
     async def create_run(
@@ -439,6 +442,13 @@ class SurveillanceService:
                 try:
                     await self._runs.cancel_stream_session(context, binding.stream_session_id)
                 except Exception:
+                    # 取消失败意味着流会话可能仍在消耗 GPU 与带宽，必须可见。
+                    logger.warning(
+                        "布控绑定 %s 的流会话 %s 取消失败",
+                        binding.binding_id,
+                        binding.stream_session_id,
+                        exc_info=True,
+                    )
                     continue
 
     async def _reconcile_task(self, context: PrincipalContext, task: SurveillanceTask, *, moment: float | None = None) -> SurveillanceTask:

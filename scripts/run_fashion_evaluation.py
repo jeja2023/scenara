@@ -19,7 +19,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from scenara.domains.fashion.evaluation import FashionEvaluator, load_evaluation_dataset  # noqa: E402
-from scenara.domains.fashion.production import ProductionFashionEngine  # noqa: E402
+from scenara.domains.fashion.reference_adapter import ReferenceFashionEngine  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -77,7 +77,7 @@ def main() -> None:
     # 初始化服饰识别引擎
     logger.info("Initializing fashion recognition engine...")
     try:
-        engine = ProductionFashionEngine(
+        engine = ReferenceFashionEngine(
             model_dir=str(args.model_dir) if args.model_dir else None,
             use_gpu=not args.no_gpu,
             verify_checksums=not args.skip_checksum,

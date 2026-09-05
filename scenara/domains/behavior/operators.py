@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from collections import defaultdict
 from typing import Any, Protocol
@@ -51,6 +52,21 @@ ACTION_LABELS_ZH: dict[str, str] = {
     "talking": "交谈",
     "activity": "活动",
 }
+
+
+logger = logging.getLogger(__name__)
+
+
+_warned_fallbacks: set[str] = set()
+
+
+def _warn_detector_fallback(reason: str) -> None:
+    """降级只在首次发生时告警：静默降级会让运维把降级结果当成正常识别结果。"""
+
+    if reason in _warned_fallbacks:
+        return
+    _warned_fallbacks.add(reason)
+    logger.warning("%s", reason, exc_info=True)
 
 
 class BehaviorEngine(Protocol):
@@ -201,7 +217,7 @@ class ProductionBehaviorEngine:
                 )
                 return [frame.get("persons", []) for frame in chunk_frames]
         except Exception:
-            pass
+            _warn_detector_fallback("人体检测运行时不可用，行为解析退化为运动区域检测")
 
         # 备选：当检测运行时不可用时，使用 OpenCV 运动/轮廓检测
         return [

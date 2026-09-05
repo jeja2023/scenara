@@ -1,3 +1,15 @@
-# Install with the matching PaddlePaddle GPU runtime for the deployment CUDA version.
-# Model weights must be supplied through the approved offline model-asset process.
-paddleocr>=3.0.0,<4.0.0
+# OCR 领域的可选推理运行时，不进入 requirements/production.lock。
+#
+# 版本锁在 PaddleOCR 2.x：scenara/domains/ocr/operators.py 的 PaddleOcrEngine 使用
+# use_angle_cls / show_log / det_model_dir 构造参数与 ocr(img, cls=True) 调用形式，
+# 这些在 PaddleOCR 3.x 已被移除，升级前必须先改适配层。
+#
+# 下面两个版本是 PyPI 上实际可得、且能在 Python 3.12 / x86_64-manylinux_2_28 上解析
+# 的组合（已用 uv pip compile 验证）。注意 PyPI 只发布到 paddlepaddle-gpu 2.6.2，
+# 对应 CUDA 11.8 构建；若部署使用其他 CUDA 版本，改从 Paddle 官方索引安装匹配的构建：
+#
+#   pip install paddlepaddle-gpu==<版本> -i https://www.paddlepaddle.org.cn/packages/stable/cu126/
+#
+# 模型权重仍须走经批准的离线模型资产流程提供。
+paddlepaddle-gpu==2.6.2
+paddleocr==2.9.1

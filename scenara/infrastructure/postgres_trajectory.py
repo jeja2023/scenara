@@ -6,6 +6,8 @@ from scenara.domains.portrait.trajectory import (
     CameraRecord,
     CameraTransition,
     LongTermIdentity,
+    ReachabilityObservation,
+    ReachabilityProbe,
     TrajectorySegment,
 )
 
@@ -21,6 +23,23 @@ def _window_clauses(
     if until is not None:
         clauses.append("first_seen_at <= to_timestamp(%s)")
         params.append(until)
+
+
+_IDENTITY_SCOPE = (
+    "WHERE tenant_id = %s AND project_id = %s AND identity_id = %s AND camera_id <> ''"
+)
+
+
+def _observation(row: Any) -> ReachabilityObservation | None:
+    """把邻近观测的查询行转成可达性判定所需的最小结构。"""
+
+    if row is None:
+        return None
+    return ReachabilityObservation(
+        camera_id=str(row[0]),
+        first_seen_at=float(row[1]),
+        last_seen_at=float(row[2]),
+    )
 
 
 class PostgresTrajectoryRepository:
@@ -202,6 +221,54 @@ class PostgresTrajectoryRepository:
                 (tenant_id, project_id, identity_id),
             )
         return int(cursor.rowcount)
+
+    async def probe_reachability(
+        self,
+        tenant_id: str,
+        project_id: str,
+        *,
+        identity_id: str,
+        camera_id: str,
+        window: tuple[float, float],
+    ) -> ReachabilityProbe:
+        """只取窗口前后紧邻的各一条观测，把邻域检索下推到数据库。
+
+        取邻居而不是整段历史，既让判定语义正确，也让代价与身份的历史长度无关。
+        严格不等号与 `_windows_overlap` 的闭区间相交互补：边界相等即视为重叠，
+        交由重叠分支处理，不会同时落进前驱或后继。
+        """
+
+        scope = (tenant_id, project_id, identity_id)
+        columns = "camera_id, extract(epoch FROM first_seen_at), extract(epoch FROM last_seen_at)"
+        async with self._pool.connection() as conn:
+            overlap_cursor = await conn.execute(
+                f"""SELECT 1 FROM scenara_trajectory_segments {_IDENTITY_SCOPE}
+                      AND camera_id <> %s
+                      AND last_seen_at >= to_timestamp(%s)
+                      AND first_seen_at <= to_timestamp(%s)
+                    LIMIT 1""",
+                (*scope, camera_id, window[0], window[1]),
+            )
+            if await overlap_cursor.fetchone() is not None:
+                return ReachabilityProbe(overlapping=True)
+            previous_cursor = await conn.execute(
+                f"""SELECT {columns} FROM scenara_trajectory_segments {_IDENTITY_SCOPE}
+                      AND last_seen_at < to_timestamp(%s)
+                    ORDER BY last_seen_at DESC LIMIT 1""",
+                (*scope, window[0]),
+            )
+            previous_row = await previous_cursor.fetchone()
+            following_cursor = await conn.execute(
+                f"""SELECT {columns} FROM scenara_trajectory_segments {_IDENTITY_SCOPE}
+                      AND first_seen_at > to_timestamp(%s)
+                    ORDER BY first_seen_at ASC LIMIT 1""",
+                (*scope, window[1]),
+            )
+            following_row = await following_cursor.fetchone()
+        return ReachabilityProbe(
+            previous=_observation(previous_row),
+            following=_observation(following_row),
+        )
 
     async def put_camera(self, camera: CameraRecord) -> None:
         from psycopg.types.json import Jsonb

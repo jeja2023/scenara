@@ -20,7 +20,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from scenara.domains.behavior.evaluation import BehaviorEvaluator, load_evaluation_dataset  # noqa: E402
-from scenara.domains.behavior.paddle_production import ProductionPaddleVideoBehaviorEngine  # noqa: E402
+from scenara.domains.behavior.paddle_reference_adapter import ReferencePaddleVideoBehaviorEngine  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -85,7 +85,7 @@ def main() -> None:
     # 初始化行为识别引擎
     logger.info("Initializing behavior recognition engine...")
     try:
-        engine = ProductionPaddleVideoBehaviorEngine(
+        engine = ReferencePaddleVideoBehaviorEngine(
             model_name=args.model_name,
             model_dir=str(args.model_dir) if args.model_dir else None,
             use_gpu=not args.no_gpu,

@@ -8,17 +8,18 @@
 
 ### 1. 生产级 OCR 引擎 ✅
 
-**文件**: `scenara/domains/ocr/paddle_production.py`
+**文件**: `scenara/domains/ocr/paddle_reference_adapter.py`
 
 - ✅ 生产就绪标记 `production_ready = True`
 - ✅ 模型权重 SHA-256 校验机制
 - ✅ 支持离线模型目录配置
-- ✅ 工厂函数 `create_production_ocr_engine()`
+- ✅ 工厂函数 `create_reference_ocr_engine()`
 - ✅ 完整的版本信息和模型来源追踪
 
 **配置**:
 ```bash
-SCENARA_OCR_ENGINE_FACTORY=scenara.domains.ocr.paddle_production:create_production_ocr_engine
+# 注意：参考适配器声明 production_ready = False，工厂与生产配置校验都会拒绝它，仅用于本地打通链路。
+SCENARA_OCR_ENGINE_FACTORY=scenara.domains.ocr.paddle_reference_adapter:create_reference_ocr_engine
 SCENARA_OCR_MODEL_DIR=           # 离线模型目录(可选)
 SCENARA_OCR_VERIFY_CHECKSUMS=false  # 是否验证模型权重
 SCENARA_OCR_USE_GPU=true         # 是否使用 GPU
@@ -141,7 +142,8 @@ pdfplumber==0.11.5
 **.env** 更新:
 ```bash
 # 使用生产级 OCR 引擎
-SCENARA_OCR_ENGINE_FACTORY=scenara.domains.ocr.paddle_production:create_production_ocr_engine
+# 注意：参考适配器声明 production_ready = False，工厂与生产配置校验都会拒绝它，仅用于本地打通链路。
+SCENARA_OCR_ENGINE_FACTORY=scenara.domains.ocr.paddle_reference_adapter:create_reference_ocr_engine
 
 # OCR 模型配置
 SCENARA_OCR_MODEL_DIR=           # 离线模型目录
@@ -250,7 +252,8 @@ pip install paddlepaddle-gpu==3.0.0 paddleocr==2.9.2 pdfplumber==0.11.5
 
 2. 更新 .env:
 ```bash
-SCENARA_OCR_ENGINE_FACTORY=scenara.domains.ocr.paddle_production:create_production_ocr_engine
+# 注意：参考适配器声明 production_ready = False，工厂与生产配置校验都会拒绝它，仅用于本地打通链路。
+SCENARA_OCR_ENGINE_FACTORY=scenara.domains.ocr.paddle_reference_adapter:create_reference_ocr_engine
 ```
 
 3. 重启服务:

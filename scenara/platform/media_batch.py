@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import contextlib
 import math
 import os
@@ -17,6 +18,8 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from scenara.platform.models import MediaKind, MediaTechnicalMetadata, SampleStrategy
 from scenara.platform.pipeline import ExecutionContext, ExecutionControl, OperatorDefinition, PipelineError
+
+logger = logging.getLogger(__name__)
 
 MAX_PIXELS = 80_000_000
 SCENE_CHANGE_HISTOGRAM_BINS = 32
@@ -672,7 +675,6 @@ def _decode_pdf(
         if extract_native_text:
             try:
                 import pdfplumber
-
                 with pdfplumber.open(BytesIO(data)) as pdf:
                     for page_num in range(page_count):
                         if page_num >= len(pdf.pages):
@@ -683,8 +685,10 @@ def _decode_pdf(
                             native_text_by_page[page_num] = text.strip()
                             native_text_available = True
             except Exception:
-                # 如果原生文本提取失败,静默回退到 OCR
-                pass
+                # 原生文本提取是可选增强：扫描版 PDF 本就没有文本层，缺少
+                # pdfplumber 时也会走到这里。回退到 OCR 是正常路径，用 debug
+                # 记录以便排查“为什么这份 PDF 走了 OCR”。
+                logger.debug("PDF 原生文本提取不可用，回退到 OCR", exc_info=True)
 
         units: list[DecodedMediaUnit] = []
         page_indexes = range(min(page_count, 1)) if preview_only else range(page_count)

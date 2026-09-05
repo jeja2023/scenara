@@ -19,7 +19,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from scenara.domains.ocr.evaluation import OcrEvaluator, load_evaluation_dataset  # noqa: E402
-from scenara.domains.ocr.paddle_production import ProductionPaddleOcrEngine  # noqa: E402
+from scenara.domains.ocr.paddle_reference_adapter import ReferencePaddleOcrEngine  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -77,7 +77,7 @@ def main() -> None:
     # 初始化 OCR 引擎
     logger.info("Initializing OCR engine...")
     try:
-        engine = ProductionPaddleOcrEngine(
+        engine = ReferencePaddleOcrEngine(
             model_dir=str(args.model_dir) if args.model_dir else None,
             use_gpu=not args.no_gpu,
             verify_checksums=not args.skip_checksum,

@@ -1,10 +1,11 @@
-"""
-基于 PaddleVideo 的生产级行为识别引擎
+"""基于 PaddleVideo 的行为识别参考适配器（非生产实现）。
 
-支持多种行为识别模型:
-- PP-TSM: 高效的时序偏移模块
-- PP-TSN: 时序分段网络
-- SlowFast: 双路径慢速和快速网络
+本模块给出接入 PaddleVideo 系模型（PP-TSM、PP-TSN、SlowFast）所需的配置形状、
+预处理与后处理流程，供对接方照此实现自己的适配器。它自身不携带权重：没有模型
+时退化为帧差启发式，最差情况下返回与输入无关的合成动作。
+
+因此本类声明 `production_ready = False`，
+`scenara.domains.behavior.factory.load_behavior_engine` 会拒绝加载它。
 """
 
 from __future__ import annotations
@@ -22,7 +23,8 @@ from scenara.platform.pipeline import DomainUnavailable
 
 logger = logging.getLogger(__name__)
 
-# 模型权重 SHA-256 校验和(生产环境应验证这些值)
+# 占位摘要：本模块不携带权重，这里只演示校验表的结构。接入方必须整表替换为自己
+# 权重的真实 SHA-256；保持占位值会让 _verify_model_checksums 拒绝任何权重文件。
 MODEL_CHECKSUMS = {
     "pptsm": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
     "pptsn": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
@@ -68,19 +70,17 @@ ACTION_LABELS_ZH = {
 }
 
 
-class ProductionPaddleVideoBehaviorEngine:
-    """
-    生产级 PaddleVideo 行为识别引擎
+class ReferencePaddleVideoBehaviorEngine:
+    """PaddleVideo 行为识别接口的参考实现，不具备识别能力。
 
-    特性:
-    - 完整的动作识别(PP-TSM/PP-TSN/SlowFast)
-    - 时序建模和分割
-    - 异常行为检测
-    - 多类别支持
-    - 模型权重校验
+    提供的是接口形状与配置骨架：
+    - PP-TSM / PP-TSN / SlowFast 的模型配置与预处理
+    - 时序切分与异常统计的调用位置
+    - Kinetics-400 类别词表与权重摘要校验流程
+    没有模型时退化为帧差启发式，最差情况下返回与输入无关的合成动作。
     """
 
-    model_id = "paddlevideo-production"
+    model_id = "paddlevideo-reference-adapter"
     production_ready = False
     qualification_status = "unqualified_reference_adapter"
     version = "2.5.0"
@@ -149,6 +149,8 @@ class ProductionPaddleVideoBehaviorEngine:
             logger.warning(f"Failed to build PaddleVideo model; adapter remains unqualified: {exc}")
             self._model = None
 
+        self._warned = False
+
         # 行为类别
         self.action_classes = KINETICS_400_CLASSES[:num_classes]
 
@@ -206,10 +208,16 @@ class ProductionPaddleVideoBehaviorEngine:
             }
 
     def _verify_model_checksums(self) -> None:
-        """验证模型权重文件的 SHA-256 校验和"""
+        """校验权重文件摘要；不匹配即拒绝加载。
+
+        模型资产政策要求生产配置拒绝未校验摘要，所以这里不能只记一条警告就继续：
+        摘要不符意味着权重来源不明，必须让加载失败。
+        """
+
         if not self._model_dir or not self._model_dir.exists():
-            logger.warning("Model directory not found, skipping checksum verification")
-            return
+            raise DomainUnavailable(
+                f"model directory does not exist: {self._model_dir}"
+            )
 
         expected_checksum = MODEL_CHECKSUMS.get(self._model_name)
         if not expected_checksum:
@@ -370,7 +378,13 @@ class ProductionPaddleVideoBehaviorEngine:
             except Exception:
                 pass
 
-        # 完全随机回退
+        # 帧差也无法计算时的最后兜底：结果与输入无关，必须让运维看到。
+        if not self._warned:
+            self._warned = True
+            logger.warning(
+                "%s 正在返回与输入无关的合成动作（无模型且帧差不可用），不得用于任何判定",
+                self.model_id,
+            )
         common_actions = ["walking", "standing", "sitting"]
         action = random.choice(common_actions)
         return [{
@@ -425,7 +439,7 @@ class ProductionPaddleVideoBehaviorEngine:
             return []
 
 
-def create_production_behavior_engine() -> ProductionPaddleVideoBehaviorEngine:
+def create_reference_behavior_engine() -> ReferencePaddleVideoBehaviorEngine:
     """
     工厂函数,创建生产级行为识别引擎实例
 
@@ -442,7 +456,7 @@ def create_production_behavior_engine() -> ProductionPaddleVideoBehaviorEngine:
     verify_checksums = os.getenv("SCENARA_BEHAVIOR_VERIFY_CHECKSUMS", "true").lower() in ("true", "1", "yes")
     use_gpu = os.getenv("SCENARA_BEHAVIOR_USE_GPU", "true").lower() in ("true", "1", "yes")
 
-    return ProductionPaddleVideoBehaviorEngine(
+    return ReferencePaddleVideoBehaviorEngine(
         model_name=model_name,
         verify_checksums=verify_checksums,
         model_dir=model_dir,
@@ -450,4 +464,4 @@ def create_production_behavior_engine() -> ProductionPaddleVideoBehaviorEngine:
     )
 
 
-__all__ = ["ProductionPaddleVideoBehaviorEngine", "create_production_behavior_engine"]
+__all__ = ["ReferencePaddleVideoBehaviorEngine", "create_reference_behavior_engine"]

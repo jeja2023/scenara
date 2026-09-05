@@ -29,9 +29,9 @@ def test_engine_init() -> bool:
     """测试引擎初始化"""
     print("\n2. 测试引擎初始化...")
     try:
-        from scenara.domains.fashion.production import ProductionFashionEngine
+        from scenara.domains.fashion.reference_adapter import ReferenceFashionEngine
 
-        engine = ProductionFashionEngine(
+        engine = ReferenceFashionEngine(
             verify_checksums=False,
             use_gpu=False,
         )
@@ -53,13 +53,13 @@ def test_cosplay_detection() -> bool:
     print("\n3. 测试 Cosplay 识别...")
     try:
         from PIL import Image
-        from scenara.domains.fashion.production import ProductionFashionEngine
+        from scenara.domains.fashion.reference_adapter import ReferenceFashionEngine
 
         # 创建测试图像
         img = Image.new("RGB", (224, 224), color=(100, 150, 200))
 
         # 执行 Cosplay 识别
-        engine = ProductionFashionEngine(
+        engine = ReferenceFashionEngine(
             verify_checksums=False,
             use_gpu=False,
         )
@@ -85,13 +85,13 @@ def test_clothing_detection() -> bool:
     print("\n4. 测试服装风格识别...")
     try:
         from PIL import Image
-        from scenara.domains.fashion.production import ProductionFashionEngine
+        from scenara.domains.fashion.reference_adapter import ReferenceFashionEngine
 
         # 创建测试图像
         img = Image.new("RGB", (224, 224), color=(255, 200, 200))
 
         # 执行服装风格识别
-        engine = ProductionFashionEngine(
+        engine = ReferenceFashionEngine(
             verify_checksums=False,
             use_gpu=False,
         )
@@ -117,13 +117,13 @@ def test_accessory_detection() -> bool:
     print("\n5. 测试配饰识别...")
     try:
         from PIL import Image
-        from scenara.domains.fashion.production import ProductionFashionEngine
+        from scenara.domains.fashion.reference_adapter import ReferenceFashionEngine
 
         # 创建测试图像
         img = Image.new("RGB", (224, 224), color=(200, 200, 255))
 
         # 执行配饰识别
-        engine = ProductionFashionEngine(
+        engine = ReferenceFashionEngine(
             verify_checksums=False,
             use_gpu=False,
         )
@@ -148,9 +148,9 @@ def test_factory() -> bool:
     """测试工厂函数"""
     print("\n6. 测试工厂函数...")
     try:
-        from scenara.domains.fashion.production import create_production_fashion_engine
+        from scenara.domains.fashion.reference_adapter import create_reference_fashion_engine
 
-        engine = create_production_fashion_engine()
+        engine = create_reference_fashion_engine()
         print(f"   [PASS] 工厂函数创建引擎成功: {engine.model_id}")
         return True
     except Exception as e:

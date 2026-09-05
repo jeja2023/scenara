@@ -66,7 +66,7 @@ API 默认位于 `http://127.0.0.1:8000`，Console 开发服务器位于 `http:/
 
 存活探针：`GET /livez`；依赖就绪探针：`GET /readyz`；兼容探针：`GET /healthz`。经接口认证的 Prometheus 指标位于 `GET /metrics`。新公共契约统一位于 `/api/v1`，旧 Portrait Hub `/v1` 契约不属于 Scenara。
 
-生产镜像和离线轮子只使用带 SHA-256 的 `requirements/production.lock`。修改 `requirements.txt` 或 `requirements/prod-optional.txt` 后，运行 `uv pip compile requirements/production.in --python-version 3.12 --python-platform x86_64-manylinux_2_28 --generate-hashes --no-emit-index-url --output-file requirements/production.lock` 并提交锁文件。
+生产镜像和离线轮子只使用带 SHA-256 的 `requirements/production.lock`。修改 `requirements.txt` 或 `requirements/prod-optional.txt` 后，运行 `uv pip compile requirements/production.in --python-version 3.12 --python-platform x86_64-manylinux_2_28 --generate-hashes --no-emit-index-url --output-file requirements/production.lock` 并提交锁文件。领域推理运行时不进入这份锁文件：PaddleOCR 及其 PaddlePaddle GPU 运行时见 `requirements/ocr-optional.txt`，PaddleVideo、PyTorch 与 PDF 原生文本提取见 `requirements/domain-optional.txt`，按部署的 CUDA 版本单独安装。
 
 ## 仓库边界
 

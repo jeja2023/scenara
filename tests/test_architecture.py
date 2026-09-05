@@ -88,7 +88,6 @@ def test_access_view_uses_domain_tabs_and_dialog_components() -> None:
         "CredentialsTab",
         "ProductsTab",
         "EventsTab",
-        "ConnectionTab",
         "IdentityDialogs",
         "CredentialsDialogs",
         "ProductsDialog",
@@ -97,6 +96,16 @@ def test_access_view_uses_domain_tabs_and_dialog_components() -> None:
     ):
         assert f"{component}.vue" in view
         assert f"<{component}" in view
+
+
+def test_connection_settings_live_in_the_application_shell() -> None:
+    """连接设置自 0.3.0-dev.43 起由全局外壳承载，不再是接入页的一个标签。"""
+    shell = Path("frontend/console/src/App.vue").read_text(encoding="utf-8")
+    for marker in ("loadConnection", "saveConnection", 'title="连接设置"'):
+        assert marker in shell
+    for module in ("views/AccessView.vue", "views/access/config.ts", "views/access/types.ts"):
+        source = Path("frontend/console/src") / module
+        assert "ConnectionTab" not in source.read_text(encoding="utf-8")
 
 
 def test_parse_view_delegates_history_roi_and_styles() -> None:

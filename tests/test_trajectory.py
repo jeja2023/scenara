@@ -31,6 +31,7 @@ from scenara.platform.features import MemoryFeatureStore
 from scenara.platform.models import PrincipalContext
 from scenara.platform.policy import DevelopmentPolicyProvider
 from scenara.server import create_app
+from tests.trajectory_repository_contract import assert_trajectory_repository_contract
 
 CONTEXT = PrincipalContext(tenant_id="tenant", project_id="project", principal_id="test")
 
@@ -312,6 +313,89 @@ def test_camera_transition_maximum_blocks_an_implausibly_late_match() -> None:
             recording_started_at=1_120.0,
         )
         assert too_late[0].segment.identity_id != first[0].segment.identity_id
+
+    asyncio.run(scenario())
+
+
+def test_same_camera_reappearance_survives_a_distant_transition_bound() -> None:
+    """行程上限只约束相邻转移，久远的异机位历史不得否决同机位再现。"""
+
+    async def scenario() -> None:
+        service = await _service()
+        await service.set_camera_transitions(
+            CONTEXT,
+            "camera-a",
+            SetCameraTransitionsRequest(
+                transitions=[CameraTransitionEntry(to_camera_id="camera-b", min_seconds=10, max_seconds=60)]
+            ),
+        )
+        first = await service.ingest_run_tracks(
+            CONTEXT,
+            run_id="run-a",
+            tracks=[_track("trk_1", [1.0, 0.0], first_pts_ms=0, last_pts_ms=1_000)],
+            camera_id="camera-a",
+            recording_started_at=1_000.0,
+        )
+        crossed = await service.ingest_run_tracks(
+            CONTEXT,
+            run_id="run-b",
+            tracks=[_track("trk_2", [1.0, 0.0], first_pts_ms=0, last_pts_ms=1_000)],
+            camera_id="camera-b",
+            recording_started_at=1_020.0,
+        )
+        stayed = await service.ingest_run_tracks(
+            CONTEXT,
+            run_id="run-c",
+            tracks=[_track("trk_3", [1.0, 0.0], first_pts_ms=0, last_pts_ms=1_000)],
+            camera_id="camera-b",
+            recording_started_at=2_000.0,
+        )
+        identity_id = first[0].segment.identity_id
+        assert crossed[0].segment.identity_id == identity_id
+        assert stayed[0].segment.identity_id == identity_id
+        assert stayed[0].segment.match_method == "reid"
+
+    asyncio.run(scenario())
+
+
+def test_camera_transition_bound_applies_to_a_later_observation_ingested_first() -> None:
+    """乱序摄取时，紧邻的后继观测同样要参与可达性判定。"""
+
+    async def scenario() -> None:
+        service = await _service()
+        await service.set_camera_transitions(
+            CONTEXT,
+            "camera-b",
+            SetCameraTransitionsRequest(
+                transitions=[CameraTransitionEntry(to_camera_id="camera-a", min_seconds=10, max_seconds=60)]
+            ),
+        )
+        later = await service.ingest_run_tracks(
+            CONTEXT,
+            run_id="run-late",
+            tracks=[_track("trk_1", [1.0, 0.0], first_pts_ms=0, last_pts_ms=1_000)],
+            camera_id="camera-a",
+            recording_started_at=5_000.0,
+        )
+        earlier = await service.ingest_run_tracks(
+            CONTEXT,
+            run_id="run-early",
+            tracks=[_track("trk_2", [1.0, 0.0], first_pts_ms=0, last_pts_ms=1_000)],
+            camera_id="camera-b",
+            recording_started_at=1_000.0,
+        )
+        assert earlier[0].segment.identity_id != later[0].segment.identity_id
+
+    asyncio.run(scenario())
+
+
+def test_memory_trajectory_repository_satisfies_the_shared_contract() -> None:
+    """内存实现与 PostgreSQL 实现共用同一套仓储契约。"""
+
+    async def scenario() -> None:
+        await assert_trajectory_repository_contract(
+            MemoryTrajectoryRepository(), tenant_id="tenant", project_id="project"
+        )
 
     asyncio.run(scenario())
 

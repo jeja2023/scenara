@@ -1,0 +1,22 @@
+# 行为、服饰领域参考适配器与 PDF 原生文本提取的可选依赖，不进入生产镜像。
+#
+# 这些包只服务于非生产的参考适配器和评估脚本，因此不列入 requirements.txt，也不
+# 编译进 requirements/production.lock。需要时在目标环境单独安装：
+#
+#   python -m pip install -r requirements/domain-optional.txt
+#
+# 注意 torch 会一并拉入 nvidia-cuda-* 运行时，安装体积在 GB 级；生产部署改用经批准
+# 的外部模型工厂（SCENARA_*_ENGINE_FACTORY=approved_models.*），由该包自行声明推理
+# 运行时依赖。
+#
+# PaddleVideo 未在 PyPI 发布可用版本（只有 0.0.1 占位包），必须从源码安装，因此不
+# 写成可解析的依赖行，避免整份清单无法安装。行为领域参考适配器需要它时执行：
+#
+#   pip install "paddlevideo @ git+https://github.com/PaddlePaddle/PaddleVideo.git@v2.5.0"
+#
+# 它还依赖 requirements/ocr-optional.txt 里的 paddlepaddle-gpu 运行时。
+
+# scenara/domains/fashion/reference_adapter.py
+torch>=2.0.0,<3.0.0
+# scenara/platform/media_batch.py 的 PDF 原生文本层提取；缺失时自动回退到 OCR
+pdfplumber==0.11.5

@@ -32,6 +32,8 @@ class MemorySurveillanceRepository(SurveillanceRepository):
         self._alerts: dict[tuple[str, str, str], AlertRecord] = {}
         self._events: dict[tuple[str, str], list[AlertEvent]] = defaultdict(list)
         self._debounce: dict[tuple[str, str, str], object] = {}
+        # 对齐 scenara_surveillance_alerts 的 UNIQUE (tenant_id, project_id, idempotency_key)。
+        self._idempotency: dict[tuple[str, str, str], str] = {}
 
     @staticmethod
     def _key(tenant_id: str, project_id: str, identifier: str) -> tuple[str, str, str]:
@@ -233,11 +235,15 @@ class MemorySurveillanceRepository(SurveillanceRepository):
                         )
                         return AlertWriteResult(alert=updated, emitted=False)
 
+            idempotency_key = self._key(alert.tenant_id, alert.project_id, alert.idempotency_key)
+            duplicate_id = self._idempotency.get(idempotency_key)
+            if duplicate_id is not None:
+                duplicate = self._alerts.get(self._key(alert.tenant_id, alert.project_id, duplicate_id))
+                if duplicate is not None:
+                    return AlertWriteResult(alert=duplicate.model_copy(deep=True), emitted=False)
             alert_key = self._key(alert.tenant_id, alert.project_id, alert.alert_id)
-            existing = self._alerts.get(alert_key)
-            if existing is not None:
-                return AlertWriteResult(alert=existing.model_copy(deep=True), emitted=False)
             self._alerts[alert_key] = alert.model_copy(deep=True)
+            self._idempotency[idempotency_key] = alert.alert_id
             event_key = (alert.tenant_id, alert.project_id)
             event = candidate.event.model_copy(update={"event_cursor": len(self._events[event_key]) + 1}, deep=True)
             self._events[event_key].append(event)
