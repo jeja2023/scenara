@@ -366,6 +366,7 @@ def build_runtime(
         data = HttpDataPlatformClient(
             settings.data_platform_url,
             service_token=settings.data_platform_service_token,
+            context_signing_key=settings.data_context_signing_key,
             timeout_seconds=settings.data_platform_timeout_seconds,
             max_retries=settings.data_platform_max_retries,
             source_assets=state,

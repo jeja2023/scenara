@@ -350,8 +350,8 @@ const productGateLabels: Record<string, string> = {
 
 const repositoryLabels: Record<string, string> = {
   scenara: "Scenara 平台集成仓库",
-  "scenara-model": "Scenara Model 专业仓库",
-  "scenara-data": "Scenara Data 专业仓库",
+  "scenara-model": "scenara model 专业仓库",
+  "scenara-data": "scenara data 专业仓库",
 };
 
 const repositorySummaryLabels: Record<string, string> = {

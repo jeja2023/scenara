@@ -2,7 +2,7 @@
 
 升级、恢复式回滚、运行探针、指标和告警基线见 [运维基线.md](运维基线.md)；上线逐项验收见 [上线逐项验收清单.md](上线逐项验收清单.md)。
 
-支持的 1.0 目标系统为 Ubuntu x86_64，配备 Docker Engine、Docker Compose v2 和一个或多个可测量的 NVIDIA GPU。PostgreSQL/pgvector、Redis 和 MinIO 属于生产 Compose 拓扑的一部分。数据服务镜像通过清单摘要固定。Python 生产依赖项仅从 `requirements/production.lock` 安装，并经过 SHA-256 校验。
+支持的 1.0 目标系统为 Ubuntu x86_64，配备 Docker Engine、Docker Compose v2 和一个或多个可测量的 NVIDIA GPU。PostgreSQL/pgvector、Redis 和 MinIO 由 [shared-infra](shared-infra/README.md) 单独提供；Core、Data、Model 各自独立部署并加入同一个平台网络。数据服务镜像通过清单摘要固定。Python 生产依赖项仅从 `requirements/production.lock` 安装，并经过 SHA-256 校验。
 
 ## 配置
 
@@ -13,7 +13,7 @@
 
 校验器不会打印机密值。在 Linux 上，它会拒绝具有组/全局可读权限的环境文件、跨信任边界复用的机密、过短的凭证、无效的 Fernet 密钥、通配符 Host/代理信任、未经认证的内置适配器、可变的镜像引用以及非 TLS 的 Data URL（除非显式允许隔离的内部 HTTP）。
 
-默认的 `deploy/compose.yml` 为个人部署配置文件。它使用本地策略提供者，不需要、不读取也不挂载企业许可证。签名企业策略实现作为可选扩展提供。要启用它，请将 `SCENARA_ENTERPRISE_LICENSE_FILE` 和 `SCENARA_ENTERPRISE_PUBLIC_KEY_FILE` 设置为可读文件，并在每个 Compose 命令中添加 `-f deploy/compose.enterprise.yml`。
+默认的 `deploy/compose.yml` 为 Core 应用编排，不再启动 PostgreSQL、Redis 或 MinIO；启动前必须先启动 `deploy/shared-infra/compose.yml`。它使用本地策略提供者，不需要、不读取也不挂载企业许可证。签名企业策略实现作为可选扩展提供。要启用它，请将 `SCENARA_ENTERPRISE_LICENSE_FILE` 和 `SCENARA_ENTERPRISE_PUBLIC_KEY_FILE` 设置为可读文件，并在每个 Compose 命令中添加 `-f deploy/compose.enterprise.yml`。
 
 每个 GPU worker 只请求一张 GPU，避免批处理和实时任务默认同时占用所有显卡。Compose 运行时负责容器级 GPU 隔离；仅在完成容量验证后，才通过 `SCENARA_BATCH_GPU_DEVICE_IDS` 与 `SCENARA_STREAM_GPU_DEVICE_IDS` 固定应用内模型缓存的设备选择。传统推理适配器从容器可见的 CUDA 设备节点或 `nvidia-smi` 发现设备。
 
@@ -29,6 +29,9 @@ PostgreSQL 连接池默认每进程 `1..4` 条连接。调整 API/worker 副本�
 
 在 CI 中构建并推送发布镜像，将其摘要记录在 `SCENARA_IMAGE_REFERENCE` 中，然后在 TLS 反向代理后启动。请勿对固定摘要的生产引用使用 `--build`。默认的主机绑定为 `127.0.0.1:8000`；直接非回环 HTTP 访问需要显式的不安全覆盖配置：
 
+    docker compose --env-file /secure/scenara-infra.env -f deploy/shared-infra/compose.yml up -d --wait
+    docker compose --env-file /secure/scenara-infra.env -f deploy/shared-infra/compose.yml run --rm postgres-init
+    docker compose --env-file /secure/scenara-infra.env -f deploy/shared-infra/compose.yml run --rm minio-init
     docker compose --env-file /secure/scenara.env -f deploy/compose.yml pull
     docker compose --env-file /secure/scenara.env -f deploy/compose.yml run --rm preflight
     docker compose --env-file /secure/scenara.env -f deploy/compose.yml run --rm migrate
@@ -59,10 +62,10 @@ API、批处理 worker、流式 worker 和调度器共享同一个版本化镜�
       SCENARA_MODEL_BUNDLE_DIR=/secure/qualified-model-packages \
       deploy/scripts/build-offline-bundle.sh /srv/scenara-release
 
-通过项目的受控渠道传输生成的 tar 压缩包，解压后在目标机器上安装：
+通过项目的受控渠道传输生成的 tar 压缩包。目标机器必须先启动 [shared-infra](shared-infra/README.md)，再解压并安装 Core 应用：
 
     deploy/scripts/install-offline.sh \
-      /srv/scenara-offline-0.3.0-dev.43 \
+      /srv/scenara-offline-0.3.0-dev.44 \
       /secure/scenara.env \
       /secure/offline-installer-result.json
 
@@ -77,11 +80,13 @@ API、批处理 worker、流式 worker 和调度器共享同一个版本化镜�
 创建并验证 PostgreSQL 与 MinIO 备份：
 
     SCENARA_COMPOSE_ENV_FILE=/secure/scenara.env \
+      SCENARA_INFRA_COMPOSE_ENV_FILE=/secure/scenara-infra.env \
       deploy/scripts/backup.sh /srv/backups/scenara-2026-07-29
 
 恢复操作具有破坏性，需要显式确认：
 
     SCENARA_COMPOSE_ENV_FILE=/secure/scenara.env \
+      SCENARA_INFRA_COMPOSE_ENV_FILE=/secure/scenara-infra.env \
       deploy/scripts/restore.sh /srv/backups/scenara-2026-07-29 --confirm
 
 Redis 被显式排除在备份之外，因为它是投递、租约和短期事件服务，而非记录系统。PostgreSQL 和 MinIO 在 worker 重启前恢复。

@@ -1,13 +1,98 @@
 services:
   postgres:
+    image: pgvector/pgvector@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
+    environment:
+      POSTGRES_DB: scenara
+      POSTGRES_USER: scenara
+      POSTGRES_PASSWORD: ${SCENARA_POSTGRES_PASSWORD:?set SCENARA_POSTGRES_PASSWORD}
+    volumes:
+      - integration-postgres-data:/var/lib/postgresql/data
+    networks: [backend]
     ports:
       - "127.0.0.1:${SCENARA_INTEGRATION_POSTGRES_PORT:-55432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scenara -d scenara"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   redis:
+    image: redis@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+    environment:
+      REDISCLI_AUTH: ${SCENARA_REDIS_PASSWORD:?set SCENARA_REDIS_PASSWORD}
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--requirepass", "${SCENARA_REDIS_PASSWORD:?set SCENARA_REDIS_PASSWORD}"]
+    volumes:
+      - integration-redis-data:/data
+    networks: [backend]
     ports:
       - "127.0.0.1:${SCENARA_INTEGRATION_REDIS_PORT:-56379}:6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDISCLI_AUTH\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
   minio:
+    image: minio/minio@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0
+    environment:
+      MINIO_ROOT_USER: ${SCENARA_MINIO_ROOT_USER:?set SCENARA_MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${SCENARA_MINIO_ROOT_PASSWORD:?set SCENARA_MINIO_ROOT_PASSWORD}
+    command: ["server", "/data", "--console-address", ":9001"]
+    volumes:
+      - integration-minio-data:/data
+    networks: [backend]
     ports:
       - "127.0.0.1:${SCENARA_INTEGRATION_MINIO_PORT:-59000}:9000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio-init:
+    image: minio/mc@sha256:fb8f773eac8ef9d6da0486d5dec2f42f219358bcb8de579d1623d518c9ebd4cc
+    environment:
+      ROOT_USER: ${SCENARA_MINIO_ROOT_USER:?set SCENARA_MINIO_ROOT_USER}
+      ROOT_PASSWORD: ${SCENARA_MINIO_ROOT_PASSWORD:?set SCENARA_MINIO_ROOT_PASSWORD}
+      ACCESS_KEY: ${SCENARA_S3_ACCESS_KEY:-scenara}
+      SECRET_KEY: ${SCENARA_S3_SECRET_KEY:?set SCENARA_S3_SECRET_KEY}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - >-
+        mc alias set local http://minio:9000 "$${ROOT_USER}" "$${ROOT_PASSWORD}" &&
+        mc mb --ignore-existing local/scenara &&
+        mc version enable local/scenara &&
+        (mc admin user info local "$${ACCESS_KEY}" >/dev/null 2>&1 ||
+          mc admin user add local "$${ACCESS_KEY}" "$${SECRET_KEY}")
+    networks: [backend]
+    depends_on:
+      minio:
+        condition: service_healthy
+
+  scenara-data:
+    build:
+      context: ${SCENARA_DATA_BUILD_CONTEXT:-../../scenara-data}
+      dockerfile: deploy/Dockerfile
+    environment:
+      SCENARA_DATA_RUNTIME_MODE: memory
+      SCENARA_DATA_TRUSTED_SERVICE_TOKEN: ${SCENARA_DATA_PLATFORM_SERVICE_TOKEN:?set SCENARA_DATA_PLATFORM_SERVICE_TOKEN}
+      SCENARA_DATA_REQUEST_CONTEXT_SIGNING_KEY: ${SCENARA_DATA_CONTEXT_SIGNING_KEY:?set SCENARA_DATA_CONTEXT_SIGNING_KEY}
+      SCENARA_DATA_REQUIRE_SIGNED_REQUEST_CONTEXT: "true"
+      SCENARA_DATA_CONSOLE_LOGIN_ENABLED: "false"
+    expose:
+      - "8081"
+    ports:
+      - "127.0.0.1:58081:8081"
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/readyz', timeout=3)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  integration-postgres-data:
+  integration-redis-data:
+  integration-minio-data:
 

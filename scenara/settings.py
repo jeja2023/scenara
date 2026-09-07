@@ -134,6 +134,8 @@ class Settings:
     trajectory_max_templates: int
     trajectory_default_transition_seconds: float
     surveillance_alert_snapshot_retention_days: int
+    # Core -> specialist service delegated identity context signature.
+    data_context_signing_key: str = ""
 
     @property
     def production(self) -> bool:
@@ -193,6 +195,8 @@ class Settings:
             errors.append("SCENARA_DATA_PLATFORM_SERVICE_TOKEN is required")
         if not self.data_event_service_token:
             errors.append("SCENARA_DATA_EVENT_SERVICE_TOKEN is required")
+        if not self.data_context_signing_key:
+            errors.append("SCENARA_DATA_CONTEXT_SIGNING_KEY is required")
         if not self.postgres_dsn:
             errors.append("SCENARA_POSTGRES_DSN is required")
         if not self.redis_url:
@@ -209,6 +213,13 @@ class Settings:
             errors.append("SCENARA_DATA_EVENT_SERVICE_TOKEN must contain at least 24 characters")
         if self.data_platform_service_token == self.data_event_service_token:
             errors.append("Data request and event service tokens must be different")
+        if self.data_context_signing_key and len(self.data_context_signing_key) < 32:
+            errors.append("SCENARA_DATA_CONTEXT_SIGNING_KEY must contain at least 32 characters")
+        if self.data_context_signing_key in {
+            self.data_platform_service_token,
+            self.data_event_service_token,
+        }:
+            errors.append("Data context signing key must be different from Data service tokens")
         if not self.production_models_required:
             errors.append("SCENARA_PRODUCTION_MODELS_REQUIRED must be true")
         if self.production_models_required and not self.ocr_engine_factory:
@@ -348,6 +359,7 @@ def load_settings() -> Settings:
             1,
             min(3650, int(os.getenv("SCENARA_SURVEILLANCE_ALERT_SNAPSHOT_RETENTION_DAYS", "30"))),
         ),
+        data_context_signing_key=_secret("SCENARA_DATA_CONTEXT_SIGNING_KEY"),
     )
     settings.validate()
     return settings

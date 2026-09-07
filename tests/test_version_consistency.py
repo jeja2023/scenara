@@ -58,8 +58,11 @@ def test_release_version_is_consistent_for_all_container_entrypoints() -> None:
 
     data_compose = yaml.safe_load((ROOT / "deploy/compose.data.yml").read_text(encoding="utf-8"))
     data_service = data_compose["services"]["data"]
+    assert data_service["profiles"] == ["legacy"]
     assert data_service["image"] == f"scenara-data:${{SCENARA_DATA_IMAGE_TAG:-{npm_version}}}"
     assert set(data_service["environment"]) >= {"SCENARA_DATA_PLATFORM_SERVICE_TOKEN"}
+    core_compose = yaml.safe_load((ROOT / "deploy/compose.yml").read_text(encoding="utf-8"))
+    assert "SCENARA_DATA_CONTEXT_SIGNING_KEY" in core_compose["x-scenara-environment"]
 
     kustomization = yaml.safe_load((ROOT / "deploy/kubernetes/kustomization.yaml").read_text(encoding="utf-8"))
     assert kustomization["images"] == [{"name": "scenara-api", "newTag": npm_version}]

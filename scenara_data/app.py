@@ -208,7 +208,7 @@ def create_data_app(*, service_token: str = "", store: DataStore | None = None) 
         finally:
             store.close()
 
-    app = FastAPI(title="Scenara Data", version=__version__, lifespan=lifespan)
+    app = FastAPI(title="scenara data", version=__version__, lifespan=lifespan)
     app.state.data_store = store
 
     def context(request: Request, authorization: str | None, tenant: str | None, project: str | None) -> tuple[str, str, str]:

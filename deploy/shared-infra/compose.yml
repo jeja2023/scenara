@@ -1,0 +1,128 @@
+name: scenara-shared-infra
+
+# Shared test/staging infrastructure. Applications remain independently
+# deployed from the Core, Data and Model repositories and join the platform
+# network created by this project.
+services:
+  postgres:
+    image: pgvector/pgvector@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${SCENARA_INFRA_POSTGRES_ADMIN_USER:-scenara_admin}
+      POSTGRES_PASSWORD: ${SCENARA_INFRA_POSTGRES_ADMIN_PASSWORD:?set SCENARA_INFRA_POSTGRES_ADMIN_PASSWORD}
+    volumes:
+      - scenara-shared-postgres:/var/lib/postgresql/data
+    networks: [platform]
+    ports:
+      - "127.0.0.1:${SCENARA_INFRA_POSTGRES_PORT:-55432}:5432"
+    shm_size: 256m
+    pids_limit: 512
+    mem_limit: ${SCENARA_INFRA_POSTGRES_MEMORY_LIMIT:-4g}
+    cpus: ${SCENARA_INFRA_POSTGRES_CPU_LIMIT:-2.0}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    stop_grace_period: 60s
+    restart: unless-stopped
+
+  postgres-init:
+    image: pgvector/pgvector@sha256:1d533553fefe4f12e5d80c7b80622ba0c382abb5758856f52983d8789179f0fb
+    environment:
+      SCENARA_INFRA_POSTGRES_ADMIN_USER: ${SCENARA_INFRA_POSTGRES_ADMIN_USER:-scenara_admin}
+      SCENARA_INFRA_POSTGRES_ADMIN_PASSWORD: ${SCENARA_INFRA_POSTGRES_ADMIN_PASSWORD:?set SCENARA_INFRA_POSTGRES_ADMIN_PASSWORD}
+      SCENARA_CORE_DB_PASSWORD: ${SCENARA_CORE_DB_PASSWORD:?set SCENARA_CORE_DB_PASSWORD}
+      SCENARA_DATA_DB_PASSWORD: ${SCENARA_DATA_DB_PASSWORD:?set SCENARA_DATA_DB_PASSWORD}
+      SCENARA_MODEL_DB_PASSWORD: ${SCENARA_MODEL_DB_PASSWORD:?set SCENARA_MODEL_DB_PASSWORD}
+    volumes:
+      - ./scripts/init-postgres.sh:/usr/local/bin/init-postgres.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/init-postgres.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [platform]
+    restart: "no"
+
+  redis:
+    image: redis@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2
+    command:
+      [
+        "redis-server",
+        "--appendonly", "yes",
+        "--appendfsync", "everysec",
+        "--maxmemory-policy", "noeviction",
+        "--requirepass", "${SCENARA_INFRA_REDIS_PASSWORD:?set SCENARA_INFRA_REDIS_PASSWORD}"
+      ]
+    volumes:
+      - scenara-shared-redis:/data
+    networks: [platform]
+    ports:
+      - "127.0.0.1:${SCENARA_INFRA_REDIS_PORT:-56379}:6379"
+    pids_limit: 256
+    mem_limit: ${SCENARA_INFRA_REDIS_MEMORY_LIMIT:-2g}
+    cpus: ${SCENARA_INFRA_REDIS_CPU_LIMIT:-1.0}
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDISCLI_AUTH\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    environment:
+      REDISCLI_AUTH: ${SCENARA_INFRA_REDIS_PASSWORD:?set SCENARA_INFRA_REDIS_PASSWORD}
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio@sha256:d249d1fb6966de4d8ad26c04754b545205ff15a62e4fd19ebd0f26fa5baacbc0
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${SCENARA_INFRA_MINIO_ROOT_USER:?set SCENARA_INFRA_MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${SCENARA_INFRA_MINIO_ROOT_PASSWORD:?set SCENARA_INFRA_MINIO_ROOT_PASSWORD}
+    volumes:
+      - scenara-shared-minio:/data
+    networks: [platform]
+    ports:
+      - "127.0.0.1:${SCENARA_INFRA_MINIO_PORT:-59000}:9000"
+      - "127.0.0.1:${SCENARA_INFRA_MINIO_CONSOLE_PORT:-59001}:9001"
+    pids_limit: 512
+    mem_limit: ${SCENARA_INFRA_MINIO_MEMORY_LIMIT:-4g}
+    cpus: ${SCENARA_INFRA_MINIO_CPU_LIMIT:-2.0}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    stop_grace_period: 60s
+    restart: unless-stopped
+
+  minio-init:
+    image: minio/mc@sha256:fb8f773eac8ef9d6da0486d5dec2f42f219358bcb8de579d1623d518c9ebd4cc
+    environment:
+      SCENARA_INFRA_MINIO_ROOT_USER: ${SCENARA_INFRA_MINIO_ROOT_USER:?set SCENARA_INFRA_MINIO_ROOT_USER}
+      SCENARA_INFRA_MINIO_ROOT_PASSWORD: ${SCENARA_INFRA_MINIO_ROOT_PASSWORD:?set SCENARA_INFRA_MINIO_ROOT_PASSWORD}
+      SCENARA_CORE_S3_ACCESS_KEY: ${SCENARA_CORE_S3_ACCESS_KEY:-scenara-core}
+      SCENARA_CORE_S3_SECRET_KEY: ${SCENARA_CORE_S3_SECRET_KEY:?set SCENARA_CORE_S3_SECRET_KEY}
+      SCENARA_DATA_S3_ACCESS_KEY: ${SCENARA_DATA_S3_ACCESS_KEY:-scenara-data}
+      SCENARA_DATA_S3_SECRET_KEY: ${SCENARA_DATA_S3_SECRET_KEY:?set SCENARA_DATA_S3_SECRET_KEY}
+      SCENARA_MODEL_S3_ACCESS_KEY: ${SCENARA_MODEL_S3_ACCESS_KEY:-scenara-model}
+      SCENARA_MODEL_S3_SECRET_KEY: ${SCENARA_MODEL_S3_SECRET_KEY:?set SCENARA_MODEL_S3_SECRET_KEY}
+    volumes:
+      - ./scripts/init-minio.sh:/usr/local/bin/init-minio.sh:ro
+    entrypoint: ["/bin/sh", "/usr/local/bin/init-minio.sh"]
+    depends_on:
+      minio:
+        condition: service_healthy
+    networks: [platform]
+    restart: "no"
+
+volumes:
+  scenara-shared-postgres:
+  scenara-shared-redis:
+  scenara-shared-minio:
+
+networks:
+  platform:
+    name: ${SCENARA_PLATFORM_NETWORK:-scenara-platform}

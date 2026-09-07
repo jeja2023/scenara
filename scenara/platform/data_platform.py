@@ -12,6 +12,9 @@ import base64
 from collections.abc import Mapping
 from datetime import UTC, datetime
 import hashlib
+import hmac
+import json
+import time
 from typing import Any, Protocol
 
 import httpx
@@ -212,6 +215,7 @@ class HttpDataPlatformClient:
         service_token: str = "",
         timeout_seconds: float = 10.0,
         max_retries: int = 2,
+        context_signing_key: str = "",
         client: httpx.AsyncClient | None = None,
         source_assets: SourceAssetStore | None = None,
         source_bucket: str = "",
@@ -220,6 +224,7 @@ class HttpDataPlatformClient:
         self._client = client or httpx.AsyncClient(base_url=base_url.rstrip("/"), timeout=timeout_seconds)
         self._owns_client = client is None
         self._service_token = service_token
+        self._context_signing_key = context_signing_key
         self._source_assets = source_assets
         self._source_bucket = source_bucket
 
@@ -239,6 +244,23 @@ class HttpDataPlatformClient:
             "X-Trace-Id": trace_id,
             "traceparent": traceparent,
         }
+        if self._context_signing_key:
+            timestamp = int(time.time())
+            headers["X-Scenara-Context-Timestamp"] = str(timestamp)
+            headers["X-Scenara-Context-Signature"] = sign_request_context(
+                self._context_signing_key,
+                method=method,
+                path=path,
+                tenant_id=context.tenant_id,
+                project_id=context.project_id,
+                principal_id=context.principal_id,
+                principal_type="service_account",
+                scopes=tuple(context.scopes),
+                entitlements=tuple(context.product_ids),
+                request_id=headers["X-Request-Id"],
+                trace_id=trace_id,
+                timestamp=timestamp,
+            )
         if self._service_token:
             headers["Authorization"] = f"Bearer {self._service_token}"
         if method in {"POST", "PATCH", "PUT", "DELETE"}:
@@ -679,6 +701,39 @@ def _trace_context(context: PrincipalContext, method: str, path: str) -> tuple[s
     return trace_id, f"00-{trace_id}-{span_id}-01"
 
 
+def sign_request_context(
+    signing_key: str,
+    *,
+    method: str,
+    path: str,
+    tenant_id: str,
+    project_id: str,
+    principal_id: str,
+    principal_type: str,
+    scopes: tuple[str, ...],
+    entitlements: tuple[str, ...],
+    request_id: str,
+    trace_id: str,
+    timestamp: int,
+) -> str:
+    """Sign the canonical delegated identity context accepted by scenara-data."""
+    payload = {
+        "entitlements": sorted(set(entitlements)),
+        "method": method.upper(),
+        "path": path,
+        "principal_id": principal_id,
+        "principal_type": principal_type,
+        "project_id": project_id,
+        "request_id": request_id,
+        "scopes": sorted(set(scopes)),
+        "tenant_id": tenant_id,
+        "timestamp": timestamp,
+        "trace_id": trace_id,
+    }
+    encoded = json.dumps(payload, ensure_ascii=True, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hmac.new(signing_key.encode("utf-8"), encoded, hashlib.sha256).hexdigest()
+
+
 def _epoch(value: object, *, fallback: float = 0.0) -> float:
     if isinstance(value, (int, float)):
         return float(value)
@@ -697,7 +752,7 @@ def _annotation_materialization_context(context: PrincipalContext) -> PrincipalC
         update={
             "scopes": context.scopes
             | frozenset({"data.dataset.create", "data.dataset.read", "data.sample.create", "data.annotation.create"}),
-            "product_ids": context.product_ids | frozenset({"scenara-data"}),
+            "product_ids": context.product_ids | frozenset({"data"}),
         }
     )
 
@@ -720,7 +775,7 @@ def _hard_sample_intake_context(context: PrincipalContext) -> PrincipalContext:
                     "data.hard_sample.import",
                 }
             ),
-            "product_ids": context.product_ids | frozenset({"scenara-data"}),
+            "product_ids": context.product_ids | frozenset({"data"}),
         }
     )
 
@@ -867,4 +922,5 @@ __all__ = [
     "DataPlatformRemoteError",
     "HttpDataPlatformClient",
     "LocalDataPlatformAdapter",
+    "sign_request_context",
 ]

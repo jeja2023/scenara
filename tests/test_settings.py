@@ -85,6 +85,7 @@ def test_production_security_boundary_requires_strong_distinct_secrets() -> None
         allow_insecure_internal_endpoints=True,
         data_platform_service_token="example-request-token-0123456789012345",
         data_event_service_token="example-event-token-012345678901234567",
+        data_context_signing_key="example-context-signing-key-0123456789012345",
         postgres_dsn="postgresql://scenara@postgres/scenara",
         redis_url="redis://:secret@redis:6379/0",
         s3_bucket="scenara",

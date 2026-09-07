@@ -180,7 +180,7 @@ test.beforeEach(async ({ page }) => {
           },
           {
             repository_id: "scenara-model",
-            name: "Scenara Model",
+            name: "scenara model",
             kind: "specialized_product",
             lifecycle: "external_existing",
             current_repository: false,
@@ -199,7 +199,7 @@ test.beforeEach(async ({ page }) => {
           },
           {
             repository_id: "scenara-data",
-            name: "Scenara Data",
+            name: "scenara data",
             kind: "specialized_product",
             lifecycle: "external_existing",
             current_repository: false,

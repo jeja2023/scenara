@@ -22,6 +22,11 @@ test -f "$bundle_dir/SHA256SUMS"
 command -v docker >/dev/null
 docker compose version >/dev/null
 command -v nvidia-smi >/dev/null
+platform_network="${SCENARA_PLATFORM_NETWORK:-scenara-platform}"
+docker network inspect "$platform_network" >/dev/null || {
+  echo "shared platform network is missing: $platform_network; start deploy/shared-infra first" >&2
+  exit 2
+}
 
 version_ge() {
   test "$(printf '%s\n' "$2" "$1" | sort -V | head -n 1)" = "$2"
@@ -67,7 +72,7 @@ compose=(docker compose --env-file "$env_file" -f "$bundle_dir/deploy/compose.ym
 "${compose[@]}" up -d --no-build --wait
 curl --fail --silent --show-error http://127.0.0.1:8000/readyz >/dev/null
 curl --fail --silent --show-error http://127.0.0.1:8000/console/ | grep -q "Scenara 景枢"
-for service in api batch-worker stream-worker scheduler postgres redis minio; do
+for service in api batch-worker stream-worker scheduler; do
   "${compose[@]}" ps --status running --services | grep -qx "$service" || {
     echo "Scenara service is not running: $service" >&2
     exit 2
@@ -94,9 +99,7 @@ if [ -n "$result_file" ]; then
     '    "batch-worker": "running",' \
     '    "stream-worker": "running",' \
     '    "scheduler": "running",' \
-    '    "postgres": "running",' \
-    '    "redis": "running",' \
-    '    "minio": "running"' \
+    '    "shared_infrastructure": "prestarted"' \
     '  },' \
     '  "installer_checks": {' \
     '    "health": "passed",' \
@@ -107,7 +110,7 @@ if [ -n "$result_file" ]; then
   trap - EXIT
 fi
 printf 'offline_install=passed\ngpu_count=%s\ngpu_memory_mib=%s\nchecksums_verified=passed\ncheck.health=passed\ncheck.console=passed\n' "$gpu_count" "$gpu_memory"
-for service in api batch-worker stream-worker scheduler postgres redis minio; do
+for service in api batch-worker stream-worker scheduler; do
   printf 'service.%s=running\n' "$service"
 done
 printf 'console_url=http://127.0.0.1:8000/console/\n'

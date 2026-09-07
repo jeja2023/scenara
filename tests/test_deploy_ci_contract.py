@@ -8,6 +8,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 COMPOSE = ROOT / "deploy" / "compose.yml"
+SHARED_INFRA_COMPOSE = ROOT / "deploy" / "shared-infra" / "compose.yml"
 ENTERPRISE_COMPOSE = ROOT / "deploy" / "compose.enterprise.yml"
 DEBUG_COMPOSE = ROOT / "deploy" / "compose.debug.yml"
 WORKFLOW = ROOT / ".github" / "workflows" / "ci.yml"
@@ -63,9 +64,8 @@ def test_compose_declares_required_variables() -> None:
         "SCENARA_BEHAVIOR_ENGINE_FACTORY",
         "SCENARA_FASHION_ENGINE_FACTORY",
         "SCENARA_REDIS_PASSWORD",
-        "SCENARA_MINIO_ROOT_USER",
-        "SCENARA_MINIO_ROOT_PASSWORD",
         "SCENARA_ALLOWED_HOSTS",
+        "SCENARA_DATA_CONTEXT_SIGNING_KEY",
     } <= required_compose_variables()
 
 
@@ -123,10 +123,11 @@ def test_linux_deploy_scripts_are_forced_to_lf() -> None:
 
 
 def test_production_data_service_images_are_digest_pinned() -> None:
-    document = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
-    services = document["services"]
-    for name in ("postgres", "migrate", "redis", "minio", "minio-init"):
-        image = str(services[name]["image"])
+    core_document = yaml.safe_load(COMPOSE.read_text(encoding="utf-8"))
+    shared_document = yaml.safe_load(SHARED_INFRA_COMPOSE.read_text(encoding="utf-8"))
+    assert re.fullmatch(r"[^@]+@sha256:[0-9a-f]{64}", str(core_document["services"]["migrate"]["image"]))
+    for name in ("postgres", "redis", "minio", "minio-init"):
+        image = str(shared_document["services"][name]["image"])
         assert re.fullmatch(r"[^@]+@sha256:[0-9a-f]{64}", image), f"{name} image is not digest-pinned"
 
 
@@ -137,20 +138,23 @@ def test_compose_hardens_runtime_and_separates_service_credentials() -> None:
     assert common["read_only"] is True
     assert common["cap_drop"] == ["ALL"]
     assert common["security_opt"] == ["no-new-privileges:true"]
-    assert set(common["networks"]) == {"backend", "egress"}
+    assert set(common["networks"]) == {"backend", "egress", "platform"}
     assert document["networks"]["backend"]["internal"] is True
 
+    shared = yaml.safe_load(SHARED_INFRA_COMPOSE.read_text(encoding="utf-8"))
+    shared_services = shared["services"]
+    assert shared_services["redis"]["environment"]["REDISCLI_AUTH"].startswith("${SCENARA_INFRA_REDIS_PASSWORD:")
+    assert "--requirepass" in shared_services["redis"]["command"]
+    assert shared_services["minio"]["environment"]["MINIO_ROOT_USER"].startswith("${SCENARA_INFRA_MINIO_ROOT_USER:")
+    init_env = shared_services["minio-init"]["environment"]
+    assert init_env["SCENARA_INFRA_MINIO_ROOT_USER"].startswith("${SCENARA_INFRA_MINIO_ROOT_USER:")
+    assert init_env["SCENARA_CORE_S3_ACCESS_KEY"].startswith("${SCENARA_CORE_S3_ACCESS_KEY:-scenara-core}")
+
+    init_script = (ROOT / "deploy" / "shared-infra" / "scripts" / "init-minio.sh").read_text(encoding="utf-8")
+    assert "arn:aws:s3:::scenara" in init_script
+    assert "arn:aws:s3:::scenara/*" in init_script
+
     services = document["services"]
-    assert services["redis"]["environment"]["REDISCLI_AUTH"].startswith("${SCENARA_REDIS_PASSWORD:")
-    assert "--requirepass" in services["redis"]["command"]
-    assert services["minio"]["environment"]["MINIO_ROOT_USER"].startswith("${SCENARA_MINIO_ROOT_USER:")
-    init_env = services["minio-init"]["environment"]
-    assert init_env["ROOT_USER"].startswith("${SCENARA_MINIO_ROOT_USER:")
-    assert init_env["ACCESS_KEY"].startswith("${SCENARA_S3_ACCESS_KEY:")
-    init_command = services["minio-init"]["command"][0]
-    assert "printf '%s'" in init_command
-    assert "arn:aws:s3:::$${BUCKET}" in init_command
-    assert "arn:aws:s3:::$${BUCKET}/*" in init_command
     assert services["api"]["depends_on"]["preflight"]["condition"] == "service_completed_successfully"
     assert services["api"]["ports"] == ["${SCENARA_BIND_ADDRESS:-127.0.0.1}:${SCENARA_HTTP_PORT:-8000}:8000"]
 

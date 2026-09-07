@@ -23,12 +23,11 @@ def render() -> str:
     replacements = {
         "replace-with-postgres-password": _token(),
         "replace-with-redis-password": _token(),
-        "replace-with-minio-root-user": "scenara-root-" + secrets.token_hex(6),
-        "replace-with-minio-root-password": _token(),
         "replace-with-s3-access-key": "scenara-app-" + secrets.token_hex(6),
         "replace-with-s3-secret-key": _token(),
         "replace-with-core-to-data-service-token": _token(),
         "replace-with-data-to-core-service-token": _token(),
+        "replace-with-core-to-data-context-signing-key": _token(),
         "replace-with-long-random-bootstrap-token": _token(48),
         "replace-with-generated-fernet-key": _fernet_key(),
         "replace-with-admin-password-16chars": _token(24),

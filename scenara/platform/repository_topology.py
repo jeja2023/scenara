@@ -61,7 +61,7 @@ def build_repository_topology() -> RepositoryTopology:
             ),
             RepositoryTopologyItem(
                 repository_id="scenara-model",
-                name="Scenara Model",
+                name="scenara model",
                 kind=RepositoryKind.SPECIALIZED_PRODUCT,
                 lifecycle=RepositoryLifecycle.EXTERNAL_EXISTING,
                 primary_product_ids=["model"],
@@ -87,7 +87,7 @@ def build_repository_topology() -> RepositoryTopology:
             ),
             RepositoryTopologyItem(
                 repository_id="scenara-data",
-                name="Scenara Data",
+                name="scenara data",
                 kind=RepositoryKind.SPECIALIZED_PRODUCT,
                 lifecycle=RepositoryLifecycle.EXTERNAL_EXISTING,
                 primary_product_ids=["data"],
@@ -110,7 +110,7 @@ def build_repository_topology() -> RepositoryTopology:
             ),
             RepositoryTopologyItem(
                 repository_id="scenara-contracts",
-                name="Scenara Contracts",
+                name="scenara contracts",
                 kind=RepositoryKind.SPECIALIZED_PRODUCT,
                 lifecycle=RepositoryLifecycle.EXTERNAL_EXISTING,
                 responsibilities=[

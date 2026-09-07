@@ -9,7 +9,7 @@ import pytest
 
 from scenara.bootstrap import build_runtime
 from scenara.platform.data_migration import export_data_migration_package
-from scenara.platform.data_platform import DataPlatformRemoteError, HttpDataPlatformClient
+from scenara.platform.data_platform import DataPlatformRemoteError, HttpDataPlatformClient, sign_request_context
 from scenara.platform.models import (
     CreateDatasetRequest,
     DatasetVersionStatus,
@@ -48,7 +48,12 @@ async def test_http_data_client_forwards_identity_trace_and_idempotency() -> Non
         )
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="https://data.example")
-    gateway = HttpDataPlatformClient("https://ignored.example", service_token="service-token", client=client)
+    gateway = HttpDataPlatformClient(
+        "https://ignored.example",
+        service_token="service-token",
+        context_signing_key="context-signing-key-that-is-long-enough-for-tests",
+        client=client,
+    )
     context = PrincipalContext(
         tenant_id="tenant-a",
         project_id="project-a",
@@ -67,6 +72,53 @@ async def test_http_data_client_forwards_identity_trace_and_idempotency() -> Non
     assert headers["x-request-id"] == "req_123"
     assert headers["idempotency-key"] == "req_123:POST:/internal/v1/datasets"
     assert headers["traceparent"].startswith("00-")
+    await gateway.close()
+    await client.aclose()
+
+
+@pytest.mark.asyncio
+async def test_http_data_client_signs_delegated_identity_context() -> None:
+    received: dict[str, str] = {}
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        received.update(dict(request.headers))
+        return httpx.Response(200, json={"items": [], "total": 0})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="https://data.example")
+    signing_key = "context-signing-key-that-is-long-enough-for-tests"
+    gateway = HttpDataPlatformClient(
+        "https://ignored.example",
+        service_token="service-token",
+        context_signing_key=signing_key,
+        client=client,
+    )
+    context = PrincipalContext(
+        tenant_id="tenant-a",
+        project_id="project-a",
+        principal_id="user-a",
+        scopes=frozenset({"data.dataset.read"}),
+        product_ids=frozenset({"data"}),
+        request_id="req-signed-context",
+    )
+
+    await gateway.list_datasets(context, offset=0, limit=100)
+    timestamp = int(received["x-scenara-context-timestamp"])
+    trace_id = received["x-trace-id"]
+    expected = sign_request_context(
+        signing_key,
+        method="GET",
+        path="/internal/v1/datasets",
+        tenant_id="tenant-a",
+        project_id="project-a",
+        principal_id="user-a",
+        principal_type="service_account",
+        scopes=("data.dataset.read",),
+        entitlements=("data",),
+        request_id="req-signed-context",
+        trace_id=trace_id,
+        timestamp=timestamp,
+    )
+    assert received["x-scenara-context-signature"] == expected
     await gateway.close()
     await client.aclose()
 

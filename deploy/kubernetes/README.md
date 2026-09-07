@@ -1,7 +1,7 @@
 # Scenara Kubernetes foundation
 
 These manifests are a hardened production foundation for the P0-P2 control-plane
-contracts. PostgreSQL, Redis, S3/MinIO, Scenara Data, TLS ingress, qualified model
+contracts. PostgreSQL, Redis, S3/MinIO, scenara data, TLS ingress, qualified model
 PVC provisioning, secret injection and backup operators remain environment-owned.
 
 Create a Secret named `scenara-runtime` with the settings referenced by
@@ -14,6 +14,7 @@ Minimum `scenara-runtime` Secret keys:
 - `SCENARA_POSTGRES_DSN` and authenticated `SCENARA_REDIS_URL`;
 - `SCENARA_S3_ACCESS_KEY` and `SCENARA_S3_SECRET_KEY`;
 - independent `SCENARA_DATA_PLATFORM_SERVICE_TOKEN` and `SCENARA_DATA_EVENT_SERVICE_TOKEN`;
+- independent `SCENARA_DATA_CONTEXT_SIGNING_KEY` shared only with the Data service for delegated identity context signatures;
 - `SCENARA_API_TOKEN` and valid Fernet `SCENARA_SECRET_ENCRYPTION_KEY`;
 - approved `SCENARA_OCR_ENGINE_FACTORY`, `SCENARA_BEHAVIOR_ENGINE_FACTORY` and `SCENARA_FASHION_ENGINE_FACTORY`.
 

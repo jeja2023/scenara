@@ -2,7 +2,10 @@ name: scenara-data
 
 services:
   data:
-    image: scenara-data:${SCENARA_DATA_IMAGE_TAG:-0.3.0-dev.43}
+    # Legacy compatibility service only; production uses the independent
+    # scenara-data repository and its production compose file.
+    profiles: [legacy]
+    image: scenara-data:${SCENARA_DATA_IMAGE_TAG:-0.3.0-dev.44}
     build:
       context: ..
       dockerfile: Dockerfile.data

@@ -40,7 +40,7 @@ def build_product_catalog(
         ),
         ProductCatalogItem(
             product_id="model",
-            name="Scenara Model",
+            name="scenara model",
             layer=ProductLayer.PRODUCT_MODULE,
             maturity=ProductMaturity.SEED,
             summary="模型准入、发布治理、回滚和部署证据管理。",
@@ -60,7 +60,7 @@ def build_product_catalog(
         ),
         ProductCatalogItem(
             product_id="data",
-            name="Scenara Data",
+            name="scenara data",
             layer=ProductLayer.PRODUCT_MODULE,
             maturity=ProductMaturity.SEED,
             summary="为视觉 AI 产品提供媒体、特征、反馈和难例数据闭环。",
