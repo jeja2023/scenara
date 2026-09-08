@@ -8,7 +8,7 @@ services:
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/ca/ca.crt:/tls/ca.crt:ro
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/postgres/server.crt:/tls/server.crt:ro
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/postgres/server.key:/tls/server.key:ro
-    ports: []
+    ports: !reset []
     networks:
       platform:
         aliases: [postgres.scenara.internal]
@@ -33,7 +33,7 @@ services:
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/ca/ca.crt:/tls/ca.crt:ro
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/redis/server.crt:/tls/server.crt:ro
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/redis/server.key:/tls/server.key:ro
-    ports: []
+    ports: !reset []
     healthcheck:
       test: ["CMD-SHELL", "redis-cli --tls --cacert /tls/ca.crt --no-auth-warning -a \"$$REDISCLI_AUTH\" -h redis.scenara.internal ping | grep -q PONG"]
     networks:
@@ -47,7 +47,7 @@ services:
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/ca/ca.crt:/tls/ca.crt:ro
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/minio/public.crt:/tls/public.crt:ro
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/minio/private.key:/tls/private.key:ro
-    ports: []
+    ports: !reset []
     healthcheck:
       test: ["CMD", "curl", "--cacert", "/tls/ca.crt", "-f", "https://minio.scenara.internal:9000/minio/health/live"]
     networks:
