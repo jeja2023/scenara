@@ -51,6 +51,18 @@ def test_local_commit_tag_is_allowed_only_in_explicit_local_image_mode() -> None
     assert "sha256 digest" in "\n".join(errors)
 
 
+def test_reference_model_validation_mode_allows_production_like_infrastructure_without_model_factories() -> None:
+    values = valid_values()
+    values["SCENARA_MODEL_VALIDATION_MODE"] = "reference"
+    values["SCENARA_PRODUCTION_MODELS_REQUIRED"] = "false"
+    values["SCENARA_OCR_ENGINE_FACTORY"] = ""
+    values["SCENARA_BEHAVIOR_ENGINE_FACTORY"] = ""
+    values["SCENARA_FASHION_ENGINE_FACTORY"] = ""
+    errors, warnings = validate(values, file_mode=True)
+    assert errors == []
+    assert any("reference" in warning for warning in warnings)
+
+
 def test_production_configuration_rejects_placeholders_reuse_and_unsafe_networks() -> None:
     values = valid_values()
     values["SCENARA_API_TOKEN"] = "replace-with-token"

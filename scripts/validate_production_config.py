@@ -13,6 +13,7 @@ PLACEHOLDER = re.compile(r"(?:replace-with|changeme|todo|tbd|<[^>]+>)", re.IGNOR
 FACTORY = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*:[A-Za-z_][A-Za-z0-9_]*$")
 SHA256_IMAGE = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
 LOCAL_COMMIT_IMAGE = re.compile(r"^[a-z0-9][a-z0-9._/-]*:[0-9a-f]{7,64}$")
+MODEL_VALIDATION_MODES = {"qualified", "reference"}
 
 REQUIRED = {
     "SCENARA_POSTGRES_PASSWORD",
@@ -115,7 +116,26 @@ def _positive_int(values: dict[str, str], name: str, default: int) -> tuple[int 
 def validate(values: dict[str, str], *, file_mode: bool) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
-    for name in sorted(REQUIRED):
+    model_validation_mode = values.get("SCENARA_MODEL_VALIDATION_MODE", "qualified").strip().lower()
+    reference_model_mode = model_validation_mode == "reference"
+    production_models_required = values.get("SCENARA_PRODUCTION_MODELS_REQUIRED", "true").lower() == "true"
+    if model_validation_mode not in MODEL_VALIDATION_MODES:
+        errors.append("SCENARA_MODEL_VALIDATION_MODE must be qualified or reference")
+    if not production_models_required and not reference_model_mode:
+        errors.append(
+            "SCENARA_PRODUCTION_MODELS_REQUIRED may be false only when SCENARA_MODEL_VALIDATION_MODE=reference"
+        )
+    if reference_model_mode:
+        warnings.append("model validation mode is reference; model assets are not production-qualified")
+
+    required_names = set(REQUIRED)
+    if reference_model_mode and not production_models_required:
+        required_names -= {
+            "SCENARA_OCR_ENGINE_FACTORY",
+            "SCENARA_BEHAVIOR_ENGINE_FACTORY",
+            "SCENARA_FASHION_ENGINE_FACTORY",
+        }
+    for name in sorted(required_names):
         value = _secret(values, name) if name in SECRET_NAMES else values.get(name, "").strip()
         if not value:
             errors.append(f"{name} is required")
@@ -154,7 +174,7 @@ def validate(values: dict[str, str], *, file_mode: bool) -> tuple[list[str], lis
         value = values.get(name, "").strip()
         if value and not FACTORY.fullmatch(value):
             errors.append(f"{name} must use module.path:factory_name")
-        if value.startswith("scenara.domains."):
+        if value.startswith("scenara.domains.") and not reference_model_mode:
             errors.append(f"{name} cannot use an unqualified built-in reference adapter")
 
     hosts = [item.strip() for item in values.get("SCENARA_ALLOWED_HOSTS", "").split(",") if item.strip()]
@@ -167,8 +187,8 @@ def validate(values: dict[str, str], *, file_mode: bool) -> tuple[list[str], lis
 
     if values.get("SCENARA_AUTH_REQUIRED", "true").lower() != "true":
         errors.append("SCENARA_AUTH_REQUIRED must be true")
-    if values.get("SCENARA_PRODUCTION_MODELS_REQUIRED", "true").lower() != "true":
-        errors.append("SCENARA_PRODUCTION_MODELS_REQUIRED must be true")
+    if production_models_required and reference_model_mode:
+        warnings.append("SCENARA_MODEL_VALIDATION_MODE=reference is ignored while production models are required")
     if values.get("SCENARA_S3_VERIFY_TLS", "true").lower() != "true":
         warnings.append("S3 TLS verification is disabled; this is acceptable only for an isolated in-cluster endpoint")
 

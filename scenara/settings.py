@@ -136,6 +136,9 @@ class Settings:
     surveillance_alert_snapshot_retention_days: int
     # Core -> specialist service delegated identity context signature.
     data_context_signing_key: str = ""
+    # `reference` is an explicit model-validation mode for production-like
+    # infrastructure before qualified production adapters are available.
+    model_validation_mode: str = "qualified"
 
     @property
     def production(self) -> bool:
@@ -220,8 +223,13 @@ class Settings:
             self.data_event_service_token,
         }:
             errors.append("Data context signing key must be different from Data service tokens")
-        if not self.production_models_required:
-            errors.append("SCENARA_PRODUCTION_MODELS_REQUIRED must be true")
+        if self.model_validation_mode not in {"qualified", "reference"}:
+            errors.append("SCENARA_MODEL_VALIDATION_MODE must be qualified or reference")
+        if not self.production_models_required and self.production and self.model_validation_mode != "reference":
+            errors.append(
+                "SCENARA_PRODUCTION_MODELS_REQUIRED may be false in production only when "
+                "SCENARA_MODEL_VALIDATION_MODE=reference"
+            )
         if self.production_models_required and not self.ocr_engine_factory:
             errors.append("SCENARA_OCR_ENGINE_FACTORY is required for the approved private OCR adapter")
         if self.production_models_required and not self.behavior_engine_factory:
@@ -360,6 +368,7 @@ def load_settings() -> Settings:
             min(3650, int(os.getenv("SCENARA_SURVEILLANCE_ALERT_SNAPSHOT_RETENTION_DAYS", "30"))),
         ),
         data_context_signing_key=_secret("SCENARA_DATA_CONTEXT_SIGNING_KEY"),
+        model_validation_mode=os.getenv("SCENARA_MODEL_VALIDATION_MODE", "qualified").strip().lower(),
     )
     settings.validate()
     return settings
