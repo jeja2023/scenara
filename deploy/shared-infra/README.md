@@ -64,6 +64,22 @@ The Data-first order is intentional: Core's Data client can then pass signed req
 
 This bundle is intended for the current test-data environment. Production should move PostgreSQL, Redis and S3-compatible storage to managed services or add TLS, backups, monitoring and secret-file integration before using a production profile.
 
+For the single-host internal production deployment, generate a private CA and service certificates on the Ubuntu host:
+
+```bash
+sudo deploy/shared-infra/scripts/generate-internal-ca.sh /secure/scenara-certs
+```
+
+The certificate names include `postgres.scenara.internal`, `redis.scenara.internal`, `minio.scenara.internal`, `core.scenara.internal`, `data.scenara.internal` and `model.scenara.internal`. Start the infrastructure with the TLS overlay:
+
+```bash
+docker compose --env-file /secure/scenara-infra.env \
+  -f deploy/shared-infra/compose.yml \
+  -f deploy/shared-infra/compose.tls.yml up -d --wait postgres redis minio
+```
+
+The TLS overlay removes the host maintenance ports. Application Compose files must mount the same certificate directory through `SCENARA_PLATFORM_CERTS_DIR` and use the internal HTTPS names.
+
 Back up and restore all three databases and all shared buckets from this stack. Stop the three application Compose projects before restoring:
 
 ```bash

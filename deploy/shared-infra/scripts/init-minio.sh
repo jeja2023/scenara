@@ -4,7 +4,14 @@ set -eu
 root_user="${SCENARA_INFRA_MINIO_ROOT_USER:?missing MinIO root user}"
 root_password="${SCENARA_INFRA_MINIO_ROOT_PASSWORD:?missing MinIO root password}"
 
-mc alias set local http://minio:9000 "$root_user" "$root_password" >/dev/null
+mc_endpoint="${SCENARA_INFRA_MINIO_ENDPOINT:-http://minio:9000}"
+mc_options=""
+case "$mc_endpoint" in
+  https://*)
+  mc_options="--insecure"
+    ;;
+esac
+mc alias set $mc_options local "$mc_endpoint" "$root_user" "$root_password" >/dev/null
 
 for bucket in \
   scenara \

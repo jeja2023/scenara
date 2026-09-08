@@ -1,0 +1,65 @@
+# TLS overlay for the single-host internal production deployment.
+# Generate certificates first with scripts/generate-internal-ca.sh.
+services:
+  postgres:
+    command:
+      ["postgres", "-c", "ssl=on", "-c", "ssl_cert_file=/tls/server.crt", "-c", "ssl_key_file=/tls/server.key", "-c", "ssl_ca_file=/tls/ca.crt"]
+    volumes:
+      - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/ca/ca.crt:/tls/ca.crt:ro
+      - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/postgres/server.crt:/tls/server.crt:ro
+      - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/postgres/server.key:/tls/server.key:ro
+    ports: []
+    networks:
+      platform:
+        aliases: [postgres.scenara.internal]
+
+  postgres-init:
+    environment:
+      SCENARA_INFRA_POSTGRES_HOST: postgres.scenara.internal
+      PGSSLMODE: verify-full
+      PGSSLROOTCERT: /tls/ca.crt
+    volumes:
+      - ./scripts/init-postgres.sh:/usr/local/bin/init-postgres.sh:ro
+      - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/ca/ca.crt:/tls/ca.crt:ro
+    networks:
+      platform:
+        aliases: [postgres.scenara.internal]
+
+  redis:
+    command:
+      ["redis-server", "--appendonly", "yes", "--appendfsync", "everysec", "--maxmemory-policy", "noeviction", "--tls-port", "6379", "--port", "0", "--tls-cert-file", "/tls/server.crt", "--tls-key-file", "/tls/server.key", "--tls-ca-cert-file", "/tls/ca.crt", "--tls-auth-clients", "no", "--requirepass", "${SCENARA_INFRA_REDIS_PASSWORD:?set SCENARA_INFRA_REDIS_PASSWORD}"]
+    volumes:
+      - scenara-shared-redis:/data
+      - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/ca/ca.crt:/tls/ca.crt:ro
+      - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/redis/server.crt:/tls/server.crt:ro
+      - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/redis/server.key:/tls/server.key:ro
+    ports: []
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --tls --cacert /tls/ca.crt --no-auth-warning -a \"$$REDISCLI_AUTH\" -h redis.scenara.internal ping | grep -q PONG"]
+    networks:
+      platform:
+        aliases: [redis.scenara.internal]
+
+  minio:
+    command: ["server", "/data", "--certs-dir", "/tls", "--console-address", ":9001"]
+    volumes:
+      - scenara-shared-minio:/data
+      - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/ca/ca.crt:/tls/ca.crt:ro
+      - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/minio/public.crt:/tls/public.crt:ro
+      - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/minio/private.key:/tls/private.key:ro
+    ports: []
+    healthcheck:
+      test: ["CMD", "curl", "--cacert", "/tls/ca.crt", "-f", "https://minio.scenara.internal:9000/minio/health/live"]
+    networks:
+      platform:
+        aliases: [minio.scenara.internal]
+
+  minio-init:
+    environment:
+      SCENARA_INFRA_MINIO_ENDPOINT: https://minio.scenara.internal:9000
+    volumes:
+      - ./scripts/init-minio.sh:/usr/local/bin/init-minio.sh:ro
+      - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/ca/ca.crt:/tls/ca.crt:ro
+    networks:
+      platform:
+        aliases: [minio.scenara.internal]
