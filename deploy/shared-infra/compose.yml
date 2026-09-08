@@ -125,4 +125,5 @@ volumes:
 
 networks:
   platform:
+    external: true
     name: ${SCENARA_PLATFORM_NETWORK:-scenara-platform}
