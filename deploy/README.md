@@ -27,7 +27,7 @@ PostgreSQL 连接池默认每进程 `1..4` 条连接。调整 API/worker 副本�
 
     docker compose --env-file /secure/scenara.env -f deploy/compose.yml config --quiet
 
-在 CI 中构建并推送发布镜像，将其摘要记录在 `SCENARA_IMAGE_REFERENCE` 中，然后在 TLS 反向代理后启动。请勿对固定摘要的生产引用使用 `--build`。默认的主机绑定为 `127.0.0.1:8000`；直接非回环 HTTP 访问需要显式的不安全覆盖配置：
+标准生产在 CI 中构建并推送发布镜像，将其摘要记录在 `SCENARA_IMAGE_REFERENCE` 中。当前单机生产环境可以设置 `SCENARA_LOCAL_IMAGE_MODE=true`，使用本机直接构建的完整 Git commit SHA 标签；不得使用 `latest`、`main` 或普通版本标签。默认的主机绑定为 `127.0.0.1:8000`；直接非回环 HTTP 访问需要显式的不安全覆盖配置：
 
     docker compose --env-file /secure/scenara-infra.env -f deploy/shared-infra/compose.yml up -d --wait
     docker compose --env-file /secure/scenara-infra.env -f deploy/shared-infra/compose.yml run --rm postgres-init
@@ -36,6 +36,12 @@ PostgreSQL 连接池默认每进程 `1..4` 条连接。调整 API/worker 副本�
     docker compose --env-file /secure/scenara.env -f deploy/compose.yml run --rm preflight
     docker compose --env-file /secure/scenara.env -f deploy/compose.yml run --rm migrate
     docker compose --env-file /secure/scenara.env -f deploy/compose.yml up -d --no-build --wait
+
+单机本地构建三个项目的镜像：
+
+    sudo deploy/scripts/build-local-production.sh /home/lxfjxtk/project
+
+脚本输出的三个 `SCENARA_*_IMAGE` 值分别写入 Core、Data、Model 的生产环境文件，然后使用生产 Compose 执行 migration 和 `up -d --no-build --wait`。脚本不会推送镜像，也不会创建 Registry。
 
 对于可选的企业配置文件，使用这两个文件进行验证和启动：
 

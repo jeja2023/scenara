@@ -12,6 +12,7 @@ from urllib.parse import urlsplit
 PLACEHOLDER = re.compile(r"(?:replace-with|changeme|todo|tbd|<[^>]+>)", re.IGNORECASE)
 FACTORY = re.compile(r"^[A-Za-z_][A-Za-z0-9_.]*:[A-Za-z_][A-Za-z0-9_]*$")
 SHA256_IMAGE = re.compile(r"^[^\s@]+@sha256:[0-9a-f]{64}$")
+LOCAL_COMMIT_IMAGE = re.compile(r"^[a-z0-9][a-z0-9._/-]*:[0-9a-f]{7,64}$")
 
 REQUIRED = {
     "SCENARA_POSTGRES_PASSWORD",
@@ -190,8 +191,16 @@ def validate(values: dict[str, str], *, file_mode: bool) -> tuple[list[str], lis
         errors.append("SCENARA_POSTGRES_POOL_MAX_SIZE must be at least SCENARA_POSTGRES_POOL_MIN_SIZE")
 
     image = values.get("SCENARA_IMAGE_REFERENCE", "").strip()
-    if image and not PLACEHOLDER.search(image) and not SHA256_IMAGE.fullmatch(image):
-        errors.append("SCENARA_IMAGE_REFERENCE must pin the application image by sha256 digest")
+    local_image_mode = values.get("SCENARA_LOCAL_IMAGE_MODE", "false").lower() == "true"
+    if image and not PLACEHOLDER.search(image):
+        if local_image_mode:
+            if not LOCAL_COMMIT_IMAGE.fullmatch(image):
+                errors.append(
+                    "SCENARA_IMAGE_REFERENCE must use an image tag containing a 7-64 character git commit SHA "
+                    "when SCENARA_LOCAL_IMAGE_MODE=true"
+                )
+        elif not SHA256_IMAGE.fullmatch(image):
+            errors.append("SCENARA_IMAGE_REFERENCE must pin the application image by sha256 digest")
 
     bind = values.get("SCENARA_BIND_ADDRESS", "127.0.0.1").strip()
     if bind not in {"127.0.0.1", "::1"} and values.get("SCENARA_ALLOW_DIRECT_HTTP", "false").lower() != "true":

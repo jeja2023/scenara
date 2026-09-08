@@ -39,6 +39,18 @@ def test_valid_production_configuration_passes_without_exposing_secrets() -> Non
     assert warnings == []
 
 
+def test_local_commit_tag_is_allowed_only_in_explicit_local_image_mode() -> None:
+    values = valid_values()
+    values["SCENARA_LOCAL_IMAGE_MODE"] = "true"
+    values["SCENARA_IMAGE_REFERENCE"] = "scenara-api:" + "a" * 40
+    errors, _ = validate(values, file_mode=True)
+    assert errors == []
+
+    values["SCENARA_LOCAL_IMAGE_MODE"] = "false"
+    errors, _ = validate(values, file_mode=True)
+    assert "sha256 digest" in "\n".join(errors)
+
+
 def test_production_configuration_rejects_placeholders_reuse_and_unsafe_networks() -> None:
     values = valid_values()
     values["SCENARA_API_TOKEN"] = "replace-with-token"
@@ -83,5 +95,6 @@ def test_generated_candidate_replaces_every_generated_secret_placeholder() -> No
         "replace-with-admin-password-16chars",
     ):
         assert placeholder not in candidate
-    assert "SCENARA_IMAGE_REFERENCE=scenara-api@sha256:replace-with-" in candidate
+    assert "SCENARA_LOCAL_IMAGE_MODE=true" in candidate
+    assert "SCENARA_IMAGE_REFERENCE=scenara-api:replace-with-" in candidate
     assert "SCENARA_FORWARDED_ALLOW_IPS=replace-with-" in candidate
