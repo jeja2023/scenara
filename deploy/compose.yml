@@ -200,7 +200,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              device_ids: ["${SCENARA_BATCH_GPU_DEVICE_ID:-0}"]
               capabilities: [gpu]
     restart: unless-stopped
 
@@ -228,7 +228,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              device_ids: ["${SCENARA_STREAM_GPU_DEVICE_ID:-1}"]
               capabilities: [gpu]
     restart: unless-stopped
 
