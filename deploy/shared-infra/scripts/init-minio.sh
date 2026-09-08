@@ -11,7 +11,12 @@ case "$mc_endpoint" in
   mc_options="--insecure"
     ;;
 esac
-mc alias set $mc_options local "$mc_endpoint" "$root_user" "$root_password" >/dev/null
+
+mc_run() {
+  mc $mc_options "$@"
+}
+
+mc_run alias set local "$mc_endpoint" "$root_user" "$root_password" >/dev/null
 
 for bucket in \
   scenara \
@@ -23,8 +28,8 @@ for bucket in \
   scenara-data-backups \
   scenara-model-artifacts
 do
-  mc mb --ignore-existing "local/$bucket" >/dev/null
-  mc version enable "local/$bucket" >/dev/null 2>&1 || true
+  mc_run mb --ignore-existing "local/$bucket" >/dev/null
+  mc_run version enable "local/$bucket" >/dev/null 2>&1 || true
 done
 
 cat >/tmp/core-policy.json <<'JSON'
@@ -42,13 +47,13 @@ create_user() {
   password="$2"
   policy="$3"
 
-  if ! mc admin user info local "$user" >/dev/null 2>&1; then
-    mc admin user add local "$user" "$password" >/dev/null
+  if ! mc_run admin user info local "$user" >/dev/null 2>&1; then
+    mc_run admin user add local "$user" "$password" >/dev/null
   fi
-  if ! mc admin policy info local "$policy" >/dev/null 2>&1; then
-    mc admin policy create local "$policy" "/tmp/$policy-policy.json" >/dev/null
+  if ! mc_run admin policy info local "$policy" >/dev/null 2>&1; then
+    mc_run admin policy create local "$policy" "/tmp/$policy-policy.json" >/dev/null
   fi
-  mc admin policy attach local "$policy" --user "$user" >/dev/null
+  mc_run admin policy attach local "$policy" --user "$user" >/dev/null
 }
 
 create_user "${SCENARA_CORE_S3_ACCESS_KEY:?missing Core S3 access key}" "${SCENARA_CORE_S3_SECRET_KEY:?missing Core S3 secret key}" core
