@@ -188,6 +188,8 @@ services:
     pids_limit: 1024
     mem_limit: ${SCENARA_BATCH_WORKER_MEMORY_LIMIT:-16g}
     cpus: ${SCENARA_BATCH_WORKER_CPU_LIMIT:-8.0}
+    healthcheck:
+      disable: true
     deploy:
       resources:
         reservations:
@@ -213,6 +215,8 @@ services:
     pids_limit: 1024
     mem_limit: ${SCENARA_STREAM_WORKER_MEMORY_LIMIT:-16g}
     cpus: ${SCENARA_STREAM_WORKER_CPU_LIMIT:-8.0}
+    healthcheck:
+      disable: true
     deploy:
       resources:
         reservations:
@@ -245,6 +249,8 @@ services:
     pids_limit: 256
     mem_limit: ${SCENARA_SCHEDULER_MEMORY_LIMIT:-2g}
     cpus: ${SCENARA_SCHEDULER_CPU_LIMIT:-2.0}
+    healthcheck:
+      disable: true
     restart: unless-stopped
 
 networks:
