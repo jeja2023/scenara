@@ -33,7 +33,7 @@ do
 done
 
 cat >/tmp/core-policy.json <<'JSON'
-{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetBucketLocation","s3:ListBucket"],"Resource":["arn:aws:s3:::scenara"]},{"Effect":"Allow","Action":["s3:GetObject","s3:PutObject","s3:DeleteObject","s3:AbortMultipartUpload","s3:ListMultipartUploadParts"],"Resource":["arn:aws:s3:::scenara/*"]}]}
+{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetBucketLocation","s3:ListBucket","s3:GetLifecycleConfiguration","s3:PutLifecycleConfiguration","s3:ListBucketMultipartUploads"],"Resource":["arn:aws:s3:::scenara"]},{"Effect":"Allow","Action":["s3:GetObject","s3:PutObject","s3:DeleteObject","s3:AbortMultipartUpload","s3:ListMultipartUploadParts"],"Resource":["arn:aws:s3:::scenara/*"]}]}
 JSON
 cat >/tmp/data-policy.json <<'JSON'
 {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetBucketLocation","s3:GetBucketVersioning","s3:ListBucket","s3:ListBucketVersions"],"Resource":["arn:aws:s3:::scenara-datasets","arn:aws:s3:::scenara-data-manifests","arn:aws:s3:::scenara-data-imports","arn:aws:s3:::scenara-data-exports","arn:aws:s3:::scenara-artifacts","arn:aws:s3:::scenara-data-backups"]},{"Effect":"Allow","Action":["s3:GetObject","s3:GetObjectVersion","s3:PutObject","s3:DeleteObject","s3:DeleteObjectVersion","s3:AbortMultipartUpload","s3:ListMultipartUploadParts"],"Resource":["arn:aws:s3:::scenara-datasets/*","arn:aws:s3:::scenara-data-manifests/*","arn:aws:s3:::scenara-data-imports/*","arn:aws:s3:::scenara-data-exports/*","arn:aws:s3:::scenara-artifacts/*","arn:aws:s3:::scenara-data-backups/*"]}]}
