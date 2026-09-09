@@ -97,7 +97,6 @@ x-scenara-service: &scenara-service
   security_opt: [no-new-privileges:true]
   tmpfs:
     - /tmp:rw,noexec,nosuid,nodev,size=2g,mode=1777
-    - /opt/scenara/runtime-state:rw,noexec,nosuid,nodev,size=512m,mode=0700
   stop_grace_period: 60s
   logging:
     driver: json-file
@@ -105,6 +104,7 @@ x-scenara-service: &scenara-service
       max-size: 20m
       max-file: "5"
   volumes:
+    - scenara-runtime-state:/opt/scenara/runtime-state
     - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/ca/ca.crt:/run/tls/ca.crt:ro
     - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/core/server.crt:/run/tls/server.crt:ro
     - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/core/server.key:/run/tls/server.key:ro
@@ -156,6 +156,7 @@ services:
     ports:
       - "${SCENARA_BIND_ADDRESS:-127.0.0.1}:${SCENARA_HTTP_PORT:-8000}:8000"
     volumes:
+      - scenara-runtime-state:/opt/scenara/runtime-state
       - ../models:/opt/scenara/models:ro
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/ca/ca.crt:/run/tls/ca.crt:ro
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/core/server.crt:/run/tls/server.crt:ro
@@ -188,6 +189,7 @@ services:
       api:
         condition: service_healthy
     volumes:
+      - scenara-runtime-state:/opt/scenara/runtime-state
       - ../models:/opt/scenara/models:ro
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/ca/ca.crt:/run/tls/ca.crt:ro
     pids_limit: 1024
@@ -216,6 +218,7 @@ services:
       api:
         condition: service_healthy
     volumes:
+      - scenara-runtime-state:/opt/scenara/runtime-state
       - ../models:/opt/scenara/models:ro
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/ca/ca.crt:/run/tls/ca.crt:ro
     pids_limit: 1024
@@ -251,6 +254,7 @@ services:
       api:
         condition: service_healthy
     volumes:
+      - scenara-runtime-state:/opt/scenara/runtime-state
       - ../models:/opt/scenara/models:ro
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/ca/ca.crt:/run/tls/ca.crt:ro
     pids_limit: 256
@@ -267,3 +271,6 @@ networks:
   platform:
     external: true
     name: ${SCENARA_PLATFORM_NETWORK:-scenara-platform}
+
+volumes:
+  scenara-runtime-state:
