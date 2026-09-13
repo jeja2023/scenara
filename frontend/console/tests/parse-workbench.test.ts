@@ -44,7 +44,9 @@ vi.mock("../src/api", () => {
     blobToDataUrl: vi.fn(async () => "data:image/jpeg;base64,cHJldmlldw=="),
     idempotencyKey: vi.fn(() => "test-idempotency"),
     revokeBlobUrl: vi.fn(() => undefined),
+    shouldUseDirectUpload: vi.fn(() => false),
     streamJsonEvents: vi.fn(async function* () {}),
+    uploadAssetDirect: vi.fn(),
     userFacingError: vi.fn((_error: unknown, fallback: string) => fallback),
   };
 });

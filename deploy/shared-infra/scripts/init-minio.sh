@@ -59,4 +59,9 @@ create_user "${SCENARA_CORE_S3_ACCESS_KEY:?missing Core S3 access key}" "${SCENA
 create_user "${SCENARA_DATA_S3_ACCESS_KEY:?missing Data S3 access key}" "${SCENARA_DATA_S3_SECRET_KEY:?missing Data S3 secret key}" data
 create_user "${SCENARA_MODEL_S3_ACCESS_KEY:?missing Model S3 access key}" "${SCENARA_MODEL_S3_SECRET_KEY:?missing Model S3 secret key}" model
 
+cat >/tmp/core-cors.json <<'JSON'
+{"CORSRules":[{"AllowedOrigins":["https://core.scenara.internal:8000"],"AllowedMethods":["PUT","HEAD"],"AllowedHeaders":["*"],"ExposeHeaders":["ETag","x-amz-checksum-sha256"],"MaxAgeSeconds":900}]}
+JSON
+mc_run cors set local/scenara /tmp/core-cors.json >/dev/null
+
 echo "shared MinIO buckets and least-privilege users are ready"

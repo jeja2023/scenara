@@ -263,6 +263,76 @@ export async function apiForm<T>(path: string, form: FormData): Promise<T> {
   return api<T>(path, { method: "POST", body: form });
 }
 
+const DIRECT_UPLOAD_THRESHOLD_BYTES = 512 * 1024 * 1024;
+
+async function sha256File(file: File): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", await file.arrayBuffer());
+  return Array.from(new Uint8Array(digest), (value) =>
+    value.toString(16).padStart(2, "0"),
+  ).join("");
+}
+
+function putPresignedFile(
+  url: string,
+  method: string,
+  headers: Record<string, string>,
+  file: File,
+  onProgress?: (value: number) => void,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open(method, url, true);
+    Object.entries(headers).forEach(([key, value]) => request.setRequestHeader(key, value));
+    request.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress?.(event.loaded / event.total);
+    };
+    request.onerror = () => reject(new ApiError(0, "OBJECT_UPLOAD_FAILED", "无法连接对象存储"));
+    request.onabort = () => reject(new ApiError(0, "OBJECT_UPLOAD_CANCELLED", "对象存储上传已取消"));
+    request.onload = () => {
+      if (request.status >= 200 && request.status < 300) resolve();
+      else reject(new ApiError(request.status, "OBJECT_UPLOAD_FAILED", `对象存储上传失败（${request.status}）`));
+    };
+    request.send(file);
+  });
+}
+
+export async function uploadAssetDirect(
+  file: File,
+  kind: "image" | "video" | "document",
+  domain?: string,
+  onProgress?: (value: number) => void,
+): Promise<import("./types").MediaAsset> {
+  const request = {
+    filename: file.name,
+    content_type: file.type || "application/octet-stream",
+    kind,
+    domain: domain || null,
+    size_bytes: file.size,
+    sha256: await sha256File(file),
+  };
+  const upload = await api<{
+    upload_id: string;
+    upload_token: string;
+    method: "PUT";
+    url: string;
+    headers: Record<string, string>;
+    expires_at: number;
+  }>("/api/v1/media/uploads/presign", {
+    method: "POST",
+    body: JSON.stringify(request),
+  });
+  await putPresignedFile(upload.url, upload.method, upload.headers, file, onProgress);
+  onProgress?.(1);
+  return api<import("./types").MediaAsset>("/api/v1/media/uploads/complete", {
+    method: "POST",
+    body: JSON.stringify({ ...request, ...upload }),
+  });
+}
+
+export function shouldUseDirectUpload(file: File): boolean {
+  return file.size > DIRECT_UPLOAD_THRESHOLD_BYTES;
+}
+
 export async function apiBlob(path: string): Promise<Blob> {
   const response = await request(path, { headers: { Accept: "image/*" } });
   if (!response.ok) {

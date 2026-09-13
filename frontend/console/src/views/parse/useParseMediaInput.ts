@@ -1,5 +1,5 @@
 import type { Ref } from "vue";
-import { api } from "../../api";
+import { api, shouldUseDirectUpload, uploadAssetDirect } from "../../api";
 import type { MediaMode } from "../../composables/useDomainCatalog";
 import type { Domain, MediaAsset, MediaSource } from "../../types";
 
@@ -136,9 +136,28 @@ export function useParseMediaInput(options: ParseMediaInputOptions) {
   }
 
   async function uploadSelectedAsset(): Promise<MediaAsset> {
+    const kind = options.mode.value;
+    if (kind === "stream") {
+      throw new Error("视频流必须先登记为视频源");
+    }
+    if (shouldUseDirectUpload(options.file.value as File)) {
+      const asset = await uploadAssetDirect(
+        options.file.value as File,
+        kind,
+        options.domain.value,
+      );
+      options.assets.value = [
+        asset,
+        ...options.assets.value.filter(
+          (item) => item.asset_id !== asset.asset_id,
+        ),
+      ];
+      void options.loadServerPreview(asset.asset_id);
+      return asset;
+    }
     const form = new FormData();
     form.append("file", options.file.value as File);
-    form.append("kind", options.mode.value);
+    form.append("kind", kind);
     form.append("domain", options.domain.value);
     const asset = await api<MediaAsset>("/api/v1/media/assets", {
       method: "POST",

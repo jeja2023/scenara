@@ -47,7 +47,10 @@ services:
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/ca/ca.crt:/tls/ca.crt:ro
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/minio/public.crt:/tls/public.crt:ro
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/minio/private.key:/tls/private.key:ro
-    ports: !reset []
+    # S3 API is reachable by browser clients for presigned uploads; the
+    # administrative console remains unexposed.
+    ports:
+      - "${SCENARA_INFRA_MINIO_PUBLIC_PORT:-59000}:9000"
     healthcheck:
       test: ["CMD", "curl", "--cacert", "/tls/ca.crt", "-f", "https://minio.scenara.internal:9000/minio/health/live"]
     networks:
