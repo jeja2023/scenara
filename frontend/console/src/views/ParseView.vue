@@ -84,6 +84,7 @@ const loading = ref(false);
 const transitioning = ref(false);
 const loadingSources = ref(false);
 const error = ref("");
+const uploadProgress = ref<number | null>(null);
 const run = ref<Run | null>(null);
 const result = ref<ResultEnvelope | null>(null);
 const selectedUnitIndex = ref(0);
@@ -179,6 +180,9 @@ const {
       caught,
       "获取视频流首帧预览失败，请检查流地址与网络连通性",
     );
+  },
+  onUploadProgress: (value) => {
+    uploadProgress.value = value;
   },
   resetResult,
   serverPreviewUrl,
@@ -526,6 +530,7 @@ async function execute(): Promise<void> {
           : labelRunStatus(run.value.status);
     }
   } catch (caught) {
+    uploadProgress.value = null;
     error.value = userFacingError(
       caught,
       "解析失败，请检查输入和模型状态后重试",
@@ -809,6 +814,16 @@ onBeforeUnmount(() => {
     />
 
     <p v-if="error" class="callout error">{{ error }}</p>
+
+    <section v-if="uploadProgress !== null" class="callout upload-progress" aria-live="polite">
+      <div class="upload-progress-label">
+        <span>正在上传大文件</span>
+        <strong>{{ Math.round(uploadProgress * 100) }}%</strong>
+      </div>
+      <div class="progress-track" role="progressbar" :aria-valuenow="Math.round(uploadProgress * 100)" aria-valuemin="0" aria-valuemax="100">
+        <span :style="{ width: `${uploadProgress * 100}%` }" />
+      </div>
+    </section>
 
     <section class="panel input-panel">
       <div class="panel-header">

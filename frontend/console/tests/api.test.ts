@@ -9,6 +9,8 @@ import {
   apiStream,
   login,
   saveConnection,
+  sha256File,
+  shouldUseDirectUpload,
   streamJsonEvents,
   userFacingError,
 } from "../src/api";
@@ -183,6 +185,24 @@ describe("console API contract", () => {
       code: "NETWORK_ERROR",
       message: "无法连接到服务，请检查接口地址和网络",
     });
+  });
+
+  it("hashes large files incrementally without reading the whole file", async () => {
+    const file = new File(["abc"], "sample.bin", {
+      type: "application/octet-stream",
+    });
+    file.arrayBuffer = () =>
+      Promise.reject(new Error("whole-file reads are forbidden"));
+
+    await expect(sha256File(file)).resolves.toBe(
+      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+    );
+    expect(
+      shouldUseDirectUpload({ size: 512 * 1024 * 1024 } as File),
+    ).toBe(false);
+    expect(
+      shouldUseDirectUpload({ size: 512 * 1024 * 1024 + 1 } as File),
+    ).toBe(true);
   });
 
   it("uses the configured connection for event streams", async () => {

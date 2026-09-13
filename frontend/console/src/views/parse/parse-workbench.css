@@ -43,6 +43,13 @@
   transition: width 0.2s ease;
 }
 
+.upload-progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
 .progress-value {
   display: grid;
   justify-items: end;

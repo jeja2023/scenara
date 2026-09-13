@@ -17,6 +17,7 @@ interface ParseMediaInputOptions {
   mediaUrl: Ref<string>;
   mode: Ref<MediaMode>;
   onPreviewError: (error: unknown) => void;
+  onUploadProgress: (value: number | null) => void;
   resetResult: () => void;
   serverPreviewUrl: Ref<string>;
   sourceId: Ref<string>;
@@ -64,6 +65,7 @@ export function useParseMediaInput(options: ParseMediaInputOptions) {
 
   async function autoPreloadAsset(selectedFile: File): Promise<void> {
     const sequence = ++preloadSequence;
+    if (shouldUseDirectUpload(selectedFile)) return;
     try {
       const form = new FormData();
       form.append("file", selectedFile);
@@ -92,6 +94,7 @@ export function useParseMediaInput(options: ParseMediaInputOptions) {
     options.inputOrigin.value = "upload";
     options.assetId.value = "";
     options.file.value = selected;
+    options.onUploadProgress(null);
     options.clearMediaUrl();
     options.resetResult();
     if (!selected) return;
@@ -145,6 +148,7 @@ export function useParseMediaInput(options: ParseMediaInputOptions) {
         options.file.value as File,
         kind,
         options.domain.value,
+        options.onUploadProgress,
       );
       options.assets.value = [
         asset,
@@ -153,6 +157,7 @@ export function useParseMediaInput(options: ParseMediaInputOptions) {
         ),
       ];
       void options.loadServerPreview(asset.asset_id);
+      options.onUploadProgress(null);
       return asset;
     }
     const form = new FormData();
