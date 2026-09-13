@@ -67,11 +67,12 @@ cat >/tmp/core-cors.xml <<'XML'
     <AllowedMethod>HEAD</AllowedMethod>
     <AllowedHeader>*</AllowedHeader>
     <ExposeHeader>ETag</ExposeHeader>
-    <ExposeHeader>x-amz-checksum-sha256</ExposeHeader>
     <MaxAgeSeconds>900</MaxAgeSeconds>
   </CORSRule>
 </CORSConfiguration>
 XML
-mc_run cors set local/scenara /tmp/core-cors.xml >/dev/null
+if ! mc_run cors set local/scenara /tmp/core-cors.xml >/dev/null 2>&1; then
+  echo "warning: bucket-level CORS is not supported by this MinIO/mc build; using MINIO_API_CORS_ALLOW_ORIGIN" >&2
+fi
 
 echo "shared MinIO buckets and least-privilege users are ready"
