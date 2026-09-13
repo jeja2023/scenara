@@ -49,7 +49,7 @@ services:
       - ${SCENARA_PLATFORM_CERTS_DIR:?set SCENARA_PLATFORM_CERTS_DIR}/minio/private.key:/tls/private.key:ro
     # S3 API is reachable by browser clients for presigned uploads; the
     # administrative console remains unexposed.
-    ports:
+    ports: !override
       - "${SCENARA_INFRA_MINIO_PORT:-59000}:9000"
       - "127.0.0.1:${SCENARA_INFRA_MINIO_CONSOLE_PORT:-59001}:9001"
     healthcheck:
