@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 import html
 import inspect
+import logging
 import os
+import threading
 import time
 from typing import Any, Literal, Protocol, cast
 
@@ -29,6 +31,9 @@ from scenara.platform.pipeline import (
     ExecutionContext,
     OperatorDefinition,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 class OcrEngine(Protocol):
@@ -123,19 +128,56 @@ class PaddleOcrEngine:
                 "provide ch_PP-OCRv4_det_infer and ch_PP-OCRv4_rec_infer"
             )
 
-        kwargs: dict[str, Any] = {
+        self._paddle_ocr = PaddleOCR
+        self._engine_kwargs: dict[str, Any] = {
             "use_angle_cls": True,
             "lang": "ch",
             "show_log": False,
-            "use_gpu": os.getenv("SCENARA_OCR_USE_GPU", "true").strip().lower()
-            in {"1", "true", "yes", "on"},
         }
-        kwargs["det_model_dir"] = str(det_dir.resolve())
-        kwargs["rec_model_dir"] = str(rec_dir.resolve())
+        self._engine_kwargs["det_model_dir"] = str(det_dir.resolve())
+        self._engine_kwargs["rec_model_dir"] = str(rec_dir.resolve())
         if cls_dir.is_dir():
-            kwargs["cls_model_dir"] = str(cls_dir.resolve())
+            self._engine_kwargs["cls_model_dir"] = str(cls_dir.resolve())
 
-        self._engine = PaddleOCR(**kwargs)
+        self._fallback_to_cpu = os.getenv(
+            "SCENARA_OCR_GPU_FALLBACK", "true"
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        requested_gpu = os.getenv("SCENARA_OCR_USE_GPU", "true").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+        self._using_gpu = requested_gpu
+        self._fallback_lock = threading.Lock()
+
+        try:
+            self._engine = self._create_engine(requested_gpu)
+        except Exception:
+            if not requested_gpu or not self._fallback_to_cpu:
+                raise
+            logger.warning(
+                "PaddleOCR GPU initialization failed; falling back to CPU",
+                exc_info=True,
+            )
+            self._engine = self._create_engine(False)
+            self._using_gpu = False
+
+    def _create_engine(self, use_gpu: bool) -> Any:
+        return self._paddle_ocr(**self._engine_kwargs, use_gpu=use_gpu)
+
+    def _fallback_engine_to_cpu(self, exc: Exception) -> None:
+        if not self._using_gpu or not self._fallback_to_cpu:
+            raise exc
+        with self._fallback_lock:
+            if self._using_gpu:
+                logger.warning(
+                    "PaddleOCR GPU inference failed; rebuilding the engine on CPU",
+                    exc_info=True,
+                )
+                cpu_engine = self._create_engine(False)
+                self._engine = cpu_engine
+                self._using_gpu = False
 
     def predict(
         self,
@@ -147,7 +189,11 @@ class PaddleOcrEngine:
         import numpy as np
 
         img_array = np.asarray(image)
-        result = self._engine.ocr(img_array, cls=True)
+        try:
+            result = self._engine.ocr(img_array, cls=True)
+        except Exception as exc:
+            self._fallback_engine_to_cpu(exc)
+            result = self._engine.ocr(img_array, cls=True)
 
         blocks: list[dict[str, Any]] = []
         if not result or not result[0]:
