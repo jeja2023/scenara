@@ -35,6 +35,9 @@ frontend/console/dist/
 frontend/console-next/dist/
 sdk/typescript/dist/
 *.patch
+*.tar
+*.tar.gz
+*.zip
 gitleaks-results.json
 *.log
 requirements-cpu.txt
