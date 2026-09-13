@@ -50,7 +50,7 @@ services:
     # S3 API is reachable by browser clients for presigned uploads; the
     # administrative console remains unexposed.
     ports:
-      - "${SCENARA_INFRA_MINIO_PUBLIC_PORT:-59000}:9000"
+      - "${SCENARA_INFRA_MINIO_PORT:-59000}:9000"
       - "127.0.0.1:${SCENARA_INFRA_MINIO_CONSOLE_PORT:-59001}:9001"
     healthcheck:
       test: ["CMD", "curl", "--cacert", "/tls/ca.crt", "-f", "https://minio.scenara.internal:9000/minio/health/live"]

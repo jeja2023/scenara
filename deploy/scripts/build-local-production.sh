@@ -28,7 +28,11 @@ data_image="scenara-data:$data_sha"
 model_image="scenara-model:$model_sha"
 
 "${docker_cmd[@]}" build -f "$data_root/deploy/Dockerfile" -t "$data_image" "$data_root"
-"${docker_cmd[@]}" build -f "$core_root/Dockerfile" -t "$core_image" "$core_root"
+"${docker_cmd[@]}" build \
+  --build-arg SCENARA_INSTALL_OCR=true \
+  -f "$core_root/Dockerfile" \
+  -t "$core_image" \
+  "$core_root"
 "${docker_cmd[@]}" build --build-arg SCENARA_MODEL_EXTRAS=postgres,s3,migrations -f "$model_root/Dockerfile" -t "$model_image" "$model_root"
 
 cat <<EOF

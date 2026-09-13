@@ -815,12 +815,22 @@ onBeforeUnmount(() => {
 
     <p v-if="error" class="callout error">{{ error }}</p>
 
-    <section v-if="uploadProgress !== null" class="callout upload-progress" aria-live="polite">
+    <section
+      v-if="uploadProgress !== null"
+      class="callout upload-progress"
+      aria-live="polite"
+    >
       <div class="upload-progress-label">
         <span>正在上传大文件</span>
         <strong>{{ Math.round(uploadProgress * 100) }}%</strong>
       </div>
-      <div class="progress-track" role="progressbar" :aria-valuenow="Math.round(uploadProgress * 100)" aria-valuemin="0" aria-valuemax="100">
+      <div
+        class="progress-track"
+        role="progressbar"
+        :aria-valuenow="Math.round(uploadProgress * 100)"
+        aria-valuemin="0"
+        aria-valuemax="100"
+      >
         <span :style="{ width: `${uploadProgress * 100}%` }" />
       </div>
     </section>

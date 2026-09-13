@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import html
 import inspect
+import os
 import time
 from typing import Any, Literal, Protocol, cast
 
@@ -111,21 +112,28 @@ class PaddleOcrEngine:
 
         from pathlib import Path
 
-        ocr_dir = Path("models/ocr")
+        ocr_dir = Path(os.getenv("SCENARA_OCR_MODEL_DIR", "models/ocr")).expanduser()
         det_dir = ocr_dir / "ch_PP-OCRv4_det_infer"
         rec_dir = ocr_dir / "ch_PP-OCRv4_rec_infer"
         cls_dir = ocr_dir / "ch_ppocr_mobile_v2.0_cls_infer"
+
+        if not det_dir.is_dir() or not rec_dir.is_dir():
+            raise DomainUnavailable(
+                f"OCR model files are missing under {ocr_dir}; "
+                "provide ch_PP-OCRv4_det_infer and ch_PP-OCRv4_rec_infer"
+            )
 
         kwargs: dict[str, Any] = {
             "use_angle_cls": True,
             "lang": "ch",
             "show_log": False,
+            "use_gpu": os.getenv("SCENARA_OCR_USE_GPU", "true").strip().lower()
+            in {"1", "true", "yes", "on"},
         }
-        if det_dir.exists() and rec_dir.exists():
-            kwargs["det_model_dir"] = str(det_dir.resolve())
-            kwargs["rec_model_dir"] = str(rec_dir.resolve())
-            if cls_dir.exists():
-                kwargs["cls_model_dir"] = str(cls_dir.resolve())
+        kwargs["det_model_dir"] = str(det_dir.resolve())
+        kwargs["rec_model_dir"] = str(rec_dir.resolve())
+        if cls_dir.is_dir():
+            kwargs["cls_model_dir"] = str(cls_dir.resolve())
 
         self._engine = PaddleOCR(**kwargs)
 
@@ -445,7 +453,9 @@ class OcrDocumentOperator:
             loaded_engine: OcrEngine
             try:
                 loaded_engine = await asyncio.to_thread(lambda: PaddleOcrEngine())
-            except Exception:
+            except Exception as exc:
+                if context.production:
+                    raise DomainUnavailable(f"无法加载 PaddleOCR 引擎: {exc}") from exc
                 loaded_engine = DevelopmentOcrEngine()
             self._engine = loaded_engine
         engine = self._engine

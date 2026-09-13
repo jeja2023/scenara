@@ -78,7 +78,7 @@ docker compose --env-file /secure/scenara-infra.env \
   -f deploy/shared-infra/compose.tls.yml up -d --wait postgres redis minio
 ```
 
-The TLS overlay publishes the S3 API on `SCENARA_INFRA_MINIO_PUBLIC_PORT` for browser presigned uploads and keeps the MinIO administration console on loopback at `SCENARA_INFRA_MINIO_CONSOLE_PORT`. Application Compose files must mount the same certificate directory through `SCENARA_PLATFORM_CERTS_DIR` and use the internal HTTPS names.
+The TLS overlay publishes the S3 API on `SCENARA_INFRA_MINIO_PORT` for browser presigned uploads and keeps the MinIO administration console on loopback at `SCENARA_INFRA_MINIO_CONSOLE_PORT`. Application Compose files must mount the same certificate directory through `SCENARA_PLATFORM_CERTS_DIR` and use the internal HTTPS names.
 
 Back up and restore all three databases and all shared buckets from this stack. Stop the three application Compose projects before restoring:
 

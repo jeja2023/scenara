@@ -14,6 +14,8 @@ FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04@sha256:9175fa92f96de35a8cfb949
 
 ARG SCENARA_VERSION=0.3.0-dev.44
 ARG SCENARA_SOURCE_COMMIT=unknown
+ARG SCENARA_INSTALL_OCR=false
+ARG SCENARA_PADDLE_WHEEL_URL=https://paddle-whl.cdn.bcebos.com/stable/cu118/paddlepaddle-gpu/paddlepaddle_gpu-2.6.2-cp312-cp312-linux_x86_64.whl
 LABEL org.opencontainers.image.title="Scenara" \
       org.opencontainers.image.version="${SCENARA_VERSION}" \
       org.opencontainers.image.revision="${SCENARA_SOURCE_COMMIT}" \
@@ -25,12 +27,20 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends python3 python3-pip python3-venv postgresql-client ffmpeg libglib2.0-0 libgl1 curl ca-certificates \
+    && apt-get install -y --no-install-recommends python3 python3-pip python3-venv postgresql-client ffmpeg libglib2.0-0 libgl1 libgomp1 curl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /opt/scenara
 COPY requirements/production.lock requirements/production.lock
 RUN python3 -m pip install --break-system-packages --require-hashes -r requirements/production.lock
+
+# PaddleOCR is intentionally optional in the base image. Enable it for a
+# Core image that will run the built-in OCR adapter on the target GPU host.
+RUN if [ "$SCENARA_INSTALL_OCR" = "true" ]; then \
+      python3 -m pip install --break-system-packages --no-cache-dir \
+        "$SCENARA_PADDLE_WHEEL_URL" \
+        "paddleocr==2.9.1"; \
+    fi
 
 RUN useradd --create-home --uid 10001 scenara \
     && mkdir -p /var/lib/scenara \
